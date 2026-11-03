@@ -79,27 +79,21 @@ func committerWithReadyWhen(t *testing.T, taskID, readyWhen string, auth Authori
 	}, domains
 }
 
-func TestCommitCodiceFirDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
+func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
-	c, domains := committerWithReadyWhen(t, "codiceFir", "false", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	c, domains := committerWithReadyWhen(t, "weightCheck", "false", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 	before, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
-		Value: map[string]any{"codiceFir": "FIR-BLOCKED"},
+		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
+		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -112,34 +106,27 @@ func TestCommitCodiceFirDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	if len(after.Submissions) != len(before.Submissions) {
 		t.Fatalf("domain mutated on readyWhen deny: before=%d after=%d", len(before.Submissions), len(after.Submissions))
 	}
-	if _, has := after.Kind("load")[instanceID]["codiceFir"]; has {
-		t.Fatal("codiceFir must not appear when readyWhen denies")
+	if _, has := after.Kind("truck")[truckID]["checkedTruckWeight"]; has {
+		t.Fatal("checkedTruckWeight must not appear when readyWhen denies")
 	}
 }
 
-func TestCommitCodiceFirAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
+func TestCommitWeightCheckAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
-	// Domain expr: open only after register mint (one load).
-	c, _ := committerWithReadyWhen(t, "codiceFir", "$count($domain.load.*) >= 1", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	c, _ := committerWithReadyWhen(t, "weightCheck", "$count($domain.load.*) >= 1", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
-		Value: map[string]any{"codiceFir": "FIR-READY"},
+		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
+		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("load")[instanceID]["codiceFir"] != "FIR-READY" {
-		t.Fatalf("domain = %#v", result.Domain.Kind("load")[instanceID])
+	if result.Domain.Kind("truck")[truckID]["checkedTruckWeight"] != 1000.0 {
+		t.Fatalf("domain = %#v", result.Domain.Kind("truck")[truckID])
 	}
 }

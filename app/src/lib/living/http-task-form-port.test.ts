@@ -56,6 +56,33 @@ describe('HttpTaskFormPort', () => {
 		]);
 	});
 
+	test('sends groupId + groupInstanceId=new for provisional spawn mount', async () => {
+		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+			expect(String(input)).toBe(
+				'/api/living/task-form?jobId=intake&taskId=register&jobInstanceId=T1&groupId=lots&groupInstanceId=new'
+			);
+			return new Response(
+				JSON.stringify({
+					...sample,
+					jobInstanceId: 'T1',
+					groupId: 'lots',
+					groupInstanceId: ''
+				}),
+				{ status: 200 }
+			);
+		});
+		const port = createHttpTaskFormPort({ fetch: fetchFn });
+		const got = await port.fetch({
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'new'
+		});
+		expect(got.groupId).toBe('lots');
+		expect(got.groupInstanceId).toBe('');
+	});
+
 	test('sends real jobInstanceId for available Task mount', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			expect(String(input)).toBe(

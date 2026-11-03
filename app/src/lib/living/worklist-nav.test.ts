@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist } from './types.js';
 import {
+	commitHasDownloadLinks,
+	resolveCommitFollowUp,
+	resolveGroupStartAnotherTarget,
 	resolvePostCommitNavigation,
 	resolveTaskDeepLink,
 	resolveTaskExit,
@@ -16,8 +19,8 @@ const taskChrome = [
 ];
 
 function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
-	const nir1Avail = viewer === 'logistic' ? ['palletWeight'] : [];
-	const advanceAvail = viewer === 'admin' ? ['codiceFir'] : [];
+	const pallet = viewer === 'logistic' ? 'actionable' : 'available';
+	const codice = viewer === 'admin' ? 'actionable' : 'available';
 	return {
 		jobs: [
 			{
@@ -34,19 +37,17 @@ function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
 						tasks: {
 							register: 'done',
 							codiceFir: 'done',
-							palletWeight: 'available'
-						},
-						viewerAvailable: nir1Avail
+							palletWeight: pallet
+						}
 					},
 					{
 						id: 'NIR-advance',
 						label: 'Advance',
 						tasks: {
 							register: 'done',
-							codiceFir: 'available',
+							codiceFir: codice,
 							palletWeight: 'locked'
-						},
-						viewerAvailable: advanceAvail
+						}
 					}
 				]
 			}
@@ -135,12 +136,134 @@ describe('Task deep link + exit', () => {
 		).toEqual({ kind: 'home' });
 	});
 
-	test('Task exit: provisional Home; existing overview', () => {
+	test('Task exit: provisional Job Home; existing overview', () => {
 		expect(resolveTaskExit('intake', '', true)).toEqual({ kind: 'home' });
 		expect(resolveTaskExit('intake', 'NIR-1', false)).toEqual({
 			kind: 'overview',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-1'
+		});
+	});
+
+	test('nested provisional Spawn deep-link mounts; minted uses group actionable', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots', 'weightCheck'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'weightCheck', title: 'Peso', roles: ['logistic'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'T1',
+							tasks: { lots: 'available', weightCheck: 'locked' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									startLabel: 'Nuovo lotto',
+									repeatable: true,
+									canSpawn: true,
+									canClose: false,
+									childTaskIds: ['register', 'labels'],
+									instances: [
+										{
+											id: 'lots-1',
+											tasks: { register: 'actionable', labels: 'locked' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+
+		expect(
+			resolveTaskDeepLink('intake', 'T1', 'register', false, wl, 'lots', 'new')
+		).toEqual({ kind: 'task' });
+		expect(
+			resolveTaskDeepLink('intake', 'T1', 'register', false, wl, 'lots', 'lots-1')
+		).toEqual({ kind: 'task' });
+		expect(
+			resolveTaskDeepLink('intake', 'T1', 'labels', false, wl, 'lots', 'lots-1')
+		).toEqual({ kind: 'overview', jobId: 'intake', jobInstanceId: 'T1' });
+	});
+
+	test('task next with nested bundle includes group coordinates', () => {
+		const nested: TaskFormBundle = {
+			...nextBundle,
+			taskId: 'register',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'lots-1'
+		};
+		expect(resolvePostCommitNavigation('task', 'intake', 'T1', nested)).toEqual({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			taskId: 'register',
+			groupId: 'lots',
+			groupInstanceId: 'lots-1'
+		});
+	});
+});
+
+describe('post-Commit stay-for-links', () => {
+	const downloadLinks = [
+		{
+			label: 'Labels',
+			url: 'https://example.test/labels.pdf',
+			action: 'download' as const,
+			filename: 'labels.pdf'
+		}
+	];
+
+	test('download links are detected; link-only is not', () => {
+		expect(commitHasDownloadLinks(downloadLinks)).toBe(true);
+		expect(
+			commitHasDownloadLinks([
+				{ label: 'Open', url: 'https://example.test/x', action: 'link' }
+			])
+		).toBe(false);
+		expect(commitHasDownloadLinks([])).toBe(false);
+		expect(commitHasDownloadLinks(null)).toBe(false);
+	});
+
+	test('with downloads → stay; without → existing next law', () => {
+		expect(
+			resolveCommitFollowUp('overview', 'intake', 'T1', null, downloadLinks)
+		).toEqual({ kind: 'stay' });
+		expect(resolveCommitFollowUp('overview', 'intake', 'T1', null, [])).toEqual({
+			kind: 'overview',
+			jobId: 'intake',
+			jobInstanceId: 'T1'
+		});
+		expect(
+			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle, [
+				{ label: 'doc', url: 'https://example.test/d', action: 'link' }
+			])
+		).toEqual({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-advance',
+			taskId: 'codiceFir'
+		});
+	});
+
+	test('Start another targets provisional first-leaf form', () => {
+		expect(resolveGroupStartAnotherTarget('intake', 'T1', 'lots', 'register')).toEqual({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'new',
+			taskId: 'register'
 		});
 	});
 });

@@ -88,18 +88,18 @@ function normalizeRow(raw: unknown): ChromeRecapRowDisplay | null {
 function normalizeSection(raw: unknown): ChromeDataReportSectionDisplay | null {
 	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
 	const rec = raw as Record<string, unknown>;
-	if (typeof rec.loadId !== 'string') return null;
+	if (typeof rec.id !== 'string') return null;
 	const secondary =
-		Array.isArray(rec.secondaryLoadIds) &&
-		rec.secondaryLoadIds.every((id) => typeof id === 'string')
-			? (rec.secondaryLoadIds as string[])
+		Array.isArray(rec.secondaryIds) &&
+		rec.secondaryIds.every((id) => typeof id === 'string')
+			? (rec.secondaryIds as string[])
 			: undefined;
 	const rows = Array.isArray(rec.rows)
 		? rec.rows.map(normalizeRow).filter((row): row is ChromeRecapRowDisplay => row != null)
 		: undefined;
 	return {
-		loadId: rec.loadId,
-		...(secondary !== undefined ? { secondaryLoadIds: secondary } : {}),
+		id: rec.id,
+		...(secondary !== undefined ? { secondaryIds: secondary } : {}),
 		...(rows !== undefined ? { rows } : {})
 	};
 }

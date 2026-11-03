@@ -35,9 +35,12 @@ export type WorklistJob = {
 	/** Authored Job display name (chrome; not the instance-label CEL). */
 	title?: string;
 	startLabel?: string;
-	/** Authored Task id order for chrome iteration. */
+	/** Authored Task id order for chrome iteration (top-level only). */
 	taskIds: string[];
-	/** Config-free Task title + roles chrome (alongside taskIds). */
+	/**
+	 * Config-free Task title + roles chrome: top-level in taskIds order, then
+	 * nested group-child chrome (lookup by id; not listed in taskIds).
+	 */
 	tasks: WorklistTask[];
 	instances: WorklistInstance[];
 };
@@ -45,13 +48,43 @@ export type WorklistJob = {
 export type WorklistInstance = {
 	id: string;
 	label: string;
-	/** Role-blind Unlock/Submission status (handoff). */
+	/** Viewer-scoped Unlock/Submission status. */
 	tasks: Record<string, TaskStatus>;
-	/** Viewer-scoped Available Task ids (status-available ∩ slug∩roles). */
-	viewerAvailable?: string[];
+	/** Present when the Job authors Task groups; omitted for flat Jobs. */
+	groups?: Record<string, WorklistGroup>;
 };
 
-export type TaskStatus = 'locked' | 'available' | 'done';
+/** Server-projected Task group chrome (spawn/close); SPA must not re-gate. */
+export type WorklistGroup = {
+	groupId: string;
+	startLabel?: string;
+	closeLabel?: string;
+	repeatable: boolean;
+	canSpawn: boolean;
+	canClose: boolean;
+	childTaskIds: string[];
+	instances: WorklistGroupInstance[];
+};
+
+export type WorklistGroupInstance = {
+	id: string;
+	/** Overview chrome from Config instanceLabelEntity ∩ nested IDsTouched. */
+	label?: string;
+	tasks: Record<string, TaskStatus>;
+};
+
+export type TaskStatus = 'locked' | 'available' | 'actionable' | 'done';
+
+/** Wire / URL sentinel for provisional spawn (mint.spawningNew). */
+export const PROVISIONAL_GROUP_INSTANCE_ID = 'new';
+
+/** Empty / `new` → '' for draft keys and deep-link gates. */
+export function normalizeGroupInstanceId(groupInstanceId: string): string {
+	if (!groupInstanceId || groupInstanceId === PROVISIONAL_GROUP_INSTANCE_ID) {
+		return '';
+	}
+	return groupInstanceId;
+}
 
 export function emptyWorklist(): Worklist {
 	return { jobs: [] };
@@ -98,6 +131,15 @@ export type JobInstance = {
 
 export function taskPath(jobId: string, taskId: string): string {
 	return `${jobId}/${taskId}`;
+}
+
+export function groupTaskPath(
+	jobId: string,
+	groupId: string,
+	groupInstanceId: string,
+	taskId: string
+): string {
+	return `${jobId}/${groupId}/${groupInstanceId}/${taskId}`;
 }
 
 export function emptyDomain(): Domain {

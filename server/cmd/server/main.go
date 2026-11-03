@@ -169,6 +169,7 @@ type Server struct {
 	turnstileVerifyURL string
 	livingDomains      living.DomainStore
 	livingConfigs      living.ConfigStore
+	livingLinks        living.LinkStore
 	livingAuthorizer   living.Authorizer
 	livingHttpPort     living.HttpPort
 }
@@ -2536,7 +2537,9 @@ func (s *Server) newMux() *http.ServeMux {
 	livingAPI := s.livingHandler()
 	mux.Handle("/api/living/domain", livingAPI)
 	mux.Handle("/api/living/task-form", livingAPI)
+	mux.Handle("/api/living/task-recap", livingAPI)
 	mux.Handle("/api/living/commit", livingAPI)
+	mux.Handle("/api/living/close", livingAPI)
 	mux.Handle("/api/living/artifacts/", livingAPI)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)

@@ -36,11 +36,19 @@ _Avoid_: Step (legacy experiment name); Stream; phase; nesting Jobs; treating a 
 
 **Task**:
 A **leaf** submit unit: schema, gates, Domain **reads** into the form, and one successful **Submission** via **Commit**. Names which **Config roles** may complete it. Cerbos Commit targets Tasks only.
-_Avoid_: Substep (legacy experiment name); Form (when meaning this unit); composite/spawn-many nodes (see Task group); leaf Job; multi-pass reopen after Submission
+_Avoid_: Substep (legacy experiment name); Form (when meaning this unit); composite/spawn-many nodes (see Task group); leaf Job; multi-pass reopen after Submission; task instance
+
+**child Task**:
+A **Task** authored under a **Task group**, completed on one occurrence of that group under a **Job instance**. Still a Task for Commit and Cerbos.
+_Avoid_: Subtask; task instance; treating child Tasks as a different Commit kind
 
 **Task group**:
-_Deferred product name (working label)._ A composite node under a Job: children, may be repeatable with parent-scoped instances; **no** Commit of its own. Spawn-many (e.g. lot under truck). Not implemented in the flat port.
-_Avoid_: Calling a Task group a Task; jobs all the way down; faking spawn-many with map/table Domain reads
+A composite node under a Job: ordered **child Tasks**, may be repeatable; **no** Commit of its own (e.g. lots under a truck). Each occurrence under a **Job instance** is one group instance (opened by **Spawn**, ended when the group is **Close**d). Operators **Close** (and may **Spawn**) from that Job instance’s overview; home **Available** may also offer provisional first-leaf Spawn when the Worklist projects `canSpawn`.
+_Avoid_: Calling a Task group a Task; jobs all the way down; faking spawn-many with map/table Domain reads; treating Close as a Task Commit; a separate glossary peer for “Task group instance”
+
+**Spawn**:
+Open a new occurrence of a **Task group** under a **Job instance** by Committing its first **child Task** with spawn mint (`spawningNew`). That occurrence holds the child Task statuses until **Close**. Offered on overview and, when `canSpawn`, as a provisional first-leaf **Available** row on home (group instance id `new`)—not a separate home Spawn band. Distinct from starting a Job. **Close** stays overview-only.
+_Avoid_: Empty-open without the first leaf Submission as the normal operator path; calling Job start “Spawn”; inventing a home Spawn peer of Can start; Task instance
 
 **Job instance**:
 One occurrence of a repeatable Job within the org Domain (e.g. one truck, one line). Often created on first Task submit; id/label from config and/or submitted data.
@@ -67,8 +75,8 @@ Authored `reads` + `dynamicProperties` that project current entity ids into a fo
 _Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product grammar; SPA twin Domain-read id helpers; SPA cell-map normalize; densify first-enum without `default`; densify `default: null` into Draft cell maps; form-level `""` as untouched sentinel; conflating map reads with Task group; dual markers (`rowTable`); table-owned enum paint; `enum: [null,…]` Domain clear; stamping `clearable: false` for enum-null law; `anyOf` null|enum as product clear; Commit nil as Domain unset
 
 **Submission**:
-Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order, startsWhen, and Worklist done status read Submissions only (one successful Submission finishes the Task on that instance).
-_Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts; row-id reopen as done law
+Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order, startsWhen, and Worklist done status read Submissions only (one successful Submission finishes the Task on that instance). Post-Commit HTTP **links** are not facts: they are stored in a separate step after Commit (+ HttpPort), and may appear on overview recap without replaying HTTP.
+_Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts; row-id reopen as done law; folding link persistence into the facts Commit write; HTTP replay to rebuild links
 
 **Draft**:
 Working data of an in-progress Task before Submission. Operators keep WIP in draft and Invia once. Not part of Domain until Commit succeeds.
@@ -121,7 +129,7 @@ Host-injected `{ userId, org, roles }` for role gates, chrome, and Submission ac
 _Avoid_: Principal; forging actor via schema fields; Operator (catalog role label) for this bag
 
 **Commit**:
-Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are Adapters only. The Commit response includes an updated viewer-scoped **Worklist**, an explicit `next` destination (`task` | `overview` | `home`), and, when auto-advance applies, the next **Task form bundle**, so the SPA navigates without a blind re-Load or Worklist re-walk for overview-vs-home.
+Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are Adapters only. The Commit response includes an updated viewer-scoped **Worklist**, an explicit `next` destination (`task` | `overview` | `home`), and, when auto-advance applies, the next **Task form bundle**, so the SPA navigates without a blind re-Load or Worklist re-walk for overview-vs-home. If Commit returns download links, the operator stays on a read-only view of the submitted form with those links; for an open **Task group** that screen also offers **Spawn** again and **Close** (confirm). Without links, an open **child Task** Commit prefers **Job instance overview**. After Close, the usual next-Task / overview / home rule applies.
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group; SPA re-deriving post-Commit destination from Worklist
 
 **Load**:
@@ -129,12 +137,12 @@ Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**, view
 _Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport; treating bulk Available bundles as the lasting home-Load or Commit shape
 
 **Worklist**:
-Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, `repeatable`, and Config-free Task title + roles chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order and startsWhen are evaluated only on the server from **Submission** relations; a Task is `done` after Submission on the instance. Status stays that Submission/unlock law for handoff/overview; **Available** affordances and **Can start** are separately scoped to the current **OperatorIdentity**’s Config roles (first Task for Can start). The UI reads the projection and does not re-implement those rules. Living `/app` landing for the affiliated operator is this board (not legacy Operator home at `/my`): two actionable bands, not `locked`/`done` rows.
-_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; row-id reopen for Task status; remapping instance Task status by viewer role; inventing Task order/labels from a client Org Config snapshot; Operator home (the `/my` Stream landing); client-side role filtering from a full Org Config
+Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, `repeatable`, and Config-free Task title + roles chrome; and per Job instance, each Task’s status as a viewer-scoped enum (`locked` | `available` | `actionable` | `done`). Unlock/Submission law yields locked / unlocked / done; unlocked splits by Config-role eligibility into `available` (not for this viewer) vs `actionable` (Per te). A Task is `done` after Submission on the instance. Home **Available** and mount gates read `actionable` (plus provisional Spawn-as-first-leaf when `canSpawn`); the SPA does not re-derive eligibility from a parallel id list. For **Task groups**, home Available includes minted nested ready **child Tasks** and, when group chrome has `canSpawn`, a provisional first-leaf deep link (`new`). Living `/app` landing for the affiliated operator is this board (not legacy Operator home at `/my`): two actionable bands, not `locked`/`done`/`available` rows.
+_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; `viewerAvailable[]` as a second eligibility channel; row-id reopen for Task status; inventing Task order/labels from a client Org Config snapshot; Operator home (the `/my` Stream landing); client-side role filtering from a full Org Config; inventing Unlock client-side to fake `canSpawn`
 
 **Job instance overview**:
-Operator screen for one Job instance at `/app/{jobId}/{jobInstanceId}`: Task statuses on that instance plus handoff copy when the next work is gated to Config roles the viewer lacks. Used after Commit when auto-advance does not apply, and as an exit target from Task/Available. Not the Worklist and not an authoring surface.
-_Avoid_: Stream timeline; process page; embedding the full instance tree on Worklist home
+Operator screen for one Job instance: numbered accordion chrome for Tasks and **Task group** cards (group expand shows occurrences + Spawn/Close; occurrence expand shows **child Task** rows). `actionable` rows navigate to the Task form; `done` rows expand to a Submission facts recap plus any stored post-Commit links; handoff when work is `available` (not actionable) for this viewer. Used after Commit when auto-advance does not apply, after **child Task** Commit while the group stays open, and as an exit target from Task/Available. Not the Worklist and not an authoring surface. Home may deep-link Spawn via provisional first-leaf Available; Close remains here only.
+_Avoid_: Stream timeline as the home board; process page; embedding the full instance tree on Worklist home; putting Spawn on Worklist home as a peer of Can start Job; inline live forms on overview; re-running onSubmit.http to rebuild recap links
 
 **Task form bundle**:
 Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load-of-Task and Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Fetched addressed by `jobId` + `taskId` + `jobInstanceId` (provisional empty / `new` when starting); Commit may include the next bundle as `nextTaskFormBundle` when auto-advance applies. Home Load and Commit omit bulk Available bundles; Task routes mount from addressed fetch.

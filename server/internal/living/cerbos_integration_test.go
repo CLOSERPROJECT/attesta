@@ -25,10 +25,9 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 
 	allowOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	if _, err := c.Commit(t.Context(), "feragame", allowOp, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-ALLOW",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	}); err != nil {
 		t.Fatalf("administration should be allowed by living policy: %v", err)
 	}
@@ -47,10 +46,9 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 	_, err := denyCommitter.Commit(t.Context(), "feragame", OperatorIdentity{
 		UserID: "gio", Org: "feragame", Roles: []string{"logistic"},
 	}, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-DENY",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {

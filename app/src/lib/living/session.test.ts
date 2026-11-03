@@ -4,7 +4,7 @@ import { CommitDomainError } from './commit-port.js';
 import { LivingSession } from './session.svelte.js';
 import type { LoadDomainPort } from './load-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
-import { emptyWorklist, type LoadResult } from './types.js';
+import { emptyWorklist, type LoadResult, type Worklist } from './types.js';
 
 const sample: LoadResult = {
 	org: 'feragame',
@@ -133,6 +133,115 @@ describe('LivingSession', () => {
 		expect(session.commitError).toBeNull();
 	});
 
+	test('commit ignores concurrent second call while committing', async () => {
+		let release!: (value: {
+			org: string;
+			jobInstanceId: string;
+			worklist: typeof sample.worklist;
+			next: 'overview';
+			nextTaskFormBundle: null;
+		}) => void;
+		const commit = vi.fn(
+			() =>
+				new Promise<Parameters<typeof release>[0]>((resolve) => {
+					release = resolve;
+				})
+		);
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const req = {
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: { client: 'NO' },
+			mint: { kind: 'none' as const }
+		};
+		const first = session.commit(req);
+		const second = session.commit(req);
+		expect(commit).toHaveBeenCalledTimes(1);
+		expect(await second).toBeNull();
+		release({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			worklist: sample.worklist,
+			next: 'overview',
+			nextTaskFormBundle: null
+		});
+		expect(await first).toMatchObject({ jobInstanceId: 'NIR-1', next: 'overview' });
+		expect(commit).toHaveBeenCalledTimes(1);
+	});
+
+	test('spawningNew clears nested provisional draft and returns overview next', async () => {
+		const nextWorklist: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots'],
+					tasks: [{ id: 'lots', title: 'Lotti', roles: ['administration'] }],
+					instances: [
+						{
+							id: 'T1',
+							label: 'T1',
+							tasks: { lots: 'available' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									canSpawn: true,
+									canClose: true,
+									repeatable: true,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'lots-1',
+											tasks: { register: 'done' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'T1',
+			worklist: nextWorklist,
+			next: 'overview' as const,
+			nextTaskFormBundle: null
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const bagKey = 'T1::lots::';
+		session.setDraft('intake/lots/new/register', bagKey, { lotId: 'L1' });
+		const outcome = await session.commit({
+			taskPath: 'intake/lots/new/register',
+			jobInstanceId: 'T1',
+			value: { lotId: 'L1' },
+			mint: { kind: 'spawningNew' },
+			draftBagInstanceKey: bagKey
+		});
+		expect(outcome?.next).toBe('overview');
+		expect(outcome?.jobInstanceId).toBe('T1');
+		expect(session.result?.worklist).toEqual(nextWorklist);
+		expect(session.getDraft('intake/lots/new/register', bagKey)).toBeNull();
+		expect(commit).toHaveBeenCalledWith({
+			taskPath: 'intake/lots/new/register',
+			jobInstanceId: 'T1',
+			value: { lotId: 'L1' },
+			mint: { kind: 'spawningNew' }
+		});
+	});
+
 	test('provisional startingNew clears _new draft and returns response id', async () => {
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
@@ -201,6 +310,42 @@ describe('LivingSession', () => {
 		});
 		expect(outcome?.next).toBe('task');
 		expect(outcome?.nextTaskFormBundle).toEqual(next);
+		expect(session.linksStayActive).toBe(false);
+	});
+
+	test('commit with download links sets linksStayActive; clearLinksStay resets', async () => {
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'T1',
+			worklist: emptyWorklist(),
+			next: 'overview' as const,
+			nextTaskFormBundle: null,
+			links: [
+				{
+					label: 'Labels',
+					url: 'https://example.test/labels.pdf',
+					action: 'download' as const,
+					filename: 'labels.pdf'
+				}
+			]
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		await session.commit({
+			taskPath: 'intake/lots/lots-1/register',
+			jobInstanceId: 'T1',
+			value: { lotId: 'L1' },
+			mint: { kind: 'none' }
+		});
+		expect(session.linksStayActive).toBe(true);
+		expect(session.lastHttpLinks).toHaveLength(1);
+		session.clearLinksStay();
+		expect(session.linksStayActive).toBe(false);
+		expect(session.lastHttpLinks).toEqual([]);
 	});
 
 	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
@@ -230,6 +375,125 @@ describe('LivingSession', () => {
 		expect(got).toEqual(bundle);
 		expect(fetch).toHaveBeenCalledWith({ jobId: 'intake', taskId: 'register' });
 		expect(session.result?.taskFormBundles).toBe(priorBundles);
+	});
+
+	test('closeGroup success replaces Worklist and returns next for advance', async () => {
+		const afterClose: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots', 'weightCheck'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'weightCheck', title: 'Peso', roles: ['logistic'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'T1',
+							tasks: { lots: 'done', weightCheck: 'actionable' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									canSpawn: false,
+									canClose: false,
+									repeatable: true,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'lots-1',
+											tasks: { register: 'done' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const nextBundle: TaskFormBundle = {
+			jobId: 'intake',
+			taskId: 'weightCheck',
+			jobInstanceId: 'T1',
+			title: 'Peso',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		};
+		const close = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'T1',
+			worklist: afterClose,
+			next: 'task' as const,
+			nextTaskFormBundle: nextBundle
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			close: { close },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const outcome = await session.closeGroup({
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots'
+		});
+		expect(outcome?.next).toBe('task');
+		expect(outcome?.nextTaskFormBundle?.taskId).toBe('weightCheck');
+		expect(session.result?.worklist).toEqual(afterClose);
+		expect(session.result?.worklist.jobs[0]?.instances[0]?.tasks.weightCheck).toBe(
+			'actionable'
+		);
+		expect(session.commitError).toBeNull();
+		expect(close).toHaveBeenCalledWith({
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots'
+		});
+	});
+
+	test('closeGroup failure keeps board, re-Loads, and preserves stay links', async () => {
+		const reloaded = structuredClone(sample);
+		const load = vi.fn(async () => reloaded);
+		const close = vi.fn(async () => {
+			throw new CommitDomainError('cannot close', 400);
+		});
+		const session = new LivingSession({
+			load: { load },
+			close: { close },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const stayLinks = [
+			{
+				label: 'Labels',
+				url: 'https://example.test/labels.pdf',
+				action: 'download' as const,
+				filename: 'labels.pdf'
+			}
+		];
+		session.lastHttpLinks = stayLinks;
+		session.lastHttpErrors = [];
+		session.linksStayActive = true;
+		const outcome = await session.closeGroup({
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots'
+		});
+		expect(outcome).toBeNull();
+		expect(session.commitError).toBe('cannot close');
+		expect(session.linksStayActive).toBe(true);
+		expect(session.lastHttpLinks).toEqual(stayLinks);
+		expect(load).toHaveBeenCalledOnce();
+		expect(session.result?.worklist).toEqual(reloaded.worklist);
 	});
 
 	test('commit denial keeps Draft and re-Loads Worklist', async () => {

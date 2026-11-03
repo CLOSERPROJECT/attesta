@@ -55,6 +55,31 @@ describe('task-form-bundle', () => {
 		expect(findTaskFormBundle([], 'intake', 'register', '')).toBeNull();
 	});
 
+	test('findTaskFormBundle distinguishes nested group coordinates', () => {
+		const bundles = [
+			sampleBundle({
+				taskId: 'register',
+				jobInstanceId: 'T1',
+				groupId: 'lots',
+				groupInstanceId: ''
+			}),
+			sampleBundle({
+				taskId: 'register',
+				jobInstanceId: 'T1',
+				groupId: 'lots',
+				groupInstanceId: 'lots-1'
+			})
+		];
+		expect(
+			findTaskFormBundle(bundles, 'intake', 'register', 'T1', 'lots', '')?.groupInstanceId
+		).toBe('');
+		expect(
+			findTaskFormBundle(bundles, 'intake', 'register', 'T1', 'lots', 'lots-1')
+				?.groupInstanceId
+		).toBe('lots-1');
+		expect(findTaskFormBundle(bundles, 'intake', 'register', 'T1')).toBeNull();
+	});
+
 	test('planFromTaskFormBundle skips authored compile; chrome strip is Go prep', () => {
 		const bundle = sampleBundle({
 			chrome: [
@@ -97,8 +122,8 @@ describe('task-form-bundle', () => {
 						title: 'Risultati finali',
 						sections: [
 							{
-								loadId: 'L1',
-								secondaryLoadIds: ['L2'],
+								id: 'L1',
+								secondaryIds: ['L2'],
 								rows: [
 									{
 										label: 'Camion lordo',
@@ -138,8 +163,8 @@ describe('task-form-bundle', () => {
 		expect(display.title).toBe('Risultati finali');
 		expect(display.sections).toEqual([
 			{
-				loadId: 'L1',
-				secondaryLoadIds: ['L2'],
+				id: 'L1',
+				secondaryIds: ['L2'],
 				rows: [
 					{ label: 'Camion lordo', value: '1000', error: null, tone: null },
 					{
@@ -164,7 +189,7 @@ describe('task-form-bundle', () => {
 		expect(display.sections).toEqual([]);
 	});
 
-	test('dataReport flat rows chrome paints without sections / loadId', () => {
+	test('dataReport flat rows chrome paints without sections / section id', () => {
 		const bundle = sampleBundle({
 			jobId: 'line',
 			taskId: 'weightCheck',

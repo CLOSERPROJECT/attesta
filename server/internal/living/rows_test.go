@@ -114,10 +114,11 @@ func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	if schemaStringEnum(nil) != nil {
 		t.Fatal("nil schemaStringEnum")
 	}
-	if schemaStringEnum(map[string]any{
-		"anyOf": []any{map[string]any{"type": "string", "enum": []any{"partial", "done"}}},
-	}) != nil {
-		t.Fatal("anyOf enums ignored")
+	if stringEnumsFromSchema(nil) != nil {
+		t.Fatal("nil stringEnums")
+	}
+	if stringEnumsFromSchema(map[string]any{"anyOf": []any{"x", map[string]any{"type": "null"}}}) != nil {
+		t.Fatal("anyOf without enums")
 	}
 	if numberViolatesBounds(1, map[string]any{"minimum": 2}) != true || numberViolatesBounds(3, map[string]any{"minimum": 2}) {
 		t.Fatal("minimum bounds")
@@ -161,31 +162,29 @@ func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	}
 }
 
-func TestAdditionalPropertiesIsCellMap(t *testing.T) {
+func TestAdditionalPropertiesIsCellMapAllowsNullAnyOf(t *testing.T) {
 	if !additionalPropertiesIsCellMap(map[string]any{"type": "string"}) {
 		t.Fatal("plain string type")
 	}
 	if !additionalPropertiesIsCellMap(map[string]any{
-		"enum": []any{"partial", "done"},
-	}) {
-		t.Fatal("string enum")
-	}
-	if additionalPropertiesIsCellMap(map[string]any{
 		"anyOf": []any{
 			map[string]any{"type": "null"},
 			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
 		},
 	}) {
-		t.Fatal("anyOf must not classify as cell map")
+		t.Fatal("null|enum anyOf")
 	}
 	if additionalPropertiesIsCellMap(map[string]any{"type": "object"}) {
 		t.Fatal("object weigh cells must not classify as cell map")
 	}
 }
 
-func TestFilterFilledCellsKeepsPartialDoneOmitsNilAndBlank(t *testing.T) {
+func TestFilterFilledCellsKeepsPartialDoneAndNullClear(t *testing.T) {
 	schema := map[string]any{
-		"enum": []any{"partial", "done"},
+		"anyOf": []any{
+			map[string]any{"type": "null"},
+			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
+		},
 	}
 	filled, err := filterFilledCells(map[string]any{
 		"a": "done", "b": "partial", "c": "", "d": nil,
@@ -193,16 +192,13 @@ func TestFilterFilledCellsKeepsPartialDoneOmitsNilAndBlank(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(filled) != 2 {
+	if len(filled) != 3 {
 		t.Fatalf("filled = %#v", filled)
 	}
-	if filled["a"] != "done" || filled["b"] != "partial" {
+	if filled["a"] != "done" || filled["b"] != "partial" || filled["d"] != nil {
 		t.Fatalf("filled = %#v", filled)
 	}
-	if _, has := filled["d"]; has {
-		t.Fatalf("nil must omit, not Domain clear: %#v", filled)
-	}
-	if validateCellFacts(filled, []string{"a", "b"}) != "" {
+	if validateCellFacts(filled, []string{"a", "b", "d"}) != "" {
 		t.Fatal("valid batch must pass")
 	}
 	_, err = filterFilledCells(map[string]any{"a": false}, schema)

@@ -1,7 +1,14 @@
 import { describe, expect, test } from 'vitest';
 
 import type { Worklist } from './types.js';
-import { formatHandoffCopy, jobInstanceOverview } from './worklist-overview.js';
+import {
+	aggregateGroupInstanceStatus,
+	formatFactValue,
+	formatHandoffCopy,
+	jobInstanceOverview,
+	openGroupLoopChrome,
+	taskStatusLabel
+} from './worklist-overview.js';
 
 const taskChrome = [
 	{ id: 'register', title: 'Registrazione', roles: ['administration'] },
@@ -10,13 +17,8 @@ const taskChrome = [
 ];
 
 function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
-	const nir1Avail = viewer === 'logistic' ? ['palletWeight'] : [];
-	const bothAvail =
-		viewer === 'admin'
-			? ['register']
-			: viewer === 'logistic'
-				? ['palletWeight']
-				: [];
+	const palletMine = viewer === 'logistic' ? 'actionable' : 'available';
+	const registerMine = viewer === 'admin' ? 'actionable' : 'available';
 	return {
 		jobs: [
 			{
@@ -33,9 +35,8 @@ function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
 						tasks: {
 							register: 'done',
 							codiceFir: 'done',
-							palletWeight: 'available'
-						},
-						viewerAvailable: nir1Avail
+							palletWeight: palletMine
+						}
 					},
 					{
 						id: 'NIR-done',
@@ -44,18 +45,16 @@ function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
 							register: 'done',
 							codiceFir: 'done',
 							palletWeight: 'done'
-						},
-						viewerAvailable: []
+						}
 					},
 					{
 						id: 'NIR-both-available',
 						label: 'Split available',
 						tasks: {
-							register: 'available',
+							register: registerMine,
 							codiceFir: 'locked',
-							palletWeight: 'available'
-						},
-						viewerAvailable: bothAvail
+							palletWeight: palletMine
+						}
 					}
 				]
 			}
@@ -67,7 +66,21 @@ const adminWorklist = worklistFor('admin');
 const logisticWorklist = worklistFor('logistic');
 
 describe('job instance overview model', () => {
-	test('lists statuses; linkable only for viewerAvailable', () => {
+	test('taskStatusLabel maps four-value status to IT tags', () => {
+		expect(taskStatusLabel('locked')).toBe('Bloccato');
+		expect(taskStatusLabel('available')).toBe('Disponibile');
+		expect(taskStatusLabel('actionable')).toBe('Per te');
+		expect(taskStatusLabel('done')).toBe('Fatto');
+	});
+
+	test('formatFactValue stringifies recap values', () => {
+		expect(formatFactValue(null)).toBe('—');
+		expect(formatFactValue('x')).toBe('x');
+		expect(formatFactValue(42)).toBe('42');
+		expect(formatFactValue({ a: 1 })).toBe('{"a":1}');
+	});
+
+	test('lists statuses; linkable only for actionable', () => {
 		const admin = jobInstanceOverview(adminWorklist, 'intake', 'NIR-1');
 		expect(admin?.label).toBe('NIR-1');
 		expect(admin?.tasks.map((t) => [t.taskId, t.status, t.linkable])).toEqual([
@@ -86,10 +99,10 @@ describe('job instance overview model', () => {
 		expect(logistic?.handoffRoles).toBeNull();
 	});
 
-	test('handoff uses first available only; no banner when next Task is theirs', () => {
+	test('handoff uses first open only; no banner when next Task is theirs', () => {
 		const admin = jobInstanceOverview(adminWorklist, 'intake', 'NIR-both-available');
 		expect(admin?.tasks.map((t) => [t.taskId, t.status, t.linkable])).toEqual([
-			['register', 'available', true],
+			['register', 'actionable', true],
 			['codiceFir', 'locked', false],
 			['palletWeight', 'available', false]
 		]);
@@ -116,5 +129,452 @@ describe('job instance overview model', () => {
 	test('unknown instance yields null', () => {
 		expect(jobInstanceOverview(adminWorklist, 'intake', 'missing')).toBeNull();
 		expect(jobInstanceOverview(adminWorklist, 'intake', 'new')).toBeNull();
+	});
+
+	test('group Spawn chrome when canSpawn; not linkable as flat Task', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots', 'weightCheck'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'weightCheck', title: 'Peso', roles: ['logistic'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { lots: 'available', weightCheck: 'locked' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									startLabel: 'Nuovo lotto',
+									closeLabel: 'Chiudi scarico',
+									repeatable: true,
+									canSpawn: true,
+									canClose: false,
+									childTaskIds: ['register', 'labels'],
+									instances: []
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const model = jobInstanceOverview(wl, 'intake', 'T1');
+		expect(model?.tasks[0]).toMatchObject({
+			taskId: 'lots',
+			linkable: false,
+			group: {
+				canSpawn: true,
+				startLabel: 'Nuovo lotto',
+				firstChildTaskId: 'register',
+				canClose: false,
+				closeLabel: 'Chiudi scarico'
+			},
+			groupInstances: []
+		});
+		expect(model?.handoffRoles).toBeNull();
+	});
+
+	test('group Close chrome when canClose; suppresses handoff', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots', 'weightCheck'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'weightCheck', title: 'Peso', roles: ['logistic'] },
+						{ id: 'register', title: 'Registrazione', roles: ['administration'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { lots: 'available', weightCheck: 'locked' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									startLabel: 'Nuovo lotto',
+									closeLabel: 'Chiudi scarico',
+									repeatable: true,
+									canSpawn: false,
+									canClose: true,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'lots-1',
+											tasks: { register: 'done' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const model = jobInstanceOverview(wl, 'intake', 'T1');
+		expect(model?.tasks[0]?.group).toMatchObject({
+			canSpawn: false,
+			canClose: true,
+			closeLabel: 'Chiudi scarico',
+			firstChildTaskId: 'register'
+		});
+		expect(model?.tasks[0]?.groupInstances).toEqual([
+			{
+				id: 'lots-1',
+				displayId: 'lots-1',
+				status: 'done',
+				children: [],
+				flatChild: {
+					taskId: 'register',
+					title: 'Registrazione',
+					status: 'done',
+					linkable: false
+				}
+			}
+		]);
+		expect(model?.handoffRoles).toBeNull();
+		expect(openGroupLoopChrome(wl, 'intake', 'T1', 'lots')).toMatchObject({
+			canSpawn: false,
+			canClose: true,
+			closeLabel: 'Chiudi scarico',
+			firstChildTaskId: 'register'
+		});
+		expect(openGroupLoopChrome(wl, 'intake', 'T1', 'missing')).toBeNull();
+	});
+
+	test('groupInstances displayId prefers projected label (load id)', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'register', title: 'Registrazione', roles: ['administration'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { lots: 'available' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									repeatable: true,
+									canSpawn: false,
+									canClose: true,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'lots-1',
+											label: '261019-1st-1-L1',
+											tasks: { register: 'done' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const model = jobInstanceOverview(wl, 'intake', 'T1');
+		expect(model?.tasks[0]?.groupInstances).toEqual([
+			{
+				id: 'lots-1',
+				displayId: '261019-1st-1-L1',
+				status: 'done',
+				children: [],
+				flatChild: {
+					taskId: 'register',
+					title: 'Registrazione',
+					status: 'done',
+					linkable: false
+				}
+			}
+		]);
+	});
+
+	test('single-child group occurrence flattens to flatChild; multi-child keeps nested children', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['solo', 'lots'],
+					tasks: [
+						{ id: 'solo', title: 'Solo group', roles: ['administration'] },
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'register', title: 'Registrazione', roles: ['administration'] },
+						{ id: 'labels', title: 'Etichette', roles: ['administration'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { solo: 'actionable', lots: 'available' },
+							groups: {
+								solo: {
+									groupId: 'solo',
+									repeatable: true,
+									canSpawn: false,
+									canClose: false,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'solo-1',
+											label: 'load-A',
+											tasks: { register: 'actionable' }
+										},
+										{
+											id: 'solo-2',
+											tasks: { register: 'available' }
+										},
+										{
+											id: 'solo-3',
+											tasks: { register: 'locked' }
+										},
+										{
+											id: 'solo-4',
+											tasks: { register: 'done' }
+										}
+									]
+								},
+								lots: {
+									groupId: 'lots',
+									repeatable: true,
+									canSpawn: false,
+									canClose: false,
+									childTaskIds: ['register', 'labels'],
+									instances: [
+										{
+											id: 'lots-1',
+											tasks: { register: 'done', labels: 'actionable' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const model = jobInstanceOverview(wl, 'intake', 'T1');
+		expect(model?.tasks.find((t) => t.taskId === 'solo')?.groupInstances).toEqual([
+			{
+				id: 'solo-1',
+				displayId: 'load-A',
+				status: 'actionable',
+				children: [],
+				flatChild: {
+					taskId: 'register',
+					title: 'Registrazione',
+					status: 'actionable',
+					linkable: true
+				}
+			},
+			{
+				id: 'solo-2',
+				displayId: 'solo-2',
+				status: 'available',
+				children: [],
+				flatChild: {
+					taskId: 'register',
+					title: 'Registrazione',
+					status: 'available',
+					linkable: false
+				}
+			},
+			{
+				id: 'solo-3',
+				displayId: 'solo-3',
+				status: 'locked',
+				children: [],
+				flatChild: {
+					taskId: 'register',
+					title: 'Registrazione',
+					status: 'locked',
+					linkable: false
+				}
+			},
+			{
+				id: 'solo-4',
+				displayId: 'solo-4',
+				status: 'done',
+				children: [],
+				flatChild: {
+					taskId: 'register',
+					title: 'Registrazione',
+					status: 'done',
+					linkable: false
+				}
+			}
+		]);
+		expect(model?.tasks.find((t) => t.taskId === 'lots')?.groupInstances).toEqual([
+			{
+				id: 'lots-1',
+				displayId: 'lots-1',
+				status: 'actionable',
+				children: [
+					{
+						taskId: 'register',
+						title: 'Registrazione',
+						status: 'done',
+						linkable: false
+					},
+					{
+						taskId: 'labels',
+						title: 'Etichette',
+						status: 'actionable',
+						linkable: true
+					}
+				]
+			}
+		]);
+	});
+
+	test('groupInstances aggregates prefer actionable over available', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots', 'weightCheck'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{ id: 'weightCheck', title: 'Peso', roles: ['logistic'] },
+						{ id: 'register', title: 'Registrazione', roles: ['administration'] },
+						{ id: 'labels', title: 'Etichette', roles: ['administration'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { lots: 'available', weightCheck: 'locked' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									startLabel: 'Nuovo lotto',
+									closeLabel: 'Chiudi scarico',
+									repeatable: true,
+									canSpawn: true,
+									canClose: false,
+									childTaskIds: ['register', 'labels'],
+									instances: [
+										{
+											id: 'lots-1',
+											tasks: { register: 'done', labels: 'done' }
+										},
+										{
+											id: 'lots-2',
+											tasks: { register: 'done', labels: 'available' }
+										},
+										{
+											id: 'lots-3',
+											tasks: { register: 'locked', labels: 'locked' }
+										},
+										{
+											id: 'lots-4',
+											tasks: { register: 'done', labels: 'actionable' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const model = jobInstanceOverview(wl, 'intake', 'T1');
+		expect(model?.tasks[0]?.groupInstances).toEqual([
+			{
+				id: 'lots-1',
+				displayId: 'lots-1',
+				status: 'done',
+				children: [
+					{
+						taskId: 'register',
+						title: 'Registrazione',
+						status: 'done',
+						linkable: false
+					},
+					{ taskId: 'labels', title: 'Etichette', status: 'done', linkable: false }
+				]
+			},
+			{
+				id: 'lots-2',
+				displayId: 'lots-2',
+				status: 'available',
+				children: [
+					{
+						taskId: 'register',
+						title: 'Registrazione',
+						status: 'done',
+						linkable: false
+					},
+					{ taskId: 'labels', title: 'Etichette', status: 'available', linkable: false }
+				]
+			},
+			{
+				id: 'lots-3',
+				displayId: 'lots-3',
+				status: 'locked',
+				children: [
+					{
+						taskId: 'register',
+						title: 'Registrazione',
+						status: 'locked',
+						linkable: false
+					},
+					{ taskId: 'labels', title: 'Etichette', status: 'locked', linkable: false }
+				]
+			},
+			{
+				id: 'lots-4',
+				displayId: 'lots-4',
+				status: 'actionable',
+				children: [
+					{
+						taskId: 'register',
+						title: 'Registrazione',
+						status: 'done',
+						linkable: false
+					},
+					{ taskId: 'labels', title: 'Etichette', status: 'actionable', linkable: true }
+				]
+			}
+		]);
+		expect(model?.tasks[0]?.group).toMatchObject({
+			canSpawn: true,
+			startLabel: 'Nuovo lotto',
+			firstChildTaskId: 'register'
+		});
+		expect(model?.tasks[0]?.linkable).toBe(false);
+		expect(
+			aggregateGroupInstanceStatus(
+				{ id: 'x', tasks: { register: 'done', labels: 'locked' } },
+				['register', 'labels']
+			)
+		).toBe('locked');
+		expect(
+			aggregateGroupInstanceStatus(
+				{ id: 'y', tasks: { register: 'available', labels: 'actionable' } },
+				['register', 'labels']
+			)
+		).toBe('actionable');
 	});
 });

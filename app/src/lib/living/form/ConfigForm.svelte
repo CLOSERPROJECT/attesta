@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BasicForm, handlers, type FormState } from '@sjsf/form';
+	import { BasicForm, type FormState } from '@sjsf/form';
 	import { setShadcnContext } from '#lib/shadcn/set-shadcn-context.js';
 	import { untrack } from 'svelte';
 	import { setChromeContext } from './chrome-context.js';
@@ -27,4 +27,5 @@
 	}
 </script>
 
-<BasicForm {form} {@attach handlers(form)} class={className} />
+<!-- Theme owns onsubmit; do not {@attach handlers(form)} (double Commit). -->
+<BasicForm {form} class={className} />

@@ -28,59 +28,78 @@ func testCommitter(t *testing.T, auth Authorizer) (*Committer, *MemoryDomainStor
 	return c, domains, &Loader{Domains: domains, Configs: configs}
 }
 
-func TestCommitRegisterPersistsAndLoadReflects(t *testing.T) {
+func TestCommitTruckArrivePersistsAndLoadReflects(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: instanceID,
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != instanceID {
-		t.Fatalf("jobInstanceId = %q", result.JobInstanceID)
+	truckID := result.JobInstanceID
+	wantID := "261019-1st-1"
+	if truckID != wantID {
+		t.Fatalf("jobInstanceId = %q, want %q", truckID, wantID)
 	}
-	if result.Domain.Kind("load")[instanceID]["client"] != "NO" {
-		t.Fatalf("load = %#v", result.Domain.Kind("load"))
-	}
-	if len(result.Domain.Kind("pallet")) != 2 {
-		t.Fatalf("pallets = %#v", result.Domain.Kind("pallet"))
+	if result.Domain.Kind("truck")[truckID]["truckWeight"] != 1000.0 {
+		t.Fatalf("truck = %#v", result.Domain.Kind("truck"))
 	}
 	if len(result.Domain.Submissions) != 1 {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 	sub := result.Domain.Submissions[0]
-	if sub.JobID != "intake" || sub.TaskID != "register" || sub.JobInstanceID != instanceID {
+	if sub.JobID != "intake" || sub.TaskID != "truckArrive" || sub.JobInstanceID != truckID {
 		t.Fatalf("submission path keys = %#v", sub)
-	}
-	if TaskPath(sub.JobID, sub.TaskID) != "intake/register" {
-		t.Fatalf("task path = %s/%s", sub.JobID, sub.TaskID)
 	}
 
 	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Domain.Kind("load")[instanceID]["truckWeight"] != 100.0 {
+	if loaded.Domain.Kind("truck")[truckID]["lastScaleReading"] != 1000.0 {
 		t.Fatalf("loaded domain = %#v", loaded.Domain)
 	}
-	if len(loaded.Domain.JobInstances) != 1 || loaded.Domain.JobInstances[0].ID != instanceID {
+	if len(loaded.Domain.JobInstances) != 1 || loaded.Domain.JobInstances[0].ID != truckID {
 		t.Fatalf("jobInstances = %#v", loaded.Domain.JobInstances)
+	}
+}
+
+func TestCommitLotRegisterMintsLoadAndPallets(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	truckID := commitTruckArrive(t, c)
+	result := commitLotRegister(t, c, truckID, registerLotValue())
+	loadID := firstLoadID(result.Domain)
+	if loadID == "" || result.Domain.Kind("load")[loadID]["client"] != "NO" {
+		t.Fatalf("load = %#v", result.Domain.Kind("load"))
+	}
+	if result.Domain.Kind("load")[loadID]["numeroFir"] != "FIR-1" {
+		t.Fatalf("numeroFir missing: %#v", result.Domain.Kind("load")[loadID])
+	}
+	if result.Domain.Kind("load")[loadID]["netWeight"] != 300.0 {
+		t.Fatalf("netWeight = %#v", result.Domain.Kind("load")[loadID]["netWeight"])
+	}
+	if len(result.Domain.Kind("pallet")) != 2 {
+		t.Fatalf("pallets = %#v", result.Domain.Kind("pallet"))
+	}
+	if result.Domain.Kind("truck")[truckID]["lastScaleReading"] != 700.0 {
+		t.Fatalf("truck last reading = %#v", result.Domain.Kind("truck")[truckID])
+	}
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.TaskID != "register" || last.GroupID != "lots" {
+		t.Fatalf("submission = %#v", last)
 	}
 }
 
 func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 	c, domains, _ := testCommitter(t, DenyAllAuthorizer{})
 	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "gio", Org: "feragame"}, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -96,7 +115,7 @@ func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
 		TaskPath:      "intake/notATask",
-		JobInstanceID: "NIR-261019-NO-1",
+		JobInstanceID: "261019-1st-1",
 		Value:         map[string]any{},
 	})
 	var ce *CommitError
@@ -105,71 +124,50 @@ func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	}
 }
 
-func TestCommitWeightCheckAfterPalletWeight(t *testing.T) {
+func TestCommitWeightCheckAfterLotsClose(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	instanceID := "NIR-261019-NO-1"
-	commitThroughCodiceFir(t, c, instanceID)
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic"}}
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
-		Value: palletWeightValue(map[string]any{
-			instanceID + ".1": weighRow(11),
-			instanceID + ".2": weighRow(22),
-		}),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/weightCheck", JobInstanceID: instanceID,
-		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 33.0},
+		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
+		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("load")[instanceID]["checkedTruckWeight"] != 100.0 {
-		t.Fatalf("load = %#v", result.Domain.Kind("load")[instanceID])
+	if result.Domain.Kind("truck")[truckID]["checkedTruckWeight"] != 1000.0 {
+		t.Fatalf("truck = %#v", result.Domain.Kind("truck")[truckID])
 	}
-	if len(result.Domain.Submissions) != 4 || result.Domain.Submissions[3].TaskID != "weightCheck" {
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.TaskID != "weightCheck" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }
 
-func TestCommitCodiceFirInOrderAfterRegister(t *testing.T) {
+func TestCommitLotsUnlocksAfterArrive(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
-		Value: map[string]any{"codiceFir": "FIR-TEST-1"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Domain.Kind("load")[instanceID]["codiceFir"] != "FIR-TEST-1" {
-		t.Fatalf("load = %#v", result.Domain.Kind("load")[instanceID])
-	}
-	if len(result.Domain.Submissions) != 2 {
-		t.Fatalf("submissions = %#v", result.Domain.Submissions)
-	}
-	if result.Domain.Submissions[1].TaskID != "codiceFir" {
-		t.Fatalf("second submission = %#v", result.Domain.Submissions[1])
-	}
+	truckID := commitTruckArrive(t, c)
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
 	intake := cfg.Jobs.Values["intake"].(Job)
+	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "palletWeight",
-		JobInstanceID: instanceID, Submissions: result.Domain.Submissions, Tasks: intake.Tasks,
+		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "lots",
+		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
 	}) {
-		t.Fatal("codiceFir Submission should unlock palletWeight (gate into later intake)")
+		t.Fatal("truckArrive should unlock lots group")
+	}
+	if IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
+		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
+		ClosedGroups: domain.ClosedGroups,
+	}) {
+		t.Fatal("weightCheck must stay locked until lots close")
 	}
 }
 
@@ -183,7 +181,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 		},
 	}
 
-	body := `{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
+	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
@@ -194,7 +192,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if wire["jobInstanceId"] != "NIR-261019-NO-1" {
+	if wire["jobInstanceId"] != "261019-1st-1" {
 		t.Fatalf("jobInstanceId = %#v", wire["jobInstanceId"])
 	}
 	if _, has := wire["domain"]; has {
@@ -209,7 +207,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if domain.Kind("load")["NIR-261019-NO-1"]["client"] != "NO" {
+	if domain.Kind("truck")["261019-1st-1"]["turno"] != "1st" {
 		t.Fatalf("stored domain = %#v", domain)
 	}
 

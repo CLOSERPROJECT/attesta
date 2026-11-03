@@ -7,6 +7,10 @@ export type TaskFormBundle = {
 	jobId: string;
 	taskId: string;
 	jobInstanceId: string;
+	/** Nested leaf under a Task group; omitted for flat Tasks. */
+	groupId?: string;
+	/** Empty when provisional spawn (mirror empty jobInstanceId for Job start). */
+	groupInstanceId?: string;
 	title: string;
 	surface: 'live';
 	schema: Schema;
@@ -26,13 +30,17 @@ export function bundleMatches(
 	bundle: TaskFormBundle | null | undefined,
 	jobId: string,
 	taskId: string,
-	jobInstanceId: string
+	jobInstanceId: string,
+	groupId = '',
+	groupInstanceId = ''
 ): bundle is TaskFormBundle {
 	return (
 		bundle != null &&
 		bundle.jobId === jobId &&
 		bundle.taskId === taskId &&
-		bundle.jobInstanceId === jobInstanceId
+		bundle.jobInstanceId === jobInstanceId &&
+		(bundle.groupId ?? '') === groupId &&
+		(bundle.groupInstanceId ?? '') === groupInstanceId
 	);
 }
 
@@ -41,13 +49,14 @@ export function findTaskFormBundle(
 	bundles: readonly TaskFormBundle[] | null | undefined,
 	jobId: string,
 	taskId: string,
-	jobInstanceId: string
+	jobInstanceId: string,
+	groupId = '',
+	groupInstanceId = ''
 ): TaskFormBundle | null {
 	if (!bundles?.length) return null;
 	return (
-		bundles.find(
-			(b) =>
-				b.jobId === jobId && b.taskId === taskId && b.jobInstanceId === jobInstanceId
+		bundles.find((b) =>
+			bundleMatches(b, jobId, taskId, jobInstanceId, groupId, groupInstanceId)
 		) ?? null
 	);
 }

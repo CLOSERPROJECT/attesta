@@ -17,6 +17,9 @@ func (s *Server) ensureLivingStores() {
 	if s.livingConfigs == nil {
 		s.livingConfigs = s.newLivingConfigStore()
 	}
+	if s.livingLinks == nil {
+		s.livingLinks = s.newLivingLinkStore()
+	}
 }
 
 func (s *Server) livingMongoDB() *mongo.Database {
@@ -42,6 +45,13 @@ func (s *Server) newLivingConfigStore() living.ConfigStore {
 		return living.NewMongoConfigStore(db)
 	}
 	return living.NewMemoryConfigStore()
+}
+
+func (s *Server) newLivingLinkStore() living.LinkStore {
+	if db := s.livingMongoDB(); db != nil {
+		return living.NewMongoLinkStore(db)
+	}
+	return living.NewMemoryLinkStore()
 }
 
 func (s *Server) livingProductAuthorizer() living.Authorizer {
@@ -79,12 +89,17 @@ func (s *Server) livingProductArtifacts() *living.SidecarHttpPort {
 func (s *Server) livingHandler() http.Handler {
 	s.ensureLivingStores()
 	return &living.Handler{
-		Loader: &living.Loader{Domains: s.livingDomains, Configs: s.livingConfigs},
+		Loader: &living.Loader{
+			Domains:   s.livingDomains,
+			Configs:   s.livingConfigs,
+			LinkStore: s.livingLinks,
+		},
 		Committer: &living.Committer{
 			Domains:    s.livingDomains,
 			Configs:    s.livingConfigs,
 			Authorizer: s.livingProductAuthorizer(),
 			HttpPort:   s.livingProductHttpPort(),
+			LinkStore:  s.livingLinks,
 		},
 		Gate:      s.livingVerifiedGate,
 		Artifacts: s.livingProductArtifacts(),

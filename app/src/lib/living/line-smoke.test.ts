@@ -54,7 +54,7 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 			]
 		};
 	}
-	const tasks: Record<string, 'locked' | 'available' | 'done'> = {
+	const tasks: Record<string, 'locked' | 'available' | 'actionable' | 'done'> = {
 		shift: 'locked',
 		lineLoad: 'locked',
 		containerReg: 'locked',
@@ -66,16 +66,17 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 	const has = (taskId: string) => lineSubs.some((s) => s.taskId === taskId);
 
 	if (has('shift')) tasks.shift = 'done';
-	else tasks.shift = 'available';
+	else tasks.shift = 'actionable';
 
 	if (has('shift')) {
-		tasks.lineLoad = has('lineLoad') ? 'done' : 'available';
+		tasks.lineLoad = has('lineLoad') ? 'done' : 'actionable';
 	}
 	if (has('lineLoad')) {
+		// containerReg is logistic-only; line smoke viewer keeps handoff available
 		tasks.containerReg = has('containerReg') ? 'done' : 'available';
 	}
 	if (has('containerReg')) {
-		tasks.loadedExtracted = has('loadedExtracted') ? 'done' : 'available';
+		tasks.loadedExtracted = has('loadedExtracted') ? 'done' : 'actionable';
 	}
 
 	return {
@@ -197,7 +198,7 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 				let next: 'task' | 'overview' | 'home' = 'home';
 				if (lineInst) {
 					for (const taskId of lineTaskIds) {
-						if (lineInst.tasks[taskId] !== 'available') continue;
+						if (lineInst.tasks[taskId] !== 'actionable') continue;
 						nextTaskFormBundle = {
 							jobId: 'line',
 							taskId,
@@ -272,7 +273,7 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 		expect(session.result?.worklist).toEqual(worklist);
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
-		).toBe('available');
+		).toBe('actionable');
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
 		).toBe('locked');

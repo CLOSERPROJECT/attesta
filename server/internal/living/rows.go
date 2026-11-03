@@ -157,12 +157,28 @@ func isEmptyScalar(cell any) bool {
 	return false
 }
 
-// Set-or-skip scalar cells; empty (omit/nil/blank) stay out of the batch.
+// Untouched this pass — omit from batch (not the same as clear null).
+func isUntouchedCell(cell any) bool {
+	if cell == nil {
+		return false
+	}
+	if s, ok := cell.(string); ok {
+		return strings.TrimSpace(s) == ""
+	}
+	return false
+}
+
+// Set or clear scalar cells; untouched rows stay out of the batch.
+// nil in the result means clear/unset (kept, not dropped).
 func filterFilledCells(value map[string]any, cellSchema map[string]any) (map[string]any, error) {
-	enums := schemaStringEnum(cellSchema)
+	enums := stringEnumsFromSchema(cellSchema)
 	filled := make(map[string]any)
 	for id, cell := range value {
-		if isEmptyScalar(cell) {
+		if isUntouchedCell(cell) {
+			continue
+		}
+		if cell == nil {
+			filled[id] = nil
 			continue
 		}
 		if len(enums) == 0 {
@@ -175,6 +191,35 @@ func filterFilledCells(value map[string]any, cellSchema map[string]any) (map[str
 		filled[id] = s
 	}
 	return filled, nil
+}
+
+func stringEnumsFromSchema(add map[string]any) []string {
+	if add == nil {
+		return nil
+	}
+	if enums := schemaStringEnum(add); len(enums) > 0 {
+		return enums
+	}
+	for _, b := range anyOfObjectBranches(add) {
+		if enums := schemaStringEnum(b); len(enums) > 0 {
+			return enums
+		}
+	}
+	return nil
+}
+
+func anyOfObjectBranches(schema map[string]any) []map[string]any {
+	raw, ok := schema["anyOf"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(raw))
+	for _, branch := range raw {
+		if b, ok := branch.(map[string]any); ok {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 func validateCellFacts(facts map[string]any, rowIDs []string) string {

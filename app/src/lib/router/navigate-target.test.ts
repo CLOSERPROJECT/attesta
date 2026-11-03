@@ -14,4 +14,26 @@ describe('hrefLivingTarget', () => {
 		expect(href).toBe(p('/'));
 		expect(href).toContain('/app');
 	});
+
+	test('nested task target includes group coordinates', () => {
+		const href = hrefLivingTarget({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'new',
+			taskId: 'register'
+		});
+		expect(href).toBe(
+			p('/:jobId/:jobInstanceId/:groupId/:groupInstanceId/:taskId', {
+				params: {
+					jobId: 'intake',
+					jobInstanceId: 'T1',
+					groupId: 'lots',
+					groupInstanceId: 'new',
+					taskId: 'register'
+				}
+			})
+		);
+	});
 });

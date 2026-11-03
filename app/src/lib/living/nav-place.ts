@@ -5,25 +5,96 @@ import { jobInstanceOverview } from './worklist-overview.js';
 
 export type NavPlaceRouteKind = 'home' | 'overview' | 'task';
 
+/** Living path segments after base strip (trailing slash normalized). */
+export function livingPathSegments(pathname: string): string[] {
+	let path = pathname;
+	if (path.length > 1 && path.endsWith('/')) {
+		path = path.slice(0, -1);
+	}
+	if (path === '/' || path === '') {
+		return [];
+	}
+	return path.replace(/^\//, '').split('/').filter(Boolean);
+}
+
+/**
+ * Task/overview coords from pathname only.
+ * Ignore route.params.groupId / groupInstanceId unless the path has 5 living
+ * segments — sv-router matchRoute leaks those keys from a failed 5-seg
+ * candidate into the winning 3-seg (flat Task) or 2-seg (overview) match.
+ */
+export type LivingRouteCoords = {
+	jobId: string;
+	jobInstanceId: string;
+	taskId: string;
+	groupId: string;
+	groupInstanceId: string;
+};
+
+export function livingRouteCoordsFromPath(input: {
+	pathname: string;
+}): LivingRouteCoords {
+	const segments = livingPathSegments(input.pathname);
+	if (segments.length >= 5) {
+		return {
+			jobId: segments[0] ?? '',
+			jobInstanceId: segments[1] ?? '',
+			groupId: segments[2] ?? '',
+			groupInstanceId: segments[3] ?? '',
+			taskId: segments[4] ?? ''
+		};
+	}
+	if (segments.length >= 3) {
+		return {
+			jobId: segments[0] ?? '',
+			jobInstanceId: segments[1] ?? '',
+			groupId: '',
+			groupInstanceId: '',
+			taskId: segments[2] ?? ''
+		};
+	}
+	if (segments.length >= 2) {
+		return {
+			jobId: segments[0] ?? '',
+			jobInstanceId: segments[1] ?? '',
+			groupId: '',
+			groupInstanceId: '',
+			taskId: ''
+		};
+	}
+	if (segments.length >= 1) {
+		return {
+			jobId: segments[0] ?? '',
+			jobInstanceId: '',
+			groupId: '',
+			groupInstanceId: '',
+			taskId: ''
+		};
+	}
+	return {
+		jobId: '',
+		jobInstanceId: '',
+		groupId: '',
+		groupInstanceId: '',
+		taskId: ''
+	};
+}
+
 /**
  * Place kind from stripped route.pathname only (base already removed).
  * Segment count — not route.params.taskId — because sv-router may retain a
  * stale taskId on 2-segment overview, which would mis-classify as task and
  * make Back navigate to the same overview (no-op).
  * Trailing slash → still home at `/`.
+ * Nested Task: job / jobInstance / group / groupInstance / task (5 segments).
  */
 export function navPlaceKindFromRoute(input: {
 	pathname: string;
 }): NavPlaceRouteKind {
-	let { pathname } = input;
-	if (pathname.length > 1 && pathname.endsWith('/')) {
-		pathname = pathname.slice(0, -1);
-	}
-	if (pathname === '/' || pathname === '') {
+	const segments = livingPathSegments(input.pathname);
+	if (segments.length === 0) {
 		return 'home';
 	}
-
-	const segments = pathname.replace(/^\//, '').split('/').filter(Boolean);
 	if (segments.length >= 3) {
 		return 'task';
 	}
@@ -38,7 +109,10 @@ export type NavPlaceInput = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	provisional: boolean;
+	/** Job-level Start only — nested Spawn keeps a real jobInstanceId. */
+	provisionalJob: boolean;
+	/** Nested provisional Spawn — task title only, Back still overview. */
+	provisionalSpawn?: boolean;
 	worklist: Worklist | null | undefined;
 };
 
@@ -78,7 +152,15 @@ function taskTitleFromWorklist(
  * Overview never composes `·` (instance label only); taskId is ignored when kind is overview.
  */
 export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
-	const { kind, jobId, jobInstanceId, taskId, provisional, worklist } = input;
+	const {
+		kind,
+		jobId,
+		jobInstanceId,
+		taskId,
+		provisionalJob,
+		provisionalSpawn = false,
+		worklist
+	} = input;
 
 	if (kind === 'home') {
 		return {
@@ -102,12 +184,12 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 	}
 
 	const taskTitle = taskTitleFromWorklist(worklist, jobId, taskId);
-	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisional) as Extract<
+	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisionalJob) as Extract<
 		PostCommitTarget,
 		{ kind: 'home' | 'overview' }
 	>;
 
-	if (provisional) {
+	if (provisionalJob || provisionalSpawn) {
 		return {
 			showBack: true,
 			backTarget,

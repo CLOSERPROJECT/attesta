@@ -1,9 +1,19 @@
-import type { Worklist, WorklistInstance, WorklistJob, WorklistTask } from './types.js';
+import type { PostCommitTarget } from './worklist-nav.js';
+import {
+	PROVISIONAL_GROUP_INSTANCE_ID,
+	type Worklist,
+	type WorklistInstance,
+	type WorklistJob,
+	type WorklistTask
+} from './types.js';
 
 export type AvailableRow = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
+	/** Nested leaf only — open group instance coordinates. */
+	groupId?: string;
+	groupInstanceId?: string;
 	/** Job instance label (product-facing name); falls back to instance id. */
 	instanceLabel: string;
 	/** Job display title; falls back to jobId when absent. */
@@ -50,7 +60,37 @@ export function progressFraction(done: number, total: number): number {
 	return Math.min(1, Math.max(0, done / total));
 }
 
-/** Sort: Job → instance → Task (Worklist / Org Config order). Reads projected viewerAvailable. */
+function pushAvailableRow(
+	out: AvailableRow[],
+	job: WorklistJob,
+	inst: WorklistInstance,
+	taskId: string,
+	progress: { done: number; total: number },
+	group?: { groupId: string; groupInstanceId: string }
+): void {
+	const chrome = taskChrome(job, taskId);
+	out.push({
+		jobId: job.jobId,
+		jobInstanceId: inst.id,
+		taskId,
+		...(group
+			? { groupId: group.groupId, groupInstanceId: group.groupInstanceId }
+			: {}),
+		instanceLabel: inst.label || inst.id,
+		jobTitle: job.title?.trim() || job.jobId,
+		title: chrome?.title || taskId,
+		roles: chrome?.roles ?? [],
+		tasksDone: progress.done,
+		tasksTotal: progress.total
+	});
+}
+
+/**
+ * Sort: Job → instance → Config taskIds (flat actionable + nested group
+ * children). When group.canSpawn, also a provisional first-leaf row
+ * (`groupInstanceId` = `new`) — Available chrome for Spawn-via-first-leaf;
+ * no separate home Spawn band. Close stays overview-only.
+ */
 export function availableRowsFromWorklist(
 	worklist: Worklist | null | undefined
 ): AvailableRow[] {
@@ -59,20 +99,31 @@ export function availableRowsFromWorklist(
 	const out: AvailableRow[] = [];
 	for (const job of jobs) {
 		for (const inst of job.instances ?? []) {
-			const { done, total } = instanceTaskProgress(job, inst);
-			for (const taskId of inst.viewerAvailable ?? []) {
-				const chrome = taskChrome(job, taskId);
-				out.push({
-					jobId: job.jobId,
-					jobInstanceId: inst.id,
-					taskId,
-					instanceLabel: inst.label || inst.id,
-					jobTitle: job.title?.trim() || job.jobId,
-					title: chrome?.title || taskId,
-					roles: chrome?.roles ?? [],
-					tasksDone: done,
-					tasksTotal: total
-				});
+			const progress = instanceTaskProgress(job, inst);
+			for (const taskId of jobConfigTaskIds(job)) {
+				const group = inst.groups?.[taskId];
+				if (group) {
+					const childIds = group.childTaskIds ?? [];
+					for (const gi of group.instances ?? []) {
+						for (const childId of childIds) {
+							if (gi.tasks[childId] !== 'actionable') continue;
+							pushAvailableRow(out, job, inst, childId, progress, {
+								groupId: taskId,
+								groupInstanceId: gi.id
+							});
+						}
+					}
+					const firstChildId = childIds[0];
+					if (group.canSpawn && firstChildId) {
+						pushAvailableRow(out, job, inst, firstChildId, progress, {
+							groupId: taskId,
+							groupInstanceId: PROVISIONAL_GROUP_INSTANCE_ID
+						});
+					}
+					continue;
+				}
+				if (inst.tasks[taskId] !== 'actionable') continue;
+				pushAvailableRow(out, job, inst, taskId, progress);
 			}
 		}
 	}
@@ -106,5 +157,28 @@ export function taskRouteInstanceSegment(jobInstanceId: string): string {
 }
 
 export function availableRowKey(row: AvailableRow): string {
+	if (row.groupId && row.groupInstanceId) {
+		return `${row.jobId}/${row.jobInstanceId}/${row.groupId}/${row.groupInstanceId}/${row.taskId}`;
+	}
 	return `${row.jobId}/${row.jobInstanceId}/${row.taskId}`;
+}
+
+/** Deep-link target for a home Available row (nested includes group coords). */
+export function availableRowTarget(row: AvailableRow): Extract<PostCommitTarget, { kind: 'task' }> {
+	if (row.groupId && row.groupInstanceId) {
+		return {
+			kind: 'task',
+			jobId: row.jobId,
+			jobInstanceId: row.jobInstanceId,
+			groupId: row.groupId,
+			groupInstanceId: row.groupInstanceId,
+			taskId: row.taskId
+		};
+	}
+	return {
+		kind: 'task',
+		jobId: row.jobId,
+		jobInstanceId: row.jobInstanceId,
+		taskId: row.taskId
+	};
 }

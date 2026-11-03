@@ -1,6 +1,5 @@
 /**
- * Cascade #8: register form open must surface JSON Schema `default`
- * (`idoneitaRiutilizzo: NIR`) and authored date sentinel (`$today` → today).
+ * Cascade #8: form open must surface authored date sentinel (`$today` → today).
  *
  * Root: createConfigForm always passes sjsf `value` bind; createForm then
  * skips mergeFormDataAndSchemaDefaults. Empty Draft → empty widget value.
@@ -8,6 +7,7 @@
  * so sjsf re-merge/reset cannot inject the sentinel literal.
  *
  * Authored schema comes from feragame-config YAML (Go ships the same shape in the bundle).
+ * Plant path: truckArrive carries `$today` on date (lot register no longer owns that field).
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -27,23 +27,21 @@ import {
 
 const libDir = dirname(fileURLToPath(import.meta.url));
 
-describe('cascade #8 schema defaults on register open', () => {
+describe('cascade #8 schema defaults on truckArrive open', () => {
 	const config = loadFeragameConfig(feragameConfigYaml);
-	const authored = taskConfig(config.jobs.intake, 'register')!;
+	const authored = taskConfig(config.jobs.intake, 'truckArrive')!;
 	const schema = authored.schema as Schema;
 	const props = (schema.properties ?? {}) as Record<string, Schema>;
 
-	test('authored idoneitaRiutilizzo default NIR and date $today survive bundle schema', () => {
-		expect(props.idoneitaRiutilizzo?.default).toBe('NIR');
+	test('authored date $today survives bundle schema', () => {
 		expect(props.date?.default).toBe(TODAY_DEFAULT_SENTINEL);
 		expect(props.date?.format).toBe('date');
 	});
 
-	test('empty-draft register open value includes NIR and today’s ISO date', () => {
+	test('empty-draft truckArrive open value includes today’s ISO date', () => {
 		const today = localCalendarDateISO();
 		const merged = mergeSchemaDefaultsIntoFormData(schema, {}, today);
 		expect(merged).toMatchObject({
-			idoneitaRiutilizzo: 'NIR',
 			date: today
 		});
 
@@ -65,34 +63,23 @@ describe('cascade #8 schema defaults on register open', () => {
 		const merger = createFormMerger({ validator, schema: resolved });
 		const remerged = merger.mergeFormDataAndSchemaDefaults({
 			schema: resolved,
-			formData: { idoneitaRiutilizzo: 'NIR' },
+			formData: { turno: '1st' },
 			initialDefaultsGenerated: true
 		}) as Record<string, unknown>;
 		expect(remerged.date).toBe(today);
 		expect(remerged.date).not.toBe(TODAY_DEFAULT_SENTINEL);
 	});
 
-	test('partial draft IR and date are not clobbered by schema defaults', () => {
+	test('partial draft date is not clobbered by schema defaults', () => {
 		const today = localCalendarDateISO();
 		const merged = mergeSchemaDefaultsIntoFormData(
 			schema,
-			{ idoneitaRiutilizzo: 'IR', date: '2020-01-15' },
+			{ date: '2020-01-15', turno: '2nd' },
 			today
 		);
-		expect(merged.idoneitaRiutilizzo).toBe('IR');
-		expect(merged.date).toBe('2020-01-15');
-	});
-
-	test('format:date without $today does not inject a calendar default', () => {
-		const bareDateSchema = {
-			type: 'object',
-			properties: {
-				date: { type: 'string', format: 'date', title: 'Data' },
-				idoneitaRiutilizzo: { type: 'string', default: 'NIR' }
-			}
-		} as Schema;
-		const merged = mergeSchemaDefaultsIntoFormData(bareDateSchema, {}, '2099-12-31');
-		expect(merged.idoneitaRiutilizzo).toBe('NIR');
-		expect(merged.date).toBeUndefined();
+		expect(merged).toMatchObject({
+			date: '2020-01-15',
+			turno: '2nd'
+		});
 	});
 });

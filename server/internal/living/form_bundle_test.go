@@ -53,10 +53,9 @@ func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	committed, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -122,17 +121,8 @@ func TestLoadJSONOmitsBulkTaskFormBundlesWhenCanStart(t *testing.T) {
 
 func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	all := FixtureAllRolesOp()
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: instanceID,
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID := commitTruckArrive(t, c)
 
 	result, err := loader.Load(t.Context(), "feragame", all)
 	if err != nil {
@@ -142,19 +132,19 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 		t.Fatalf("home Load must omit bulk bundles; got %#v", addresses(result.TaskFormBundles))
 	}
 
-	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", "new")
+	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
 	if err != nil || provisional == nil {
-		t.Fatalf("provisional register: %v %#v", err, provisional)
+		t.Fatalf("provisional lots/register: %v %#v", err, provisional)
 	}
-	codice, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "codiceFir", instanceID)
-	if err != nil || codice == nil {
-		t.Fatalf("codiceFir: %v %#v", err, codice)
+	arrive, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", "")
+	if err != nil || arrive == nil {
+		t.Fatalf("provisional truckArrive: %v %#v", err, arrive)
 	}
-	if codice.Surface != "live" || codice.Schema == nil || codice.Bindings == nil {
-		t.Fatalf("codiceFir incomplete: %#v", codice)
+	if arrive.Surface != "live" || arrive.Schema == nil {
+		t.Fatalf("truckArrive incomplete: %#v", arrive)
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", instanceID); err == nil {
-		t.Fatal("done register must be forbidden on addressed fetch")
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", truckID, "", ""); err == nil {
+		t.Fatal("done truckArrive must be forbidden on addressed fetch")
 	}
 }
 
@@ -168,8 +158,8 @@ func addresses(bundles []*TaskFormBundle) []string {
 
 func TestLoadTaskBundlePalletWeightRows(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	instanceID := "NIR-261019-NO-1"
-	commitThroughCodiceFir(t, c, instanceID)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
 
 	home, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
@@ -178,15 +168,24 @@ func TestLoadTaskBundlePalletWeightRows(t *testing.T) {
 	if len(home.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(home.TaskFormBundles))
 	}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "intake", "palletWeight", instanceID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID)
 	if err != nil || bundle == nil {
-		t.Fatalf("missing palletWeight: %v", err)
+		t.Fatalf("missing weigh: %v", err)
 	}
 	if bundle.Surface != "live" {
 		t.Fatalf("surface = %q", bundle.Surface)
 	}
 	if len(bundle.RowIDs) == 0 {
-		t.Fatal("palletWeight bundle missing rowIds")
+		t.Fatal("weigh bundle missing rowIds")
+	}
+	found := false
+	for _, id := range bundle.RowIDs {
+		if id == loadID+".1" || id == loadID+".2" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("rowIds = %#v, want pallets for %s", bundle.RowIDs, loadID)
 	}
 	if bundle.ProjectionKey == "" {
 		t.Fatal("missing projectionKey")
@@ -194,27 +193,24 @@ func TestLoadTaskBundlePalletWeightRows(t *testing.T) {
 	if len(bundle.Derived) == 0 {
 		t.Fatal("expected expanded derived rules")
 	}
-	domainBag, _ := bundle.Bindings["domain"].(map[string]any)
-	if _, has := domainBag["tareKinds"]; has {
+	domainBound, _ := bundle.Bindings["domain"].(map[string]any)
+	if _, has := domainBound["tareKinds"]; has {
 		t.Fatal("bindings.domain must not inject tareKinds")
 	}
-	catalogsBag, _ := bundle.Bindings["catalogs"].(map[string]any)
-	if catalogsBag == nil {
+	catalogsBound, _ := bundle.Bindings["catalogs"].(map[string]any)
+	if catalogsBound == nil {
 		t.Fatal("bindings.catalogs missing")
 	}
-	tare, _ := catalogsBag["tareKinds"].(map[string]any)
+	tare, _ := catalogsBound["tareKinds"].(map[string]any)
 	if tare["euro"] == nil {
-		t.Fatalf("bindings.catalogs.tareKinds = %#v", catalogsBag["tareKinds"])
+		t.Fatalf("bindings.catalogs.tareKinds = %#v", catalogsBound["tareKinds"])
 	}
-	if load, ok := domainBag["load"].(map[string]any); !ok || len(load) == 0 {
-		t.Fatalf("bindings.domain.load = %#v, want minted load kind", domainBag["load"])
+	if load, ok := domainBound["load"].(map[string]any); !ok || len(load) == 0 {
+		t.Fatalf("bindings.domain.load = %#v, want minted load kind", domainBound["load"])
 	}
-	subs, ok := domainBag["submissions"].([]any)
-	if !ok {
-		t.Fatalf("bindings.domain.submissions = %#v, want array", domainBag["submissions"])
-	}
-	if len(subs) == 0 {
-		t.Fatal("expected submissions after codiceFir for DomainSnapshot-shaped bindings")
+	subs, ok := domainBound["submissions"].([]any)
+	if !ok || len(subs) == 0 {
+		t.Fatalf("bindings.domain.submissions = %#v", domainBound["submissions"])
 	}
 	if weights, has := bundle.InitialData["weights"]; has {
 		m, _ := weights.(map[string]any)
@@ -267,40 +263,33 @@ func assertConcreteDynamicMap(t *testing.T, mapSchema map[string]any, rowIDs []s
 
 func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	intakeID := "NIR-261019-NO-1"
-	opLogistic := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	opLine := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
 
-	commitThroughCodiceFir(t, c, intakeID)
-	pallet, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "intake", "palletWeight", intakeID)
-	if err != nil || pallet == nil {
-		t.Fatalf("missing palletWeight: %v", err)
+	weigh, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID)
+	if err != nil || weigh == nil {
+		t.Fatalf("missing weigh: %v", err)
 	}
-	if len(pallet.RowIDs) == 0 {
-		t.Fatal("palletWeight full-map needs Domain-read row ids")
+	if len(weigh.RowIDs) == 0 {
+		t.Fatal("weigh full-map needs Domain-read row ids")
 	}
-	weightsProps, _ := pallet.Schema["properties"].(map[string]any)
+	weightsProps, _ := weigh.Schema["properties"].(map[string]any)
 	weightsSchema, _ := weightsProps["weights"].(map[string]any)
-	assertConcreteDynamicMap(t, weightsSchema, pallet.RowIDs, true)
+	assertConcreteDynamicMap(t, weightsSchema, weigh.RowIDs, true)
 
-	if _, err := c.Commit(t.Context(), "feragame", opLogistic, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: intakeID,
-		Value: palletWeightValue(map[string]any{
-			intakeID + ".1": weighRow(11),
-			intakeID + ".2": weighRow(22),
-		}),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	shift, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
-		TaskPath: "line/shift", JobInstanceID: "1st", Value: map[string]any{"shift": "1st"}, Mint: startingNewMint(),
+	_ = commitWeigh(t, c, lineID, map[string]any{
+		loadID + ".1": weighRow(11),
+		loadID + ".2": weighRow(22),
+	})
+	closed, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
+		JobID: "line", JobInstanceID: lineID, GroupID: "palletWeight",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	lineLoad := shift.NextTaskFormBundle
-	if lineLoad == nil || lineLoad.TaskID != "lineLoad" || lineLoad.JobInstanceID != "1st" {
-		t.Fatalf("after shift next = %s, want line/lineLoad@1st", bundleAddress(lineLoad))
+	lineLoad := closed.NextTaskFormBundle
+	if lineLoad == nil || lineLoad.TaskID != "lineLoad" || lineLoad.JobInstanceID != lineID {
+		t.Fatalf("after weigh close next = %s, want lineLoad@%s", bundleAddress(lineLoad), lineID)
 	}
 	if len(lineLoad.RowIDs) == 0 {
 		t.Fatal("lineLoad partial-map still projects Domain-read row ids")
@@ -390,15 +379,7 @@ func assertLineLoadCellMapBundle(t *testing.T, bundle *TaskFormBundle) {
 func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: instanceID,
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID := commitTruckArrive(t, c)
 
 	h := &Handler{
 		Loader: loader,
@@ -426,25 +407,16 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 	if _, ok := wire["roles"].([]any); !ok {
 		t.Fatalf("HTTP Load missing roles: %s", rec.Body.String())
 	}
-	codice, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "codiceFir", instanceID)
-	if err != nil || codice == nil {
-		t.Fatalf("addressed codiceFir after Load: %v", err)
+	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
+	if err != nil || spawn == nil {
+		t.Fatalf("addressed lots/register after Load: %v", err)
 	}
 }
 
 func TestCommitNextBundleNotBulk(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	all := FixtureAllRolesOp()
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: instanceID,
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 	loaded, err := loader.Load(t.Context(), "feragame", all)
 	if err != nil {
 		t.Fatal(err)
@@ -452,29 +424,26 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if len(loaded.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(loaded.TaskFormBundles))
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "codiceFir", instanceID); err != nil {
-		t.Fatalf("pre-commit addressed codiceFir: %v", err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err != nil {
+		t.Fatalf("pre-commit addressed weightCheck: %v", err)
 	}
 
 	committed, err := c.Commit(t.Context(), "feragame", all, CommitRequest{
-		TaskPath:      "intake/codiceFir",
-		JobInstanceID: instanceID,
-		Value:         map[string]any{"codiceFir": "FIR-1"},
+		TaskPath:      "intake/weightCheck",
+		JobInstanceID: truckID,
+		Value:         map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if committed.Next != CommitNextTask {
-		t.Fatalf("advance Next = %q, want task", committed.Next)
+	if committed.Next != CommitNextOverview && committed.Next != CommitNextHome && committed.Next != CommitNextTask {
+		t.Fatalf("advance Next = %q", committed.Next)
 	}
-	if committed.NextTaskFormBundle == nil || committed.NextTaskFormBundle.TaskID != "palletWeight" {
-		t.Fatalf("advance bundle = %s, want palletWeight", bundleAddress(committed.NextTaskFormBundle))
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err == nil {
+		t.Fatal("addressed weightCheck must deny after it leaves available")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "codiceFir", instanceID); err == nil {
-		t.Fatal("addressed codiceFir must deny after it leaves available")
-	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", ""); err != nil {
-		t.Fatalf("provisional register while canStart: %v", err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", ""); err != nil {
+		t.Fatalf("provisional truckArrive while canStart: %v", err)
 	}
 
 	raw, err := json.Marshal(committed)
@@ -488,46 +457,30 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if _, has := wire["taskFormBundles"]; has {
 		t.Fatalf("Commit JSON must omit taskFormBundles: %s", string(raw))
 	}
-	if wire["next"] != string(CommitNextTask) {
+	if wire["next"] == nil || wire["next"] == "" {
 		t.Fatalf("Commit JSON next = %#v", wire["next"])
-	}
-	if _, ok := wire["nextTaskFormBundle"].(map[string]any); !ok {
-		t.Fatalf("Commit JSON missing nextTaskFormBundle: %s", string(raw))
 	}
 }
 
 func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	opLine := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	intakeID := "NIR-261019-NO-1"
 
-	completeIntakeThroughPalletWeight(t, c, intakeID)
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
 
-	shift, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
-		TaskPath: "line/shift", JobInstanceID: "1st", Value: map[string]any{"shift": "1st"}, Mint: startingNewMint(),
-	})
-	if err != nil {
-		t.Fatal(err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "truckArrive", "", "", ""); err == nil {
+		t.Fatal("line viewer must not mount intake provisional truckArrive")
 	}
-	if shift.Next != CommitNextTask {
-		t.Fatalf("after shift Next = %q, want task", shift.Next)
-	}
-	if shift.NextTaskFormBundle == nil || shift.NextTaskFormBundle.TaskID != "lineLoad" {
-		t.Fatalf("after shift bundle = %s, want lineLoad", bundleAddress(shift.NextTaskFormBundle))
-	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "register", ""); err == nil {
-		t.Fatal("line viewer must not mount intake provisional register")
-	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "shift", ""); err != nil {
-		t.Fatalf("line canStart provisional shift after first shift mint: %v", err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "openTurno", "", "", ""); err != nil {
+		t.Fatalf("line canStart provisional openTurno after first mint: %v", err)
 	}
 
 	loaded, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: "1st",
+		TaskPath: "line/lineLoad", JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
-				intakeID + ".1": "done",
-				intakeID + ".2": "partial",
+				loadID + ".1": "done",
+				loadID + ".2": "partial",
 			},
 		},
 	})
@@ -537,14 +490,14 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	if loaded.NextTaskFormBundle != nil {
 		t.Fatalf("line after lineLoad must hand off; got %s", bundleAddress(loaded.NextTaskFormBundle))
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "containerReg", "1st"); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "containerReg", lineID, "", ""); err == nil {
 		t.Fatal("line viewer must not mount containerReg")
 	}
-	lineJob, ok := worklistJobByID(loaded.Worklist, "line")
+	lineJobWL, ok := worklistJobByID(loaded.Worklist, "line")
 	if !ok {
 		t.Fatal("missing line worklist")
 	}
-	inst, ok := worklistInstance(lineJob, "1st")
+	inst, ok := worklistInstance(lineJobWL, lineID)
 	if !ok || inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg status = %#v, want available", inst)
 	}

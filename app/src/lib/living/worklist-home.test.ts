@@ -1,8 +1,23 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
+vi.mock('../router/index.js', () => ({
+	p: (path: string, opts?: { params?: Record<string, string> }) => {
+		if (!opts?.params) return path === '/' ? '/app' : `/app${path}`;
+		let out = path;
+		for (const [key, value] of Object.entries(opts.params)) {
+			out = out.replace(`:${key}`, value);
+		}
+		return `/app${out}`;
+	},
+	navigate: vi.fn()
+}));
+
+import { hrefLivingTarget } from '../router/navigate-target.js';
 import type { Worklist } from './types.js';
 import {
+	availableRowKey,
 	availableRowsFromWorklist,
+	availableRowTarget,
 	canStartRowsFromWorklist,
 	instanceTaskProgress,
 	progressFraction,
@@ -20,7 +35,7 @@ const chrome = {
 	]
 } as const;
 
-/** Viewer-scoped Worklists (statuses shared; viewerAvailable differs). */
+/** Viewer-scoped Worklists (unlocked leaf is actionable vs available). */
 const adminWorklist: Worklist = {
 	jobs: [
 		{
@@ -35,14 +50,12 @@ const adminWorklist: Worklist = {
 				{
 					id: 'NIR-1',
 					label: 'NIR-1',
-					tasks: { register: 'done', palletWeight: 'available' },
-					viewerAvailable: []
+					tasks: { register: 'done', palletWeight: 'available' }
 				},
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' },
-					viewerAvailable: ['register']
+					tasks: { register: 'actionable', palletWeight: 'locked' }
 				}
 			]
 		},
@@ -58,8 +71,7 @@ const adminWorklist: Worklist = {
 				{
 					id: '1st',
 					label: 'Turno: 1st',
-					tasks: { shift: 'done', lineLoad: 'available' },
-					viewerAvailable: []
+					tasks: { shift: 'done', lineLoad: 'available' }
 				}
 			]
 		}
@@ -80,14 +92,12 @@ const logisticWorklist: Worklist = {
 				{
 					id: 'NIR-1',
 					label: 'NIR-1',
-					tasks: { register: 'done', palletWeight: 'available' },
-					viewerAvailable: ['palletWeight']
+					tasks: { register: 'done', palletWeight: 'actionable' }
 				},
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' },
-					viewerAvailable: []
+					tasks: { register: 'available', palletWeight: 'locked' }
 				}
 			]
 		},
@@ -103,8 +113,7 @@ const logisticWorklist: Worklist = {
 				{
 					id: '1st',
 					label: 'Turno: 1st',
-					tasks: { shift: 'done', lineLoad: 'available' },
-					viewerAvailable: []
+					tasks: { shift: 'done', lineLoad: 'available' }
 				}
 			]
 		}
@@ -125,14 +134,12 @@ const lineWorklist: Worklist = {
 				{
 					id: 'NIR-1',
 					label: 'NIR-1',
-					tasks: { register: 'done', palletWeight: 'available' },
-					viewerAvailable: []
+					tasks: { register: 'done', palletWeight: 'available' }
 				},
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' },
-					viewerAvailable: []
+					tasks: { register: 'available', palletWeight: 'locked' }
 				}
 			]
 		},
@@ -148,8 +155,7 @@ const lineWorklist: Worklist = {
 				{
 					id: '1st',
 					label: 'Turno: 1st',
-					tasks: { shift: 'done', lineLoad: 'available' },
-					viewerAvailable: ['lineLoad']
+					tasks: { shift: 'done', lineLoad: 'actionable' }
 				}
 			]
 		}
@@ -170,14 +176,12 @@ const allRolesWorklist: Worklist = {
 				{
 					id: 'NIR-1',
 					label: 'NIR-1',
-					tasks: { register: 'done', palletWeight: 'available' },
-					viewerAvailable: ['palletWeight']
+					tasks: { register: 'done', palletWeight: 'actionable' }
 				},
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' },
-					viewerAvailable: ['register']
+					tasks: { register: 'actionable', palletWeight: 'locked' }
 				}
 			]
 		},
@@ -193,8 +197,7 @@ const allRolesWorklist: Worklist = {
 				{
 					id: '1st',
 					label: 'Turno: 1st',
-					tasks: { shift: 'done', lineLoad: 'available' },
-					viewerAvailable: ['lineLoad']
+					tasks: { shift: 'done', lineLoad: 'actionable' }
 				}
 			]
 		}
@@ -202,7 +205,7 @@ const allRolesWorklist: Worklist = {
 };
 
 describe('worklist-home bands', () => {
-	test('availableRows sort Job → instance → Task from viewerAvailable', () => {
+	test('availableRows sort Job → instance → Task from actionable', () => {
 		const admin = availableRowsFromWorklist(adminWorklist);
 		expect(admin.map((r) => `${r.jobId}/${r.jobInstanceId}/${r.taskId}`)).toEqual([
 			'intake/NIR-2/register'
@@ -265,5 +268,148 @@ describe('worklist-home bands', () => {
 		expect(availableRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(canStartRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(availableRowsFromWorklist(null)).toEqual([]);
+	});
+
+	test('nested ready Tasks and canSpawn provisional first-leaf appear in Available', () => {
+		const nested: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					title: 'Camion',
+					taskIds: ['truckArrive', 'lots', 'weightCheck'],
+					tasks: [
+						{ id: 'truckArrive', title: 'Arrive', roles: ['administration'] },
+						{ id: 'lots', title: 'Lots', roles: [] },
+						{ id: 'weightCheck', title: 'Weight', roles: ['administration'] },
+						{ id: 'register', title: 'Register lot', roles: ['administration'] }
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: {
+								truckArrive: 'done',
+								lots: 'available',
+								weightCheck: 'locked'
+							},
+							groups: {
+								lots: {
+									groupId: 'lots',
+									startLabel: 'Nuovo lotto',
+									closeLabel: 'Chiudi scarico',
+									repeatable: true,
+									canSpawn: true,
+									canClose: true,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'L1',
+											tasks: { register: 'actionable' }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+
+		const rows = availableRowsFromWorklist(nested);
+		expect(rows).toHaveLength(2);
+		expect(rows[0]).toMatchObject({
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'L1',
+			taskId: 'register',
+			title: 'Register lot',
+			instanceLabel: 'Truck 1'
+		});
+		expect(availableRowKey(rows[0]!)).toBe('intake/T1/lots/L1/register');
+		expect(hrefLivingTarget(availableRowTarget(rows[0]!))).toBe(
+			'/app/intake/T1/lots/L1/register'
+		);
+
+		expect(rows[1]).toMatchObject({
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'new',
+			taskId: 'register',
+			title: 'Register lot',
+			instanceLabel: 'Truck 1'
+		});
+		expect(availableRowKey(rows[1]!)).toBe('intake/T1/lots/new/register');
+		expect(availableRowTarget(rows[1]!)).toEqual({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'new',
+			taskId: 'register'
+		});
+		expect(hrefLivingTarget(availableRowTarget(rows[1]!))).toBe(
+			'/app/intake/T1/lots/new/register'
+		);
+
+		// truckArrive-shaped: canSpawn, empty open group → provisional first-leaf only.
+		const spawnOnly: Worklist = {
+			jobs: [
+				{
+					...nested.jobs[0]!,
+					instances: [
+						{
+							...nested.jobs[0]!.instances[0]!,
+							groups: {
+								lots: {
+									...nested.jobs[0]!.instances[0]!.groups!.lots,
+									canSpawn: true,
+									canClose: false,
+									instances: []
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const spawnRows = availableRowsFromWorklist(spawnOnly);
+		expect(spawnRows).toHaveLength(1);
+		expect(spawnRows[0]).toMatchObject({
+			groupId: 'lots',
+			groupInstanceId: 'new',
+			taskId: 'register',
+			title: 'Register lot'
+		});
+		expect(hrefLivingTarget(availableRowTarget(spawnRows[0]!))).toBe(
+			'/app/intake/T1/lots/new/register'
+		);
+		// Still no separate Spawn / Can start peer for the group.
+		expect(canStartRowsFromWorklist(spawnOnly)).toEqual([]);
+
+		const noSpawn: Worklist = {
+			jobs: [
+				{
+					...nested.jobs[0]!,
+					instances: [
+						{
+							...nested.jobs[0]!.instances[0]!,
+							groups: {
+								lots: {
+									...nested.jobs[0]!.instances[0]!.groups!.lots,
+									canSpawn: false,
+									canClose: false,
+									instances: []
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		expect(availableRowsFromWorklist(noSpawn)).toEqual([]);
 	});
 });

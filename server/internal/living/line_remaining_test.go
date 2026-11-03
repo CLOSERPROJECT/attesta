@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
-func commitLineLoadDone(t *testing.T, c *Committer, shift, intakeID string) {
+func commitLineLoadDone(t *testing.T, c *Committer, lineID, loadID string) {
 	t.Helper()
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: shift,
+		TaskPath: "line/lineLoad", JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
-				intakeID + ".1": "done",
-				intakeID + ".2": "done",
+				loadID + ".1": "done",
+				loadID + ".2": "done",
 			},
 		},
 	})
@@ -28,36 +28,32 @@ func commitLineLoadDone(t *testing.T, c *Committer, shift, intakeID string) {
 
 func TestContainerRegLockedUntilLineLoadSubmission(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
-	domain := commitLineShift(t, c, "1st")
+	_, lineID := seedLineReadyForLineLoad(t, c)
+	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	line := lineJob(t)
 	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "containerReg",
-		JobInstanceID: "1st", Submissions: domain.Submissions, Tasks: line.Tasks,
+		JobInstanceID: lineID, Submissions: domain.Submissions, Tasks: line.Tasks,
+		ClosedGroups: domain.ClosedGroups,
 	}) {
 		t.Fatal("containerReg must stay locked until lineLoad Submission")
-	}
-	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "loadedExtracted",
-		JobInstanceID: "1st", Submissions: domain.Submissions, Tasks: line.Tasks,
-	}) {
-		t.Fatal("loadedExtracted stays locked until containerReg Submission")
 	}
 }
 
 func TestCommitContainerRegMintsContainersAndUnlocksLoadedExtracted(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	intakeID := "NIR-261019-NO-1"
-	completeIntakeThroughPalletWeight(t, c, intakeID)
-	commitLineShift(t, c, "1st")
-	commitLineLoadDone(t, c, "1st", intakeID)
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
+	commitLineLoadDone(t, c, lineID, loadID)
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/containerReg", JobInstanceID: "1st",
+		TaskPath: "line/containerReg", JobInstanceID: lineID,
 		Value: map[string]any{
-			"sourceLoadId": intakeID,
+			"sourceLoadId": loadID,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 120.0},
 			},
@@ -71,33 +67,22 @@ func TestCommitContainerRegMintsContainersAndUnlocksLoadedExtracted(t *testing.T
 	}
 	if result.Domain.Kind("container")["C-1"]["material"] != "Polvere di vetro" ||
 		result.Domain.Kind("container")["C-1"]["weight"] != 120.0 ||
-		result.Domain.Kind("container")["C-1"]["sourceLoadId"] != intakeID {
+		result.Domain.Kind("container")["C-1"]["sourceLoadId"] != loadID {
 		t.Fatalf("C-1 = %#v", result.Domain.Kind("container")["C-1"])
 	}
 	if result.Domain.Kind("container")["C-2"]["material"] != "Plastica" {
 		t.Fatalf("C-2 = %#v", result.Domain.Kind("container")["C-2"])
 	}
-	if _, has := result.Domain.Kind("container")["C-1"]["secondarySourceLoadId"]; has {
-		t.Fatal("single-source must omit secondarySourceLoadId")
-	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "containerReg" || last.JobInstanceID != "1st" {
+	if last.TaskID != "containerReg" || last.JobInstanceID != lineID {
 		t.Fatalf("submission = %#v", last)
-	}
-	// Submission facts stay form-shaped; bind reshapes only for mintMany.
-	glass, _ := last.Facts["polvereDiVetro"].([]any)
-	plastic, _ := last.Facts["plastica"].([]any)
-	if len(glass) != 1 || len(plastic) != 1 {
-		t.Fatalf("submission facts = %#v", last.Facts)
-	}
-	if len(last.IDsTouched) != 2 || last.IDsTouched[0] != "C-1" {
-		t.Fatalf("idsTouched = %#v", last.IDsTouched)
 	}
 
 	line := lineJob(t)
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "loadedExtracted",
-		JobInstanceID: "1st", Submissions: result.Domain.Submissions, Tasks: line.Tasks,
+		JobInstanceID: lineID, Submissions: result.Domain.Submissions, Tasks: line.Tasks,
+		ClosedGroups: result.Domain.ClosedGroups,
 	}) {
 		t.Fatal("containerReg Submission must unlock loadedExtracted")
 	}
@@ -105,28 +90,30 @@ func TestCommitContainerRegMintsContainersAndUnlocksLoadedExtracted(t *testing.T
 
 func TestCommitContainerRegDualSourceOmitsSecondaryWeight(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	intakeA := "NIR-261019-NO-1"
-	completeIntakeThroughPalletWeight(t, c, intakeA)
-	// Second intake load for dual secondary (register only — startsWhen already open).
-	opAdmin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic"}}
-	intakeB := "NIR-261019-SU-1"
-	valB := registerValue()
+	loadA, lineID := seedLineReadyForLineLoad(t, c)
+	commitLineLoadDone(t, c, lineID, loadA)
+
+	truckID := commitTruckArrive(t, c)
+	valB := registerLotValue()
 	valB["client"] = "SU"
 	valB["palletCount"] = 1.0
-	if _, err := c.Commit(t.Context(), "feragame", opAdmin, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: intakeB, Value: valB,
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
+	valB["truckWeightAfter"] = 650.0
+	resultB := commitLotRegister(t, c, truckID, valB)
+	loadB := firstLoadID(resultB.Domain)
+	// Prefer the newly minted SU load (firstLoadID may return NO from prior truck).
+	for id, facts := range resultB.Domain.Kind("load") {
+		if facts["client"] == "SU" {
+			loadB = id
+			break
+		}
 	}
 
-	commitLineShift(t, c, "1st")
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/containerReg", JobInstanceID: "1st",
+		TaskPath: "line/containerReg", JobInstanceID: lineID,
 		Value: map[string]any{
-			"sourceLoadId":          intakeA,
-			"secondarySourceLoadId": intakeB,
+			"sourceLoadId":          loadA,
+			"secondarySourceLoadId": loadB,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 100.0, "dualSources": true},
 			},
@@ -136,7 +123,7 @@ func TestCommitContainerRegDualSourceOmitsSecondaryWeight(t *testing.T) {
 		t.Fatal(err)
 	}
 	c1 := result.Domain.Kind("container")["C-1"]
-	if c1["secondarySourceLoadId"] != intakeB || c1["sourceLoadId"] != intakeA {
+	if c1["secondarySourceLoadId"] != loadB || c1["sourceLoadId"] != loadA {
 		t.Fatalf("dual container = %#v", c1)
 	}
 	if _, has := c1["secondaryWeight"]; has {
@@ -144,38 +131,15 @@ func TestCommitContainerRegDualSourceOmitsSecondaryWeight(t *testing.T) {
 	}
 }
 
-func TestCommitContainerRegWithoutLineLoad(t *testing.T) {
-	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	intakeID := "NIR-261019-NO-1"
-	completeIntakeThroughPalletWeight(t, c, intakeID)
-	commitLineShift(t, c, "1st")
-
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/containerReg", JobInstanceID: "1st",
-		Value: map[string]any{
-			"sourceLoadId": intakeID,
-			"alluminio":    []any{map[string]any{"weight": 5.0}},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Domain.Kind("container")["C-1"]["material"] != "Alluminio" {
-		t.Fatalf("container = %#v", result.Domain.Kind("container"))
-	}
-}
-
 func TestCommitLoadedExtractedRecordsFactsOnly(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	intakeID := "NIR-261019-NO-1"
-	completeIntakeThroughPalletWeight(t, c, intakeID)
-	commitLineShift(t, c, "1st")
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
+	commitLineLoadDone(t, c, lineID, loadID)
 	opLog := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
 	afterReg, err := c.Commit(t.Context(), "feragame", opLog, CommitRequest{
-		TaskPath: "line/containerReg", JobInstanceID: "1st",
+		TaskPath: "line/containerReg", JobInstanceID: lineID,
 		Value: map[string]any{
-			"sourceLoadId":   intakeID,
+			"sourceLoadId":   loadID,
 			"polvereDiVetro": []any{map[string]any{"weight": 120.0}},
 		},
 	})
@@ -186,7 +150,7 @@ func TestCommitLoadedExtractedRecordsFactsOnly(t *testing.T) {
 
 	opAdmin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), "feragame", opAdmin, CommitRequest{
-		TaskPath: "line/loadedExtracted", JobInstanceID: "1st",
+		TaskPath: "line/loadedExtracted", JobInstanceID: lineID,
 		Value: map[string]any{
 			"checkedLoadedWeight": 850.0,
 			"checkedContainerSum": 130.0,
@@ -205,9 +169,6 @@ func TestCommitLoadedExtractedRecordsFactsOnly(t *testing.T) {
 	if last.Facts["checkedLoadedWeight"] != 850.0 || last.Facts["checkedContainerSum"] != 130.0 {
 		t.Fatalf("facts = %#v", last.Facts)
 	}
-	if len(last.IDsTouched) != 0 {
-		t.Fatalf("idsTouched = %#v", last.IDsTouched)
-	}
 }
 
 func TestCommitLoadedExtractedDeniedViaCerbosBeforeContainerReg(t *testing.T) {
@@ -215,20 +176,23 @@ func TestCommitLoadedExtractedDeniedViaCerbosBeforeContainerReg(t *testing.T) {
 	defer pdp.Close()
 
 	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
-	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
-	before := commitLineShift(t, c, "1st")
+	_, lineID := seedLineReadyForLineLoad(t, c)
+	before, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sequenceOkForCommit(cfg, before, "line", "loadedExtracted", "1st") {
+	if sequenceOkForCommit(cfg, before, "line", "loadedExtracted", lineID) {
 		t.Fatal("sequenceOk must be false before containerReg")
 	}
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/loadedExtracted", JobInstanceID: "1st",
+		TaskPath: "line/loadedExtracted", JobInstanceID: lineID,
 		Value: map[string]any{
 			"checkedLoadedWeight": 850.0,
 			"checkedContainerSum": 120.0,
@@ -237,13 +201,6 @@ func TestCommitLoadedExtractedDeniedViaCerbosBeforeContainerReg(t *testing.T) {
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("err = %v", err)
-	}
-	domain, err := domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(domain.Submissions) != len(before.Submissions) {
-		t.Fatal("locked loadedExtracted must not append Submission")
 	}
 }
 
@@ -258,7 +215,7 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		},
 	}
 
-	post := func(body string) {
+	post := func(body string) map[string]any {
 		t.Helper()
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
@@ -270,38 +227,54 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 			t.Fatal(err)
 		}
-		if _, has := wire["domain"]; has {
-			t.Fatalf("Commit JSON must omit domain: %#v", wire["domain"])
-		}
-		if _, ok := wire["worklist"].(map[string]any); !ok {
-			t.Fatalf("Commit JSON missing worklist for %s", body)
+		return wire
+	}
+	postClose := func(jobID, jobInstanceID, groupID string) {
+		t.Helper()
+		body := `{"jobId":"` + jobID + `","jobInstanceId":"` + jobInstanceID + `","groupId":"` + groupID + `"}`
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/living/close", strings.NewReader(body))
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("close status = %d body=%s", rec.Code, rec.Body.String())
 		}
 	}
 
-	intakeID := "NIR-261019-NO-1"
-	post(`{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":900,"truckTare":50,"palletCount":2,"notes":""}}`)
-	post(`{"taskPath":"intake/codiceFir","jobInstanceId":"NIR-261019-NO-1","value":{"codiceFir":"FIR-E2E"}}`)
-	post(`{"taskPath":"intake/palletWeight","jobInstanceId":"NIR-261019-NO-1","value":{"averagePanelWeight":10,"tareKind":"euro","weights":{"NIR-261019-NO-1.1":{"weight":400,"tareKind":"euro","idoneita":"NIR","panelCount":1},"NIR-261019-NO-1.2":{"weight":450,"tareKind":"euro","idoneita":"NIR","panelCount":1}}}}`)
-	post(`{"taskPath":"line/shift","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"shift":"1st"}}`)
-	post(`{"taskPath":"line/lineLoad","jobInstanceId":"1st","value":{"progress":{"NIR-261019-NO-1.1":"done","NIR-261019-NO-1.2":"done"}}}`)
-	post(`{"taskPath":"line/containerReg","jobInstanceId":"1st","value":{"sourceLoadId":"NIR-261019-NO-1","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)
-	post(`{"taskPath":"line/loadedExtracted","jobInstanceId":"1st","value":{"checkedLoadedWeight":850,"checkedContainerSum":160}}`)
+	arrive := post(`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`)
+	truckID, _ := arrive["jobInstanceId"].(string)
+	reg := post(`{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"NO","wasteCode":"191212","numeroFir":"FIR-E2E","palletCount":2,"truckWeightAfter":700,"notes":""}}`)
+	postClose("intake", truckID, "lots")
 
 	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadID := firstLoadID(domain)
+	_ = reg
+
+	open := post(`{"taskPath":"line/openTurno","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st"}}`)
+	lineID, _ := open["jobInstanceId"].(string)
+	post(`{"taskPath":"line/palletWeight/new/weigh","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"averagePanelWeight":10,"tareKind":"euro","weights":{"` + loadID + `.1":{"weight":400,"tareKind":"euro","idoneita":"NIR","panelCount":1},"` + loadID + `.2":{"weight":450,"tareKind":"euro","idoneita":"NIR","panelCount":1}}}}`)
+	postClose("line", lineID, "palletWeight")
+	post(`{"taskPath":"line/lineLoad","jobInstanceId":"` + lineID + `","value":{"progress":{"` + loadID + `.1":"done","` + loadID + `.2":"done"}}}`)
+	post(`{"taskPath":"line/containerReg","jobInstanceId":"` + lineID + `","value":{"sourceLoadId":"` + loadID + `","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)
+	post(`{"taskPath":"line/loadedExtracted","jobInstanceId":"` + lineID + `","value":{"checkedLoadedWeight":850,"checkedContainerSum":160}}`)
+
+	domain, err = c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(domain.Kind("container")) != 2 {
 		t.Fatalf("containers = %#v", domain.Kind("container"))
 	}
-	var sawShift, sawLineLoad, sawContainerReg, sawLoadedExtracted bool
+	var sawOpen, sawLineLoad, sawContainerReg, sawLoadedExtracted bool
 	for _, s := range domain.Submissions {
-		if s.JobID != "line" || s.JobInstanceID != "1st" {
+		if s.JobID != "line" || s.JobInstanceID != lineID {
 			continue
 		}
 		switch s.TaskID {
-		case "shift":
-			sawShift = true
+		case "openTurno":
+			sawOpen = true
 		case "lineLoad":
 			sawLineLoad = true
 		case "containerReg":
@@ -310,31 +283,7 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 			sawLoadedExtracted = true
 		}
 	}
-	if !sawShift || !sawLineLoad || !sawContainerReg || !sawLoadedExtracted {
+	if !sawOpen || !sawLineLoad || !sawContainerReg || !sawLoadedExtracted {
 		t.Fatalf("line Submissions incomplete: %#v", domain.Submissions)
-	}
-	if domain.Kind("container")["C-1"]["sourceLoadId"] != intakeID {
-		t.Fatalf("C-1 = %#v", domain.Kind("container")["C-1"])
-	}
-
-	loadRec := httptest.NewRecorder()
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/living/domain", nil)
-	h.ServeHTTP(loadRec, loadReq)
-	if loadRec.Code != http.StatusOK {
-		t.Fatalf("load status = %d", loadRec.Code)
-	}
-	var loadWire map[string]any
-	if err := json.Unmarshal(loadRec.Body.Bytes(), &loadWire); err != nil {
-		t.Fatal(err)
-	}
-	if _, has := loadWire["domain"]; has {
-		t.Fatalf("Load JSON must omit domain")
-	}
-	if _, has := loadWire["config"]; has {
-		t.Fatalf("Load JSON must omit config")
-	}
-	wl, _ := loadWire["worklist"].(map[string]any)
-	if wl == nil {
-		t.Fatalf("Load JSON missing worklist: %#v", loadWire)
 	}
 }

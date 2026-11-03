@@ -152,8 +152,11 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	if _, ok := got.Kind("load")["L1"]; ok {
 		t.Fatal("pre-replace L1 must not survive staged rebuild")
 	}
-	if _, ok := got.Kind("load")[living.SeedIntakeWeightCheckID]; !ok {
-		t.Fatalf("staged Domain missing weightCheck intake: %#v", got.Kind("load"))
+	if _, ok := got.Kind("truck")[living.SeedTruckWeightCheckID]; !ok {
+		t.Fatalf("staged Domain missing weightCheck truck: %#v", got.Kind("truck"))
+	}
+	if len(got.Kind("load")) == 0 {
+		t.Fatalf("staged Domain missing loads: %#v", got.Kind("load"))
 	}
 	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
 		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))

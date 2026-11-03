@@ -124,12 +124,12 @@
 		{:else if sectionsEmpty}
 			<p class="data-report__empty">No primary load</p>
 		{:else}
-			{#each sections as section (section.loadId)}
-				<article class="data-report__section" data-load-id={section.loadId}>
-					<h4 class="data-report__load">{section.loadId}</h4>
-					{#if section.secondaryLoadIds && section.secondaryLoadIds.length > 0}
+			{#each sections as section (section.id)}
+				<article class="data-report__section" data-section-id={section.id}>
+					<h4 class="data-report__load">{section.id}</h4>
+					{#if section.secondaryIds && section.secondaryIds.length > 0}
 						<p class="data-report__secondary">
-							anche: {section.secondaryLoadIds.join(', ')}
+							anche: {section.secondaryIds.join(', ')}
 						</p>
 					{/if}
 					{#if section.rows && section.rows.length > 0}

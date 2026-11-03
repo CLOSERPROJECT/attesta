@@ -40,28 +40,29 @@ func main() {
 		Now:        func() time.Time { return time.Date(2026, 10, 30, 16, 0, 0, 0, time.UTC) },
 	}
 
-	intakeID := living.DemoIntakeInstanceID
+	truckID := living.DemoTruckInstanceID
+	loadID := living.DemoLoadInstanceID
 	admin := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
 	lineOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"line"}}
 	logOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"logistic"}}
 
 	commit(c, admin, living.CommitRequest{
-		TaskPath: "intake/weightCheck", JobInstanceID: intakeID,
+		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 33.0},
 	})
 	commit(c, lineOp, living.CommitRequest{
 		TaskPath: "line/lineLoad", JobInstanceID: living.DemoLineShiftID,
 		Value: map[string]any{
 			"progress": map[string]any{
-				intakeID + ".1": "done",
-				intakeID + ".2": "done",
+				loadID + ".1": "done",
+				loadID + ".2": "done",
 			},
 		},
 	})
 	res := commit(c, logOp, living.CommitRequest{
 		TaskPath: "line/containerReg", JobInstanceID: living.DemoLineShiftID,
 		Value: map[string]any{
-			"sourceLoadId": intakeID,
+			"sourceLoadId": loadID,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 80.0},
 			},
@@ -116,7 +117,7 @@ func main() {
 			}
 		}
 	}
-	refs := living.CollectAvailableTaskRefs(cfg, wl)
+	refs := living.CollectActionableTaskRefs(cfg, wl)
 	var haveLE, haveWC bool
 	for _, ref := range refs {
 		b, err := living.BuildTaskFormBundle(cfg, res.Domain, ref)

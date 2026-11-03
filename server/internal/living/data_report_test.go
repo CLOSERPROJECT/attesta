@@ -7,8 +7,11 @@ import (
 
 func dataReportProbeDomain() Domain {
 	d := domainFromKinds(map[string]EntityMap{
+		"truck": {
+			"T1": {"date": "2026-10-19", "turno": "1st", "truckWeight": 1000.0, "lastScaleReading": 200.0},
+		},
 		"load": {
-			"L1": {"truckWeight": 1000.0, "truckTare": 200.0},
+			"L1": {"netWeight": 800.0, "truckId": "T1", "client": "NO"},
 		},
 		"pallet": {
 			"P1": {"loadId": "L1", "weight": 125.0, "progress": "done"},
@@ -25,7 +28,8 @@ func dataReportProbeDomain() Domain {
 		},
 	})
 	d.Submissions = []Submission{{
-		JobID: "intake", TaskID: "palletWeight", JobInstanceID: "L1",
+		JobID: "line", TaskID: "weigh", JobInstanceID: "2026-10-19-1st",
+		GroupID: "palletWeight", GroupInstanceID: "pw-1",
 		Facts: map[string]any{
 			"tareKind": "euro",
 			"weights":  map[string]any{"P1": map[string]any{}, "P2": map[string]any{}},
@@ -39,7 +43,7 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), AvailableTaskRef{
+	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), ActionableTaskRef{
 		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
 	if err != nil {
@@ -95,12 +99,12 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 		t.Fatalf("sections = %#v", sections)
 	}
 	section, _ := sections[0].(map[string]any)
-	if section["loadId"] != "L1" {
-		t.Fatalf("loadId = %#v", section["loadId"])
+	if section["id"] != "L1" {
+		t.Fatalf("id = %#v", section["id"])
 	}
-	secs, _ := section["secondaryLoadIds"].([]any)
+	secs, _ := section["secondaryIds"].([]any)
 	if len(secs) != 1 || secs[0] != "L2" {
-		t.Fatalf("secondaryLoadIds = %#v", section["secondaryLoadIds"])
+		t.Fatalf("secondaryIds = %#v", section["secondaryIds"])
 	}
 	rows, _ := section["rows"].([]any)
 	byLabel := map[string]map[string]any{}
@@ -125,7 +129,7 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 			t.Fatalf("%s tone = %#v, want %#v", label, row["tone"], tone)
 		}
 	}
-	assertRow("Camion lordo", "1000", nil)
+	assertRow("Netto lotto", "800", nil)
 	assertRow("Massa netta pannelli", "175", nil)
 	assertRow("Plastica", "70", "info")
 	assertRow("Alluminio", "30", "info")
@@ -139,7 +143,7 @@ func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{
+	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
 		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
 	if err != nil {
@@ -172,9 +176,9 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Probe: L1 truck 1000; pallets 125+100 → sum 225; match 22.5% → danger.
-	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), AvailableTaskRef{
-		JobID: "intake", TaskID: "weightCheck", JobInstanceID: "L1",
+	// Probe: truck T1 gross 1000, last reading 200; lot net 800 → match vs Σ lots.
+	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), ActionableTaskRef{
+		JobID: "intake", TaskID: "weightCheck", JobInstanceID: "T1",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +242,7 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 		t.Fatalf("flat weightCheck DTO must not set sections: %#v", display["sections"])
 	}
 	rows, _ := display["rows"].([]any)
-	if len(rows) != 3 {
+	if len(rows) != 4 {
 		t.Fatalf("rows = %#v", rows)
 	}
 	byLabel := map[string]map[string]any{}
@@ -263,9 +267,10 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 			t.Fatalf("%s tone = %#v, want %#v", label, row["tone"], tone)
 		}
 	}
-	assertRow("Peso camion live", "1000", nil)
-	assertRow("Somma pesi bancali live", "225", nil)
-	assertRow("Match %", "22.5", "danger")
+	assertRow("Peso lordo camion", "1000", nil)
+	assertRow("Ultima lettura (tara)", "200", nil)
+	assertRow("Σ netti lotti", "800", nil)
+	assertRow("Match %", "100", "green")
 }
 
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
@@ -284,7 +289,7 @@ func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
 	report, _ := chrome["resultsReport"].(map[string]any)
 	report["expr"] = "$this is not (( valid"
 
-	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{
+	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
 		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
 	if err == nil {

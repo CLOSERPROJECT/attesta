@@ -11,9 +11,9 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roles := rolesAllowedForTask(cfg, "intake", "register")
+	roles := rolesAllowedForTask(cfg, "intake", "truckArrive")
 	if len(roles) != 1 || roles[0] != "administration" {
-		t.Fatalf("register rolesAllowed = %#v, want [administration]", roles)
+		t.Fatalf("truckArrive rolesAllowed = %#v, want [administration]", roles)
 	}
 
 	if cfg.ID != "feragame-config" {
@@ -28,10 +28,14 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if cfg.Catalogs == nil {
 		t.Fatal("catalogs missing")
 	}
-	for _, key := range []string{"tareKinds", "materials", "clients"} {
+	for _, key := range []string{"tareKinds", "materials", "clients", "turni"} {
 		if cfg.Catalogs[key] == nil {
 			t.Fatalf("catalogs.%s missing", key)
 		}
+	}
+	entities, _ := cfg.Domain["entities"].(map[string]any)
+	if entities["truck"] == nil || entities["load"] == nil {
+		t.Fatalf("domain.entities missing truck/load: %#v", entities)
 	}
 	if cfg.Jobs.Len() != 2 {
 		t.Fatalf("jobs len = %d, keys=%v", cfg.Jobs.Len(), cfg.Jobs.Keys)
@@ -48,31 +52,30 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !ok {
 		t.Fatalf("intake type %T", intakeAny)
 	}
-	if !intake.Repeatable || intake.StartLabel != "Nuovo camion" || intake.Title != "Camion" {
+	if !intake.Repeatable || intake.StartLabel != "Nuovo camion" {
 		t.Fatalf("intake = %#v", intake)
 	}
-	wantIntakeTasks := []string{"register", "codiceFir", "palletWeight", "weightCheck"}
+	wantIntakeTasks := []string{"truckArrive", "lots", "weightCheck"}
 	if got := OrderedTaskIDs(intake.Tasks); strings.Join(got, ",") != strings.Join(wantIntakeTasks, ",") {
 		t.Fatalf("intake tasks = %v", got)
+	}
+	lots, ok := TaskByID(intake.Tasks, "lots")
+	if !ok || !lots.IsGroup() {
+		t.Fatalf("lots group = %#v", lots)
 	}
 
 	lineAny, _ := cfg.Jobs.Get("line")
 	line := lineAny.(Job)
-	if line.Title != "Linea" {
-		t.Fatalf("line title = %q", line.Title)
+	if line.StartsWhen != nil {
+		t.Fatalf("line must not have startsWhen, got %#v", line.StartsWhen)
 	}
-	if line.StartsWhen == nil {
-		t.Fatal("line startsWhen missing")
-	}
-	if line.StartsWhen.Task.JobID != "intake" || line.StartsWhen.Task.TaskID != "palletWeight" {
-		t.Fatalf("startsWhen.task = %#v", line.StartsWhen.Task)
-	}
-	if line.StartsWhen.Quantifier != "some" {
-		t.Fatalf("quantifier = %q", line.StartsWhen.Quantifier)
-	}
-	wantLineTasks := []string{"shift", "lineLoad", "containerReg", "loadedExtracted"}
+	wantLineTasks := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "loadedExtracted"}
 	if got := OrderedTaskIDs(line.Tasks); strings.Join(got, ",") != strings.Join(wantLineTasks, ",") {
 		t.Fatalf("line tasks = %v", got)
+	}
+	pw, ok := TaskByID(line.Tasks, "palletWeight")
+	if !ok || !pw.IsGroup() {
+		t.Fatalf("palletWeight group = %#v", pw)
 	}
 
 	raw, err := json.Marshal(cfg)

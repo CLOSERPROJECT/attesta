@@ -1,13 +1,55 @@
-import type { TaskStatus, Worklist, WorklistInstance, WorklistJob } from './types.js';
+import type {
+	TaskStatus,
+	Worklist,
+	WorklistGroup,
+	WorklistGroupInstance,
+	WorklistInstance,
+	WorklistJob
+} from './types.js';
 import { worklistJobFor } from './types.js';
+
+export type OverviewGroupChrome = {
+	canSpawn: boolean;
+	startLabel: string;
+	firstChildTaskId: string;
+	canClose: boolean;
+	closeLabel: string;
+};
+
+export type OverviewChildTaskRow = {
+	taskId: string;
+	title: string;
+	status: TaskStatus;
+	linkable: boolean;
+};
+
+export type OverviewGroupInstanceRow = {
+	id: string;
+	/** Projected load id when present; else group instance id. */
+	displayId: string;
+	status: TaskStatus;
+	/**
+	 * Nested child Task rows when the group has 2+ children.
+	 * Empty when `flatChild` is set (single-child flatten).
+	 */
+	children: OverviewChildTaskRow[];
+	/**
+	 * When the Task group has exactly one child Task, the occurrence presents
+	 * that child's interaction directly (title stays `displayId`).
+	 */
+	flatChild?: OverviewChildTaskRow;
+};
 
 export type OverviewTaskRow = {
 	taskId: string;
 	title: string;
 	status: TaskStatus;
 	roles: string[];
-	/** Projected viewerAvailable membership — link to Task route; else status-only. */
+	/** `actionable` leaf — link to Task route; else status-only. */
 	linkable: boolean;
+	/** Present when this Config node is a Task group (Spawn/Close chrome; not a leaf). */
+	group?: OverviewGroupChrome;
+	groupInstances?: OverviewGroupInstanceRow[];
 };
 
 export type JobInstanceOverviewModel = {
@@ -37,8 +79,124 @@ function taskChrome(job: WorklistJob, taskId: string) {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
 }
 
-function viewerMayAct(inst: WorklistInstance, taskId: string): boolean {
-	return (inst.viewerAvailable ?? []).includes(taskId);
+function groupChrome(
+	group: WorklistGroup | undefined,
+	chromeTitle: string
+): OverviewGroupChrome | undefined {
+	if (!group) return undefined;
+	const firstChildTaskId = group.childTaskIds?.[0] ?? '';
+	return {
+		canSpawn: Boolean(group.canSpawn && firstChildTaskId),
+		startLabel: group.startLabel?.trim() || chromeTitle || 'Spawn',
+		firstChildTaskId,
+		canClose: Boolean(group.canClose),
+		closeLabel: group.closeLabel?.trim() || 'Close'
+	};
+}
+
+export function aggregateGroupInstanceStatus(
+	instance: WorklistGroupInstance,
+	childTaskIds?: string[]
+): TaskStatus {
+	const ids =
+		childTaskIds && childTaskIds.length > 0
+			? childTaskIds
+			: Object.keys(instance.tasks);
+	const statuses = ids.map((id) => (instance.tasks[id] ?? 'locked') as TaskStatus);
+	if (statuses.some((s) => s === 'actionable')) return 'actionable';
+	if (statuses.some((s) => s === 'available')) return 'available';
+	if (statuses.length > 0 && statuses.every((s) => s === 'done')) return 'done';
+	return 'locked';
+}
+
+function projectChildTasks(
+	job: WorklistJob,
+	instance: WorklistGroupInstance,
+	childTaskIds: string[]
+): OverviewChildTaskRow[] {
+	return childTaskIds.map((taskId) => {
+		const chrome = taskChrome(job, taskId);
+		const status = (instance.tasks[taskId] ?? 'locked') as TaskStatus;
+		return {
+			taskId,
+			title: chrome?.title || taskId,
+			status,
+			linkable: status === 'actionable'
+		};
+	});
+}
+
+function projectGroupInstances(
+	job: WorklistJob,
+	group: WorklistGroup | undefined
+): OverviewGroupInstanceRow[] | undefined {
+	if (!group) return undefined;
+	const childTaskIds = group.childTaskIds ?? [];
+	const singleChild = childTaskIds.length === 1;
+	return group.instances.map((gi) => {
+		const children = projectChildTasks(job, gi, childTaskIds);
+		const status = aggregateGroupInstanceStatus(gi, childTaskIds);
+		if (singleChild) {
+			return {
+				id: gi.id,
+				displayId: gi.label || gi.id,
+				status,
+				children: [],
+				flatChild: children[0]
+			};
+		}
+		return {
+			id: gi.id,
+			displayId: gi.label || gi.id,
+			status,
+			children
+		};
+	});
+}
+
+export function taskStatusLabel(status: TaskStatus): string {
+	switch (status) {
+		case 'locked':
+			return 'Bloccato';
+		case 'available':
+			return 'Disponibile';
+		case 'actionable':
+			return 'Per te';
+		case 'done':
+			return 'Fatto';
+	}
+}
+
+export function formatFactValue(value: unknown): string {
+	if (value === null || value === undefined) return '—';
+	if (typeof value === 'string') return value;
+	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+	try {
+		return JSON.stringify(value);
+	} catch {
+		return String(value);
+	}
+}
+
+/**
+ * Open-group Spawn/Close chrome for post-submit links loop (ticket 05).
+ * Null when the group is missing on the Worklist instance.
+ */
+export function openGroupLoopChrome(
+	worklist: Worklist | null | undefined,
+	jobId: string,
+	jobInstanceId: string,
+	groupId: string
+): OverviewGroupChrome | null {
+	if (!jobId || !jobInstanceId || !groupId) return null;
+	const job = worklistJobFor(worklist, jobId);
+	if (!job) return null;
+	const inst = instanceFor(job, jobInstanceId);
+	if (!inst) return null;
+	const chrome = taskChrome(job, groupId);
+	return (
+		groupChrome(inst.groups?.[groupId], chrome?.title || groupId) ?? null
+	);
 }
 
 export function jobInstanceOverview(
@@ -53,30 +211,39 @@ export function jobInstanceOverview(
 	if (!inst) return null;
 
 	const tasks: OverviewTaskRow[] = [];
-	let firstAvailable: OverviewTaskRow | null = null;
+	let firstOpen: OverviewTaskRow | null = null;
 
 	for (const taskId of jobConfigTaskIds(job)) {
 		const chrome = taskChrome(job, taskId);
 		const roles = chrome?.roles ?? [];
 		const status = (inst.tasks[taskId] ?? 'locked') as TaskStatus;
-		const linkable = viewerMayAct(inst, taskId);
+		const worklistGroup = inst.groups?.[taskId];
+		const group = groupChrome(worklistGroup, chrome?.title || taskId);
+		const groupInstances = projectGroupInstances(job, worklistGroup);
+		const linkable = group ? false : status === 'actionable';
 		const row: OverviewTaskRow = {
 			taskId,
 			title: chrome?.title || taskId,
 			status,
 			roles,
-			linkable
+			linkable,
+			...(group ? { group } : {}),
+			...(groupInstances ? { groupInstances } : {})
 		};
 		tasks.push(row);
-		if (firstAvailable == null && status === 'available') {
-			firstAvailable = row;
+		if (firstOpen == null && (status === 'available' || status === 'actionable')) {
+			firstOpen = row;
 		}
 	}
 
-	// "Next" = first available in Config order; handoff only when that Task is not ours.
+	// "Next" = first unlocked leaf/group in Config order; handoff when that Task is not ours.
 	const handoffRoles =
-		firstAvailable && !firstAvailable.linkable && firstAvailable.roles.length > 0
-			? [...firstAvailable.roles]
+		firstOpen &&
+		!firstOpen.linkable &&
+		!firstOpen.group?.canSpawn &&
+		!firstOpen.group?.canClose &&
+		firstOpen.roles.length > 0
+			? [...firstOpen.roles]
 			: null;
 
 	return {

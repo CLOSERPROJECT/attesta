@@ -90,7 +90,7 @@ func TestRunTransformBindingsIncludeCatalogs(t *testing.T) {
 func TestBuildFormBindingsNoTareKindsInjection(t *testing.T) {
 	domain := EmptyDomain()
 	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
-	bindings := buildFormBindings(domain, AvailableTaskRef{
+	bindings := buildFormBindings(domain, ActionableTaskRef{
 		JobID: "intake", TaskID: "palletWeight", JobInstanceID: "L1",
 	}, map[string]any{
 		"tareKinds": map[string]any{"euro": 25, "industrial": 30},
@@ -173,7 +173,7 @@ func TestBuildTaskFormBundleExposesCatalogsNotTaskTareKinds(t *testing.T) {
 			},
 		},
 	}
-	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{
+	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
 		JobID: "intake", TaskID: "register",
 	})
 	if err != nil {

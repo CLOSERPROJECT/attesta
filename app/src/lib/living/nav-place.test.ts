@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { navPlaceKindFromRoute, resolveNavPlace } from './nav-place.js';
+import {
+	livingRouteCoordsFromPath,
+	navPlaceKindFromRoute,
+	resolveNavPlace
+} from './nav-place.js';
 import type { Worklist } from './types.js';
 
 const worklist: Worklist = {
@@ -20,8 +24,7 @@ const worklist: Worklist = {
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' },
-					viewerAvailable: ['register']
+					tasks: { register: 'actionable', palletWeight: 'locked' }
 				}
 			]
 		},
@@ -35,8 +38,7 @@ const worklist: Worklist = {
 				{
 					id: 'u1',
 					label: 'U-1',
-					tasks: { only: 'available' },
-					viewerAvailable: ['only']
+					tasks: { only: 'actionable' }
 				}
 			]
 		}
@@ -75,6 +77,12 @@ describe('navPlaceKindFromRoute', () => {
 	test('trailing slash on overview still → overview', () => {
 		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2/' })).toBe('overview');
 	});
+
+	test('5 path segments → task (nested group)', () => {
+		expect(
+			navPlaceKindFromRoute({ pathname: '/intake/NIR-2/lots/new/register' })
+		).toBe('task');
+	});
 });
 
 describe('resolveNavPlace', () => {
@@ -85,7 +93,7 @@ describe('resolveNavPlace', () => {
 				jobId: '',
 				jobInstanceId: '',
 				taskId: '',
-				provisional: false,
+				provisionalJob: false,
 				worklist
 			})
 		).toEqual({
@@ -103,7 +111,7 @@ describe('resolveNavPlace', () => {
 				jobId: 'intake',
 				jobInstanceId: 'NIR-2',
 				taskId: 'register',
-				provisional: false,
+				provisionalJob: false,
 				worklist
 			})
 		).toEqual({
@@ -121,25 +129,44 @@ describe('resolveNavPlace', () => {
 				jobId: 'untitled',
 				jobInstanceId: 'u1',
 				taskId: '',
-				provisional: false,
+				provisionalJob: false,
 				worklist
 			}).jobTitleLine
 		).toBeNull();
 	});
 
-	test('task provisional: task title only, back home', () => {
+	test('task provisional Job: task title only, back home', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
 				jobId: 'intake',
 				jobInstanceId: '',
 				taskId: 'register',
-				provisional: true,
+				provisionalJob: true,
 				worklist
 			})
 		).toEqual({
 			showBack: true,
 			backTarget: { kind: 'home' },
+			primaryLabel: 'Registrazione',
+			jobTitleLine: 'Camion'
+		});
+	});
+
+	test('task provisional Spawn: task title only, back overview', () => {
+		expect(
+			resolveNavPlace({
+				kind: 'task',
+				jobId: 'intake',
+				jobInstanceId: 'NIR-2',
+				taskId: 'register',
+				provisionalJob: false,
+				provisionalSpawn: true,
+				worklist
+			})
+		).toEqual({
+			showBack: true,
+			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion'
 		});
@@ -152,7 +179,7 @@ describe('resolveNavPlace', () => {
 				jobId: 'intake',
 				jobInstanceId: 'NIR-2',
 				taskId: 'register',
-				provisional: false,
+				provisionalJob: false,
 				worklist
 			})
 		).toEqual({
@@ -170,7 +197,7 @@ describe('resolveNavPlace', () => {
 				jobId: 'intake',
 				jobInstanceId: '',
 				taskId: 'unknownTask',
-				provisional: true,
+				provisionalJob: true,
 				worklist
 			}).primaryLabel
 		).toBe('unknownTask');
@@ -201,9 +228,56 @@ describe('resolveNavPlace', () => {
 				jobId: 'intake',
 				jobInstanceId: 'NIR-1',
 				taskId: 'codiceFir',
-				provisional: false,
+				provisionalJob: false,
 				worklist: wl
 			}).primaryLabel
 		).toBe('NIR-1 · codiceFir');
+	});
+});
+
+describe('livingRouteCoordsFromPath', () => {
+	test('flat Can-start 3-seg ignores leaked groupId (sv-router pollution)', () => {
+		// matchRoute leaves groupId=truckArrive on winning 3-seg; pathname wins.
+		expect(livingRouteCoordsFromPath({ pathname: '/intake/new/truckArrive' })).toEqual({
+			jobId: 'intake',
+			jobInstanceId: 'new',
+			taskId: 'truckArrive',
+			groupId: '',
+			groupInstanceId: ''
+		});
+	});
+
+	test('flat minted 3-seg ignores leaked groupId (weightCheck bounce class)', () => {
+		expect(
+			livingRouteCoordsFromPath({ pathname: '/intake/261102-1st-2/weightCheck' })
+		).toEqual({
+			jobId: 'intake',
+			jobInstanceId: '261102-1st-2',
+			taskId: 'weightCheck',
+			groupId: '',
+			groupInstanceId: ''
+		});
+	});
+
+	test('5-seg nested Spawn keeps group coords', () => {
+		expect(
+			livingRouteCoordsFromPath({ pathname: '/intake/NIR-2/lots/new/register' })
+		).toEqual({
+			jobId: 'intake',
+			jobInstanceId: 'NIR-2',
+			groupId: 'lots',
+			groupInstanceId: 'new',
+			taskId: 'register'
+		});
+	});
+
+	test('2-seg overview clears task and group coords', () => {
+		expect(livingRouteCoordsFromPath({ pathname: '/intake/NIR-2' })).toEqual({
+			jobId: 'intake',
+			jobInstanceId: 'NIR-2',
+			taskId: '',
+			groupId: '',
+			groupInstanceId: ''
+		});
 	});
 });

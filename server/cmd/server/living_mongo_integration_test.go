@@ -35,6 +35,7 @@ func TestEnsureLivingStoresUsesMongoWhenAvailable(t *testing.T) {
 		_ = db.Collection("living_domains").Drop(context.Background())
 		_ = db.Collection("living_org_configs").Drop(context.Background())
 		_ = db.Collection("living_active_config").Drop(context.Background())
+		_ = db.Collection("living_submission_links").Drop(context.Background())
 	})
 	server := &Server{store: NewMongoStore(db)}
 	server.ensureLivingStores()
@@ -43,6 +44,9 @@ func TestEnsureLivingStoresUsesMongoWhenAvailable(t *testing.T) {
 	}
 	if _, ok := server.livingConfigs.(*living.MongoConfigStore); !ok {
 		t.Fatalf("configs = %T, want *living.MongoConfigStore", server.livingConfigs)
+	}
+	if _, ok := server.livingLinks.(*living.MongoLinkStore); !ok {
+		t.Fatalf("links = %T, want *living.MongoLinkStore", server.livingLinks)
 	}
 	_, err = server.livingConfigs.ActiveVersion(t.Context(), "feragame")
 	if !errors.Is(err, living.ErrNotFound) {

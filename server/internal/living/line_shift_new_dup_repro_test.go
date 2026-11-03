@@ -4,28 +4,28 @@ import (
 	"testing"
 )
 
-// Nuovo turno: two startingNew Commits with the same evaluated shift id must not
-// append a duplicate line/1st JobInstance (JobPanel keyed-each would crash).
-func TestCommitLineShiftStartingNewTwiceDeniesDuplicate(t *testing.T) {
+// Nuovo turno: two startingNew Commits with the same evaluated date+turno must not
+// append a duplicate line JobInstance (JobPanel keyed-each would crash).
+func TestCommitOpenTurnoStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	first, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/shift",
-		Value:    map[string]any{"shift": "1st"},
+		TaskPath: "line/openTurno",
+		Value:    openTurnoValue(),
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.JobInstanceID != "1st" {
+	wantID := "2026-10-19-1st"
+	if first.JobInstanceID != wantID {
 		t.Fatalf("first mint = %q", first.JobInstanceID)
 	}
 
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/shift",
-		Value:    map[string]any{"shift": "1st"},
+		TaskPath: "line/openTurno",
+		Value:    openTurnoValue(),
 		Mint:     startingNewMint(),
 	})
 	var ce *CommitError
@@ -39,26 +39,26 @@ func TestCommitLineShiftStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	}
 	var count int
 	for _, inst := range domain.JobInstances {
-		if inst.JobID == "line" && inst.ID == "1st" {
+		if inst.JobID == "line" && inst.ID == wantID {
 			count++
 		}
 	}
 	if count != 1 {
-		t.Fatalf("line JobInstances with id 1st = %d (want 1); all=%#v", count, domain.JobInstances)
+		t.Fatalf("line JobInstances with id %s = %d (want 1); all=%#v", wantID, count, domain.JobInstances)
 	}
 }
 
 func TestMutateRejectsDuplicateJobInstance(t *testing.T) {
 	domain := EmptyDomain()
-	domain.JobInstances = []JobInstance{{JobID: "line", ID: "1st", Label: "Turno: 1st"}}
+	domain.JobInstances = []JobInstance{{JobID: "line", ID: "2026-10-19-1st", Label: "Turno: 2026-10-19 1°"}}
 	_, err := Mutate(domain, MutateRequest{
 		UserID:         "ada",
 		JobID:          "line",
-		TaskID:         "shift",
-		JobInstanceID:  "1st",
+		TaskID:         "openTurno",
+		JobInstanceID:  "2026-10-19-1st",
 		Timestamp:      "2026-10-30T12:00:00Z",
-		Facts:          map[string]any{"shift": "1st"},
-		NewJobInstance: &JobInstance{JobID: "line", ID: "1st", Label: "Turno: 1st"},
+		Facts:          map[string]any{"date": "2026-10-19", "turno": "1st"},
+		NewJobInstance: &JobInstance{JobID: "line", ID: "2026-10-19-1st", Label: "Turno: 2026-10-19 1°"},
 	})
 	var me MutateError
 	if err == nil || !asMutateError(err, &me) || me.Kind != "duplicate-job-instance" {

@@ -5,109 +5,55 @@ import (
 	"time"
 )
 
-func completeIntakeThroughPalletWeight(t *testing.T, c *Committer, instanceID string) Domain {
-	t.Helper()
-	domain, err := commitIntakeThroughPalletWeight(t.Context(), c, "feragame", instanceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return domain
-}
-
-func TestFixtureLineStartsWhenSomeQuantifier(t *testing.T) {
+func TestFixtureLineHasNoStartsWhen(t *testing.T) {
 	line := lineJob(t)
-	if line.StartsWhen == nil {
-		t.Fatal("line startsWhen missing")
-	}
-	if line.StartsWhen.Quantifier != "some" {
-		t.Fatalf("fixture quantifier = %q, want some", line.StartsWhen.Quantifier)
-	}
-	if line.StartsWhen.Task.JobID != "intake" || line.StartsWhen.Task.TaskID != "palletWeight" {
-		t.Fatalf("startsWhen.task = %#v", line.StartsWhen.Task)
+	if line.StartsWhen != nil {
+		t.Fatalf("line must not author startsWhen, got %#v", line.StartsWhen)
 	}
 	if !line.Repeatable {
-		t.Fatal("line must be repeatable so one gate Submission keeps start open")
+		t.Fatal("line must stay repeatable")
+	}
+	want := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "loadedExtracted"}
+	got := OrderedTaskIDs(line.Tasks)
+	if len(got) != len(want) {
+		t.Fatalf("line tasks = %v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("line tasks = %v, want %v", got, want)
+		}
 	}
 }
 
-func TestCanStartJobBeforeAndAfterPalletWeightGate(t *testing.T) {
+func TestCanStartJobLineWithoutStartsWhen(t *testing.T) {
 	line := lineJob(t)
-	intake := intakeTasks(t)
-	gateTask := palletWeightTask(intake)
-
 	empty := EmptyDomain()
-	if CanStartJob(line, "line", empty.Submissions, empty.JobInstances, gateTask) {
-		t.Fatal("line must not start before intake gate Submission")
-	}
-
-	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	domain := completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
-	if !IsStartsWhenSatisfied(line.StartsWhen, domain.Submissions, domain.JobInstances, gateTask) {
-		t.Fatal("fixture some must satisfy after one palletWeight Submission")
-	}
-	if !CanStartJob(line, "line", domain.Submissions, domain.JobInstances, gateTask) {
-		t.Fatal("line Job must be startable after gate")
+	if !CanStartJob(line, "line", empty.Submissions, empty.JobInstances, nil) {
+		t.Fatal("line must be startable with no startsWhen gate")
 	}
 }
 
-func TestCommitLineShiftDeniedViaCerbosBeforeStartsWhen(t *testing.T) {
-	pdp := policySimulatingPDP(t)
-	defer pdp.Close()
-
-	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "line/shift",
-		JobInstanceID: "1st",
-		Value:         map[string]any{"shift": "1st"},
-		Mint:          startingNewMint(),
-	})
-	var ce *CommitError
-	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
-		t.Fatalf("err = %v", err)
-	}
-	if _, getErr := domains.Get(t.Context(), "feragame"); getErr == nil {
-		t.Fatal("domain must stay unset when startsWhen denies first line Task")
-	}
-
-	line := lineJob(t)
-	if CanStartJob(line, "line", nil, nil, palletWeightTask(intakeTasks(t))) {
-		t.Fatal("CanStartJob must stay false without gate Submission")
-	}
-}
-
-func TestCommitLineShiftAllowedViaCerbosAfterStartsWhen(t *testing.T) {
+func TestCommitOpenTurnoViaCerbosOnEmptyDomain(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
 	c, _, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
-	intakeID := "NIR-261019-NO-1"
-	domain := completeIntakeThroughPalletWeight(t, c, intakeID)
-
-	line := lineJob(t)
-	if line.StartsWhen.Quantifier != "some" {
-		t.Fatalf("quantifier = %q", line.StartsWhen.Quantifier)
-	}
-	if !CanStartJob(line, "line", domain.Submissions, domain.JobInstances, palletWeightTask(intakeTasks(t))) {
-		t.Fatal("line must be startable after palletWeight gate")
-	}
-
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "line/shift",
-		JobInstanceID: "1st",
-		Value:         map[string]any{"shift": "1st"},
-		Mint:          startingNewMint(),
+		TaskPath: "line/openTurno",
+		Value:    openTurnoValue(),
+		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "1st" {
-		t.Fatalf("jobInstanceId = %q", result.JobInstanceID)
+	wantID := "2026-10-19-1st"
+	if result.JobInstanceID != wantID {
+		t.Fatalf("jobInstanceId = %q, want %q", result.JobInstanceID, wantID)
 	}
 	found := false
 	for _, inst := range result.Domain.JobInstances {
-		if inst.JobID == "line" && inst.ID == "1st" && inst.Label == "Turno: 1st" {
+		if inst.JobID == "line" && inst.ID == wantID {
 			found = true
 			break
 		}
@@ -115,29 +61,15 @@ func TestCommitLineShiftAllowedViaCerbosAfterStartsWhen(t *testing.T) {
 	if !found {
 		t.Fatalf("line Job instance missing: %#v", result.Domain.JobInstances)
 	}
-	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.JobID != "line" || last.TaskID != "shift" || last.JobInstanceID != "1st" {
-		t.Fatalf("shift Submission = %#v", last)
-	}
 }
 
-func TestSequenceOkForCommitIncludesStartsWhen(t *testing.T) {
+func TestSequenceOkForCommitLineWithoutStartsWhen(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
 	empty := EmptyDomain()
-	if sequenceOkForCommit(cfg, empty, "line", "shift", "1st") {
-		t.Fatal("sequenceOk must be false before startsWhen gate")
-	}
-
-	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	domain := completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
-	if !sequenceOkForCommit(cfg, domain, "line", "shift", "1st") {
-		t.Fatal("sequenceOk must be true after fixture some gate")
-	}
-	// Intake Jobs without startsWhen stay gated only by Unlock.
-	if !sequenceOkForCommit(cfg, domain, "intake", "weightCheck", "NIR-261019-NO-1") {
-		t.Fatal("intake Unlock must still pass independently of line startsWhen")
+	if !sequenceOkForCommit(cfg, empty, "line", "openTurno", "") {
+		t.Fatal("sequenceOk must allow openTurno without startsWhen")
 	}
 }

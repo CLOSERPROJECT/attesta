@@ -100,18 +100,17 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	c, domains, _ := testCommitter(t, AllowAllAuthorizer{})
 	c.HttpPort = UnconfiguredHttpPort{}
 
-	result, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
-		UserID: "ada", Org: "feragame", Roles: []string{"administration"},
-	}, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+	truckID := commitTruckArrive(t, c)
+	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		JobInstanceID: truckID,
+		Value:         registerLotValue(),
+		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatalf("Commit must succeed: %v", err)
 	}
-	if result.Domain.Kind("load")["NIR-261019-NO-1"]["client"] != "NO" {
+	if result.Domain.Kind("load")[firstLoadID(result.Domain)]["client"] != "NO" {
 		t.Fatalf("domain missing: %#v", result.Domain.Kind("load"))
 	}
 	if len(result.Links) != 0 {
@@ -124,7 +123,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")["NIR-261019-NO-1"]["client"] != "NO" {
+	if stored.Kind("load")[firstLoadID(stored)]["client"] != "NO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }
@@ -145,13 +144,12 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	c.HttpPort = NewSidecarHttpPort(srv.URL, "tok", srv.Client())
 
-	result, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
-		UserID: "ada", Org: "feragame", Roles: []string{"administration"},
-	}, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+	truckID := commitTruckArrive(t, c)
+	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		JobInstanceID: truckID,
+		Value:         registerLotValue(),
+		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -23,12 +23,13 @@ type SeedOptions struct {
 }
 
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
-// Intake ids follow Feragame load grammar from seedRegisterValue (date 2026-11-02).
+// Truck grammar: YYMMDD-turno-n from seedTruckArriveValue (date 2026-11-02).
+// Line grammar: date-turno from openTurno.
 const (
-	SeedIntakeAfterRegisterID = "NIR-261102-NO-1"
-	SeedIntakeAfterFirID      = "NIR-261102-SU-1"
-	SeedIntakeWeightCheckID   = "NIR-261102-NO-2"
-	SeedLineShiftID           = "1st"
+	SeedTruckLotsOpenID    = "261102-1st-1"
+	SeedTruckWeightCheckID = "261102-1st-2"
+	SeedLineWeighOpenID    = "2026-11-02-1st"
+	SeedLineLineLoadID     = "2026-11-02-2nd"
 )
 
 // SeedDemo puts the demo Feragame Org Config as the Active Config version and,
@@ -81,8 +82,8 @@ func domainSeedEmpty(d Domain) bool {
 	return len(d.JobInstances) == 0 && len(d.Submissions) == 0
 }
 
-// seedStagedDemoDomain wipes then Commits the minimal intake/line stage matrix so
-// split-role Worklists diverge (administration / logistic / line).
+// seedStagedDemoDomain wipes then Commits the plant stage matrix so split-role
+// Worklists diverge (administration / logistic / line) under Task groups.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
 	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
 		return err
@@ -97,81 +98,98 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	logistic := OperatorIdentity{UserID: "seed-logistic", Org: org, Roles: []string{"logistic"}}
 	lineOp := OperatorIdentity{UserID: "seed-line", Org: org, Roles: []string{"line"}}
 
-	afterReg, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath: "intake/register",
-		Value:    seedRegisterValue("NO", 2),
+	lotsOpen, err := seedCommit(ctx, c, org, admin, CommitRequest{
+		TaskPath: "intake/truckArrive",
+		Value:    seedTruckArriveValue("1st", 1000),
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		return err
 	}
-	if afterReg.JobInstanceID != SeedIntakeAfterRegisterID {
-		return fmt.Errorf("living seed: after-register id %q, want %q", afterReg.JobInstanceID, SeedIntakeAfterRegisterID)
+	if lotsOpen.JobInstanceID != SeedTruckLotsOpenID {
+		return fmt.Errorf("living seed: lots-open truck id %q, want %q", lotsOpen.JobInstanceID, SeedTruckLotsOpenID)
 	}
 
-	afterFir, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath: "intake/register",
-		Value:    seedRegisterValue("SU", 2),
+	wcTruck, err := seedCommit(ctx, c, org, admin, CommitRequest{
+		TaskPath: "intake/truckArrive",
+		Value:    seedTruckArriveValue("1st", 2000),
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		return err
 	}
-	if afterFir.JobInstanceID != SeedIntakeAfterFirID {
-		return fmt.Errorf("living seed: after-fir id %q, want %q", afterFir.JobInstanceID, SeedIntakeAfterFirID)
+	if wcTruck.JobInstanceID != SeedTruckWeightCheckID {
+		return fmt.Errorf("living seed: weightCheck truck id %q, want %q", wcTruck.JobInstanceID, SeedTruckWeightCheckID)
 	}
-	if _, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: afterFir.JobInstanceID,
-		Value: map[string]any{"codiceFir": "FIR-SEED-FIR"},
-	}); err != nil {
+	lot, err := seedCommit(ctx, c, org, admin, CommitRequest{
+		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		JobInstanceID: wcTruck.JobInstanceID,
+		Value:         seedLotRegisterValue("NO", "FIR-SEED-WC", 2, 1400),
+		Mint:          spawningNewMint(),
+	})
+	if err != nil {
 		return err
+	}
+	var loadID string
+	for id := range lot.Domain.Kind("load") {
+		loadID = id
+		break
+	}
+	if loadID == "" {
+		return fmt.Errorf("living seed: expected minted load")
+	}
+	if _, err := c.CloseGroup(ctx, org, admin, CloseGroupRequest{
+		JobID: "intake", JobInstanceID: wcTruck.JobInstanceID, GroupID: "lots",
+	}); err != nil {
+		return fmt.Errorf("living seed close lots: %w", err)
 	}
 
-	wcReady, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath: "intake/register",
-		Value:    seedRegisterValue("NO", 2),
+	weighOpen, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+		TaskPath: "line/openTurno",
+		Value:    map[string]any{"date": "2026-11-02", "turno": "1st"},
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		return err
 	}
-	if wcReady.JobInstanceID != SeedIntakeWeightCheckID {
-		return fmt.Errorf("living seed: weightCheck id %q, want %q", wcReady.JobInstanceID, SeedIntakeWeightCheckID)
+	if weighOpen.JobInstanceID != SeedLineWeighOpenID {
+		return fmt.Errorf("living seed: weigh-open line id %q, want %q", weighOpen.JobInstanceID, SeedLineWeighOpenID)
 	}
-	if _, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: wcReady.JobInstanceID,
-		Value: map[string]any{"codiceFir": "FIR-SEED-WC"},
-	}); err != nil {
+
+	lineLoadReady, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+		TaskPath: "line/openTurno",
+		Value:    map[string]any{"date": "2026-11-02", "turno": "2nd"},
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
 		return err
+	}
+	if lineLoadReady.JobInstanceID != SeedLineLineLoadID {
+		return fmt.Errorf("living seed: lineLoad line id %q, want %q", lineLoadReady.JobInstanceID, SeedLineLineLoadID)
 	}
 	if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: wcReady.JobInstanceID,
+		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+		JobInstanceID: lineLoadReady.JobInstanceID,
 		Value: map[string]any{
 			"averagePanelWeight": 10.0,
 			"tareKind":           "euro",
 			"weights": map[string]any{
-				wcReady.JobInstanceID + ".1": map[string]any{
+				loadID + ".1": map[string]any{
 					"weight": 125.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0,
 				},
-				wcReady.JobInstanceID + ".2": map[string]any{
+				loadID + ".2": map[string]any{
 					"weight": 100.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0,
 				},
 			},
 		},
+		Mint: spawningNewMint(),
 	}); err != nil {
 		return err
 	}
-
-	shift, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
-		TaskPath: "line/shift",
-		Value:    map[string]any{"shift": SeedLineShiftID},
-		Mint:     startingNewMint(),
-	})
-	if err != nil {
-		return err
-	}
-	if shift.JobInstanceID != SeedLineShiftID {
-		return fmt.Errorf("living seed: line shift id %q, want %q", shift.JobInstanceID, SeedLineShiftID)
+	if _, err := c.CloseGroup(ctx, org, logistic, CloseGroupRequest{
+		JobID: "line", JobInstanceID: lineLoadReady.JobInstanceID, GroupID: "palletWeight",
+	}); err != nil {
+		return fmt.Errorf("living seed close palletWeight: %w", err)
 	}
 	return nil
 }
@@ -184,16 +202,22 @@ func seedCommit(ctx context.Context, c *Committer, org string, op OperatorIdenti
 	return res, nil
 }
 
-func seedRegisterValue(client string, palletCount float64) map[string]any {
+func seedTruckArriveValue(turno string, truckWeight float64) map[string]any {
 	return map[string]any{
-		"client":             client,
-		"date":               "2026-11-02",
-		"wasteCode":          "191212",
-		"idoneitaRiutilizzo": "NIR",
-		"truckWeight":        1000.0,
-		"truckTare":          200.0,
-		"palletCount":        palletCount,
-		"notes":              "",
+		"date":        "2026-11-02",
+		"turno":       turno,
+		"truckWeight": truckWeight,
+	}
+}
+
+func seedLotRegisterValue(client, numeroFir string, palletCount, truckWeightAfter float64) map[string]any {
+	return map[string]any{
+		"client":           client,
+		"wasteCode":        "191212",
+		"numeroFir":        numeroFir,
+		"palletCount":      palletCount,
+		"truckWeightAfter": truckWeightAfter,
+		"notes":            "",
 	}
 }
 

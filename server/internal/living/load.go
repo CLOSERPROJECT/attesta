@@ -36,6 +36,8 @@ var ErrTaskBundleForbidden = errors.New("living: task form bundle forbidden")
 type Loader struct {
 	Domains DomainStore
 	Configs ConfigStore
+	// LinkStore supplies post-Commit links for TaskRecap. Nil → facts only.
+	LinkStore LinkStore
 }
 
 // Load returns the org Domain (empty when none stored) and the Active Config
@@ -86,12 +88,21 @@ func (l *Loader) Load(ctx context.Context, org string, op OperatorIdentity) (Loa
 }
 
 // LoadTaskBundle returns one Task form bundle for jobId+taskId+jobInstanceId
-// (empty or "new" = provisional start). Denied when outside viewer Worklist scope.
-func (l *Loader) LoadTaskBundle(ctx context.Context, org string, op OperatorIdentity, jobID, taskID, jobInstanceID string) (*TaskFormBundle, error) {
+// (empty or "new" = provisional start). Optional groupId + groupInstanceId
+// address nested leaves (provisional group instance "new" → empty). Denied
+// when outside viewer Worklist scope.
+func (l *Loader) LoadTaskBundle(
+	ctx context.Context,
+	org string,
+	op OperatorIdentity,
+	jobID, taskID, jobInstanceID, groupID, groupInstanceID string,
+) (*TaskFormBundle, error) {
 	org = strings.TrimSpace(org)
 	jobID = strings.TrimSpace(jobID)
 	taskID = strings.TrimSpace(taskID)
+	groupID = strings.TrimSpace(groupID)
 	jobInstanceID = NormalizeJobInstanceID(jobInstanceID)
+	groupInstanceID = NormalizeGroupInstanceID(groupInstanceID)
 	if org == "" || jobID == "" || taskID == "" {
 		return nil, fmt.Errorf("living: org, jobId, and taskId required")
 	}
@@ -117,7 +128,13 @@ func (l *Loader) LoadTaskBundle(ctx context.Context, org string, op OperatorIden
 	}
 
 	wl := ProjectWorklist(cfg, domain, op)
-	ref := AvailableTaskRef{JobID: jobID, TaskID: taskID, JobInstanceID: jobInstanceID}
+	ref := ActionableTaskRef{
+		JobID:           jobID,
+		TaskID:          taskID,
+		JobInstanceID:   jobInstanceID,
+		GroupID:         groupID,
+		GroupInstanceID: groupInstanceID,
+	}
 	if !ViewerMayMountTask(cfg, wl, ref) {
 		return nil, ErrTaskBundleForbidden
 	}

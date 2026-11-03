@@ -335,18 +335,18 @@ func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 	}
 }
 
-func TestFirstAvailableTaskAndCompileDerivedEdges(t *testing.T) {
+func TestFirstActionableTaskAndCompileDerivedEdges(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
 	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
-	ref, ok := FirstAvailableTask(cfg, wl)
-	if !ok || ref.JobID != "intake" || ref.TaskID != "register" || ref.JobInstanceID != "" {
+	ref, ok := FirstActionableTask(cfg, wl)
+	if !ok || ref.JobID != "intake" || ref.TaskID != "truckArrive" || ref.JobInstanceID != "" {
 		t.Fatalf("first = %#v ok=%v", ref, ok)
 	}
-	ref, ok = FirstAvailableTask(OrgConfig{}, Worklist{})
+	ref, ok = FirstActionableTask(OrgConfig{}, Worklist{})
 	if ok || ref.JobID != "" {
 		t.Fatalf("empty first = %#v", ref)
 	}
@@ -501,7 +501,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	deny := &Handler{Loader: loader, Committer: &Committer{Domains: domains, Configs: configs, Authorizer: DenyAllAuthorizer{}}, Gate: gateOK}
 	rec = httptest.NewRecorder()
 	deny.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(
-		`{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`,
+		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`,
 	)))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("unauthorized commit = %d body=%s", rec.Code, rec.Body.String())
@@ -517,9 +517,9 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(
-		`{"taskPath":"intake/register","jobInstanceId":"x","mint":{"kind":"none"},"value":{}}`,
+		`{"taskPath":"intake/weightCheck","jobInstanceId":"x","mint":{"kind":"none"},"value":{}}`,
 	)))
-	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusForbidden {
+	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusForbidden && rec.Code != http.StatusConflict {
 		t.Fatalf("prep/forbidden path = %d body=%s", rec.Code, rec.Body.String())
 	}
 
@@ -1273,26 +1273,27 @@ func TestCommitErrorWrappingViaApply(t *testing.T) {
 		t.Fatalf("unknown task = %v", err)
 	}
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", Value: registerValue(), Mint: startingNewMint(),
+		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: "", Value: map[string]any{"codiceFir": "X"}, Mint: startingNewMint(),
+		TaskPath: "intake/weightCheck", JobInstanceID: "", Value: map[string]any{}, Mint: startingNewMint(),
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("startingNew non-first = %v", err)
 	}
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/shift", Value: map[string]any{"shift": "1st"}, Mint: startingNewMint(),
+	lineOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
+	if _, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
+		TaskPath: "line/openTurno", Value: openTurnoValue(), Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/shift", Value: map[string]any{"shift": "1st"}, Mint: startingNewMint(),
+	_, err = c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
+		TaskPath: "line/openTurno", Value: openTurnoValue(), Mint: startingNewMint(),
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("duplicate shift instance = %v", err)
+		t.Fatalf("duplicate openTurno instance = %v", err)
 	}
 }
 
@@ -1310,15 +1311,19 @@ func TestReferencedStartsWhenAndRolesHelpers(t *testing.T) {
 	if referencedStartsWhenTask(cfg, &StartsWhen{Task: StartsWhenRef{JobID: "intake", TaskID: "missing"}}) != nil {
 		t.Fatal("missing task")
 	}
-	if got := referencedStartsWhenTask(cfg, &StartsWhen{Task: StartsWhenRef{JobID: "intake", TaskID: "palletWeight"}}); got == nil {
+	if got := referencedStartsWhenTask(cfg, &StartsWhen{Task: StartsWhenRef{JobID: "intake", TaskID: "truckArrive"}}); got == nil {
 		t.Fatal("expected task")
 	}
 	if rolesAllowedForTask(cfg, "missing", "x") != nil {
 		t.Fatal("roles missing job")
 	}
-	roles := rolesAllowedForTask(cfg, "intake", "register")
+	roles := rolesAllowedForTask(cfg, "intake", "truckArrive")
 	if len(roles) == 0 {
-		t.Fatal("register roles")
+		t.Fatal("truckArrive roles")
+	}
+	nestedRoles := rolesAllowedForPath(cfg, TaskPathRef{JobID: "intake", GroupID: "lots", TaskID: "register"})
+	if len(nestedRoles) == 0 {
+		t.Fatal("lots/register roles")
 	}
 }
 
@@ -1358,14 +1363,14 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "missing", TaskID: "x"}); err == nil {
+	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "missing", TaskID: "x"}); err == nil {
 		t.Fatal("unknown job")
 	}
-	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "intake", TaskID: "missing"}); err == nil {
+	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "missing"}); err == nil {
 		t.Fatal("unknown task")
 	}
 	cfg.Jobs.Values["intake"] = "nope"
-	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "intake", TaskID: "register"}); err == nil {
+	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "truckArrive"}); err == nil {
 		t.Fatal("invalid job")
 	}
 	cfg, _ = LoadFeragameConfigFixture()
@@ -1376,7 +1381,7 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	}
 	intake.Tasks[0] = TaskConfig(task)
 	cfg.Jobs.Values["intake"] = intake
-	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "intake", TaskID: "register", JobInstanceID: ""}); err == nil {
+	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "register", JobInstanceID: ""}); err == nil {
 		t.Fatal("chrome collision")
 	}
 
@@ -1388,7 +1393,7 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	}
 	intake.Tasks[0] = TaskConfig(task)
 	cfg.Jobs.Values["intake"] = intake
-	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "intake", TaskID: "register"}); err == nil {
+	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "truckArrive"}); err == nil {
 		t.Fatal("bad dataReport dto")
 	}
 	task["chrome"] = map[string]any{
@@ -1396,7 +1401,7 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	}
 	intake.Tasks[0] = TaskConfig(task)
 	cfg.Jobs.Values["intake"] = intake
-	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "intake", TaskID: "register"}); err == nil {
+	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "truckArrive"}); err == nil {
 		t.Fatal("bad dataReport expr")
 	}
 	task["chrome"] = map[string]any{
@@ -1404,7 +1409,7 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	}
 	intake.Tasks[0] = TaskConfig(task)
 	cfg.Jobs.Values["intake"] = intake
-	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), AvailableTaskRef{JobID: "intake", TaskID: "register"})
+	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "truckArrive"})
 	if err != nil || bundle == nil {
 		t.Fatalf("good dataReport = %v %#v", err, bundle)
 	}
@@ -1476,7 +1481,7 @@ func (errAuthorizer) AllowCommit(context.Context, AuthorizeCommit) (bool, error)
 func TestCommitAuthorizerErrorAndReadyWhen(t *testing.T) {
 	c, _, _ := testCommitter(t, errAuthorizer{})
 	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
-		TaskPath: "intake/register", Value: registerValue(), Mint: startingNewMint(),
+		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err == nil || !strings.Contains(err.Error(), "auth boom") {
 		t.Fatalf("authorizer err = %v", err)
@@ -1595,8 +1600,8 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	if additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{"nope", map[string]any{"type": "number"}}}) {
 		t.Fatal("anyOf must not classify")
 	}
-	if additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
-		t.Fatal("anyOf string must not classify as cell map")
+	if !additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
+		t.Fatal("anyOf string must classify as cell map")
 	}
 	if msg := enforceRequiredMapKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {
 		t.Fatalf("joinComma via required keys = %q", msg)

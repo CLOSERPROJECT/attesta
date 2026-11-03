@@ -48,15 +48,14 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 	if !ok {
 		t.Fatal("missing line worklist job")
 	}
-	if line.CanStart {
-		t.Fatal("line canStart want false before intake palletWeight")
+	if !line.CanStart {
+		t.Fatal("line canStart want true (plant line has no startsWhen)")
 	}
 }
 
 func TestLoadJSONWorklistIntakeUnlockOrder(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	instanceID := "NIR-261019-NO-1"
-	commitThroughCodiceFir(t, c, instanceID)
+	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 
 	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
@@ -70,43 +69,37 @@ func TestLoadJSONWorklistIntakeUnlockOrder(t *testing.T) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		t.Fatal(err)
 	}
-	wlRaw, ok := wire["worklist"].(map[string]any)
-	if !ok {
+	if _, ok := wire["worklist"].(map[string]any); !ok {
 		t.Fatalf("Load JSON missing worklist: %s", string(raw))
 	}
-	_ = wlRaw
 
 	intake, ok := worklistJobByID(result.Worklist, "intake")
 	if !ok {
 		t.Fatal("missing intake")
 	}
-	inst, ok := worklistInstance(intake, instanceID)
+	inst, ok := worklistInstance(intake, truckID)
 	if !ok {
-		t.Fatalf("missing intake instance %s", instanceID)
+		t.Fatalf("missing intake instance %s", truckID)
 	}
-	if inst.Tasks["register"] != TaskStatusDone {
-		t.Fatalf("register = %q, want done", inst.Tasks["register"])
+	if inst.Tasks["truckArrive"] != TaskStatusDone {
+		t.Fatalf("truckArrive = %q, want done", inst.Tasks["truckArrive"])
 	}
-	if inst.Tasks["codiceFir"] != TaskStatusDone {
-		t.Fatalf("codiceFir = %q, want done", inst.Tasks["codiceFir"])
+	if inst.Tasks["lots"] != TaskStatusDone {
+		t.Fatalf("lots = %q, want done", inst.Tasks["lots"])
 	}
-	if inst.Tasks["palletWeight"] != TaskStatusAvailable {
-		t.Fatalf("palletWeight = %q, want available", inst.Tasks["palletWeight"])
-	}
-	if inst.Tasks["weightCheck"] != TaskStatusLocked {
-		t.Fatalf("weightCheck = %q, want locked", inst.Tasks["weightCheck"])
+	if inst.Tasks["weightCheck"] != TaskStatusActionable {
+		t.Fatalf("weightCheck = %q, want actionable", inst.Tasks["weightCheck"])
 	}
 
 	line, ok := worklistJobByID(result.Worklist, "line")
-	if !ok || line.CanStart {
-		t.Fatalf("line canStart before palletWeight = %#v", line)
+	if !ok || !line.CanStart {
+		t.Fatalf("line canStart = %#v, want true", line)
 	}
 }
 
 func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	intakeID := "NIR-261019-NO-1"
-	completeIntakeThroughPalletWeight(t, c, intakeID)
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
 
 	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
@@ -117,17 +110,16 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 		t.Fatal("missing line")
 	}
 	if !line.CanStart {
-		t.Fatal("line canStart want true after intake palletWeight")
+		t.Fatal("line canStart want true")
 	}
 
-	commitLineShift(t, c, "1st")
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: "1st",
+		TaskPath: "line/lineLoad", JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
-				intakeID + ".1": "done",
-				intakeID + ".2": "partial",
+				loadID + ".1": "done",
+				loadID + ".2": "partial",
 			},
 		},
 	})
@@ -154,18 +146,18 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 	if !ok {
 		t.Fatal("decoded missing line worklist")
 	}
-	inst, ok := worklistInstance(line, "1st")
+	inst, ok := worklistInstance(line, lineID)
 	if !ok {
-		t.Fatal("missing line instance 1st")
+		t.Fatalf("missing line instance %s", lineID)
 	}
-	if inst.Tasks["shift"] != TaskStatusDone {
-		t.Fatalf("shift = %q, want done", inst.Tasks["shift"])
+	if inst.Tasks["openTurno"] != TaskStatusDone {
+		t.Fatalf("openTurno = %q, want done", inst.Tasks["openTurno"])
 	}
 	if inst.Tasks["lineLoad"] != TaskStatusDone {
 		t.Fatalf("lineLoad after Submission = %q, want done", inst.Tasks["lineLoad"])
 	}
-	if inst.Tasks["containerReg"] != TaskStatusAvailable {
-		t.Fatalf("containerReg = %q, want available after lineLoad Submission", inst.Tasks["containerReg"])
+	if inst.Tasks["containerReg"] != TaskStatusActionable {
+		t.Fatalf("containerReg = %q, want actionable after lineLoad Submission", inst.Tasks["containerReg"])
 	}
 }
 
@@ -200,7 +192,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	}
 	line, _ := worklistJobByID(got.Worklist, "line")
 	if line.CanStart {
-		t.Fatal("line canStart should be false")
+		t.Fatal("administration viewer must not canStart line (openTurno is line-only)")
 	}
 }
 
@@ -214,7 +206,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 		},
 	}
 
-	body := `{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
+	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
@@ -251,29 +243,28 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing intake instance %q", got.JobInstanceID)
 	}
-	if inst.Tasks["register"] != TaskStatusDone {
-		t.Fatalf("register = %q, want done", inst.Tasks["register"])
+	if inst.Tasks["truckArrive"] != TaskStatusDone {
+		t.Fatalf("truckArrive = %q, want done", inst.Tasks["truckArrive"])
 	}
-	if inst.Tasks["codiceFir"] != TaskStatusAvailable {
-		t.Fatalf("codiceFir = %q, want available", inst.Tasks["codiceFir"])
+	if inst.Tasks["lots"] != TaskStatusAvailable {
+		t.Fatalf("lots = %q, want available", inst.Tasks["lots"])
 	}
 	line, _ := worklistJobByID(got.Worklist, "line")
 	if line.CanStart {
-		t.Fatal("line canStart should still be false after register only")
+		t.Fatal("administration viewer must not canStart line after truckArrive")
 	}
 }
 
 func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
-	commitLineShift(t, c, "1st")
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
 	lineOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	result, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: "1st",
+		TaskPath: "line/lineLoad", JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
-				"NIR-261019-NO-1.1": "done",
-				"NIR-261019-NO-1.2": "partial",
+				loadID + ".1": "done",
+				loadID + ".2": "partial",
 			},
 		},
 	})
@@ -287,9 +278,9 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if !line.CanStart {
 		t.Fatal("line canStart want true")
 	}
-	inst, ok := worklistInstance(line, "1st")
+	inst, ok := worklistInstance(line, lineID)
 	if !ok {
-		t.Fatal("missing line instance 1st")
+		t.Fatalf("missing line instance %s", lineID)
 	}
 	if inst.Tasks["lineLoad"] != TaskStatusDone {
 		t.Fatalf("lineLoad = %q, want done after Submission", inst.Tasks["lineLoad"])
@@ -327,29 +318,27 @@ func TestProjectWorklistViewerRoleSplitCanStartAndChrome(t *testing.T) {
 		t.Fatal("logistic missing intake")
 	}
 	if !adminIntake.CanStart {
-		t.Fatal("administration canStart intake want true (first Task register)")
+		t.Fatal("administration canStart intake want true (first Task truckArrive)")
 	}
 	if logIntake.CanStart {
-		t.Fatal("logistic canStart intake want false (first Task register is administration-only)")
+		t.Fatal("logistic canStart intake want false (first Task truckArrive is administration-only)")
 	}
-	if len(adminIntake.Tasks) == 0 || adminIntake.Tasks[0].ID != "register" {
+	if len(adminIntake.Tasks) == 0 || adminIntake.Tasks[0].ID != "truckArrive" {
 		t.Fatalf("task chrome = %#v", adminIntake.Tasks)
 	}
 	if got := adminIntake.Tasks[0].Roles; len(got) != 1 || got[0] != "administration" {
-		t.Fatalf("register roles chrome = %#v", got)
+		t.Fatalf("truckArrive roles chrome = %#v", got)
 	}
 	if adminIntake.Tasks[0].Title == "" {
-		t.Fatal("register title chrome empty")
+		t.Fatal("truckArrive title chrome empty")
 	}
-	if adminIntake.Title != "Camion" {
-		t.Fatalf("intake job title = %q", adminIntake.Title)
+	lots := worklistTaskByIDOrFatal(t, adminIntake, "lots")
+	if lots.ID != "lots" {
+		t.Fatalf("lots chrome = %#v", lots)
 	}
-	pallet := worklistTaskByIDOrFatal(t, adminIntake, "palletWeight")
-	if len(pallet.Roles) != 1 || pallet.Roles[0] != "logistic" {
-		t.Fatalf("palletWeight roles = %#v", pallet.Roles)
-	}
-	if pallet.Title == "" {
-		t.Fatal("palletWeight title empty")
+	weight := worklistTaskByIDOrFatal(t, adminIntake, "weightCheck")
+	if len(weight.Roles) != 1 || weight.Roles[0] != "administration" {
+		t.Fatalf("weightCheck roles = %#v", weight.Roles)
 	}
 }
 
@@ -364,8 +353,8 @@ func worklistTaskByIDOrFatal(t *testing.T, job WorklistJob, taskID string) Workl
 
 func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	instanceID := "NIR-261019-NO-1"
-	commitThroughCodiceFir(t, c, instanceID)
+	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
 
 	cfg := mustActiveConfig(t, c)
 	domain, err := c.Domains.Get(t.Context(), "feragame")
@@ -379,34 +368,44 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	adminWL := ProjectWorklist(cfg, domain, admin)
 	logWL := ProjectWorklist(cfg, domain, logistic)
 
-	adminIntake, _ := worklistJobByID(adminWL, "intake")
-	logIntake, _ := worklistJobByID(logWL, "intake")
-	adminInst, ok := worklistInstance(adminIntake, instanceID)
+	adminLine, _ := worklistJobByID(adminWL, "line")
+	logLine, _ := worklistJobByID(logWL, "line")
+	adminInst, ok := worklistInstance(adminLine, lineID)
 	if !ok {
-		t.Fatal("admin missing instance")
+		t.Fatal("admin missing line instance")
 	}
-	logInst, ok := worklistInstance(logIntake, instanceID)
+	logInst, ok := worklistInstance(logLine, lineID)
 	if !ok {
-		t.Fatal("logistic missing instance")
+		t.Fatal("logistic missing line instance")
 	}
-	// Unlock/Submission status stays shared (not remapped by roles).
 	if adminInst.Tasks["palletWeight"] != TaskStatusAvailable || logInst.Tasks["palletWeight"] != TaskStatusAvailable {
-		t.Fatalf("palletWeight status admin=%q logistic=%q, want available", adminInst.Tasks["palletWeight"], logInst.Tasks["palletWeight"])
-	}
-	if containsString(adminInst.ViewerAvailable, "palletWeight") {
-		t.Fatalf("administration ViewerAvailable must exclude palletWeight: %#v", adminInst.ViewerAvailable)
-	}
-	if !containsString(logInst.ViewerAvailable, "palletWeight") {
-		t.Fatalf("logistic ViewerAvailable must include palletWeight: %#v", logInst.ViewerAvailable)
+		t.Fatalf("palletWeight group status admin=%q logistic=%q, want available (group unlock)", adminInst.Tasks["palletWeight"], logInst.Tasks["palletWeight"])
 	}
 
-	adminRefs := CollectAvailableTaskRefs(cfg, adminWL)
-	logRefs := CollectAvailableTaskRefs(cfg, logWL)
-	if hasAvailableRef(adminRefs, "intake", "palletWeight", instanceID) {
-		t.Fatalf("administration Available affordances must exclude palletWeight: %#v", adminRefs)
+	adminIntake, _ := worklistJobByID(adminWL, "intake")
+	logIntake, _ := worklistJobByID(logWL, "intake")
+	adminTruck, ok := worklistInstance(adminIntake, truckID)
+	if !ok {
+		t.Fatal("admin missing intake instance")
 	}
-	if !hasAvailableRef(logRefs, "intake", "palletWeight", instanceID) {
-		t.Fatalf("logistic Available affordances must include palletWeight: %#v", logRefs)
+	logTruck, ok := worklistInstance(logIntake, truckID)
+	if !ok {
+		t.Fatal("logistic missing intake instance")
+	}
+	if adminTruck.Tasks["weightCheck"] != TaskStatusActionable {
+		t.Fatalf("admin weightCheck = %q, want actionable", adminTruck.Tasks["weightCheck"])
+	}
+	if logTruck.Tasks["weightCheck"] != TaskStatusAvailable {
+		t.Fatalf("logistic weightCheck = %q, want available (handoff)", logTruck.Tasks["weightCheck"])
+	}
+
+	adminRefs := CollectActionableTaskRefs(cfg, adminWL)
+	logRefs := CollectActionableTaskRefs(cfg, logWL)
+	if hasNestedActionableRef(adminRefs, "line", "palletWeight", lineID, "weigh") {
+		t.Fatalf("administration Available affordances must exclude weigh: %#v", adminRefs)
+	}
+	if !hasNestedActionableRef(logRefs, "line", "palletWeight", lineID, "weigh") {
+		t.Fatalf("logistic Available affordances must include weigh: %#v", logRefs)
 	}
 
 	adminLoaded, err := loader.Load(t.Context(), "feragame", admin)
@@ -420,26 +419,17 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	if len(adminLoaded.TaskFormBundles) != 0 || len(logLoaded.TaskFormBundles) != 0 {
 		t.Fatal("home Load must omit bulk Task form bundles for all viewers")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "palletWeight", instanceID); err == nil {
-		t.Fatal("administration addressed fetch must forbid palletWeight")
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID); err == nil {
+		t.Fatal("administration addressed fetch must forbid weigh")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", logistic, "intake", "palletWeight", instanceID); err != nil {
-		t.Fatalf("logistic addressed fetch must allow palletWeight: %v", err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", logistic, "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID); err != nil {
+		t.Fatalf("logistic addressed fetch must allow weigh: %v", err)
 	}
 }
 
-func hasAvailableRef(refs []AvailableTaskRef, jobID, taskID, jobInstanceID string) bool {
+func hasActionableRef(refs []ActionableTaskRef, jobID, taskID, jobInstanceID string) bool {
 	for _, r := range refs {
 		if r.JobID == jobID && r.TaskID == taskID && r.JobInstanceID == jobInstanceID {
-			return true
-		}
-	}
-	return false
-}
-
-func containsString(ids []string, want string) bool {
-	for _, id := range ids {
-		if id == want {
 			return true
 		}
 	}
@@ -453,5 +443,215 @@ func bundleHasTask(bundles []*TaskFormBundle, taskID string) bool {
 		}
 	}
 	return false
+}
+
+func TestProjectWorklistGroupChromeSpawnCloseAndChildStatuses(t *testing.T) {
+	lots := TaskConfig{
+		"id":                           "lots",
+		"kind":                         "group",
+		"repeatable":                   true,
+		"startLabel":                   "Nuovo lotto",
+		"closeLabel":                   "Chiudi scarico",
+		"closeRequiresChildSubmission": true,
+		"tasks": []TaskConfig{
+			{
+				"id": "register", "roles": []any{"administration"},
+				"schema": map[string]any{"title": "Register"},
+			},
+		},
+	}
+	cfg := OrgConfig{
+		Jobs: OrderedObject{
+			Keys: []string{"intake"},
+			Values: map[string]any{
+				"intake": Job{
+					Repeatable: true,
+					Tasks: []TaskConfig{
+						{
+							"id": "truckArrive", "roles": []any{"administration"},
+							"schema": map[string]any{"title": "Arrive"},
+						},
+						lots,
+						{
+							"id": "weightCheck", "roles": []any{"administration"},
+							"schema": map[string]any{"title": "Weight"},
+						},
+					},
+				},
+			},
+		},
+	}
+	op := OperatorIdentity{UserID: "ada", Org: "test", Roles: []string{"administration"}}
+
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "truck"}}
+	domain.Submissions = []Submission{sub("intake", "truckArrive", "T1")}
+
+	wl := ProjectWorklist(cfg, domain, op)
+	intake, ok := worklistJobByID(wl, "intake")
+	if !ok {
+		t.Fatal("missing intake")
+	}
+	inst, ok := worklistInstance(intake, "T1")
+	if !ok {
+		t.Fatal("missing instance")
+	}
+	if inst.Tasks["lots"] != TaskStatusAvailable {
+		t.Fatalf("lots = %q, want available", inst.Tasks["lots"])
+	}
+	if inst.Tasks["weightCheck"] != TaskStatusLocked {
+		t.Fatalf("weightCheck = %q, want locked", inst.Tasks["weightCheck"])
+	}
+	g, ok := inst.Groups["lots"]
+	if !ok || !g.CanSpawn || g.CanClose || g.StartLabel != "Nuovo lotto" || g.CloseLabel != "Chiudi scarico" {
+		t.Fatalf("open empty lots chrome = %#v", g)
+	}
+	regChrome, ok := worklistTaskByID(intake, "register")
+	if !ok || regChrome.Title != "Register" {
+		t.Fatalf("nested child chrome on job.Tasks = %#v ok=%v", regChrome, ok)
+	}
+	if refs := CollectActionableTaskRefs(cfg, wl); hasActionableRef(refs, "intake", "weightCheck", "T1") {
+		t.Fatalf("no flat actionable while only group is open: %#v", refs)
+	}
+
+	domain, err := SpawnGroupInstance(domain, "intake", "T1", "lots", "L1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	domain = withLotsChildSub(domain, "T1", "L1")
+	wl = ProjectWorklist(cfg, domain, op)
+	inst, _ = worklistInstance(worklistMustJob(t, wl, "intake"), "T1")
+	g = inst.Groups["lots"]
+	if !g.CanSpawn || !g.CanClose || len(g.Instances) != 1 {
+		t.Fatalf("after child submit lots = %#v", g)
+	}
+	if g.Instances[0].ID != "L1" || g.Instances[0].Tasks["register"] != TaskStatusDone {
+		t.Fatalf("group instance chrome = %#v", g.Instances[0])
+	}
+	if inst.Tasks["weightCheck"] != TaskStatusLocked {
+		t.Fatalf("weightCheck before close = %q", inst.Tasks["weightCheck"])
+	}
+
+	closed, err := CloseGroup(domain, lots, "intake", "T1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wl = ProjectWorklist(cfg, closed, op)
+	inst, _ = worklistInstance(worklistMustJob(t, wl, "intake"), "T1")
+	if inst.Tasks["lots"] != TaskStatusDone {
+		t.Fatalf("lots after close = %q", inst.Tasks["lots"])
+	}
+	g = inst.Groups["lots"]
+	if g.CanSpawn || g.CanClose {
+		t.Fatalf("closed group affordances = %#v", g)
+	}
+	if inst.Tasks["weightCheck"] != TaskStatusActionable {
+		t.Fatalf("weightCheck after close = %q, want actionable", inst.Tasks["weightCheck"])
+	}
+	if refs := CollectActionableTaskRefs(cfg, wl); !hasActionableRef(refs, "intake", "weightCheck", "T1") {
+		t.Fatalf("actionable weightCheck missing from CollectActionable: %#v", refs)
+	}
+}
+
+func TestProjectWorklistGroupInstanceLabelFromLoadAfterRegister(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	truckID := commitTruckArrive(t, c)
+	result := commitLotRegister(t, c, truckID, registerLotValue())
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	wl := ProjectWorklist(mustActiveConfig(t, c), result.Domain, op)
+	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), truckID)
+	if !ok {
+		t.Fatal("missing truck instance")
+	}
+	g, ok := inst.Groups["lots"]
+	if !ok || len(g.Instances) != 1 {
+		t.Fatalf("lots group = %#v", g)
+	}
+	gi := g.Instances[0]
+	if gi.ID != "lots-1" {
+		t.Fatalf("group instance id = %q, want lots-1", gi.ID)
+	}
+	if gi.Label == "" {
+		t.Fatal("expected group instance label from minted load")
+	}
+	if _, ok := result.Domain.Kind("load")[gi.Label]; !ok {
+		t.Fatalf("label %q not present under Domain load: %#v", gi.Label, result.Domain.Kind("load"))
+	}
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.GroupInstanceID != "lots-1" || !containsString(last.IDsTouched, gi.Label) {
+		t.Fatalf("register submission must touch load id %q: %#v", gi.Label, last)
+	}
+}
+
+func TestGroupInstanceEntityLabelIgnoresNonMatchingIDsTouched(t *testing.T) {
+	domain := EmptyDomain()
+	putKind(&domain, "load", EntityMap{"L-real": {"client": "NO"}})
+	putKind(&domain, "pallet", EntityMap{"P1": {"loadId": "L-real"}})
+	domain.Submissions = []Submission{{
+		JobID: "intake", TaskID: "register", JobInstanceID: "T1",
+		GroupID: "lots", GroupInstanceID: "lots-1",
+		IDsTouched: []string{"P1", "L-real"},
+	}}
+	got := groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "load")
+	if got != "L-real" {
+		t.Fatalf("label = %q, want L-real (first IDsTouched ∩ entity kind)", got)
+	}
+	if groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-2", "load") != "" {
+		t.Fatal("unrelated group instance must omit label")
+	}
+}
+
+func TestGroupInstanceEntityLabelEmptyWithoutEntityKind(t *testing.T) {
+	domain := EmptyDomain()
+	putKind(&domain, "load", EntityMap{"L-real": {"client": "NO"}})
+	domain.Submissions = []Submission{{
+		JobID: "intake", TaskID: "register", JobInstanceID: "T1",
+		GroupID: "lots", GroupInstanceID: "lots-1",
+		IDsTouched: []string{"L-real"},
+	}}
+	if groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "") != "" {
+		t.Fatal("empty entityKind must omit label even when matching entities exist")
+	}
+
+	lots := TaskConfig{
+		"id": "lots", "kind": "group", "repeatable": true,
+		"tasks": []TaskConfig{{"id": "register", "roles": []any{"administration"}}},
+	}
+	cfg := OrgConfig{
+		Jobs: OrderedObject{
+			Keys: []string{"intake"},
+			Values: map[string]any{
+				"intake": Job{
+					Repeatable: true,
+					Tasks: []TaskConfig{
+						{"id": "truckArrive", "roles": []any{"administration"}},
+						lots,
+					},
+				},
+			},
+		},
+	}
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1"}}
+	domain.GroupInstances = []GroupInstance{{
+		JobID: "intake", JobInstanceID: "T1", GroupID: "lots", ID: "lots-1",
+	}}
+	wl := ProjectWorklist(cfg, domain, OperatorIdentity{UserID: "ada", Org: "x", Roles: []string{"administration"}})
+	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), "T1")
+	if !ok {
+		t.Fatal("missing instance")
+	}
+	g := inst.Groups["lots"]
+	if len(g.Instances) != 1 || g.Instances[0].Label != "" {
+		t.Fatalf("group without instanceLabelEntity must omit label: %#v", g.Instances)
+	}
+}
+
+func worklistMustJob(t *testing.T, wl Worklist, jobID string) WorklistJob {
+	t.Helper()
+	job, ok := worklistJobByID(wl, jobID)
+	if !ok {
+		t.Fatalf("missing worklist job %q", jobID)
+	}
+	return job
 }
 

@@ -33,20 +33,24 @@ func NewMongoDomainStore(db *mongo.Database) *MongoDomainStore {
 }
 
 type mongoDomainDoc struct {
-	Org          string                               `bson:"_id"`
-	Entities     map[string]map[string]map[string]any `bson:"entities"`
-	Submissions  []mongoSubmissionDoc                 `bson:"submissions"`
-	JobInstances []JobInstance                        `bson:"jobInstances"`
+	Org            string                               `bson:"_id"`
+	Entities       map[string]map[string]map[string]any `bson:"entities"`
+	Submissions    []mongoSubmissionDoc                 `bson:"submissions"`
+	JobInstances   []JobInstance                        `bson:"jobInstances"`
+	GroupInstances []GroupInstance                      `bson:"groupInstances"`
+	ClosedGroups   []ClosedGroup                        `bson:"closedGroups"`
 }
 
 type mongoSubmissionDoc struct {
-	JobID         string         `bson:"jobId"`
-	TaskID        string         `bson:"taskId"`
-	JobInstanceID string         `bson:"jobInstanceId,omitempty"`
-	Timestamp     string         `bson:"timestamp"`
-	UserID        string         `bson:"userId"`
-	Facts         map[string]any `bson:"facts"`
-	IDsTouched    []string       `bson:"idsTouched"`
+	JobID           string         `bson:"jobId"`
+	TaskID          string         `bson:"taskId"`
+	JobInstanceID   string         `bson:"jobInstanceId,omitempty"`
+	GroupID         string         `bson:"groupId,omitempty"`
+	GroupInstanceID string         `bson:"groupInstanceId,omitempty"`
+	Timestamp       string         `bson:"timestamp"`
+	UserID          string         `bson:"userId"`
+	Facts           map[string]any `bson:"facts"`
+	IDsTouched      []string       `bson:"idsTouched"`
 }
 
 func (s *MongoDomainStore) coll() *mongo.Collection {
@@ -203,10 +207,12 @@ func (s *MongoConfigStore) SetActiveVersion(ctx context.Context, org, version st
 func domainToMongoDoc(org string, domain Domain) mongoDomainDoc {
 	ensureEntities(&domain)
 	doc := mongoDomainDoc{
-		Org:          org,
-		Entities:     make(map[string]map[string]map[string]any, len(domain.Entities)),
-		Submissions:  encodeSubmissions(domain.Submissions),
-		JobInstances: append([]JobInstance(nil), domain.JobInstances...),
+		Org:            org,
+		Entities:       make(map[string]map[string]map[string]any, len(domain.Entities)),
+		Submissions:    encodeSubmissions(domain.Submissions),
+		JobInstances:   append([]JobInstance(nil), domain.JobInstances...),
+		GroupInstances: append([]GroupInstance(nil), domain.GroupInstances...),
+		ClosedGroups:   append([]ClosedGroup(nil), domain.ClosedGroups...),
 	}
 	for kind, m := range domain.Entities {
 		doc.Entities[encodeMongoKey(kind)] = encodeEntityMap(m)
@@ -220,6 +226,12 @@ func domainToMongoDoc(org string, domain Domain) mongoDomainDoc {
 	if doc.JobInstances == nil {
 		doc.JobInstances = []JobInstance{}
 	}
+	if doc.GroupInstances == nil {
+		doc.GroupInstances = []GroupInstance{}
+	}
+	if doc.ClosedGroups == nil {
+		doc.ClosedGroups = []ClosedGroup{}
+	}
 	return doc
 }
 
@@ -227,6 +239,8 @@ func domainFromMongoDoc(doc mongoDomainDoc) Domain {
 	out := EmptyDomain()
 	out.Submissions = decodeSubmissions(doc.Submissions)
 	out.JobInstances = append([]JobInstance(nil), doc.JobInstances...)
+	out.GroupInstances = append([]GroupInstance(nil), doc.GroupInstances...)
+	out.ClosedGroups = append([]ClosedGroup(nil), doc.ClosedGroups...)
 	for kind, m := range doc.Entities {
 		out.Entities[decodeMongoKey(kind)] = decodeEntityMap(m)
 	}
@@ -235,6 +249,12 @@ func domainFromMongoDoc(doc mongoDomainDoc) Domain {
 	}
 	if out.JobInstances == nil {
 		out.JobInstances = []JobInstance{}
+	}
+	if out.GroupInstances == nil {
+		out.GroupInstances = []GroupInstance{}
+	}
+	if out.ClosedGroups == nil {
+		out.ClosedGroups = []ClosedGroup{}
 	}
 	return out
 }
@@ -268,13 +288,15 @@ func encodeSubmissions(in []Submission) []mongoSubmissionDoc {
 	out := make([]mongoSubmissionDoc, len(in))
 	for i, s := range in {
 		out[i] = mongoSubmissionDoc{
-			JobID:         s.JobID,
-			TaskID:        s.TaskID,
-			JobInstanceID: s.JobInstanceID,
-			Timestamp:     s.Timestamp,
-			UserID:        s.UserID,
-			Facts:         encodeStringKeyedMap(s.Facts),
-			IDsTouched:    append([]string(nil), s.IDsTouched...),
+			JobID:           s.JobID,
+			TaskID:          s.TaskID,
+			JobInstanceID:   s.JobInstanceID,
+			GroupID:         s.GroupID,
+			GroupInstanceID: s.GroupInstanceID,
+			Timestamp:       s.Timestamp,
+			UserID:          s.UserID,
+			Facts:           encodeStringKeyedMap(s.Facts),
+			IDsTouched:      append([]string(nil), s.IDsTouched...),
 		}
 	}
 	return out
@@ -287,13 +309,15 @@ func decodeSubmissions(in []mongoSubmissionDoc) []Submission {
 	out := make([]Submission, len(in))
 	for i, s := range in {
 		out[i] = Submission{
-			JobID:         s.JobID,
-			TaskID:        s.TaskID,
-			JobInstanceID: s.JobInstanceID,
-			Timestamp:     s.Timestamp,
-			UserID:        s.UserID,
-			Facts:         decodeStringKeyedMap(s.Facts),
-			IDsTouched:    append([]string(nil), s.IDsTouched...),
+			JobID:           s.JobID,
+			TaskID:          s.TaskID,
+			JobInstanceID:   s.JobInstanceID,
+			GroupID:         s.GroupID,
+			GroupInstanceID: s.GroupInstanceID,
+			Timestamp:       s.Timestamp,
+			UserID:          s.UserID,
+			Facts:           decodeStringKeyedMap(s.Facts),
+			IDsTouched:      append([]string(nil), s.IDsTouched...),
 		}
 	}
 	return out

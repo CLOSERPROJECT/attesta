@@ -139,23 +139,17 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 	}
 
 	tasks := make([]TaskConfig, 0, len(substepsNode.Content))
-	seen := make(map[string]struct{}, len(substepsNode.Content))
 	var roles []string
 	for i, taskNode := range substepsNode.Content {
-		var payload map[string]any
-		if err := taskNode.Decode(&payload); err != nil {
-			return Job{}, nil, fmt.Errorf("jobs.%s.tasks[%d]: %w", jobID, i, err)
+		task, taskRoles, err := decodeFixtureTask(jobID, fmt.Sprintf("tasks[%d]", i), taskNode)
+		if err != nil {
+			return Job{}, nil, err
 		}
-		id, _ := payload["id"].(string)
-		if id == "" {
-			return Job{}, nil, fmt.Errorf("jobs.%s.tasks[%d]: id required", jobID, i)
-		}
-		if _, dup := seen[id]; dup {
-			return Job{}, nil, fmt.Errorf("jobs.%s.tasks: duplicate id %q", jobID, id)
-		}
-		seen[id] = struct{}{}
-		tasks = append(tasks, TaskConfig(payload))
-		roles = append(roles, rolesFromTask(payload)...)
+		tasks = append(tasks, task)
+		roles = append(roles, taskRoles...)
+	}
+	if err := validateTaskConfigs(tasks); err != nil {
+		return Job{}, nil, fmt.Errorf("jobs.%s: %w", jobID, err)
 	}
 
 	job := Job{
@@ -180,6 +174,46 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 	return job, roles, nil
 }
 
+// decodeFixtureTask decodes one YAML Task or Task group. Nested substeps become
+// living "tasks" so OrgConfig speaks Job/Task nouns only after load.
+func decodeFixtureTask(jobID, path string, node *yaml.Node) (TaskConfig, []string, error) {
+	var payload map[string]any
+	if err := node.Decode(&payload); err != nil {
+		return nil, nil, fmt.Errorf("jobs.%s.%s: %w", jobID, path, err)
+	}
+	id, _ := payload["id"].(string)
+	if id == "" {
+		return nil, nil, fmt.Errorf("jobs.%s.%s: id required", jobID, path)
+	}
+
+	m := mappingContent(node)
+	childrenNode := child(m, "substeps")
+	if childrenNode == nil {
+		childrenNode = child(m, "tasks")
+	}
+	if childrenNode != nil {
+		if childrenNode.Kind != yaml.SequenceNode {
+			return nil, nil, fmt.Errorf("jobs.%s.%s: children must be a list", jobID, path)
+		}
+		children := make([]TaskConfig, 0, len(childrenNode.Content))
+		var roles []string
+		for i, childNode := range childrenNode.Content {
+			childPath := fmt.Sprintf("%s.tasks[%d]", path, i)
+			childTask, childRoles, err := decodeFixtureTask(jobID, childPath, childNode)
+			if err != nil {
+				return nil, nil, err
+			}
+			children = append(children, childTask)
+			roles = append(roles, childRoles...)
+		}
+		delete(payload, "substeps")
+		payload["tasks"] = children
+		return TaskConfig(payload), roles, nil
+	}
+
+	return TaskConfig(payload), rolesFromTask(payload), nil
+}
+
 func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 	m := mappingContent(node)
 	if m == nil {
@@ -191,6 +225,10 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 	}
 	ref, err := ParseTaskPath(path)
 	if err != nil {
+		return nil, fmt.Errorf("jobs.%s.startsWhen.task must be \"<jobId>/<taskId>\"", jobID)
+	}
+	// StartsWhenRef is flat JobID/TaskID only until nested gates use LeafTaskByPath.
+	if ref.Nested() {
 		return nil, fmt.Errorf("jobs.%s.startsWhen.task must be \"<jobId>/<taskId>\"", jobID)
 	}
 	quantifier := "some"
@@ -238,7 +276,11 @@ func rolesFromTask(payload any) []string {
 }
 
 func rolesAllowedForTask(cfg OrgConfig, jobID, taskID string) []string {
-	jobVal, ok := cfg.Jobs.Get(jobID)
+	return rolesAllowedForPath(cfg, TaskPathRef{JobID: jobID, TaskID: taskID})
+}
+
+func rolesAllowedForPath(cfg OrgConfig, ref TaskPathRef) []string {
+	jobVal, ok := cfg.Jobs.Get(ref.JobID)
 	if !ok {
 		return nil
 	}
@@ -246,7 +288,7 @@ func rolesAllowedForTask(cfg OrgConfig, jobID, taskID string) []string {
 	if !ok {
 		return nil
 	}
-	task, ok := TaskByID(job.Tasks, taskID)
+	task, ok := LeafTaskByPath(job.Tasks, ref)
 	if !ok {
 		return nil
 	}

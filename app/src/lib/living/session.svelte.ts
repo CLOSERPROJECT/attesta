@@ -6,6 +6,8 @@ import type {
 } from './commit-port.js';
 import { createHttpCommitDomainPort } from './http-commit-port.js';
 import { draftKey } from './drafts.js';
+import type { CloseGroupPort, CloseGroupRequest } from './group-close-port.js';
+import { createHttpCloseGroupPort } from './http-group-close-port.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
 import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
@@ -15,11 +17,13 @@ import {
 	operatorFromLoad,
 	type OperatorIdentity
 } from './form/operator-identity.js';
+import { commitHasDownloadLinks } from './worklist-nav.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 export type LivingSessionOptions = {
 	load?: LoadDomainPort;
 	commit?: CommitDomainPort;
+	close?: CloseGroupPort;
 	taskForm?: TaskFormPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
@@ -28,6 +32,7 @@ export type LivingSessionOptions = {
 export class LivingSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
+	readonly closePort: CloseGroupPort;
 	readonly taskFormPort: TaskFormPort;
 	result = $state.raw<LoadResult | null>(null);
 	loading = $state(false);
@@ -37,11 +42,17 @@ export class LivingSession {
 	/** Last Commit HttpPort links (FormPlan strip can wait for ticket 14). */
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
+	/**
+	 * Set synchronously with Commit downloads so Task deep-link $effect
+	 * does not redirect before the route can enter stay-for-links.
+	 */
+	linksStayActive = $state(false);
 	drafts = $state.raw<Record<string, Record<string, unknown>>>({});
 
 	constructor(options: LivingSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
+		this.closePort = options.close ?? createHttpCloseGroupPort();
 		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 		if (options.hydrate !== false) {
 			void this.hydrate();
@@ -121,10 +132,12 @@ export class LivingSession {
 	 * post-Commit routing. On failure: keep Draft, re-Load, surface error.
 	 */
 	commit = async (req: CommitRequest): Promise<CommitOutcome | null> => {
+		if (this.committing) return null;
 		this.committing = true;
 		this.commitError = null;
 		try {
-			const committed = await this.commitPort.commit(req);
+			const { draftBagInstanceKey: bagKey, ...wire } = req;
+			const committed = await this.commitPort.commit(wire);
 			const prior = this.result;
 			if (prior) {
 				this.result = {
@@ -144,7 +157,8 @@ export class LivingSession {
 			}
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
-			this.clearDraft(req.taskPath, req.jobInstanceId);
+			this.linksStayActive = commitHasDownloadLinks(this.lastHttpLinks);
+			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
 				worklist: committed.worklist,
@@ -155,6 +169,58 @@ export class LivingSession {
 			this.commitError = err instanceof Error ? err.message : String(err);
 			this.lastHttpLinks = [];
 			this.lastHttpErrors = [];
+			this.linksStayActive = false;
+			await this.refreshKeepDrafts();
+			return null;
+		} finally {
+			this.committing = false;
+		}
+	};
+
+	/** Clear stay-for-links before navigating away (Continue / Start another / Close). */
+	clearLinksStay = (): void => {
+		this.linksStayActive = false;
+		this.lastHttpLinks = [];
+		this.lastHttpErrors = [];
+	};
+
+	/**
+	 * Close a Task group. On success: replace Worklist from response, return
+	 * Commit-shaped outcome for post-Close routing. On failure: re-Load, surface error.
+	 */
+	closeGroup = async (req: CloseGroupRequest): Promise<CommitOutcome | null> => {
+		this.committing = true;
+		this.commitError = null;
+		try {
+			const closed = await this.closePort.close(req);
+			const prior = this.result;
+			if (prior) {
+				this.result = {
+					...prior,
+					org: closed.org || prior.org,
+					worklist: closed.worklist
+				};
+			} else {
+				await this.refreshKeepDrafts();
+				const loaded = this.result;
+				if (loaded) {
+					this.result = {
+						...loaded,
+						worklist: closed.worklist
+					};
+				}
+			}
+			this.lastHttpLinks = [];
+			this.lastHttpErrors = [];
+			this.linksStayActive = false;
+			return {
+				jobInstanceId: closed.jobInstanceId,
+				worklist: closed.worklist,
+				next: closed.next,
+				nextTaskFormBundle: closed.nextTaskFormBundle ?? null
+			};
+		} catch (err) {
+			this.commitError = err instanceof Error ? err.message : String(err);
 			await this.refreshKeepDrafts();
 			return null;
 		} finally {

@@ -85,16 +85,16 @@ func roleIntersect(principal any, allowed any) bool {
 	return false
 }
 
-func TestCommitCodiceFirDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
+func TestCommitWeightCheckDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
 	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/codiceFir",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         map[string]any{"codiceFir": "FIR-TOO-EARLY"},
+		TaskPath:      "intake/weightCheck",
+		JobInstanceID: "261019-1st-1",
+		Value:         map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -105,38 +105,36 @@ func TestCommitCodiceFirDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
 	}
 }
 
-func TestCommitCodiceFirAllowedViaCerbosInUnlockOrder(t *testing.T) {
+func TestCommitLotRegisterAllowedViaCerbosInUnlockOrder(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
 	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID := commitTruckArrive(t, c)
 	before, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(before.Submissions) != 1 {
-		t.Fatalf("submissions before codiceFir = %#v", before.Submissions)
+		t.Fatalf("submissions before register = %#v", before.Submissions)
 	}
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
-		Value: map[string]any{"codiceFir": "FIR-OK"},
+		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		JobInstanceID: truckID,
+		Value:         registerLotValue(),
+		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("load")[instanceID]["codiceFir"] != "FIR-OK" {
-		t.Fatalf("domain = %#v", result.Domain.Kind("load")[instanceID])
+	loadID := firstLoadID(result.Domain)
+	if result.Domain.Kind("load")[loadID]["numeroFir"] != "FIR-1" {
+		t.Fatalf("domain = %#v", result.Domain.Kind("load")[loadID])
 	}
-	if len(result.Domain.Submissions) != 2 || result.Domain.Submissions[1].TaskID != "codiceFir" {
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.TaskID != "register" || last.GroupID != "lots" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }
@@ -147,26 +145,19 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 
 	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	instanceID := "NIR-261019-NO-1"
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	truckID := commitTruckArrive(t, c)
 	before, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// palletWeight is next after codiceFir only; skipping codiceFir must deny and leave Domain intact.
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
-		Value: map[string]any{},
+		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
+		Value: map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
-		t.Fatalf("skipping codiceFir should deny via Unlock: %v", err)
+		t.Fatalf("weightCheck before lots close should deny via Unlock: %v", err)
 	}
 	after, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
@@ -175,32 +166,28 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	if len(after.Submissions) != len(before.Submissions) {
 		t.Fatalf("submissions mutated on deny: before=%d after=%d", len(before.Submissions), len(after.Submissions))
 	}
-	if _, hasFir := after.Kind("load")[instanceID]["codiceFir"]; hasFir {
-		t.Fatal("codiceFir fact must not appear on out-of-order deny")
-	}
 }
 
-func TestCommitRegisterAllowedViaCerbosWhenRolePermitted(t *testing.T) {
+func TestCommitTruckArriveAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
 	c, _, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("load")["NIR-261019-NO-1"]["client"] != "NO" {
+	if result.Domain.Kind("truck")[result.JobInstanceID]["turno"] != "1st" {
 		t.Fatalf("domain = %#v", result.Domain)
 	}
 }
 
-func TestCommitRegisterDeniedViaCerbosWhenRoleDisallowed(t *testing.T) {
+func TestCommitTruckArriveDeniedViaCerbosWhenRoleDisallowed(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
@@ -210,10 +197,9 @@ func TestCommitRegisterDeniedViaCerbosWhenRoleDisallowed(t *testing.T) {
 		Org:    "feragame",
 		Roles:  []string{"logistic"},
 	}, CommitRequest{
-		TaskPath:      "intake/register",
-		JobInstanceID: "NIR-261019-NO-1",
-		Value:         registerValue(),
-		Mint:          startingNewMint(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {

@@ -30,16 +30,16 @@ func TestLookupTaskAfterJSONRoundTrip(t *testing.T) {
 		t.Fatalf("JSON decode should store typed Job, got %T", intakeVal)
 	}
 	ids := OrderedTaskIDs(job.Tasks)
-	if len(ids) == 0 || ids[0] != "register" {
-		t.Fatalf("firstTaskId after JSON = %v, want register first", ids)
+	if len(ids) == 0 || ids[0] != "truckArrive" {
+		t.Fatalf("firstTaskId after JSON = %v, want truckArrive first", ids)
 	}
 
-	_, task, err := lookupTask(decoded, "intake", "register")
+	_, task, err := lookupTask(decoded, "intake", "truckArrive")
 	if err != nil {
 		t.Fatalf("lookupTask after JSON round-trip: %v", err)
 	}
 	if task == nil {
-		t.Fatal("register task nil")
+		t.Fatal("truckArrive task nil")
 	}
 
 	normalizeOrgConfigJobs(&decoded)
@@ -50,7 +50,7 @@ func TestLookupTaskAfterJSONRoundTrip(t *testing.T) {
 	if _, typed := intakeVal.(Job); !typed {
 		t.Fatalf("normalizeOrgConfigJobs should keep Job, got %T", intakeVal)
 	}
-	_, _, err = lookupTask(decoded, "intake", "register")
+	_, _, err = lookupTask(decoded, "intake", "truckArrive")
 	if err != nil {
 		t.Fatalf("lookupTask after normalize: %v", err)
 	}

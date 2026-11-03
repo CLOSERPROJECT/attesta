@@ -2,11 +2,13 @@
 	import { onMount } from 'svelte';
 
 	import { p } from '../router/index.js';
+	import { hrefLivingTarget } from '../router/navigate-target.js';
 	import { living } from './living-app.svelte.js';
 	import WorklistRow from './WorklistRow.svelte';
 	import {
 		availableRowKey,
 		availableRowsFromWorklist,
+		availableRowTarget,
 		canStartRowsFromWorklist,
 		progressFraction,
 		taskRouteInstanceSegment
@@ -56,15 +58,11 @@
 							data-testid="available-row"
 							data-job-id={row.jobId}
 							data-instance-id={row.jobInstanceId}
+							data-group-id={row.groupId}
+							data-group-instance-id={row.groupInstanceId}
 							data-task-id={row.taskId}
 							ready
-							href={p('/:jobId/:jobInstanceId/:taskId', {
-								params: {
-									jobId: row.jobId,
-									jobInstanceId: row.jobInstanceId,
-									taskId: row.taskId
-								}
-							})}
+							href={hrefLivingTarget(availableRowTarget(row))}
 						>
 							<p class="min-w-0 text-sm font-bold text-zinc-900">
 								{row.instanceLabel}

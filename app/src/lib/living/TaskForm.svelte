@@ -3,7 +3,12 @@
 	import type { FailureValidationResult } from '@sjsf/form';
 	import type { CommitOutcome } from './commit-port.js';
 	import { living } from './living-app.svelte.js';
-	import { taskPath } from './types.js';
+	import { draftBagInstanceKey } from './drafts.js';
+	import {
+		groupTaskPath,
+		PROVISIONAL_GROUP_INSTANCE_ID,
+		taskPath
+	} from './types.js';
 	import ConfigForm from './form/ConfigForm.svelte';
 	import HttpLinkStrip from './form/HttpLinkStrip.svelte';
 	import type { TaskFormPlan } from './form/task-form-plan.js';
@@ -23,6 +28,8 @@
 		taskId: string;
 		/** Empty string = provisional start (first Task / mint). */
 		jobInstanceId: string;
+		groupId?: string;
+		groupInstanceId?: string;
 		bundle: TaskFormBundle;
 		disabled?: boolean;
 		onCommitted?: (outcome: CommitOutcome) => void;
@@ -32,12 +39,26 @@
 		jobId,
 		taskId,
 		jobInstanceId,
+		groupId = '',
+		groupInstanceId = '',
 		bundle,
 		disabled = false,
 		onCommitted
 	}: Props = $props();
 
-	const path = $derived(taskPath(jobId, taskId));
+	const path = $derived(
+		groupId
+			? groupTaskPath(
+					jobId,
+					groupId,
+					groupInstanceId || PROVISIONAL_GROUP_INSTANCE_ID,
+					taskId
+				)
+			: taskPath(jobId, taskId)
+	);
+	const draftInstanceKey = $derived(
+		draftBagInstanceKey({ jobInstanceId, groupId, groupInstanceId })
+	);
 	const drafts = $derived(living.drafts);
 
 	let submitError = $state.raw<string | null>(null);
@@ -47,11 +68,11 @@
 
 	function readDraft(): Record<string, unknown> {
 		void drafts;
-		return living.getDraft(path, jobInstanceId) ?? {};
+		return living.getDraft(path, draftInstanceKey) ?? {};
 	}
 
 	function writeDraft(next: Record<string, unknown>) {
-		living.setDraft(path, jobInstanceId, next);
+		living.setDraft(path, draftInstanceKey, next);
 	}
 
 	/** Live Chrome/Derived `$domain` — bindings bag only. */
@@ -81,13 +102,21 @@
 	}
 
 	async function submitSealed(value: Record<string, unknown>) {
+		if (living.committing) return;
 		submitError = null;
-		const provisional = jobInstanceId === '';
+		const provisionalJob = !groupId && jobInstanceId === '';
+		const provisionalSpawn = Boolean(groupId) && groupInstanceId === '';
+		const mint = provisionalJob
+			? ({ kind: 'startingNew' } as const)
+			: provisionalSpawn
+				? ({ kind: 'spawningNew' } as const)
+				: ({ kind: 'none' } as const);
 		const outcome = await living.commit({
 			taskPath: path,
-			jobInstanceId: provisional ? '' : jobInstanceId,
+			jobInstanceId: provisionalJob ? '' : jobInstanceId,
 			value,
-			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
+			mint,
+			draftBagInstanceKey: draftInstanceKey
 		});
 		if (outcome == null) return;
 		onCommitted?.(outcome);
@@ -133,7 +162,7 @@
 
 	$effect(() => {
 		void drafts;
-		void jobInstanceId;
+		void draftInstanceKey;
 		void bundle;
 
 		seedBundleDraft(bundle);
@@ -155,6 +184,8 @@
 	data-testid={`task-${taskId}`}
 	data-task-path={path}
 	data-instance-id={jobInstanceId || 'provisional'}
+	data-group-id={groupId || undefined}
+	data-group-instance-id={groupInstanceId || (groupId ? 'provisional' : undefined)}
 	data-from-bundle="1"
 >
 	{#if live?.form}

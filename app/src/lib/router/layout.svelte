@@ -5,7 +5,11 @@
 
 	import attestaMark from '#lib/assets/attesta-mark.svg';
 	import { living } from '#lib/living/living-app.svelte.js';
-	import { navPlaceKindFromRoute, resolveNavPlace } from '#lib/living/nav-place.js';
+	import {
+		livingRouteCoordsFromPath,
+		navPlaceKindFromRoute,
+		resolveNavPlace
+	} from '#lib/living/nav-place.js';
 	import { Badge } from '#lib/shadcn/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
 	import { route } from '#lib/router/index.js';
@@ -13,15 +17,22 @@
 
 	let { children }: { children: Snippet } = $props();
 
-	const jobId = $derived(String(route.params.jobId ?? ''));
-	const routeInstance = $derived(String(route.params.jobInstanceId ?? ''));
-	const routeTaskId = $derived(String(route.params.taskId ?? ''));
-	const provisional = $derived(routeInstance === '' || routeInstance === 'new');
-	const jobInstanceId = $derived(provisional ? '' : routeInstance);
+	// Pathname segments only — sv-router leaks group*/taskId across matches.
+	const coords = $derived(livingRouteCoordsFromPath({ pathname: route.pathname }));
+	const jobId = $derived(coords.jobId);
+	const routeInstance = $derived(coords.jobInstanceId);
+	const groupId = $derived(coords.groupId);
+	const groupRoute = $derived(coords.groupInstanceId);
+	const provisionalJob = $derived(
+		!groupId && (routeInstance === '' || routeInstance === 'new')
+	);
+	const provisionalSpawn = $derived(
+		Boolean(groupId) && (groupRoute === '' || groupRoute === 'new')
+	);
+	const jobInstanceId = $derived(provisionalJob ? '' : routeInstance);
 
-	// Pathname segments only — route.params.taskId can stay stale on overview.
 	const placeKind = $derived(navPlaceKindFromRoute({ pathname: route.pathname }));
-	const taskId = $derived(placeKind === 'task' ? routeTaskId : '');
+	const taskId = $derived(placeKind === 'task' ? coords.taskId : '');
 
 	const place = $derived(
 		resolveNavPlace({
@@ -29,7 +40,8 @@
 			jobId,
 			jobInstanceId,
 			taskId,
-			provisional: placeKind === 'task' ? provisional : false,
+			provisionalJob: placeKind === 'task' ? provisionalJob : false,
+			provisionalSpawn: placeKind === 'task' ? provisionalSpawn : false,
 			worklist: living.result?.worklist
 		})
 	);

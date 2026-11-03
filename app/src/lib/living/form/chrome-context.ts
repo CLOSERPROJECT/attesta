@@ -8,11 +8,11 @@ export type ChromeRecapRowDisplay = {
 	tone: ChromeTone | null;
 };
 
-/** One primary-load section for `kind: dataReport` (server chromeDisplay fills). */
+/** One section for `kind: dataReport` (server chromeDisplay fills). */
 export type ChromeDataReportSectionDisplay = {
-	loadId: string;
-	/** Dual secondary load ids — muted chrome text only, never their own section. */
-	secondaryLoadIds?: readonly string[];
+	id: string;
+	/** Secondary ids — muted chrome text only, never their own section. */
+	secondaryIds?: readonly string[];
 	rows?: readonly ChromeRecapRowDisplay[];
 };
 

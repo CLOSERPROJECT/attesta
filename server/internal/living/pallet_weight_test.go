@@ -5,48 +5,18 @@ import (
 	"testing"
 )
 
-func commitThroughCodiceFir(t *testing.T, c *Committer, instanceID string) {
-	t.Helper()
-	if err := commitIntakeThroughCodiceFir(t.Context(), c, "feragame", instanceID); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func intakeTasks(t *testing.T) Job {
-	t.Helper()
-	cfg, err := LoadFeragameConfigFixture()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cfg.Jobs.Values["intake"].(Job)
-}
-
-func lineJob(t *testing.T) Job {
-	t.Helper()
-	cfg, err := LoadFeragameConfigFixture()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cfg.Jobs.Values["line"].(Job)
-}
-
-func palletWeightTask(intake Job) TaskConfig {
-	v, _ := TaskByID(intake.Tasks, "palletWeight")
-	return v
-}
-
-func TestCommitPalletWeightRejectsPartialRequiredMap(t *testing.T) {
+func TestCommitWeighRejectsPartialRequiredMap(t *testing.T) {
 	c, domains, _ := testCommitter(t, AllowAllAuthorizer{})
-	instanceID := "NIR-261019-NO-1"
-	commitThroughCodiceFir(t, c, instanceID)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
 
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
+	_, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+		JobInstanceID: lineID,
 		Value: palletWeightValue(map[string]any{
-			instanceID + ".1": weighRow(11),
-			// .2 omitted — required map keys incomplete
+			loadID + ".1": weighRow(11),
 		}),
+		Mint: spawningNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
@@ -60,86 +30,47 @@ func TestCommitPalletWeightRejectsPartialRequiredMap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(domain.Submissions) != 2 {
-		t.Fatalf("partial must not append Submission: %#v", domain.Submissions)
+	for _, s := range domain.Submissions {
+		if s.TaskID == "weigh" {
+			t.Fatalf("partial must not append weigh Submission: %#v", domain.Submissions)
+		}
 	}
-	if _, has := domain.Kind("pallet")[instanceID+".1"]["weight"]; has {
+	if _, has := domain.Kind("pallet")[loadID+".1"]["weight"]; has {
 		t.Fatal("partial reject must not patch pallets")
-	}
-
-	intake := intakeTasks(t)
-	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
-		JobInstanceID: instanceID, Submissions: domain.Submissions, Tasks: intake.Tasks,
-	}) {
-		t.Fatal("incomplete required map must not unlock weightCheck")
-	}
-	line := lineJob(t)
-	if IsStartsWhenSatisfied(line.StartsWhen, domain.Submissions, domain.JobInstances, palletWeightTask(intake)) {
-		t.Fatal("incomplete required map must not satisfy line startsWhen")
 	}
 }
 
-func TestCommitPalletWeightCompleteAllUnlocksAndStartsWhen(t *testing.T) {
+func TestCommitWeighCompleteThenCloseUnlocksLineLoad(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	instanceID := "NIR-261019-NO-1"
-	commitThroughCodiceFir(t, c, instanceID)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
 
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
-		Value: palletWeightValue(map[string]any{
-			instanceID + ".1": weighRow(11),
-			instanceID + ".2": weighRow(22),
-		}),
+	result := commitWeigh(t, c, lineID, map[string]any{
+		loadID + ".1": weighRow(11),
+		loadID + ".2": weighRow(22),
 	})
+	if result.Domain.Kind("pallet")[loadID+".1"]["weight"] != 11.0 {
+		t.Fatalf("pallet .1 = %#v", result.Domain.Kind("pallet")[loadID+".1"])
+	}
+	if result.Domain.Kind("pallet")[loadID+".2"]["weight"] != 22.0 {
+		t.Fatalf("pallet .2 = %#v", result.Domain.Kind("pallet")[loadID+".2"])
+	}
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.TaskID != "weigh" || last.GroupID != "palletWeight" {
+		t.Fatalf("weigh submission = %#v", last)
+	}
+
+	closePalletWeight(t, c, lineID)
+	stored, err := c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("pallet")[instanceID+".1"]["weight"] != 11.0 {
-		t.Fatalf("pallet .1 = %#v", result.Domain.Kind("pallet")[instanceID+".1"])
-	}
-	if result.Domain.Kind("pallet")[instanceID+".2"]["weight"] != 22.0 {
-		t.Fatalf("pallet .2 = %#v", result.Domain.Kind("pallet")[instanceID+".2"])
-	}
-	if len(result.Domain.Submissions) != 3 || result.Domain.Submissions[2].TaskID != "palletWeight" {
-		t.Fatalf("submissions = %#v", result.Domain.Submissions)
-	}
-	if rows := palletWeightRowIDs(result.Domain, instanceID); len(rows) != 0 {
-		t.Fatalf("rows after complete = %#v", rows)
-	}
-
-	intake := intakeTasks(t)
-	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
-		JobInstanceID: instanceID, Submissions: result.Domain.Submissions, Tasks: intake.Tasks,
-	}) {
-		t.Fatal("palletWeight Submission must unlock weightCheck")
-	}
 	line := lineJob(t)
-	if !IsStartsWhenSatisfied(line.StartsWhen, result.Domain.Submissions, result.Domain.JobInstances, palletWeightTask(intake)) {
-		t.Fatal("palletWeight Submission must enable authored line startsWhen target")
-	}
-}
-
-func TestIsTaskUnlockedAfterPalletWeightSubmission(t *testing.T) {
-	tasks := intakeUnlockTasks()
-	order := []string{"register", "codiceFir", "palletWeight", "weightCheck"}
-	afterFir := []Submission{
-		sub("intake", "register", "load-1"),
-		sub("intake", "codiceFir", "load-1"),
-	}
-	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "intake", TaskID: "weightCheck",
-		JobInstanceID: "load-1", Submissions: afterFir, Tasks: tasks,
-	}) {
-		t.Fatal("weightCheck locked until palletWeight Submission")
-	}
-	afterAll := append(afterFir, sub("intake", "palletWeight", "load-1"))
 	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "intake", TaskID: "weightCheck",
-		JobInstanceID: "load-1", Submissions: afterAll, Tasks: tasks,
+		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "lineLoad",
+		JobInstanceID: lineID, Submissions: stored.Submissions, Tasks: line.Tasks,
+		ClosedGroups: stored.ClosedGroups,
 	}) {
-		t.Fatal("palletWeight Submission unlocks weightCheck")
+		t.Fatal("closing palletWeight must unlock lineLoad")
 	}
 }

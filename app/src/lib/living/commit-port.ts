@@ -3,7 +3,8 @@ import type { TaskFormBundle, Worklist } from './types.js';
 /** Commit wire mint knob (omit → none on server). */
 export type CommitMint =
 	| { kind: 'none' }
-	| { kind: 'startingNew' };
+	| { kind: 'startingNew' }
+	| { kind: 'spawningNew' };
 
 export type CommitRequest = {
 	taskPath: string;
@@ -11,6 +12,11 @@ export type CommitRequest = {
 	jobInstanceId: string;
 	value: Record<string, unknown>;
 	mint?: CommitMint;
+	/**
+	 * Client draft-bag instance key (see draftBagInstanceKey). Not on the wire.
+	 * Omit → clear using jobInstanceId only.
+	 */
+	draftBagInstanceKey?: string;
 };
 
 /** Post-Commit HttpPort link-strip item (server-resolved onSubmit.http). */

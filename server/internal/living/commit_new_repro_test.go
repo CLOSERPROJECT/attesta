@@ -8,8 +8,7 @@ import (
 )
 
 // After Mongo/JSON OrgConfig decode, intake Task order must stay authored
-// (register first). Remarshaling Jobs via unordered map sorted tasks to
-// codiceFir first → Nuovo camion minted on the wrong Task → empty $load.id.
+// (truckArrive first). Remarshaling Jobs via unordered map must not scramble.
 func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
@@ -31,8 +30,8 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 		t.Fatalf("intake Job after JSON: %T", intake)
 	}
 	ids := OrderedTaskIDs(job.Tasks)
-	if len(ids) == 0 || ids[0] != "register" {
-		t.Fatalf("firstTaskId after Mongo JSON = %v, want register first", ids)
+	if len(ids) == 0 || ids[0] != "truckArrive" {
+		t.Fatalf("firstTaskId after Mongo JSON = %v, want truckArrive first", ids)
 	}
 
 	configs := NewMemoryConfigStore()
@@ -52,15 +51,15 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register",
-		Value:    registerValue(),
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "NIR-261019-NO-1" {
-		t.Fatalf("jobInstanceId=%q want NIR-261019-NO-1", result.JobInstanceID)
+	if result.JobInstanceID != "261019-1st-1" {
+		t.Fatalf("jobInstanceId=%q want 261019-1st-1", result.JobInstanceID)
 	}
 	for _, inst := range result.Domain.JobInstances {
 		if inst.ID == "_new" {
@@ -69,7 +68,7 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	}
 }
 
-func TestCommitRegisterStartingNewAfterMongoJSONMintsLoadID(t *testing.T) {
+func TestCommitTruckArriveStartingNewAfterMongoJSONMintsTruckID(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
@@ -90,8 +89,8 @@ func TestCommitRegisterStartingNewAfterMongoJSONMintsLoadID(t *testing.T) {
 		t.Fatalf("intake Job after JSON: %T", intake)
 	}
 	ids := OrderedTaskIDs(job.Tasks)
-	if len(ids) == 0 || ids[0] != "register" {
-		t.Fatalf("OrderedTaskIDs after JSON normalize = %v, want register first", ids)
+	if len(ids) == 0 || ids[0] != "truckArrive" {
+		t.Fatalf("OrderedTaskIDs after JSON normalize = %v, want truckArrive first", ids)
 	}
 
 	configs := NewMemoryConfigStore()
@@ -103,13 +102,13 @@ func TestCommitRegisterStartingNewAfterMongoJSONMintsLoadID(t *testing.T) {
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", Value: registerValue(), Mint: startingNewMint(),
+		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "NIR-261019-NO-1" {
-		t.Fatalf("jobInstanceId=%q want NIR-261019-NO-1", result.JobInstanceID)
+	if result.JobInstanceID != "261019-1st-1" {
+		t.Fatalf("jobInstanceId=%q want 261019-1st-1", result.JobInstanceID)
 	}
 }
 
@@ -117,9 +116,9 @@ func TestCommitRejectsWireNewSentinel(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      "intake/register",
+		TaskPath:      "intake/truckArrive",
 		JobInstanceID: "_new",
-		Value:         registerValue(),
+		Value:         truckArriveValue(),
 		Mint:          startingNewMint(),
 	})
 	var ce *CommitError
