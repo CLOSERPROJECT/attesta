@@ -3,10 +3,7 @@ import { overrideByRecord } from '@sjsf/form/lib/resolver';
 import { theme as shadcnTheme } from '@sjsf/shadcn4-theme';
 // compat resolver maps string enums → enumField; include registers the component.
 import '@sjsf/form/fields/extra/enum-include';
-// format: date → shadcn DatePicker (register Substep).
-import '@sjsf/shadcn4-theme/extra-widgets/date-picker-include';
-// register selectWidget → radioWidget for authored string enums.
-import '@sjsf/shadcn4-theme/extra-widgets/radio-include';
+import '#lib/shadcn/extra-widgets.js';
 import { authoredFieldThemeOverrides } from './authored-field-registry.js';
 import CheckboxOnlyField from './checkbox-only-field.svelte';
 import CompactArrayItemField from './compact-array-item-field.svelte';
