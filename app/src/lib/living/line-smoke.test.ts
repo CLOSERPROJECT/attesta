@@ -236,6 +236,8 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 			org: 'feragame',
 			activeConfigVersion: '1',
 			configId: 'feragame-config',
+			userId: 'ada',
+			displayName: 'Ada',
 			roles: ['line', 'administration', 'logistic'],
 			worklist,
 			taskFormBundles: []

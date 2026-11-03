@@ -16,6 +16,9 @@ type LoadResult struct {
 	Org                 string `json:"org"`
 	ActiveConfigVersion string `json:"activeConfigVersion"`
 	ConfigID            string `json:"configId"`
+	// Viewer OperatorIdentity projection for SPA chrome ($operator) — not Cerbos.
+	UserID      string   `json:"userId"`
+	DisplayName string   `json:"displayName"`
 	// Roles are the caller's Config role slugs (OperatorIdentity; not Cerbos).
 	Roles    []string  `json:"roles"`
 	Domain   Domain    `json:"-"`
@@ -64,10 +67,16 @@ func (l *Loader) Load(ctx context.Context, org string, op OperatorIdentity) (Loa
 	}
 
 	wl := ProjectWorklist(cfg, domain, op)
+	displayName := strings.TrimSpace(op.DisplayName)
+	if displayName == "" {
+		displayName = strings.TrimSpace(op.UserID)
+	}
 	return LoadResult{
 		Org:                 org,
 		ActiveConfigVersion: version,
 		ConfigID:            cfg.ID,
+		UserID:              strings.TrimSpace(op.UserID),
+		DisplayName:         displayName,
 		Roles:               append([]string(nil), op.Roles...),
 		Domain:              domain,
 		Config:              cfg,

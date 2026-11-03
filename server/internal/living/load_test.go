@@ -87,6 +87,12 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	if _, ok := wire["worklist"].(map[string]any); !ok {
 		t.Fatalf("Load JSON missing worklist: %#v", wire)
 	}
+	if wire["userId"] != "u1" {
+		t.Fatalf("userId = %#v", wire["userId"])
+	}
+	if wire["displayName"] != "u1" {
+		t.Fatalf("displayName = %#v (want userId fallback)", wire["displayName"])
+	}
 }
 
 func TestHandleLoadRejectsWhenGateDenies(t *testing.T) {

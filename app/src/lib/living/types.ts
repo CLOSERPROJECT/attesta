@@ -6,6 +6,9 @@ export type LoadResult = {
 	org: string;
 	activeConfigVersion: string;
 	configId: string;
+	/** Viewer OperatorIdentity projection for chrome `$operator` (not Cerbos). */
+	userId: string;
+	displayName: string;
 	/** Viewer Config role slugs (OperatorIdentity; board chrome, not Cerbos). */
 	roles: string[];
 	worklist: Worklist;

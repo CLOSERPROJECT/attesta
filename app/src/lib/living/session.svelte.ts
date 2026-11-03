@@ -11,6 +11,10 @@ import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
 import type { TaskFormPort, TaskFormRequest } from './task-form-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
+import {
+	operatorFromLoad,
+	type OperatorIdentity
+} from './form/operator-identity.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 export type LivingSessionOptions = {
@@ -45,6 +49,9 @@ export class LivingSession {
 	}
 
 	jobIds = $derived(orderedJobIdsFromWorklist(this.result?.worklist));
+
+	/** Chrome `$operator` from Load projection (session Gate → LoadResult). */
+	operator = (): OperatorIdentity | undefined => operatorFromLoad(this.result);
 
 	worklistJob = (jobId: string): WorklistJob | null => {
 		const jobs = this.result?.worklist.jobs;

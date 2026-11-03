@@ -4,6 +4,8 @@ const homeLoad = {
 	org: 'feragame',
 	activeConfigVersion: '1',
 	configId: 'feragame-config',
+	userId: 'u1',
+	displayName: 'Ada',
 	roles: ['administration'],
 	worklist: {
 		jobs: [

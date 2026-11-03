@@ -10,6 +10,8 @@ const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
 	configId: 'feragame-config',
+	userId: 'u1',
+	displayName: 'Ada',
 	roles: ['administration'],
 	worklist: {
 		jobs: [
@@ -51,6 +53,12 @@ describe('LivingSession', () => {
 		expect(load).toHaveBeenCalledOnce();
 		expect(session.error).toBeNull();
 		expect(session.result?.org).toBe('feragame');
+		expect(session.operator()).toEqual({
+			userId: 'u1',
+			displayName: 'Ada',
+			org: 'feragame',
+			roles: ['administration']
+		});
 		expect(session.jobIds).toEqual(['intake', 'line']);
 		expect(session.worklistJob('intake')?.startLabel).toBe('Nuovo camion');
 		const register = session.worklistJob('intake')?.tasks.find((t) => t.id === 'register');

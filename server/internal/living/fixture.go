@@ -206,9 +206,10 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 // Role-blind so tests and seed tooling can project the full board without a plant role pick.
 func FixtureAllRolesOp() OperatorIdentity {
 	return OperatorIdentity{
-		UserID: "ada",
-		Org:    "feragame",
-		Roles:  []string{"administration", "logistic", "line"},
+		UserID:      "ada",
+		DisplayName: "ada",
+		Org:         "feragame",
+		Roles:       []string{"administration", "logistic", "line"},
 	}
 }
 

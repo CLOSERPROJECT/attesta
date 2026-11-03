@@ -11,8 +11,10 @@ import (
 // OperatorIdentity is the verified session actor injected by the host.
 type OperatorIdentity struct {
 	UserID string
-	Org    string
-	Roles  []string
+	// DisplayName is human-facing chrome ($operator.displayName); email when known.
+	DisplayName string
+	Org         string
+	Roles       []string
 }
 
 // Gate authenticates the caller; on failure it writes the HTTP error and returns ok=false.

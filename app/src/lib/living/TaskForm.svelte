@@ -109,6 +109,7 @@
 			getCatalogs: () => liveCatalogs(),
 			getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
 			getInstance: () => bundleInstance(),
+			getOperator: () => living.operator(),
 			onSubmit: (value) => {
 				void submitSealed(value);
 			},
@@ -161,7 +162,7 @@
 			<fieldset disabled={disabled || living.committing} class="space-y-4">
 				<ConfigForm
 					form={live.form}
-					class="flex flex-col gap-4 [&_button[type=submit]]:self-end"
+					class="flex flex-col gap-4 [&_button[type=submit]]:mt-6 [&_button[type=submit]]:self-end"
 				/>
 			</fieldset>
 		{/key}
