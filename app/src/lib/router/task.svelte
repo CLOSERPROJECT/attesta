@@ -128,27 +128,6 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="task-route">
-	<header class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<p class="font-mono text-xs text-zinc-500">
-				{jobId} / {provisional ? 'new' : jobInstanceId} / {taskId}
-			</p>
-			{#if bundle}
-				<h1 class="text-xl font-semibold text-zinc-900">{bundle.title}</h1>
-			{:else}
-				<h1 class="text-xl font-semibold text-zinc-900">Task</h1>
-			{/if}
-		</div>
-		<button
-			type="button"
-			class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-			data-testid="task-back-home"
-			onclick={goExit}
-		>
-			{provisional ? 'Home' : 'Overview'}
-		</button>
-	</header>
-
 	{#if living.commitError}
 		<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
 			Commit denied: {living.commitError}

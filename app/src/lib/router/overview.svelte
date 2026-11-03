@@ -35,23 +35,6 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="overview-route">
-	<header class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<p class="font-mono text-xs text-zinc-500">{jobId} / {jobInstanceId}</p>
-			<h1 class="text-xl font-semibold text-zinc-900" data-testid="overview-label">
-				{model?.label ?? 'Job instance'}
-			</h1>
-		</div>
-		<button
-			type="button"
-			class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-			data-testid="overview-back-home"
-			onclick={() => navigate('/')}
-		>
-			Home
-		</button>
-	</header>
-
 	{#if living.loading && !living.result}
 		<p class="text-sm text-zinc-500" data-testid="overview-load-status">Loading…</p>
 	{:else if living.error && !living.result}
