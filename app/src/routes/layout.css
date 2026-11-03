@@ -1,8 +1,10 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 @import '@sjsf/shadcn4-theme/styles.css';
 @source '../../node_modules/@sjsf/shadcn4-theme/dist';
+@custom-variant dark (&:is(.dark *));
 
 /* Living FormPlan / sjsf light tokens */
 :root {

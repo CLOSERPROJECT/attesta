@@ -65,7 +65,6 @@ describe('submit validation visibility', () => {
 		expect(bundleSrc).not.toContain('form-cell-map');
 		expect(task).toContain('task-submit-error');
 		expect(task).toContain('onSubmitError');
-		expect(task).toContain('findTaskFormBundle');
 		expect(task).toContain('initialData');
 		expect(task).toContain('planFromTaskFormBundle');
 		expect(task).toContain('ConfigForm');

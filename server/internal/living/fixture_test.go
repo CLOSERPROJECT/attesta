@@ -48,7 +48,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !ok {
 		t.Fatalf("intake type %T", intakeAny)
 	}
-	if !intake.Repeatable || intake.StartLabel != "Nuovo camion" {
+	if !intake.Repeatable || intake.StartLabel != "Nuovo camion" || intake.Title != "Camion" {
 		t.Fatalf("intake = %#v", intake)
 	}
 	wantIntakeTasks := []string{"register", "codiceFir", "palletWeight", "weightCheck"}
@@ -58,6 +58,9 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 
 	lineAny, _ := cfg.Jobs.Get("line")
 	line := lineAny.(Job)
+	if line.Title != "Linea" {
+		t.Fatalf("line title = %q", line.Title)
+	}
 	if line.StartsWhen == nil {
 		t.Fatal("line startsWhen missing")
 	}

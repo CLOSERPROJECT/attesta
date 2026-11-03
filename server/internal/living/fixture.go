@@ -164,6 +164,9 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 		Label:      label,
 		Tasks:      tasks,
 	}
+	if title, ok := optionalString(m, "title"); ok {
+		job.Title = title
+	}
 	if startLabel, ok := optionalString(m, "startLabel"); ok {
 		job.StartLabel = startLabel
 	}
@@ -198,6 +201,16 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 		quantifier = q
 	}
 	return &StartsWhen{Task: StartsWhenRef{JobID: ref.JobID, TaskID: ref.TaskID}, Quantifier: quantifier}, nil
+}
+
+// Role-blind so tests and seed tooling can project the full board without a plant role pick.
+func FixtureAllRolesOp() OperatorIdentity {
+	return OperatorIdentity{
+		UserID:      "ada",
+		DisplayName: "ada",
+		Org:         "feragame",
+		Roles:       []string{"administration", "logistic", "line"},
+	}
 }
 
 func rolesFromTask(payload any) []string {

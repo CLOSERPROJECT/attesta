@@ -1,21 +1,34 @@
-import type { CommitDomainPort, CommitRequest, HttpLinkItem } from './commit-port.js';
+import type {
+	CommitDomainPort,
+	CommitOutcome,
+	CommitRequest,
+	HttpLinkItem
+} from './commit-port.js';
 import { createHttpCommitDomainPort } from './http-commit-port.js';
 import { draftKey } from './drafts.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
+import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
+import type { TaskFormPort, TaskFormRequest } from './task-form-port.js';
+import type { TaskFormBundle } from './form/task-form-bundle.js';
+import {
+	operatorFromLoad,
+	type OperatorIdentity
+} from './form/operator-identity.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 export type LivingSessionOptions = {
 	load?: LoadDomainPort;
 	commit?: CommitDomainPort;
+	taskForm?: TaskFormPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
 };
 
-/** Living org session: Load Worklist + bundles; Commit sealed Tasks; client Drafts. */
 export class LivingSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
+	readonly taskFormPort: TaskFormPort;
 	result = $state.raw<LoadResult | null>(null);
 	loading = $state(false);
 	committing = $state(false);
@@ -24,18 +37,21 @@ export class LivingSession {
 	/** Last Commit HttpPort links (FormPlan strip can wait for ticket 14). */
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
-	/** taskPath::jobInstanceId → sealed-shape draft object */
 	drafts = $state.raw<Record<string, Record<string, unknown>>>({});
 
 	constructor(options: LivingSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
+		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 		if (options.hydrate !== false) {
 			void this.hydrate();
 		}
 	}
 
 	jobIds = $derived(orderedJobIdsFromWorklist(this.result?.worklist));
+
+	/** Chrome `$operator` from Load projection (session Gate → LoadResult). */
+	operator = (): OperatorIdentity | undefined => operatorFromLoad(this.result);
 
 	worklistJob = (jobId: string): WorklistJob | null => {
 		const jobs = this.result?.worklist.jobs;
@@ -77,8 +93,13 @@ export class LivingSession {
 		}
 	};
 
+	/** Addressed Task form hydrate; does not mutate home LoadResult bundles. */
+	fetchTaskForm = (req: TaskFormRequest): Promise<TaskFormBundle> => {
+		return this.taskFormPort.fetch(req);
+	};
+
 	/**
-	 * Re-Load Worklist + bundles without wiping client Drafts.
+	 * Re-Load Worklist without wiping client Drafts.
 	 * Used after Commit denial so chrome matches server truth.
 	 */
 	refreshKeepDrafts = async (): Promise<void> => {
@@ -95,11 +116,11 @@ export class LivingSession {
 	};
 
 	/**
-	 * Commit sealed value. On success: replace Worklist + Task form bundles
-	 * from response, clear Draft keyed by the request id (provisional '' → `_new`),
-	 * return response jobInstanceId. On failure: keep Draft, re-Load, surface error.
+	 * Commit sealed value. On success: replace Worklist from response, clear Draft
+	 * keyed by the request id (provisional '' → `_new`), return outcome for
+	 * post-Commit routing. On failure: keep Draft, re-Load, surface error.
 	 */
-	commit = async (req: CommitRequest): Promise<string | null> => {
+	commit = async (req: CommitRequest): Promise<CommitOutcome | null> => {
 		this.committing = true;
 		this.commitError = null;
 		try {
@@ -109,8 +130,7 @@ export class LivingSession {
 				this.result = {
 					...prior,
 					org: committed.org || prior.org,
-					worklist: committed.worklist,
-					taskFormBundles: committed.taskFormBundles
+					worklist: committed.worklist
 				};
 			} else {
 				await this.refreshKeepDrafts();
@@ -118,15 +138,19 @@ export class LivingSession {
 				if (loaded) {
 					this.result = {
 						...loaded,
-						worklist: committed.worklist,
-						taskFormBundles: committed.taskFormBundles
+						worklist: committed.worklist
 					};
 				}
 			}
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
 			this.clearDraft(req.taskPath, req.jobInstanceId);
-			return committed.jobInstanceId;
+			return {
+				jobInstanceId: committed.jobInstanceId,
+				worklist: committed.worklist,
+				next: committed.next,
+				nextTaskFormBundle: committed.nextTaskFormBundle ?? null
+			};
 		} catch (err) {
 			this.commitError = err instanceof Error ? err.message : String(err);
 			this.lastHttpLinks = [];

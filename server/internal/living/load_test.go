@@ -16,7 +16,7 @@ func TestLoaderEmptyDomainAndActiveConfig(t *testing.T) {
 	}
 
 	loader := &Loader{Domains: domains, Configs: configs}
-	result, err := loader.Load(t.Context(), "feragame")
+	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestLoaderMissingActiveConfig(t *testing.T) {
 		Domains: NewMemoryDomainStore(),
 		Configs: NewMemoryConfigStore(),
 	}
-	_, err := loader.Load(t.Context(), "feragame")
+	_, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
@@ -86,6 +86,12 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	}
 	if _, ok := wire["worklist"].(map[string]any); !ok {
 		t.Fatalf("Load JSON missing worklist: %#v", wire)
+	}
+	if wire["userId"] != "u1" {
+		t.Fatalf("userId = %#v", wire["userId"])
+	}
+	if wire["displayName"] != "u1" {
+		t.Fatalf("displayName = %#v (want userId fallback)", wire["displayName"])
 	}
 }
 

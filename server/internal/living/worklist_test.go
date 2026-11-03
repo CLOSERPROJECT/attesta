@@ -21,24 +21,6 @@ func mustActiveConfig(t *testing.T, c *Committer) OrgConfig {
 	return cfg
 }
 
-func worklistJobByID(wl Worklist, jobID string) (WorklistJob, bool) {
-	for _, j := range wl.Jobs {
-		if j.JobID == jobID {
-			return j, true
-		}
-	}
-	return WorklistJob{}, false
-}
-
-func worklistInstance(job WorklistJob, id string) (WorklistInstance, bool) {
-	for _, inst := range job.Instances {
-		if inst.ID == id {
-			return inst, true
-		}
-	}
-	return WorklistInstance{}, false
-}
-
 func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
@@ -46,7 +28,7 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	loader := &Loader{Domains: domains, Configs: configs}
-	result, err := loader.Load(t.Context(), "feragame")
+	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +58,7 @@ func TestLoadJSONWorklistIntakeUnlockOrder(t *testing.T) {
 	instanceID := "NIR-261019-NO-1"
 	commitThroughCodiceFir(t, c, instanceID)
 
-	result, err := loader.Load(t.Context(), "feragame")
+	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +108,7 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 	intakeID := "NIR-261019-NO-1"
 	completeIntakeThroughPalletWeight(t, c, intakeID)
 
-	loaded, err := loader.Load(t.Context(), "feragame")
+	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +135,7 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loaded, err = loader.Load(t.Context(), "feragame")
+	loaded, err = loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +238,8 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := ProjectWorklist(mustActiveConfig(t, c), domain)
+	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	want := ProjectWorklist(mustActiveConfig(t, c), domain, admin)
 	if len(got.Worklist.Jobs) != len(want.Jobs) {
 		t.Fatalf("worklist jobs = %#v, want %#v", got.Worklist.Jobs, want.Jobs)
 	}
@@ -284,9 +267,8 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
 	commitLineShift(t, c, "1st")
-	result, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
-		UserID: "ada", Org: "feragame", Roles: []string{"line"},
-	}, CommitRequest{
+	lineOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
+	result, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
 		TaskPath: "line/lineLoad", JobInstanceID: "1st",
 		Value: map[string]any{
 			"progress": map[string]any{
@@ -315,10 +297,161 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg = %q, want available after lineLoad Submission", inst.Tasks["containerReg"])
 	}
-	want := ProjectWorklist(mustActiveConfig(t, c), result.Domain)
+	want := ProjectWorklist(mustActiveConfig(t, c), result.Domain, lineOp)
 	rawGot, _ := json.Marshal(result.Worklist)
 	rawWant, _ := json.Marshal(want)
 	if string(rawGot) != string(rawWant) {
 		t.Fatalf("Commit worklist != ProjectWorklist(domain)\ngot  %s\nwant %s", rawGot, rawWant)
 	}
 }
+
+func TestProjectWorklistViewerRoleSplitCanStartAndChrome(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	domain := EmptyDomain()
+
+	admin := OperatorIdentity{UserID: "admin", Org: "feragame", Roles: []string{"administration"}}
+	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+
+	adminWL := ProjectWorklist(cfg, domain, admin)
+	logWL := ProjectWorklist(cfg, domain, logistic)
+
+	adminIntake, ok := worklistJobByID(adminWL, "intake")
+	if !ok {
+		t.Fatal("admin missing intake")
+	}
+	logIntake, ok := worklistJobByID(logWL, "intake")
+	if !ok {
+		t.Fatal("logistic missing intake")
+	}
+	if !adminIntake.CanStart {
+		t.Fatal("administration canStart intake want true (first Task register)")
+	}
+	if logIntake.CanStart {
+		t.Fatal("logistic canStart intake want false (first Task register is administration-only)")
+	}
+	if len(adminIntake.Tasks) == 0 || adminIntake.Tasks[0].ID != "register" {
+		t.Fatalf("task chrome = %#v", adminIntake.Tasks)
+	}
+	if got := adminIntake.Tasks[0].Roles; len(got) != 1 || got[0] != "administration" {
+		t.Fatalf("register roles chrome = %#v", got)
+	}
+	if adminIntake.Tasks[0].Title == "" {
+		t.Fatal("register title chrome empty")
+	}
+	if adminIntake.Title != "Camion" {
+		t.Fatalf("intake job title = %q", adminIntake.Title)
+	}
+	pallet := worklistTaskByIDOrFatal(t, adminIntake, "palletWeight")
+	if len(pallet.Roles) != 1 || pallet.Roles[0] != "logistic" {
+		t.Fatalf("palletWeight roles = %#v", pallet.Roles)
+	}
+	if pallet.Title == "" {
+		t.Fatal("palletWeight title empty")
+	}
+}
+
+func worklistTaskByIDOrFatal(t *testing.T, job WorklistJob, taskID string) WorklistTask {
+	t.Helper()
+	chrome, ok := worklistTaskByID(job, taskID)
+	if !ok {
+		t.Fatalf("missing task chrome %q", taskID)
+	}
+	return chrome
+}
+
+func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
+	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
+	instanceID := "NIR-261019-NO-1"
+	commitThroughCodiceFir(t, c, instanceID)
+
+	cfg := mustActiveConfig(t, c)
+	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	admin := OperatorIdentity{UserID: "admin", Org: "feragame", Roles: []string{"administration"}}
+	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+
+	adminWL := ProjectWorklist(cfg, domain, admin)
+	logWL := ProjectWorklist(cfg, domain, logistic)
+
+	adminIntake, _ := worklistJobByID(adminWL, "intake")
+	logIntake, _ := worklistJobByID(logWL, "intake")
+	adminInst, ok := worklistInstance(adminIntake, instanceID)
+	if !ok {
+		t.Fatal("admin missing instance")
+	}
+	logInst, ok := worklistInstance(logIntake, instanceID)
+	if !ok {
+		t.Fatal("logistic missing instance")
+	}
+	// Unlock/Submission status stays shared (not remapped by roles).
+	if adminInst.Tasks["palletWeight"] != TaskStatusAvailable || logInst.Tasks["palletWeight"] != TaskStatusAvailable {
+		t.Fatalf("palletWeight status admin=%q logistic=%q, want available", adminInst.Tasks["palletWeight"], logInst.Tasks["palletWeight"])
+	}
+	if containsString(adminInst.ViewerAvailable, "palletWeight") {
+		t.Fatalf("administration ViewerAvailable must exclude palletWeight: %#v", adminInst.ViewerAvailable)
+	}
+	if !containsString(logInst.ViewerAvailable, "palletWeight") {
+		t.Fatalf("logistic ViewerAvailable must include palletWeight: %#v", logInst.ViewerAvailable)
+	}
+
+	adminRefs := CollectAvailableTaskRefs(cfg, adminWL)
+	logRefs := CollectAvailableTaskRefs(cfg, logWL)
+	if hasAvailableRef(adminRefs, "intake", "palletWeight", instanceID) {
+		t.Fatalf("administration Available affordances must exclude palletWeight: %#v", adminRefs)
+	}
+	if !hasAvailableRef(logRefs, "intake", "palletWeight", instanceID) {
+		t.Fatalf("logistic Available affordances must include palletWeight: %#v", logRefs)
+	}
+
+	adminLoaded, err := loader.Load(t.Context(), "feragame", admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logLoaded, err := loader.Load(t.Context(), "feragame", logistic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(adminLoaded.TaskFormBundles) != 0 || len(logLoaded.TaskFormBundles) != 0 {
+		t.Fatal("home Load must omit bulk Task form bundles for all viewers")
+	}
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "palletWeight", instanceID); err == nil {
+		t.Fatal("administration addressed fetch must forbid palletWeight")
+	}
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", logistic, "intake", "palletWeight", instanceID); err != nil {
+		t.Fatalf("logistic addressed fetch must allow palletWeight: %v", err)
+	}
+}
+
+func hasAvailableRef(refs []AvailableTaskRef, jobID, taskID, jobInstanceID string) bool {
+	for _, r := range refs {
+		if r.JobID == jobID && r.TaskID == taskID && r.JobInstanceID == jobInstanceID {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(ids []string, want string) bool {
+	for _, id := range ids {
+		if id == want {
+			return true
+		}
+	}
+	return false
+}
+
+func bundleHasTask(bundles []*TaskFormBundle, taskID string) bool {
+	for _, b := range bundles {
+		if b != nil && b.TaskID == taskID {
+			return true
+		}
+	}
+	return false
+}
+

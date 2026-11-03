@@ -27,9 +27,11 @@ func main() {
 	db := client.Database(dbName)
 	domains := living.NewMongoDomainStore(db)
 	configs := living.NewMongoConfigStore(db)
-	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{WipeDomain: true}); err != nil {
+	// Active Config only — smoke builds Domain from empty; staged matrix would collide on line "1st".
+	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{SkipEmptyDomainStaging: true}); err != nil {
 		must(err)
 	}
+	must(domains.Put(ctx, "feragame", living.EmptyDomain()))
 
 	c := &living.Committer{
 		Domains:    domains,
@@ -103,7 +105,7 @@ func main() {
 	must(err)
 	cfg, err := configs.Get(ctx, "feragame", ver)
 	must(err)
-	wl := living.ProjectWorklist(cfg, res.Domain)
+	wl := living.ProjectWorklist(cfg, res.Domain, living.FixtureAllRolesOp())
 	fmt.Printf("seeded feragame in %s\n", dbName)
 	fmt.Printf("containers=%d submissions=%d\n", len(res.Domain.Kind("container")), len(res.Domain.Submissions))
 	for _, j := range wl.Jobs {
@@ -114,10 +116,11 @@ func main() {
 			}
 		}
 	}
-	bundles, err := living.ProjectAvailableBundles(cfg, res.Domain, wl)
-	must(err)
+	refs := living.CollectAvailableTaskRefs(cfg, wl)
 	var haveLE, haveWC bool
-	for _, b := range bundles {
+	for _, ref := range refs {
+		b, err := living.BuildTaskFormBundle(cfg, res.Domain, ref)
+		must(err)
 		cd, _ := b.Bindings["chromeDisplay"].(map[string]any)
 		switch b.TaskID {
 		case "loadedExtracted":

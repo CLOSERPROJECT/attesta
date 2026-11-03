@@ -9,7 +9,8 @@ export default defineConfig({
 		reuseExistingServer: !process.env.CI
 	},
 	use: {
-		baseURL: `http://127.0.0.1:${port}`
+		// Vite preview binds localhost (often IPv6-only); 127.0.0.1 refuses.
+		baseURL: `http://localhost:${port}`
 	},
 	testMatch: '**/*.e2e.{ts,js}'
 });

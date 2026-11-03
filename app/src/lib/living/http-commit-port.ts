@@ -1,6 +1,7 @@
 import {
 	CommitDomainError,
 	type CommitDomainPort,
+	type CommitNext,
 	type CommitResult,
 	type HttpLinkItem
 } from './commit-port.js';
@@ -33,15 +34,17 @@ function parseWorklist(raw: unknown): Worklist {
 	return { jobs: jobs as Worklist['jobs'] };
 }
 
-function parseTaskFormBundles(raw: unknown): TaskFormBundle[] {
-	if (!Array.isArray(raw)) return [];
-	return raw.filter(
-		(item): item is TaskFormBundle =>
-			item != null && typeof item === 'object' && !Array.isArray(item)
-	) as TaskFormBundle[];
+function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
+	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	return raw as TaskFormBundle;
 }
 
-/** Normalize Commit JSON so SPA always sees arrays for links / httpErrors / bundles. */
+function parseCommitNext(raw: unknown): CommitNext {
+	if (raw === 'task' || raw === 'overview' || raw === 'home') return raw;
+	return 'home';
+}
+
+/** Normalize Commit JSON so SPA always sees arrays for links / httpErrors. */
 export function parseCommitResult(raw: unknown): CommitResult {
 	const body = raw as CommitResult;
 	const linksRaw = Array.isArray((raw as { links?: unknown })?.links)
@@ -56,18 +59,19 @@ export function parseCommitResult(raw: unknown): CommitResult {
 		if (parsed) links.push(parsed);
 	}
 	const httpErrors = errorsRaw.filter((e): e is string => typeof e === 'string');
+	const nextBundle = parseOptionalTaskFormBundle(
+		(raw as { nextTaskFormBundle?: unknown })?.nextTaskFormBundle
+	);
 	return {
 		...body,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
-		taskFormBundles: parseTaskFormBundles(
-			(raw as { taskFormBundles?: unknown })?.taskFormBundles
-		),
+		next: parseCommitNext((raw as { next?: unknown })?.next),
+		nextTaskFormBundle: nextBundle,
 		links,
 		httpErrors
 	};
 }
 
-/** Browser Adapter: POST /api/living/commit → Worklist + bundles. Drafts stay client-side. */
 export function createHttpCommitDomainPort(
 	options: HttpCommitDomainPortOptions = {}
 ): CommitDomainPort {

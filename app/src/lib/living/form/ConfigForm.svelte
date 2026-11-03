@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { BasicForm, handlers, type FormState } from '@sjsf/form';
-	import { setThemeContext } from '@sjsf/shadcn4-theme';
-	import * as components from '@sjsf/shadcn4-theme/new-york';
+	import { setShadcnContext } from '#lib/shadcn/set-shadcn-context.js';
 	import { untrack } from 'svelte';
 	import { setChromeContext } from './chrome-context.js';
 	import { setConfigFormContext } from './config-form-context.js';
@@ -14,7 +13,7 @@
 
 	let { form, class: className }: Props = $props();
 
-	setThemeContext({ components });
+	setShadcnContext();
 
 	// setContext must run at init; parent remounts via projection key when row ids change.
 	const mounted = untrack(() => form as CreateConfigFormResult<Record<string, unknown>>);

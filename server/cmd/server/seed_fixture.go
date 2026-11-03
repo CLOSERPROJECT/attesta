@@ -21,10 +21,13 @@ type demoFixture struct {
 	Users []demoFixtureUser
 }
 
-// Living Feragame demo org / all-roles operator (Cerbos Commit demos on /app).
+// Living Feragame demo org / operators (Cerbos Commit demos on /app).
 const (
-	demoLivingOrgSlug   = "feragame"
-	demoLivingUserEmail = "living@attesta.com"
+	demoLivingOrgSlug           = "feragame"
+	demoLivingUserEmail         = "living@attesta.com"
+	demoLivingAdminUserEmail    = "administration@attesta.com"
+	demoLivingLogisticUserEmail = "logistic@attesta.com"
+	demoLivingLineUserEmail     = "line@attesta.com"
 )
 
 func defaultDemoFixture() demoFixture {
@@ -101,6 +104,33 @@ func defaultDemoFixture() demoFixture {
 				OrgAdminSlugs: []string{demoLivingOrgSlug},
 				MembershipRoles: map[string][]string{
 					demoLivingOrgSlug: {"administration", "logistic", "line"},
+				},
+			},
+			{
+				Email:         demoLivingAdminUserEmail,
+				Password:      demoLivingAdminUserEmail,
+				Name:          "Living Administration",
+				OrgAdminSlugs: []string{demoLivingOrgSlug},
+				MembershipRoles: map[string][]string{
+					demoLivingOrgSlug: {"administration"},
+				},
+			},
+			{
+				Email:         demoLivingLogisticUserEmail,
+				Password:      demoLivingLogisticUserEmail,
+				Name:          "Living Logistic",
+				OrgAdminSlugs: []string{demoLivingOrgSlug},
+				MembershipRoles: map[string][]string{
+					demoLivingOrgSlug: {"logistic"},
+				},
+			},
+			{
+				Email:         demoLivingLineUserEmail,
+				Password:      demoLivingLineUserEmail,
+				Name:          "Living Line",
+				OrgAdminSlugs: []string{demoLivingOrgSlug},
+				MembershipRoles: map[string][]string{
+					demoLivingOrgSlug: {"line"},
 				},
 			},
 		},

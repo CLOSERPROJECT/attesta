@@ -2,13 +2,17 @@ import type { TaskFormBundle } from './form/task-form-bundle.js';
 
 export type { TaskFormBundle };
 
-/** Org hydrate from GET /api/living/domain — Worklist + bundles + config metadata. */
 export type LoadResult = {
 	org: string;
 	activeConfigVersion: string;
 	configId: string;
+	/** Viewer OperatorIdentity projection for chrome `$operator` (not Cerbos). */
+	userId: string;
+	displayName: string;
+	/** Viewer Config role slugs (OperatorIdentity; board chrome, not Cerbos). */
+	roles: string[];
 	worklist: Worklist;
-	/** Worklist-available + provisional Task form mount payloads (replaced on Commit). */
+	/** Always empty on home Load (ADR-0006); Task mounts use addressed fetch. */
 	taskFormBundles: TaskFormBundle[];
 };
 
@@ -17,20 +21,34 @@ export type Worklist = {
 	jobs: WorklistJob[];
 };
 
+export type WorklistTask = {
+	id: string;
+	title: string;
+	/** Authored Config role slugs for board chrome (slug∩roles; not Cerbos). */
+	roles: string[];
+};
+
 export type WorklistJob = {
 	jobId: string;
 	canStart: boolean;
 	repeatable: boolean;
+	/** Authored Job display name (chrome; not the instance-label CEL). */
+	title?: string;
 	startLabel?: string;
 	/** Authored Task id order for chrome iteration. */
 	taskIds: string[];
+	/** Config-free Task title + roles chrome (alongside taskIds). */
+	tasks: WorklistTask[];
 	instances: WorklistInstance[];
 };
 
 export type WorklistInstance = {
 	id: string;
 	label: string;
+	/** Role-blind Unlock/Submission status (handoff). */
 	tasks: Record<string, TaskStatus>;
+	/** Viewer-scoped Available Task ids (status-available ∩ slug∩roles). */
+	viewerAvailable?: string[];
 };
 
 export type TaskStatus = 'locked' | 'available' | 'done';

@@ -36,6 +36,7 @@ catalogs:
 steps:
     intake:
         repeatable: true
+        title: Camion
         startLabel: Nuovo camion
         # After first Substep Submission + transform bindings (e.g. $load):
         instanceId: $load.id
@@ -333,6 +334,7 @@ steps:
                         checkedPalletSum: $.checkedPalletSum
     line:
         repeatable: true
+        title: Linea
         startLabel: Nuovo turno
         startsWhen:
             substep: intake/palletWeight

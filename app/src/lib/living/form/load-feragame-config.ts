@@ -7,6 +7,7 @@ export type JobTemplate = {
 	repeatable: boolean;
 	instanceId: string;
 	label: string;
+	title?: string;
 	startLabel?: string;
 	startsWhen?: unknown;
 	tasks: TaskConfig[];
@@ -62,6 +63,9 @@ export function loadFeragameConfig(yamlText: string): FeragameConfig {
 			label: typeof raw.label === 'string' ? raw.label : jobId,
 			tasks
 		};
+		if (typeof raw.title === 'string' && raw.title.length > 0) {
+			job.title = raw.title;
+		}
 		if (typeof raw.startLabel === 'string' && raw.startLabel.length > 0) {
 			job.startLabel = raw.startLabel;
 		}

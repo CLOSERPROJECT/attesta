@@ -1,6 +1,5 @@
 import type { LoadResult } from './types.js';
 
-/** Org Domain Load — no run id. */
 export type LoadDomainPort = {
 	load(): Promise<LoadResult>;
 };

@@ -62,7 +62,7 @@ func TestCommitRegisterPersistsAndLoadReflects(t *testing.T) {
 		t.Fatalf("task path = %s/%s", sub.JobID, sub.TaskID)
 	}
 
-	loaded, err := loader.Load(t.Context(), "feragame")
+	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}

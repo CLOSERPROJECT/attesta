@@ -5,7 +5,6 @@ export type CommitMint =
 	| { kind: 'none' }
 	| { kind: 'startingNew' };
 
-/** Org Domain Commit — Task path + Job instance; no run id. */
 export type CommitRequest = {
 	taskPath: string;
 	/** Empty only with mint.startingNew; never send `_new` on the wire. */
@@ -22,17 +21,29 @@ export type HttpLinkItem = {
 	filename?: string;
 };
 
+/** ADR-0006 post-Commit destination (server-evaluated; SPA navigates only). */
+export type CommitNext = 'task' | 'overview' | 'home';
+
 export type CommitResult = {
 	org: string;
 	jobInstanceId: string;
 	/** Server-projected board after this Commit (same projector as Load). */
 	worklist: Worklist;
-	/** Replaces prior Load/Commit bundle set (available + provisional). */
-	taskFormBundles: TaskFormBundle[];
+	/** Explicit destination: task | overview | home. */
+	next: CommitNext;
+	/** Present only when next is task (auto-advance bundle). */
+	nextTaskFormBundle?: TaskFormBundle | null;
 	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
 	links?: HttpLinkItem[];
 	/** HttpPort failures; Domain remains committed server-side. */
 	httpErrors?: string[];
+};
+
+export type CommitOutcome = {
+	jobInstanceId: string;
+	worklist: Worklist;
+	next: CommitNext;
+	nextTaskFormBundle: TaskFormBundle | null;
 };
 
 export type CommitDomainPort = {

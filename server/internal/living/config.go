@@ -133,6 +133,7 @@ type Job struct {
 	Repeatable bool         `json:"repeatable"`
 	InstanceID string       `json:"instanceId"`
 	Label      string       `json:"label"`
+	Title      string       `json:"title,omitempty"`
 	StartLabel string       `json:"startLabel,omitempty"`
 	StartsWhen *StartsWhen  `json:"startsWhen,omitempty"`
 	Tasks      []TaskConfig `json:"tasks"`

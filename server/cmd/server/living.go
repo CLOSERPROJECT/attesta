@@ -103,13 +103,18 @@ func (s *Server) livingVerifiedGate(w http.ResponseWriter, r *http.Request) (liv
 	org := ""
 	roles := []string(nil)
 	userID := ""
+	displayName := ""
 	if user != nil {
 		org = strings.TrimSpace(user.OrgSlug)
 		roles = append([]string(nil), user.RoleSlugs...)
 		userID = strings.TrimSpace(user.IdentityUserID)
+		displayName = strings.TrimSpace(user.Email)
 		if userID == "" {
-			userID = strings.TrimSpace(user.Email)
+			userID = displayName
+		}
+		if displayName == "" {
+			displayName = userID
 		}
 	}
-	return living.OperatorIdentity{UserID: userID, Org: org, Roles: roles}, true
+	return living.OperatorIdentity{UserID: userID, DisplayName: displayName, Org: org, Roles: roles}, true
 }

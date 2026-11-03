@@ -51,67 +51,6 @@ type DerivedRule struct {
 	Overridable *bool  `json:"overridable,omitempty"`
 }
 
-// AvailableTaskRef addresses one Worklist-available Task on an instance.
-type AvailableTaskRef struct {
-	JobID         string
-	TaskID        string
-	JobInstanceID string
-}
-
-// CollectAvailableTaskRefs walks Worklist in Org Config Job order: provisional
-// first Task when canStart (empty jobInstanceId), then every available Task on
-// each instance in authored Task order.
-func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist) []AvailableTaskRef {
-	byJob := make(map[string]WorklistJob, len(wl.Jobs))
-	for _, j := range wl.Jobs {
-		byJob[j.JobID] = j
-	}
-	out := make([]AvailableTaskRef, 0)
-	for _, jobID := range cfg.Jobs.Keys {
-		jobVal, ok := cfg.Jobs.Get(jobID)
-		if !ok {
-			continue
-		}
-		job, ok := AsJob(jobVal)
-		if !ok {
-			continue
-		}
-		wlJob, ok := byJob[jobID]
-		if !ok {
-			continue
-		}
-		ordered := OrderedTaskIDs(job.Tasks)
-		if wlJob.CanStart && len(ordered) > 0 {
-			out = append(out, AvailableTaskRef{
-				JobID:         jobID,
-				TaskID:        ordered[0],
-				JobInstanceID: "",
-			})
-		}
-		for _, inst := range wlJob.Instances {
-			for _, taskID := range ordered {
-				if inst.Tasks[taskID] == TaskStatusAvailable {
-					out = append(out, AvailableTaskRef{
-						JobID:         jobID,
-						TaskID:        taskID,
-						JobInstanceID: inst.ID,
-					})
-				}
-			}
-		}
-	}
-	return out
-}
-
-// FirstAvailableTask returns the first CollectAvailableTaskRefs entry.
-func FirstAvailableTask(cfg OrgConfig, wl Worklist) (AvailableTaskRef, bool) {
-	refs := CollectAvailableTaskRefs(cfg, wl)
-	if len(refs) == 0 {
-		return AvailableTaskRef{}, false
-	}
-	return refs[0], true
-}
-
 // BuildTaskFormBundle projects schema/ui + chrome/derived rules for one Task.
 // Living code stays generic (no fixture Task id branches).
 func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*TaskFormBundle, error) {
@@ -235,21 +174,6 @@ func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 	}
 	bindings["chromeDisplay"] = display
 	return nil
-}
-
-// ProjectAvailableBundles builds Task form bundles for every CollectAvailableTaskRefs
-// address (available + provisional). Empty when none.
-func ProjectAvailableBundles(cfg OrgConfig, domain Domain, wl Worklist) ([]*TaskFormBundle, error) {
-	refs := CollectAvailableTaskRefs(cfg, wl)
-	out := make([]*TaskFormBundle, 0, len(refs))
-	for _, ref := range refs {
-		bundle, err := BuildTaskFormBundle(cfg, domain, ref)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, bundle)
-	}
-	return out, nil
 }
 
 func taskTitle(payload map[string]any, taskID string) string {

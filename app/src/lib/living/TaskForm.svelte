@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { FailureValidationResult } from '@sjsf/form';
+	import type { CommitOutcome } from './commit-port.js';
 	import { living } from './living-app.svelte.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/ConfigForm.svelte';
@@ -11,7 +12,6 @@
 		catalogsFromBundleBindings,
 		chromeDisplayFromBundleBindings,
 		domainFromBundleBindings,
-		findTaskFormBundle,
 		planFromTaskFormBundle,
 		type TaskFormBundle
 	} from './form/task-form-bundle.js';
@@ -23,11 +23,9 @@
 		taskId: string;
 		/** Empty string = provisional start (first Task / mint). */
 		jobInstanceId: string;
-		/** Mount payload from Load/Commit bundle set — only mount path. */
 		bundle: TaskFormBundle;
 		disabled?: boolean;
-		/** Called after successful Commit (e.g. close provisional). */
-		onCommitted?: (jobInstanceId: string) => void;
+		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
 	let {
@@ -40,7 +38,6 @@
 	}: Props = $props();
 
 	const path = $derived(taskPath(jobId, taskId));
-	const title = $derived(bundle.title);
 	const drafts = $derived(living.drafts);
 
 	let submitError = $state.raw<string | null>(null);
@@ -86,23 +83,14 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		submitError = null;
 		const provisional = jobInstanceId === '';
-		const mintedId = await living.commit({
+		const outcome = await living.commit({
 			taskPath: path,
 			jobInstanceId: provisional ? '' : jobInstanceId,
 			value,
 			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
 		});
-		if (mintedId == null) return;
-		const next = findTaskFormBundle(
-			living.result?.taskFormBundles,
-			jobId,
-			taskId,
-			mintedId
-		);
-		if (next) {
-			writeDraft({ ...(next.initialData ?? {}) });
-		}
-		onCommitted?.(mintedId);
+		if (outcome == null) return;
+		onCommitted?.(outcome);
 	}
 
 	function disposeLive() {
@@ -121,6 +109,7 @@
 			getCatalogs: () => liveCatalogs(),
 			getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
 			getInstance: () => bundleInstance(),
+			getOperator: () => living.operator(),
 			onSubmit: (value) => {
 				void submitSealed(value);
 			},
@@ -162,18 +151,19 @@
 </script>
 
 <section
-	class="space-y-3 rounded-md border border-zinc-200 bg-zinc-50 p-3"
+	class="space-y-3"
 	data-testid={`task-${taskId}`}
 	data-task-path={path}
 	data-instance-id={jobInstanceId || 'provisional'}
 	data-from-bundle="1"
 >
-	<h3 class="text-sm font-semibold text-zinc-800">{title}</h3>
-
 	{#if live?.form}
 		{#key live.plan.projectionKey}
 			<fieldset disabled={disabled || living.committing} class="space-y-4">
-				<ConfigForm form={live.form} class="space-y-4" />
+				<ConfigForm
+					form={live.form}
+					class="flex flex-col gap-4 [&_button[type=submit]]:mt-6 [&_button[type=submit]]:self-end"
+				/>
 			</fieldset>
 		{/key}
 	{:else}

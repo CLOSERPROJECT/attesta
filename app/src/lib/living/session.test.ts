@@ -10,6 +10,9 @@ const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
 	configId: 'feragame-config',
+	userId: 'u1',
+	displayName: 'Ada',
+	roles: ['administration'],
 	worklist: {
 		jobs: [
 			{
@@ -17,7 +20,11 @@ const sample: LoadResult = {
 				canStart: true,
 				repeatable: true,
 				startLabel: 'Nuovo camion',
-				taskIds: ['register'],
+				taskIds: ['register', 'palletWeight'],
+				tasks: [
+					{ id: 'register', title: 'Registrazione', roles: ['administration'] },
+					{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
+				],
 				instances: []
 			},
 			{
@@ -26,6 +33,7 @@ const sample: LoadResult = {
 				repeatable: true,
 				startLabel: 'Nuovo turno',
 				taskIds: ['shift'],
+				tasks: [{ id: 'shift', title: 'Turno', roles: ['line'] }],
 				instances: []
 			}
 		]
@@ -34,7 +42,7 @@ const sample: LoadResult = {
 };
 
 describe('LivingSession', () => {
-	test('hydrate loads Worklist + bundles via LoadDomainPort', async () => {
+	test('hydrate loads Worklist via LoadDomainPort', async () => {
 		const load = vi.fn(async () => sample) satisfies LoadDomainPort['load'];
 		const session = new LivingSession({
 			load: { load },
@@ -45,8 +53,20 @@ describe('LivingSession', () => {
 		expect(load).toHaveBeenCalledOnce();
 		expect(session.error).toBeNull();
 		expect(session.result?.org).toBe('feragame');
+		expect(session.operator()).toEqual({
+			userId: 'u1',
+			displayName: 'Ada',
+			org: 'feragame',
+			roles: ['administration']
+		});
 		expect(session.jobIds).toEqual(['intake', 'line']);
 		expect(session.worklistJob('intake')?.startLabel).toBe('Nuovo camion');
+		const register = session.worklistJob('intake')?.tasks.find((t) => t.id === 'register');
+		expect(register?.title).toBe('Registrazione');
+		expect(register?.roles).toEqual(['administration']);
+		const pallet = session.worklistJob('intake')?.tasks.find((t) => t.id === 'palletWeight');
+		expect(pallet?.title).toBeTruthy();
+		expect(pallet?.roles).toEqual(['logistic']);
 	});
 
 	test('hydrate surfaces port errors without leaving stale result', async () => {
@@ -64,7 +84,7 @@ describe('LivingSession', () => {
 		expect(session.error).toBe('boom');
 	});
 
-	test('commit success replaces Worklist + bundles and clears Draft', async () => {
+	test('commit success replaces Worklist and clears Draft', async () => {
 		const nextWorklist = {
 			jobs: [
 				{
@@ -72,6 +92,7 @@ describe('LivingSession', () => {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register', 'codiceFir'],
+					tasks: [],
 					instances: [
 						{
 							id: 'NIR-1',
@@ -80,30 +101,15 @@ describe('LivingSession', () => {
 						}
 					]
 				},
-				{ jobId: 'line', canStart: false, repeatable: true, taskIds: ['shift'], instances: [] }
+				{ jobId: 'line', canStart: false, repeatable: true, taskIds: ['shift'], tasks: [], instances: [] }
 			]
 		};
-		const nextBundles: TaskFormBundle[] = [
-			{
-				jobId: 'intake',
-				taskId: 'codiceFir',
-				jobInstanceId: 'NIR-1',
-				title: 'Codice FIR',
-				surface: 'live',
-				schema: { type: 'object' },
-				uiSchema: {},
-				initialData: {},
-				chrome: [],
-				chromeFieldIds: [],
-				sealFieldIds: ['codiceFir'],
-				bindings: { domain: {} }
-			}
-		];
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: nextWorklist,
-			taskFormBundles: nextBundles
+			next: 'overview' as const,
+			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
@@ -112,15 +118,17 @@ describe('LivingSession', () => {
 		});
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
-		const minted = await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO', palletCount: 1 },
 			mint: { kind: 'none' }
 		});
-		expect(minted).toBe('NIR-1');
+		expect(outcome?.jobInstanceId).toBe('NIR-1');
+		expect(outcome?.next).toBe('overview');
+		expect(outcome?.nextTaskFormBundle).toBeNull();
 		expect(session.result?.worklist).toEqual(nextWorklist);
-		expect(session.result?.taskFormBundles).toEqual(nextBundles);
+		expect(session.result?.taskFormBundles).toEqual([]);
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
 		expect(session.commitError).toBeNull();
 	});
@@ -130,7 +138,8 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
-			taskFormBundles: []
+			next: 'task' as const,
+			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
@@ -139,13 +148,13 @@ describe('LivingSession', () => {
 		});
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '', { client: 'NO' });
-		const minted = await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: '',
 			value: { client: 'NO' },
 			mint: { kind: 'startingNew' }
 		});
-		expect(minted).toBe('NIR-1');
+		expect(outcome?.jobInstanceId).toBe('NIR-1');
 		expect(commit).toHaveBeenCalledWith({
 			taskPath: 'intake/register',
 			jobInstanceId: '',
@@ -154,6 +163,73 @@ describe('LivingSession', () => {
 		});
 		expect(session.getDraft('intake/register', '')).toBeNull();
 		expect(session.getDraft('intake/register', '_new')).toBeNull();
+	});
+
+	test('commit outcome surfaces next + nextTaskFormBundle for auto-advance', async () => {
+		const next: TaskFormBundle = {
+			jobId: 'intake',
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-1',
+			title: 'Codice FIR',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		};
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			worklist: emptyWorklist(),
+			next: 'task' as const,
+			nextTaskFormBundle: next
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const outcome = await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: { client: 'NO' },
+			mint: { kind: 'none' }
+		});
+		expect(outcome?.next).toBe('task');
+		expect(outcome?.nextTaskFormBundle).toEqual(next);
+	});
+
+	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
+		const bundle: TaskFormBundle = {
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '',
+			title: 'Register',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		};
+		const fetch = vi.fn(async () => bundle);
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			taskForm: { fetch },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const priorBundles = session.result.taskFormBundles;
+		const got = await session.fetchTaskForm({ jobId: 'intake', taskId: 'register' });
+		expect(got).toEqual(bundle);
+		expect(fetch).toHaveBeenCalledWith({ jobId: 'intake', taskId: 'register' });
+		expect(session.result?.taskFormBundles).toBe(priorBundles);
 	});
 
 	test('commit denial keeps Draft and re-Loads Worklist', async () => {
@@ -165,6 +241,7 @@ describe('LivingSession', () => {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register'],
+					tasks: [],
 					instances: []
 				}
 			]
@@ -181,13 +258,13 @@ describe('LivingSession', () => {
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
 
-		const minted = await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
 			mint: { kind: 'none' }
 		});
-		expect(minted).toBeNull();
+		expect(outcome).toBeNull();
 		expect(session.commitError).toBe('forbidden');
 		expect(session.getDraft('intake/register', '_new')).toEqual({
 			client: 'NO',
