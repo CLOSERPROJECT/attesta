@@ -38,7 +38,6 @@
 	}: Props = $props();
 
 	const path = $derived(taskPath(jobId, taskId));
-	const title = $derived(bundle.title);
 	const drafts = $derived(living.drafts);
 
 	let submitError = $state.raw<string | null>(null);
@@ -151,18 +150,19 @@
 </script>
 
 <section
-	class="space-y-3 rounded-md border border-zinc-200 bg-zinc-50 p-3"
+	class="space-y-3"
 	data-testid={`task-${taskId}`}
 	data-task-path={path}
 	data-instance-id={jobInstanceId || 'provisional'}
 	data-from-bundle="1"
 >
-	<h3 class="text-sm font-semibold text-zinc-800">{title}</h3>
-
 	{#if live?.form}
 		{#key live.plan.projectionKey}
 			<fieldset disabled={disabled || living.committing} class="space-y-4">
-				<ConfigForm form={live.form} class="space-y-4" />
+				<ConfigForm
+					form={live.form}
+					class="flex flex-col gap-4 [&_button[type=submit]]:self-end"
+				/>
 			</fieldset>
 		{/key}
 	{:else}

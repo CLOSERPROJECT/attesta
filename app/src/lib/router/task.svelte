@@ -7,7 +7,6 @@
 	import {
 		resolvePostCommitNavigation,
 		resolveTaskDeepLink,
-		resolveTaskExit,
 		resolveUnmountableTaskTarget
 	} from '../living/worklist-nav.js';
 	import { route } from './index.js';
@@ -24,10 +23,6 @@
 	let error = $state.raw<string | null>(null);
 	let loadGen = 0;
 	let redirected = $state(false);
-
-	function goExit() {
-		navigateLivingTarget(resolveTaskExit(jobId, jobInstanceId, provisional));
-	}
 
 	function onCommitted(outcome: CommitOutcome) {
 		navigateLivingTarget(
@@ -150,13 +145,5 @@
 			{bundle}
 			onCommitted={onCommitted}
 		/>
-		<button
-			type="button"
-			class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-			data-testid="task-annulla"
-			onclick={goExit}
-		>
-			Annulla
-		</button>
 	{/if}
 </div>

@@ -106,29 +106,30 @@ test('home route renders Worklist Home bands', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'Can start' })).toBeVisible();
 });
 
-test('Home → Can start → Annulla → Home', async ({ page }) => {
+test('Home → Can start → nav-back → Home', async ({ page }) => {
 	await stubLivingApis(page);
 	await page.goto('/app');
 	await expect(page.getByTestId('worklist-can-start')).toBeVisible();
 	await page.getByTestId('can-start-row').click();
 	await expect(page.getByTestId('task-route')).toBeVisible();
+	await expect(page.getByTestId('task-register')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
-	await expect(page.getByTestId('task-annulla')).toBeVisible();
-	await page.getByTestId('task-annulla').click();
+	await page.getByTestId('nav-back').click();
 	await expect(page.getByTestId('living-shell')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 	await expect(page.getByTestId('worklist-available')).toBeVisible();
 	await expect(page.getByTestId('worklist-can-start')).toBeVisible();
 });
 
-test('Home → Available row → Annulla → overview', async ({ page }) => {
+test('Home → Available row → nav-back → overview', async ({ page }) => {
 	await stubLivingApis(page);
 	await page.goto('/app');
 	await expect(page.getByTestId('available-row')).toBeVisible();
 	await page.getByTestId('available-row').click();
 	await expect(page.getByTestId('task-route')).toBeVisible();
-	await expect(page.getByTestId('task-annulla')).toBeVisible();
-	await page.getByTestId('task-annulla').click();
+	await expect(page.getByTestId('task-register')).toBeVisible();
+	await expect(page.getByTestId('nav-back')).toBeVisible();
+	await page.getByTestId('nav-back').click();
 	await expect(page.getByTestId('overview-route')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Camion B');
 	await expect(page.getByTestId('overview-tasks')).toBeVisible();
