@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 
 	import { living } from '../living/living-app.svelte.js';
+	import WorklistRow from '../living/WorklistRow.svelte';
 	import {
 		formatHandoffCopy,
 		jobInstanceOverview
@@ -51,37 +52,27 @@
 			</p>
 		{/if}
 
-		<ul
-			class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white"
-			data-testid="overview-tasks"
-		>
+		<ul class="flex flex-col gap-1" data-testid="overview-tasks">
 			{#each model.tasks as row (row.taskId)}
-				<li class="px-4 py-3" data-testid="overview-task-row" data-task-id={row.taskId}>
-					{#if row.linkable}
-						<a
-							class="block hover:underline"
-							data-testid="overview-task-link"
-							href={p('/:jobId/:jobInstanceId/:taskId', {
-								params: {
-									jobId: model.jobId,
-									jobInstanceId: model.jobInstanceId,
-									taskId: row.taskId
-								}
-							})}
-						>
-							<p class="text-sm font-medium text-zinc-900">{row.title}</p>
-							<p class="mt-0.5 font-mono text-xs text-zinc-500">
-								{row.taskId} · {row.status}
-							</p>
-						</a>
-					{:else}
-						<div data-testid="overview-task-status">
-							<p class="text-sm font-medium text-zinc-900">{row.title}</p>
-							<p class="mt-0.5 font-mono text-xs text-zinc-500">
-								{row.taskId} · {row.status}
-							</p>
-						</div>
-					{/if}
+				<li data-testid="overview-task-row" data-task-id={row.taskId}>
+					<WorklistRow
+						data-testid={row.linkable ? 'overview-task-link' : 'overview-task-status'}
+						ready={row.status === 'available'}
+						href={row.linkable
+							? p('/:jobId/:jobInstanceId/:taskId', {
+									params: {
+										jobId: model.jobId,
+										jobInstanceId: model.jobInstanceId,
+										taskId: row.taskId
+									}
+								})
+							: null}
+					>
+						<p class="text-sm font-medium text-zinc-900">{row.title}</p>
+						<p class="mt-0.5 font-mono text-xs text-zinc-500">
+							{row.taskId} · {row.status}
+						</p>
+					</WorklistRow>
 				</li>
 			{/each}
 		</ul>

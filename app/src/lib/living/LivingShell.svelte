@@ -3,6 +3,7 @@
 
 	import { p } from '../router/index.js';
 	import { living } from './living-app.svelte.js';
+	import WorklistRow from './WorklistRow.svelte';
 	import {
 		availableRowKey,
 		availableRowsFromWorklist,
@@ -46,17 +47,17 @@
 	{#if living.result}
 		<section class="space-y-3" data-testid="worklist-available">
 			<h2 class="text-lg font-semibold text-zinc-900">Available</h2>
-			<ul class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+			<ul class="flex flex-col gap-1">
 				{#each available as row (availableRowKey(row))}
 					{@const ringFrac = progressFraction(row.tasksDone, row.tasksTotal)}
 					{@const ringOffset = PROGRESS_RING_C * (1 - ringFrac)}
 					<li>
-						<a
-							class="block px-4 py-3 hover:bg-zinc-50"
+						<WorklistRow
 							data-testid="available-row"
 							data-job-id={row.jobId}
 							data-instance-id={row.jobInstanceId}
 							data-task-id={row.taskId}
+							ready
 							href={p('/:jobId/:jobInstanceId/:taskId', {
 								params: {
 									jobId: row.jobId,
@@ -65,23 +66,15 @@
 								}
 							})}
 						>
-							<div class="flex items-start justify-between gap-3">
-								<p class="min-w-0 text-sm font-bold text-zinc-900">
-									{row.instanceLabel}
-									<span class="font-normal text-zinc-400">·</span>
-									{#if row.jobTitle === row.jobId}
-										<span class="font-mono text-xs font-normal text-zinc-500">{row.jobId}</span>
-									{:else}
-										<span class="text-xs font-normal text-zinc-500">{row.jobTitle}</span>
-									{/if}
-								</p>
-								<span
-									class="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"
-									role="img"
-									aria-label="Available"
-									data-testid="available-ready-dot"
-								></span>
-							</div>
+							<p class="min-w-0 text-sm font-bold text-zinc-900">
+								{row.instanceLabel}
+								<span class="font-normal text-zinc-400">·</span>
+								{#if row.jobTitle === row.jobId}
+									<span class="font-mono text-xs font-normal text-zinc-500">{row.jobId}</span>
+								{:else}
+									<span class="text-xs font-normal text-zinc-500">{row.jobTitle}</span>
+								{/if}
+							</p>
 							<div class="mt-1 flex min-w-0 items-center gap-1.5">
 								<p class="min-w-0 truncate text-sm text-zinc-600">{row.title}</p>
 								<span
@@ -123,14 +116,13 @@
 									</span>
 								</span>
 							</div>
-						</a>
+						</WorklistRow>
 					</li>
 				{:else}
-					<li
-						class="px-4 py-3 text-sm text-zinc-500"
-						data-testid="available-empty"
-					>
-						No available Tasks.
+					<li>
+						<WorklistRow data-testid="available-empty" class="text-sm text-zinc-500">
+							No available Tasks.
+						</WorklistRow>
 					</li>
 				{/each}
 			</ul>
@@ -138,11 +130,10 @@
 
 		<section class="space-y-3" data-testid="worklist-can-start">
 			<h2 class="text-lg font-semibold text-zinc-900">Can start</h2>
-			<ul class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+			<ul class="flex flex-col gap-1">
 				{#each canStart as row (row.jobId)}
 					<li>
-						<a
-							class="block px-4 py-3 hover:bg-zinc-50"
+						<WorklistRow
 							data-testid="can-start-row"
 							data-job-id={row.jobId}
 							href={p('/:jobId/:jobInstanceId/:taskId', {
@@ -159,14 +150,13 @@
 							{:else}
 								<p class="mt-0.5 text-xs text-zinc-500">{row.jobTitle}</p>
 							{/if}
-						</a>
+						</WorklistRow>
 					</li>
 				{:else}
-					<li
-						class="px-4 py-3 text-sm text-zinc-500"
-						data-testid="can-start-empty"
-					>
-						No Jobs to start.
+					<li>
+						<WorklistRow data-testid="can-start-empty" class="text-sm text-zinc-500">
+							No Jobs to start.
+						</WorklistRow>
 					</li>
 				{/each}
 			</ul>
