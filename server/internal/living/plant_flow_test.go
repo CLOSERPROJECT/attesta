@@ -204,7 +204,8 @@ func palletWeightTask(line Job) TaskConfig {
 }
 
 // TestPlantPathLotsAndLineWeigh locks the feragame plant fixture: several intake
-// lots (FakeHttp labels), Close → weightCheck, then line weigh-series Close → lineLoad.
+// lots (FakeHttp labels), Close → weightCheck, then line openTurno → weigh (readyWhen)
+// unlocks lineLoad without requiring palletWeight Close.
 func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	c.HttpPort = NewFakeHttpPort()
@@ -303,6 +304,9 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if !ok || lineInst.Tasks["palletWeight"] != TaskStatusAvailable {
 		t.Fatalf("palletWeight after openTurno = %#v", lineInst)
 	}
+	if lineInst.Tasks["lineLoad"] != TaskStatusUnavailable {
+		t.Fatalf("lineLoad after openTurno (no weighed pallets) = %q, want unavailable", lineInst.Tasks["lineLoad"])
+	}
 	if g := lineInst.Groups["palletWeight"]; !g.CanSpawn {
 		t.Fatalf("weigh group chrome = %#v", g)
 	}
@@ -324,6 +328,19 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 		t.Fatalf("weigh submission = %#v", last)
 	}
 
+	midLine, err := loader.Load(t.Context(), "feragame", op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, _ = worklistJobByID(midLine.Worklist, "line")
+	lineInst, _ = worklistInstance(line, lineID)
+	if lineInst.Tasks["palletWeight"] != TaskStatusAvailable {
+		t.Fatalf("palletWeight still open after weigh = %q", lineInst.Tasks["palletWeight"])
+	}
+	if lineInst.Tasks["lineLoad"] != TaskStatusActionable {
+		t.Fatalf("lineLoad after weigh (group open) = %q, want actionable", lineInst.Tasks["lineLoad"])
+	}
+
 	closePalletWeight(t, c, lineID)
 	ready, err := loader.Load(t.Context(), "feragame", op)
 	if err != nil {
@@ -335,6 +352,6 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 		t.Fatalf("palletWeight after close = %q", lineInst.Tasks["palletWeight"])
 	}
 	if lineInst.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("lineLoad after weigh close = %q, want actionable", lineInst.Tasks["lineLoad"])
+		t.Fatalf("lineLoad after weigh close = %q, want actionable (Close not the gate)", lineInst.Tasks["lineLoad"])
 	}
 }

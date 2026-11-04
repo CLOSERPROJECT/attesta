@@ -285,7 +285,8 @@ func TestLineLoadPartialMapAfterOnePalletWeighClose(t *testing.T) {
 	}
 	lineLoad := closed.NextTaskFormBundle
 	if lineLoad == nil || lineLoad.TaskID != "lineLoad" || lineLoad.JobInstanceID != lineID {
-		t.Fatalf("after weigh close next = %s, want lineLoad@%s", bundleAddress(lineLoad), lineID)
+		// readyWhen already true from weigh; Close is not the unlock gate but next advance still lands here.
+		t.Fatalf("after weigh (Close) next = %s, want lineLoad@%s", bundleAddress(lineLoad), lineID)
 	}
 	if len(lineLoad.RowIDs) == 0 {
 		t.Fatal("lineLoad partial-map still projects Domain-read row ids")

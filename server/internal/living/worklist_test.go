@@ -655,3 +655,167 @@ func worklistMustJob(t *testing.T, wl Worklist, jobID string) WorklistJob {
 	return job
 }
 
+// Synthetic Job/Task ids only — plant ids must not appear in this fold suite.
+func TestProjectWorklistReadyWhenFold(t *testing.T) {
+	op := OperatorIdentity{UserID: "u", Org: "test", Roles: []string{"ops"}}
+	other := OperatorIdentity{UserID: "v", Org: "test", Roles: []string{"other"}}
+
+	leaf := func(id string, readyWhen any) TaskConfig {
+		tc := TaskConfig{
+			"id": id, "roles": []any{"ops"},
+			"schema": map[string]any{"title": id},
+		}
+		if readyWhen != nil {
+			tc["readyWhen"] = readyWhen
+		}
+		return tc
+	}
+
+	cfgFor := func(gated TaskConfig) OrgConfig {
+		return OrgConfig{
+			Jobs: OrderedObject{
+				Keys: []string{"gateJob"},
+				Values: map[string]any{
+					"gateJob": Job{
+						Tasks: []TaskConfig{
+							leaf("opener", nil),
+							gated,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	domainUnlocked := EmptyDomain()
+	domainUnlocked.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
+	domainUnlocked.Submissions = []Submission{sub("gateJob", "opener", "I1")}
+
+	t.Run("omit_readyWhen_role_split", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", nil))
+		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusActionable {
+			t.Fatalf("omit + eligible = %q, want actionable", inst.Tasks["gated"])
+		}
+		wlOther := ProjectWorklist(cfg, domainUnlocked, other)
+		instOther, _ := worklistInstance(worklistMustJob(t, wlOther, "gateJob"), "I1")
+		if instOther.Tasks["gated"] != TaskStatusAvailable {
+			t.Fatalf("omit + ineligible = %q, want available", instOther.Tasks["gated"])
+		}
+	})
+
+	t.Run("literal_true", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", "true"))
+		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusActionable {
+			t.Fatalf("true = %q, want actionable", inst.Tasks["gated"])
+		}
+	})
+
+	t.Run("literal_false_skips_role_split", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", "false"))
+		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusUnavailable {
+			t.Fatalf("false + eligible = %q, want unavailable", inst.Tasks["gated"])
+		}
+		wlOther := ProjectWorklist(cfg, domainUnlocked, other)
+		instOther, _ := worklistInstance(worklistMustJob(t, wlOther, "gateJob"), "I1")
+		if instOther.Tasks["gated"] != TaskStatusUnavailable {
+			t.Fatalf("false + ineligible = %q, want unavailable (not available)", instOther.Tasks["gated"])
+		}
+		if refs := CollectActionableTaskRefs(cfg, wl); hasActionableRef(refs, "gateJob", "gated", "I1") {
+			t.Fatalf("unavailable must not be CollectActionable: %#v", refs)
+		}
+		if ViewerMayMountTask(cfg, wl, ActionableTaskRef{JobID: "gateJob", TaskID: "gated", JobInstanceID: "I1"}) {
+			t.Fatal("unavailable must not mount")
+		}
+	})
+
+	t.Run("blank_string_omit_semantics", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", "   "))
+		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusActionable {
+			t.Fatalf("blank = %q, want actionable", inst.Tasks["gated"])
+		}
+	})
+
+	t.Run("invalid_fail_closed", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", 1))
+		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusUnavailable {
+			t.Fatalf("invalid = %q, want unavailable", inst.Tasks["gated"])
+		}
+	})
+
+	t.Run("domain_expr", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", "$count($domain.widget.*) >= 1"))
+		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusUnavailable {
+			t.Fatalf("no widget = %q, want unavailable", inst.Tasks["gated"])
+		}
+		withWidget := domainUnlocked
+		putKind(&withWidget, "widget", EntityMap{"W1": {"n": 1}})
+		wl = ProjectWorklist(cfg, withWidget, op)
+		inst, _ = worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusActionable {
+			t.Fatalf("with widget = %q, want actionable", inst.Tasks["gated"])
+		}
+	})
+
+	t.Run("locked_skips_readyWhen", func(t *testing.T) {
+		cfg := cfgFor(leaf("gated", "false"))
+		empty := EmptyDomain()
+		empty.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
+		wl := ProjectWorklist(cfg, empty, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		if inst.Tasks["gated"] != TaskStatusLocked {
+			t.Fatalf("locked before unlock = %q, want locked (not unavailable)", inst.Tasks["gated"])
+		}
+	})
+
+	t.Run("group_child_readyWhen", func(t *testing.T) {
+		cfg := OrgConfig{
+			Jobs: OrderedObject{
+				Keys: []string{"gateJob"},
+				Values: map[string]any{
+					"gateJob": Job{
+						Tasks: []TaskConfig{
+							leaf("opener", nil),
+							{
+								"id": "bundle", "kind": "group",
+								"tasks": []TaskConfig{
+									{
+										"id": "childGate", "roles": []any{"ops"},
+										"readyWhen": "false",
+										"schema":    map[string]any{"title": "Child"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		domain := EmptyDomain()
+		domain.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
+		domain.Submissions = []Submission{sub("gateJob", "opener", "I1")}
+		var err error
+		domain, err = SpawnGroupInstance(domain, "gateJob", "I1", "bundle", "G1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		wl := ProjectWorklist(cfg, domain, op)
+		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
+		g := inst.Groups["bundle"]
+		if len(g.Instances) != 1 || g.Instances[0].Tasks["childGate"] != TaskStatusUnavailable {
+			t.Fatalf("group child readyWhen false = %#v", g.Instances)
+		}
+	})
+}
+

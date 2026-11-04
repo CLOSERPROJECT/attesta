@@ -130,7 +130,7 @@ func commitLineShiftNew(ctx context.Context, c *Committer, org, shift string) (D
 }
 
 // seedLineLoadReadyDomain wipes org Domain then Commits intake lots + line weigh
-// so lineLoad is available with weighed pallet row ids.
+// so lineLoad readyWhen is true (weighed pallet row ids).
 func seedLineLoadReadyDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
 	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
 		return err

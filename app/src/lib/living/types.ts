@@ -73,7 +73,7 @@ export type WorklistGroupInstance = {
 	tasks: Record<string, TaskStatus>;
 };
 
-export type TaskStatus = 'locked' | 'available' | 'actionable' | 'done';
+export type TaskStatus = 'locked' | 'unavailable' | 'available' | 'actionable' | 'done';
 
 /** Wire / URL sentinel for provisional spawn (mint.spawningNew). */
 export const PROVISIONAL_GROUP_INSTANCE_ID = 'new';

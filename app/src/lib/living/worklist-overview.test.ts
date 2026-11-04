@@ -66,8 +66,9 @@ const adminWorklist = worklistFor('admin');
 const logisticWorklist = worklistFor('logistic');
 
 describe('job instance overview model', () => {
-	test('taskStatusLabel maps four-value status to IT tags', () => {
+	test('taskStatusLabel maps five-value status to IT tags', () => {
 		expect(taskStatusLabel('locked')).toBe('Bloccato');
+		expect(taskStatusLabel('unavailable')).toBe('Non disponibile');
 		expect(taskStatusLabel('available')).toBe('Disponibile');
 		expect(taskStatusLabel('actionable')).toBe('Per te');
 		expect(taskStatusLabel('done')).toBe('Fatto');

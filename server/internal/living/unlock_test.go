@@ -133,6 +133,99 @@ func TestIsTaskUnlockedSubmissionGatesNext(t *testing.T) {
 	}
 }
 
+func TestIsTaskUnlockedFanOutFromSharedPredecessor(t *testing.T) {
+	// Synthetic: after open Submission, linear sibling mid and unlockFrom sibling side both unlock.
+	tasks := []TaskConfig{
+		{"id": "open"},
+		{"id": "mid"},
+		{"id": "side", "unlockFrom": "open"},
+	}
+	order := OrderedTaskIDs(tasks)
+
+	if IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "mid",
+		JobInstanceID: "J1", Submissions: nil, Tasks: tasks,
+	}) || IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "side",
+		JobInstanceID: "J1", Submissions: nil, Tasks: tasks,
+	}) {
+		t.Fatal("successors locked before open Submission")
+	}
+
+	afterOpen := []Submission{sub("job", "open", "J1")}
+	if !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "mid",
+		JobInstanceID: "J1", Submissions: afterOpen, Tasks: tasks,
+	}) {
+		t.Fatal("mid unlocks linearly after open")
+	}
+	if !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "side",
+		JobInstanceID: "J1", Submissions: afterOpen, Tasks: tasks,
+	}) {
+		t.Fatal("side unlocks via unlockFrom open without waiting for mid")
+	}
+
+	bothFromOpen := []TaskConfig{
+		{"id": "open"},
+		{"id": "alpha", "unlockFrom": "open"},
+		{"id": "beta", "unlockFrom": "open"},
+	}
+	bothOrder := OrderedTaskIDs(bothFromOpen)
+	if !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: bothOrder, JobID: "job", TaskID: "alpha",
+		JobInstanceID: "J1", Submissions: afterOpen, Tasks: bothFromOpen,
+	}) || !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: bothOrder, JobID: "job", TaskID: "beta",
+		JobInstanceID: "J1", Submissions: afterOpen, Tasks: bothFromOpen,
+	}) {
+		t.Fatal("both unlockFrom successors unlock after shared predecessor Submission")
+	}
+}
+
+func TestIsTaskUnlockedFanOutGroupPredecessorStillRequiresClose(t *testing.T) {
+	tasks := []TaskConfig{
+		{"id": "open"},
+		{
+			"id":   "batch",
+			"kind": "group",
+			"tasks": []TaskConfig{
+				{"id": "item"},
+			},
+		},
+		{"id": "follow", "unlockFrom": "batch"},
+		{"id": "linearAfter"},
+	}
+	order := OrderedTaskIDs(tasks)
+	afterOpen := []Submission{sub("job", "open", "J1")}
+	childOnly := append(afterOpen, Submission{
+		JobID: "job", TaskID: "item", JobInstanceID: "J1",
+		GroupID: "batch", GroupInstanceID: "B1",
+		Timestamp: "2026-11-04T10:00:00Z", UserID: "ada", Facts: map[string]any{},
+	})
+
+	if IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "follow",
+		JobInstanceID: "J1", Submissions: childOnly, Tasks: tasks,
+	}) {
+		t.Fatal("unlockFrom group predecessor must not unlock on child Submission")
+	}
+	if IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "linearAfter",
+		JobInstanceID: "J1", Submissions: childOnly, Tasks: tasks,
+	}) {
+		t.Fatal("linear successor of unlockFrom leaf stays locked until that leaf submits")
+	}
+
+	closed := []ClosedGroup{{JobID: "job", JobInstanceID: "J1", GroupID: "batch"}}
+	if !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: order, JobID: "job", TaskID: "follow",
+		JobInstanceID: "J1", Submissions: childOnly, ClosedGroups: closed, Tasks: tasks,
+	}) {
+		t.Fatal("unlockFrom group predecessor unlocks on Close")
+	}
+}
+
 func intakeUnlockTasks() []TaskConfig {
 	return []TaskConfig{
 		{"id": "truckArrive"},

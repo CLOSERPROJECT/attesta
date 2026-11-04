@@ -15,10 +15,12 @@ type UnlockQuery struct {
 	Tasks           []TaskConfig
 }
 
-// IsTaskUnlocked: Task k+1 unlocks when predecessor k is satisfied on this
-// Job instance. Leaf predecessor → one Submission. Group predecessor → group
-// closed (not one child Submission). First Task is always unlocked.
-// Distinct from startsWhen / readyWhen. Predecessor primitive inside EvaluatePathUnlock.
+// IsTaskUnlocked: Task unlocks when its Unlock predecessor is satisfied on this
+// Job instance. Default predecessor is the previous ordered sibling; optional
+// unlockFrom names an earlier sibling instead. Leaf predecessor → one
+// Submission. Group predecessor → group closed (not one child Submission).
+// First Task is always unlocked. Distinct from startsWhen / readyWhen.
+// Predecessor primitive inside EvaluatePathUnlock.
 func IsTaskUnlocked(q UnlockQuery) bool {
 	index := -1
 	for i, id := range q.OrderedIDs {
@@ -37,7 +39,10 @@ func IsTaskUnlocked(q UnlockQuery) bool {
 		return false
 	}
 
-	previousID := q.OrderedIDs[index-1]
+	previousID, ok := unlockPredecessorID(q, index)
+	if !ok {
+		return false
+	}
 	prev, ok := TaskByID(q.Tasks, previousID)
 	if !ok {
 		return false
@@ -54,6 +59,26 @@ func IsTaskUnlocked(q UnlockQuery) bool {
 		return IsGroupClosed(q.ClosedGroups, q.JobID, q.JobInstanceID, previousID)
 	}
 	return hasFlatSubmissionOnInstance(q.Submissions, q.JobID, previousID, q.JobInstanceID)
+}
+
+// unlockPredecessorID resolves the Unlock predecessor for OrderedIDs[index].
+// unlockFrom (when present) must be a non-empty string Task id; omit ⇒ previous sibling.
+func unlockPredecessorID(q UnlockQuery, index int) (string, bool) {
+	current, ok := TaskByID(q.Tasks, q.TaskID)
+	if !ok {
+		return "", false
+	}
+	if raw, present := current["unlockFrom"]; present {
+		from, ok := raw.(string)
+		if !ok || from == "" {
+			return "", false
+		}
+		return from, true
+	}
+	if index < 1 || index > len(q.OrderedIDs) {
+		return "", false
+	}
+	return q.OrderedIDs[index-1], true
 }
 
 func hasFlatSubmissionOnInstance(subs []Submission, jobID, taskID, jobInstanceID string) bool {

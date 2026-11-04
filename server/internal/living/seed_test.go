@@ -314,6 +314,10 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if !ok || weighOpen.Tasks["openTurno"] != TaskStatusDone || weighOpen.Tasks["palletWeight"] != TaskStatusAvailable {
 		t.Fatalf("weigh-open line = %#v", weighOpen)
 	}
+	// Domain leftovers from the other shift make readyWhen true while weigh stays open.
+	if weighOpen.Tasks["lineLoad"] != TaskStatusActionable {
+		t.Fatalf("weigh-open lineLoad with Domain leftovers = %q, want actionable", weighOpen.Tasks["lineLoad"])
+	}
 	lineLoad, ok := worklistInstance(line, SeedLineLineLoadID)
 	if !ok || lineLoad.Tasks["palletWeight"] != TaskStatusDone || lineLoad.Tasks["lineLoad"] != TaskStatusActionable {
 		t.Fatalf("lineLoad ready = %#v", lineLoad)

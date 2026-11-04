@@ -96,6 +96,10 @@ func validateTaskConfigsAt(tasks []TaskConfig, path string) error {
 		}
 		seen[id] = struct{}{}
 
+		if err := validateUnlockFrom(tasks, i, t, prefix); err != nil {
+			return err
+		}
+
 		children := t.ChildTasks()
 		if t.IsGroup() {
 			if len(children) == 0 {
@@ -119,6 +123,40 @@ func validateTaskConfigsAt(tasks []TaskConfig, path string) error {
 		}
 	}
 	return nil
+}
+
+// validateUnlockFrom: optional unlockFrom must name a strictly earlier sibling
+// in the same list (no first-task, empty, non-string, self, forward, or unknown).
+func validateUnlockFrom(tasks []TaskConfig, index int, t TaskConfig, prefix string) error {
+	raw, present := t["unlockFrom"]
+	if !present {
+		return nil
+	}
+	id := t.ID()
+	if index == 0 {
+		return fmt.Errorf("%s %q: first task must not declare unlockFrom", prefix, id)
+	}
+	from, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("%s %q: unlockFrom must be a string task id", prefix, id)
+	}
+	if from == "" {
+		return fmt.Errorf("%s %q: unlockFrom must be a non-empty task id", prefix, id)
+	}
+	if from == id {
+		return fmt.Errorf("%s %q: unlockFrom must not reference self", prefix, id)
+	}
+	for j := 0; j < index; j++ {
+		if tasks[j].ID() == from {
+			return nil
+		}
+	}
+	for j := index + 1; j < len(tasks); j++ {
+		if tasks[j].ID() == from {
+			return fmt.Errorf("%s %q: unlockFrom %q must name an earlier sibling", prefix, id, from)
+		}
+	}
+	return fmt.Errorf("%s %q: unlockFrom %q is not a sibling task id", prefix, id, from)
 }
 
 func hasLeafCommitFields(t TaskConfig) bool {

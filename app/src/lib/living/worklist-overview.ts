@@ -158,6 +158,8 @@ export function taskStatusLabel(status: TaskStatus): string {
 	switch (status) {
 		case 'locked':
 			return 'Bloccato';
+		case 'unavailable':
+			return 'Non disponibile';
 		case 'available':
 			return 'Disponibile';
 		case 'actionable':

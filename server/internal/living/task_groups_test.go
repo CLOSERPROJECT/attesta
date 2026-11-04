@@ -124,6 +124,61 @@ func TestLeafTaskByPath(t *testing.T) {
 	}
 }
 
+func TestValidateTaskConfigsUnlockFrom(t *testing.T) {
+	if err := validateTaskConfigs([]TaskConfig{
+		{"id": "open"},
+		{"id": "mid"},
+		{"id": "side", "unlockFrom": "open"},
+	}); err != nil {
+		t.Fatalf("valid unlockFrom = %v", err)
+	}
+
+	cases := []struct {
+		name string
+		tasks []TaskConfig
+		want string
+	}{
+		{
+			name:  "first_task",
+			tasks: []TaskConfig{{"id": "open", "unlockFrom": "ghost"}},
+			want:  "first task must not declare unlockFrom",
+		},
+		{
+			name:  "non_string",
+			tasks: []TaskConfig{{"id": "open"}, {"id": "side", "unlockFrom": 1}},
+			want:  "unlockFrom must be a string",
+		},
+		{
+			name:  "empty",
+			tasks: []TaskConfig{{"id": "open"}, {"id": "side", "unlockFrom": ""}},
+			want:  "non-empty",
+		},
+		{
+			name:  "self",
+			tasks: []TaskConfig{{"id": "open"}, {"id": "side", "unlockFrom": "side"}},
+			want:  "self",
+		},
+		{
+			name:  "forward",
+			tasks: []TaskConfig{{"id": "open"}, {"id": "side", "unlockFrom": "later"}, {"id": "later"}},
+			want:  "earlier sibling",
+		},
+		{
+			name:  "unknown",
+			tasks: []TaskConfig{{"id": "open"}, {"id": "side", "unlockFrom": "missing"}},
+			want:  "not a sibling",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateTaskConfigs(tc.tasks)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v want substring %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidateTaskConfigsGroups(t *testing.T) {
 	if err := validateTaskConfigs([]TaskConfig{
 		{"id": "a"},

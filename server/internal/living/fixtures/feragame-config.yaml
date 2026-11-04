@@ -399,6 +399,9 @@ steps:
                             idoneita: $.idoneita
                             panelCount: $.panelCount
             - id: lineLoad
+              unlockFrom: openTurno
+              readyWhen: >-
+                $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
               roles: [line]
               dynamicProperties:
                 progress:

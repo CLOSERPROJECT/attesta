@@ -3,15 +3,17 @@ package living
 import "strings"
 
 // TaskStatus is the Worklist chrome vocabulary for one Task on a Job instance.
-// Unlock/Submission yields locked / unlocked / done; unlocked splits by
-// Config-role eligibility into available (not for this viewer) vs actionable.
+// Unlock/Submission yields locked / unlocked / done; unlocked-not-done folds
+// Task readyWhen (false ⇒ unavailable); else role eligibility splits into
+// available (not for this viewer) vs actionable.
 type TaskStatus string
 
 const (
-	TaskStatusLocked     TaskStatus = "locked"
-	TaskStatusAvailable  TaskStatus = "available"
-	TaskStatusActionable TaskStatus = "actionable"
-	TaskStatusDone       TaskStatus = "done"
+	TaskStatusLocked      TaskStatus = "locked"
+	TaskStatusUnavailable TaskStatus = "unavailable"
+	TaskStatusAvailable   TaskStatus = "available"
+	TaskStatusActionable  TaskStatus = "actionable"
+	TaskStatusDone        TaskStatus = "done"
 )
 
 // Worklist is the server-projected operator board for one org.
@@ -42,8 +44,8 @@ type WorklistJob struct {
 }
 
 // WorklistInstance is one Job instance's viewer-scoped Task status map.
-// Leaf statuses are locked | available | actionable | done; Groups is omitted
-// on flat Jobs (backward-compatible wire).
+// Leaf statuses are locked | unavailable | available | actionable | done;
+// Groups is omitted on flat Jobs (backward-compatible wire).
 type WorklistInstance struct {
 	ID     string                   `json:"id"`
 	Label  string                   `json:"label"`
@@ -76,8 +78,9 @@ type WorklistGroupInstance struct {
 // ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
 // statuses, then scopes canStart to OperatorIdentity Config-role intersection
 // with the Job's first Task (board chrome; not Cerbos). A Task is done after
-// Submission on the instance (Submission law). Unlocked leaves split by role
-// eligibility into available vs actionable (ADR-0005).
+// Submission on the instance (Submission law). Unlocked leaves fold readyWhen
+// (false ⇒ unavailable), else split by role eligibility into available vs
+// actionable (ADR-0005).
 func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
 	out := Worklist{Jobs: make([]WorklistJob, 0, cfg.Jobs.Len())}
 	for _, jobID := range cfg.Jobs.Keys {
@@ -124,7 +127,8 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 		for i, taskID := range ordered {
 			tc, ok := TaskByID(job.Tasks, taskID)
 			if ok && tc.IsGroup() {
-				tasks[taskID] = projectGroupStatus(cfg, domain, jobID, taskID, inst.ID)
+				// Group-node chrome stays Unlock/Close unless the group authors readyWhen.
+				tasks[taskID] = foldReadyWhen(domain, projectGroupStatus(cfg, domain, jobID, taskID, inst.ID), tc, inst.ID, cfg.Catalogs)
 				g := projectWorklistGroup(cfg, domain, jobID, inst.ID, tc, op)
 				if groups == nil {
 					groups = map[string]WorklistGroup{}
@@ -133,8 +137,12 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 				continue
 			}
 			unlock := projectTaskStatus(cfg, domain, jobID, taskID, inst.ID)
+			status := unlock
+			if ok {
+				status = foldReadyWhen(domain, unlock, tc, inst.ID, cfg.Catalogs)
+			}
 			eligible := i < len(chrome) && rolesIntersect(op.Roles, chrome[i].Roles)
-			tasks[taskID] = viewerScopedStatus(unlock, eligible)
+			tasks[taskID] = viewerScopedStatus(status, eligible)
 		}
 		instances = append(instances, WorklistInstance{
 			ID:     inst.ID,
@@ -188,8 +196,22 @@ func pathUnlockStatus(ev PathUnlock) TaskStatus {
 	return TaskStatusLocked
 }
 
+// foldReadyWhen applies Task readyWhen after path Unlock says unlocked-not-done.
+// Same semantics as Commit (readyWhenOkForCommit): omit/blank ⇒ true; fail ⇒ false.
+// False ⇒ unavailable (caller must not role-split).
+func foldReadyWhen(domain Domain, unlock TaskStatus, task TaskConfig, jobInstanceID string, catalogs map[string]any) TaskStatus {
+	if unlock != TaskStatusAvailable {
+		return unlock
+	}
+	if !readyWhenOkForCommit(domain, taskPayload(task), jobInstanceID, catalogs) {
+		return TaskStatusUnavailable
+	}
+	return unlock
+}
+
 // viewerScopedStatus maps unlock Available into actionable when the viewer
 // intersects Config roles; otherwise leaves available for handoff.
+// unavailable / locked / done pass through (no role split).
 func viewerScopedStatus(unlock TaskStatus, eligible bool) TaskStatus {
 	if unlock != TaskStatusAvailable {
 		return unlock
@@ -225,8 +247,12 @@ func projectWorklistGroup(
 		for _, childID := range childIDs {
 			unlock := projectGroupChildStatus(cfg, domain, jobID, jobInstanceID, groupID, gi.ID, childID)
 			child, ok := TaskByID(children, childID)
+			status := unlock
+			if ok {
+				status = foldReadyWhen(domain, unlock, child, jobInstanceID, cfg.Catalogs)
+			}
 			eligible := ok && rolesIntersect(op.Roles, rolesFromTask(child))
-			childStatus[childID] = viewerScopedStatus(unlock, eligible)
+			childStatus[childID] = viewerScopedStatus(status, eligible)
 		}
 		instances = append(instances, WorklistGroupInstance{
 			ID:    gi.ID,

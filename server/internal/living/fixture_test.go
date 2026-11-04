@@ -2,6 +2,9 @@ package living
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -77,6 +80,24 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !ok || !pw.IsGroup() {
 		t.Fatalf("palletWeight group = %#v", pw)
 	}
+	lineLoad, ok := TaskByID(line.Tasks, "lineLoad")
+	if !ok {
+		t.Fatal("missing lineLoad")
+	}
+	if got, _ := lineLoad["unlockFrom"].(string); got != "openTurno" {
+		t.Fatalf("lineLoad.unlockFrom = %#v, want openTurno", lineLoad["unlockFrom"])
+	}
+	readyWhen, _ := lineLoad["readyWhen"].(string)
+	if !strings.Contains(readyWhen, "$exists(weight)") || !strings.Contains(readyWhen, "progress = 'done'") {
+		t.Fatalf("lineLoad.readyWhen = %q, want locked Domain leftover expr", readyWhen)
+	}
+	if _, has := pw["unlockFrom"]; has {
+		t.Fatalf("palletWeight must omit unlockFrom (linear), got %#v", pw["unlockFrom"])
+	}
+	containerReg, _ := TaskByID(line.Tasks, "containerReg")
+	if _, has := containerReg["unlockFrom"]; has {
+		t.Fatalf("containerReg must omit unlockFrom (linear after lineLoad), got %#v", containerReg["unlockFrom"])
+	}
 
 	raw, err := json.Marshal(cfg)
 	if err != nil {
@@ -90,6 +111,27 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	}
 	if !strings.Contains(body, `"jobs"`) || !strings.Contains(body, `"tasks"`) {
 		t.Fatalf("serialized config missing jobs/tasks: %s", body[:min(200, len(body))])
+	}
+}
+
+// Fail closed: Unlock / readyWhen / Worklist engines must stay generic — no plant Task id branches.
+func TestEngineSourcesOmitPlantTaskIDBranches(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(thisFile)
+	for _, name := range []string{"unlock.go", "ready_when.go", "worklist.go", "tasks.go"} {
+		body, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		src := string(body)
+		for _, token := range []string{`"lineLoad"`, `"feragame"`, `"openTurno"`, `"palletWeight"`} {
+			if strings.Contains(src, token) {
+				t.Fatalf("%s must not hard-code plant token %s", name, token)
+			}
+		}
 	}
 }
 

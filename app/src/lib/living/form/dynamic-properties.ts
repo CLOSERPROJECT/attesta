@@ -74,7 +74,9 @@ export function parseAuthoredPayload(path: string, raw: unknown): Record<string,
 		);
 	}
 	if (raw.unlockFrom !== undefined) {
-		throw new Error(`${path}.unlockFrom is removed; Unlock follows Submission order only`);
+		if (typeof raw.unlockFrom !== 'string' || raw.unlockFrom.length === 0) {
+			throw new Error(`${path}.unlockFrom must be a non-empty string task id when present`);
+		}
 	}
 	if (raw.roles !== undefined) {
 		if (!Array.isArray(raw.roles) || raw.roles.length === 0) {
