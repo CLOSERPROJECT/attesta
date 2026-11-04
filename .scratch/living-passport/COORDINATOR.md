@@ -44,7 +44,7 @@
 | 10 | **reverted** by 11 — Commit.Links was OK |
 | 11 | done — `6666b5f` + `c386455` |
 | 12 | done — `0d946d5` |
-| 13 | done — (see Done notes) |
+| 13 | done — `dfed442` |
 
 **Active (2026-11-04):** — (13 complete).
 ### Investigation note (eligibility)
@@ -66,7 +66,7 @@ Passport Can start always-on: no Job `startsWhen`; Domain gate only on select en
 | 10 | `6a2f835` (reverted by 11 / `6666b5f`) | Spec+Standards APPROVE then human override |
 | 11 | `6666b5f` + `c386455` | Spec+Standards APPROVE (nits non-blocking) |
 | 12 | `0d946d5` | Spec+Standards APPROVE (nits non-blocking) |
-| 13 | (pending SHA) | implementer — HttpLinkStrip button chrome |
+| 13 | `dfed442` | implementer — HttpLinkStrip button chrome |
 | board | `f217a86` ledger stamp | — |
 
 ## Human smoke (Compose, after seed refresh)
