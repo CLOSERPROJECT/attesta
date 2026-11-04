@@ -2,6 +2,7 @@ package living
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -303,8 +304,13 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			if !ok {
 				return RunTransformResult{}, TransformError{Kind: "type", Message: "patchEach requires $ to be an object"}
 			}
-			for id, cell := range cells {
-				cellBindings := mergeBindings(bindings, ExprBindings{"value": cell})
+			ids := make([]string, 0, len(cells))
+			for id := range cells {
+				ids = append(ids, id)
+			}
+			sort.Strings(ids)
+			for _, id := range ids {
+				cellBindings := mergeBindings(bindings, ExprBindings{"value": cells[id]})
 				set, err := evalSet(o.Set, workingFacts, cellBindings)
 				if err != nil {
 					return RunTransformResult{}, err
