@@ -42,6 +42,23 @@ read_env_key() {
   awk -F= -v k="$key" '$1 == k { print $2; exit }' "$path"
 }
 
+# True when URL host is loopback (localhost / 127.0.0.1 / ::1). Empty URL → false.
+public_base_url_is_loopback() {
+  local url="${1:-}"
+  local host="${url#*://}"
+  host="${host%%/*}"
+  if [[ "$host" == \[* ]]; then
+    host="${host#\[}"
+    host="${host%%\]*}"
+  else
+    host="${host%%:*}"
+  fi
+  case "$host" in
+    localhost|127.0.0.1|::1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Export KEY=VAL from file without overriding already-set environment variables.
 load_env_file() {
   local path="$1"

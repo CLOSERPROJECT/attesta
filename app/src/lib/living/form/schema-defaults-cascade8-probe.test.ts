@@ -82,4 +82,18 @@ describe('cascade #8 schema defaults on truckArrive open', () => {
 			turno: '2nd'
 		});
 	});
+
+	// Go seedFormDefaultsFromSchema copies authored default: "$today" into
+	// bundle initialData verbatim; merge must rewrite before the date-picker.
+	test('bundle initialData $today date becomes today’s ISO, never $today', () => {
+		const today = localCalendarDateISO();
+		const merged = mergeSchemaDefaultsIntoFormData(
+			schema,
+			{ date: TODAY_DEFAULT_SENTINEL, turno: '1st' },
+			today
+		);
+		expect(merged.date).toBe(today);
+		expect(merged.date).not.toBe(TODAY_DEFAULT_SENTINEL);
+		expect(merged).toMatchObject({ turno: '1st' });
+	});
 });

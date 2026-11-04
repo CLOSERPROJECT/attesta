@@ -115,12 +115,12 @@ func commitOpenTurno(t *testing.T, c *Committer) string {
 	return commitOpenTurnoWith(t, c, openTurnoValue())
 }
 
-func commitWeigh(t *testing.T, c *Committer, lineID string, weights map[string]any) CommitResult {
+func commitWeigh(t *testing.T, c *Committer, lineID, palletID string, weight float64) CommitResult {
 	t.Helper()
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
 		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
 		JobInstanceID: lineID,
-		Value:         palletWeightValue(weights),
+		Value:         weighValue(palletID, weight),
 		Mint:          spawningNewMint(),
 	})
 	if err != nil {
@@ -138,15 +138,12 @@ func closePalletWeight(t *testing.T, c *Committer, lineID string) {
 	}
 }
 
-// seedLineReadyForLineLoad: intake lots + openTurno + weigh all pallets + close weigh group.
 func seedLineReadyForLineLoad(t *testing.T, c *Committer) (loadID, lineID string) {
 	t.Helper()
 	_, loadID, _ = commitIntakeThroughLotsClosed(t, c)
 	lineID = commitOpenTurno(t, c)
-	_ = commitWeigh(t, c, lineID, map[string]any{
-		loadID + ".1": weighRow(11),
-		loadID + ".2": weighRow(22),
-	})
+	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
+	_ = commitWeigh(t, c, lineID, loadID+".2", 22)
 	closePalletWeight(t, c, lineID)
 	return loadID, lineID
 }
@@ -317,12 +314,11 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if len(loads) != 2 {
 		t.Fatalf("loads = %#v", loads)
 	}
-	weights := map[string]any{}
+	var weighed CommitResult
 	for _, loadID := range loads {
-		weights[loadID+".1"] = weighRow(11)
-		weights[loadID+".2"] = weighRow(22)
+		_ = commitWeigh(t, c, lineID, loadID+".1", 11)
+		weighed = commitWeigh(t, c, lineID, loadID+".2", 22)
 	}
-	weighed := commitWeigh(t, c, lineID, weights)
 	last := weighed.Domain.Submissions[len(weighed.Domain.Submissions)-1]
 	if last.TaskID != "weigh" || last.GroupID != "palletWeight" {
 		t.Fatalf("weigh submission = %#v", last)

@@ -6,7 +6,7 @@ Grill + interactive Config walk. **Do not re-litigate** without human.
 ## Product
 
 - **Job:** `line` / Task group `palletWeight` / child `weigh` (logistic).
-- **Cadence:** one pallet = one group occurrence — Spawn → weigh → explicit Close; serialize open pesate; `closeRequiresChildSubmission: true`.
+- **Cadence:** lots-style within the shift — N× (Spawn → weigh one pallet), then **one** explicit Close; `closeRequiresChildSubmission: true`. (Human 2026-11-03: not Spawn→Close per pallet; spawn after Close stays forbidden.)
 - **Form:** flat `palletId` + weight + tare (+ custom) + `averagePanelWeight` + idoneita (required, default NIR) + derived `panelCount`.
 - **Commit:** `patch` that one pallet; `averagePanelWeight` stays Submission fact.
 - **No** multi-pallet `weights` mapTable / full-map.
@@ -17,7 +17,7 @@ Grill + interactive Config walk. **Do not re-litigate** without human.
 
 - Baked into register labels PDF (`lots/register` → HttpPort → Sidecar).
 - Config authors string: `$qrEndpoint & "?entityId=" & $id` (or equivalent).
-- `$qrEndpoint` = runtime binding (ops/env → submit bindings).
+- `$qrEndpoint` = submit binding derived as `PUBLIC_BASE_URL` (trim trailing `/`) + `/app`.
 - Sidecar dumb-draws `labels[].qr`.
 - Cold https link desired (same string).
 
@@ -41,10 +41,11 @@ qr:
         groupId: palletWeight
         taskId: weigh
         allowSpawn: true
+      # jsonata-go: $exists($p) after $lookup is true for missing keys — sift + field exists.
       eligible: |
         (
-          $p := $lookup($domain.pallet, $scan.entityId);
-          $exists($p) and $not($exists($p.weight))
+          $count($sift($domain.pallet, function($v, $k){$k = $scan.entityId})) = 1
+          and $not($exists($lookup($domain.pallet, $scan.entityId).weight))
         )
       seed:
         palletId: $scan.entityId

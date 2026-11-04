@@ -41,6 +41,29 @@ catalogs:
         - {key: alluminio, label: Alluminio}
         - {key: sopravaglio, label: Sopravaglio}
         - {key: polvereDiAspirazione, label: Polvere di aspirazione}
+# QR resolve (topbar Scan / cold ?entityId=). Encode stays on lots/register http body.
+qr:
+    rules:
+        - id: line-pallet-weigh
+          when: >-
+            $type($scan.entityId) = "string" and $length($trim($scan.entityId)) > 0
+          match:
+            jobId: line
+            groupId: palletWeight
+            taskId: weigh
+            allowSpawn: true
+          # jsonata-go: $exists($lookup(...)) is true for missing keys; probe a field / sift instead.
+          eligible: |
+            (
+              $count($sift($domain.pallet, function($v, $k){$k = $scan.entityId})) = 1
+              and $not($exists($lookup($domain.pallet, $scan.entityId).weight))
+            )
+          seed:
+            palletId: $scan.entityId
+          messages:
+            onZero: Nessuna pesatura disponibile per questo bancale
+            onMany: "Più destinazioni possibili: apri il turno giusto dal Worklist"
+            onIneligible: Bancale non pesabile (assente o già pesato)
 steps:
     intake:
         repeatable: true
@@ -181,12 +204,17 @@ steps:
                             {
 
                               "loadId": $load.id,
+                              "date": $substring($replace($lookup($domain.truck, $instance.id).date, '-', ''), 2),
+                              "client": $.client,
+                              "clientProgressive": $load.clientProgressive,
                               "numeroFir": $.numeroFir,
+                              "wasteCode": $.wasteCode,
                               "palletCount": $.palletCount,
-                              "labels": $each(
+                              "netWeight": $load.netWeight,
+                              "labels": [$each(
                                 $sift($domain.pallet, function($v){$v.loadId = $load.id}),
-                                function($v, $k){{ "id": $k, "client": $.client }}
-                              )
+                                function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
+                              )]
                             }
                         - method: '"POST"'
                           url: '"/fake/register-csv"'
@@ -203,10 +231,10 @@ steps:
                               "notes": $.notes,
                               "loadId": $load.id,
                               "truckId": $instance.id,
-                              "palletIds": $each(
+                              "palletIds": [$each(
                                 $sift($domain.pallet, function($v){$v.loadId = $load.id}),
                                 function($v, $k){$k}
-                              )
+                              )]
                             }
             - id: weightCheck
               roles: [administration]
@@ -295,97 +323,81 @@ steps:
               repeatable: true
               startLabel: Nuova pesata
               closeLabel: Chiudi pesatura
+              closeRequiresChildSubmission: true
               substeps:
                 - id: weigh
                   roles: [logistic]
-                  derived:
-                    "weights.*.panelCount":
-                        overridable: true
-                        expr: >
-                            (
-
-                              $avg := $data.averagePanelWeight;
-                              $row := $lookup($data.weights, "__ROW_ID__");
-                              $kind := $exists($row.tareKind) ? $row.tareKind : $data.tareKind;
-                              $tare := $kind = 'custom'
-                                ? $data.customTareWeight
-                                : $lookup($catalogs.tareKinds, $kind);
-                              $w := $row.weight;
-                              $avg > 0 and $type($tare) = 'number' and $type($w) = 'number'
-                                ? $floor(($w - $tare) / $avg)
-                                : undefined
-                            )
-
-                  dynamicProperties:
-                    weights:
-                        read: rows
                   reads:
-                    rows:
+                    pallets:
                         entity: pallet
                         where: $not($exists(weight))
                         key: id
+                  enumReads:
+                    palletId: pallets
+                  derived:
+                    panelCount:
+                        overridable: true
+                        expr: |
+                            (
+                              $avg := $data.averagePanelWeight;
+                              $kind := $data.tareKind;
+                              $tare := $kind = 'custom'
+                                ? $data.customTareWeight
+                                : $lookup($catalogs.tareKinds, $kind);
+                              $w := $data.weight;
+                              $avg > 0 and $type($tare) = "number" and $type($w) = "number"
+                                ? $floor(($w - $tare) / $avg)
+                                : undefined
+                            )
                   schema:
                     type: object
-                    title: Pesi bancali
-                    required: [averagePanelWeight, tareKind, weights]
+                    title: Pesa bancale
+                    required: [palletId, averagePanelWeight, tareKind, weight, idoneita]
                     properties:
+                        palletId: {type: string, title: Bancale}
                         averagePanelWeight:
                             type: number
                             exclusiveMinimum: 0
                             title: Peso medio pannello (kg)
+                            default: 20
                         tareKind:
                             type: string
-                            title: Tara (default nuove righe)
+                            title: Tara
                             enum: [euro, industrial, custom]
+                            default: euro
                         customTareWeight:
                             type: number
                             exclusiveMinimum: 0
                             title: Tara personalizzata (kg)
-                        weights:
-                            type: object
-                            additionalProperties:
-                                type: object
-                                required: [weight]
-                                properties:
-                                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
-                                    tareKind:
-                                        type: string
-                                        title: Tara
-                                        enum: [euro, industrial, custom]
-                                    idoneita:
-                                        type: string
-                                        title: IR / NIR
-                                        enum: [NIR, IR]
-                                    panelCount: {type: number, title: Pannelli}
+                        weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                        idoneita:
+                            type: string
+                            title: IR / NIR
+                            enum: [NIR, IR]
+                            default: NIR
+                        panelCount: {type: number, title: Pannelli}
                   uiSchema:
                     ui:options:
-                        order: [averagePanelWeight, tareKind, customTareWeight, weights]
+                        order:
+                            [palletId, averagePanelWeight, tareKind, customTareWeight, weight, idoneita, panelCount]
                     tareKind:
                         ui:options:
                             enumNames: ['euro (25 kg)', 'industriale (30 kg)', 'personalizzata']
-                    weights:
-                        ui:field: mapTable
+                    idoneita:
                         ui:options:
-                            expandable: false
-                            columns: {id: Bancale, value: Peso}
-                        additionalProperties:
-                            tareKind:
-                                ui:options:
-                                    enumNames: ['euro (25 kg)', 'industriale (30 kg)', 'personalizzata']
-                            idoneita:
-                                ui:options:
-                                    enumNames: [NIR, IR]
-                            panelCount:
-                                ui:field: derivedLeaf
+                            enumNames: [NIR, IR]
+                    panelCount:
+                        ui:field: derivedLeaf
                   onSubmit:
                     transform:
-                        - op: patchEach
+                        - op: patch
                           entity: pallet
+                          id: $.palletId
                           set:
-                            weight: $value.weight
-                            tareKind: $value.tareKind
-                            idoneita: $value.idoneita
-                            panelCount: $value.panelCount
+                            weight: $.weight
+                            tareKind: $.tareKind
+                            idoneita: $.idoneita
+                            panelCount: $.panelCount
             - id: lineLoad
               roles: [line]
               dynamicProperties:

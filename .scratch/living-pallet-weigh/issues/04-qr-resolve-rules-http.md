@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (One-pallet palletWeight weigh Config + Commit).
 
-**Status:** ready-for-agent
+**Status:** implement-done
 
-- [ ] Org Config accepts frozen `qr.rules` shape; Feragame fixture includes the locked rule
-- [ ] HTTP resolve accepts `{ raw }`, returns one destination + seed or toastable error
-- [ ] Decode: `entityId` query param if present, else bare raw as id (no Config parse)
-- [ ] Go tests cover when / eligible / zero / one / many without Feragame hardcoding in engine source beyond reading Config
+- [x] Org Config accepts frozen `qr.rules` shape; Feragame fixture includes the locked rule
+- [x] HTTP resolve accepts `{ raw }`, returns one destination + seed or toastable error
+- [x] Decode: `entityId` query param if present, else bare raw as id (no Config parse)
+- [x] Go tests cover when / eligible / zero / one / many without Feragame hardcoding in engine source beyond reading Config

@@ -20,10 +20,11 @@ func testCommitter(t *testing.T, auth Authorizer) (*Committer, *MemoryDomainStor
 		auth = AllowAllAuthorizer{}
 	}
 	c := &Committer{
-		Domains:    domains,
-		Configs:    configs,
-		Authorizer: auth,
-		Now:        func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
+		Domains:        domains,
+		Configs:        configs,
+		Authorizer:     auth,
+		SubmitBindings: ExprBindings{"qrEndpoint": "https://example.test/app"},
+		Now:            func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
 	return c, domains, &Loader{Domains: domains, Configs: configs}
 }

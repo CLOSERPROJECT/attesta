@@ -186,6 +186,7 @@ func TestLivingDomainMuxRegistration(t *testing.T) {
 }
 
 func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
+	t.Setenv("PUBLIC_BASE_URL", "https://plant.example")
 	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 	sessionID := "living-commit-ok"
 	server := &Server{
@@ -362,6 +363,7 @@ func TestLivingProductAuthorizerDefaultsToCerbos(t *testing.T) {
 func TestLivingProductHttpPortFromEnvOrSoftFail(t *testing.T) {
 	t.Setenv("LIVING_HTTP_URL", "")
 	t.Setenv("LIVING_HTTP_TOKEN", "")
+	t.Setenv("PUBLIC_BASE_URL", "https://plant.example")
 	server := &Server{}
 	port := server.livingProductHttpPort()
 	if _, ok := port.(living.UnconfiguredHttpPort); !ok {
@@ -394,6 +396,9 @@ func TestLivingProductHttpPortFromEnvOrSoftFail(t *testing.T) {
 	}
 	if handler.Committer.HttpPort != stub {
 		t.Fatalf("handler HttpPort = %T, want override", handler.Committer.HttpPort)
+	}
+	if handler.Committer.SubmitBindings["qrEndpoint"] != "https://plant.example/app" {
+		t.Fatalf("SubmitBindings = %#v", handler.Committer.SubmitBindings)
 	}
 	if handler.Artifacts == nil {
 		t.Fatal("handler Artifacts should still come from env when HttpPort is overridden")
@@ -489,6 +494,39 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestLivingQRResolveMuxRegistration(t *testing.T) {
+	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	sessionID := "living-qr-resolve-mux"
+	server := &Server{
+		identity: testIdentityForSessions(now, map[string]AccountUser{
+			sessionID: {
+				IdentityUserID: "user-1",
+				Email:          "op@example.com",
+				OrgSlug:        "feragame",
+				RoleSlugs:      []string{"administration"},
+				Status:         "active",
+				EmailVerified:  true,
+			},
+		}),
+		store:            NewMemoryStore(),
+		enforceAuth:      true,
+		now:              func() time.Time { return now },
+		tmpl:             testTemplates(),
+		livingAuthorizer: living.AllowAllAuthorizer{},
+	}
+	seedLivingDemo(t, server)
+	mux := server.newMux()
+	req := httptest.NewRequest(http.MethodPost, "/api/living/qr-resolve",
+		strings.NewReader(`{"raw":"missing-pallet"}`))
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	// 422 from living.Handler proves mux registration; Go default would be 404.
+	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
 }

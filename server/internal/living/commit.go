@@ -91,6 +91,9 @@ type Committer struct {
 	// HttpPort runs onSubmit.http after DomainStore.Put. Nil is always a no-op
 	// (no links/errors) even when the Task declares effects; product uses SidecarHttpPort or soft-fail.
 	HttpPort HttpPort
+	// SubmitBindings are ops/runtime JSONata vars merged into onSubmit.http evaluation
+	// (e.g. qrEndpoint from LivingAppBaseURL). Nil/empty is fine.
+	SubmitBindings ExprBindings
 	// LinkStore persists Commit links[] after HttpPort. Nil skips persist; Put errors
 	// never fail Commit or roll back Domain (response still returns links for stay UI).
 	LinkStore LinkStore
@@ -260,7 +263,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
-			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, applied.Bindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs, org)
+			httpBindings := mergeBindings(applied.Bindings, c.SubmitBindings)
+			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, httpBindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs, org)
 			result.Links = httpResult.Links
 			result.HttpErrors = httpResult.Errors
 		}

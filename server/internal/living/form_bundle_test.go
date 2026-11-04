@@ -156,7 +156,7 @@ func addresses(bundles []*TaskFormBundle) []string {
 	return out
 }
 
-func TestLoadTaskBundlePalletWeightRows(t *testing.T) {
+func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
@@ -175,23 +175,14 @@ func TestLoadTaskBundlePalletWeightRows(t *testing.T) {
 	if bundle.Surface != "live" {
 		t.Fatalf("surface = %q", bundle.Surface)
 	}
-	if len(bundle.RowIDs) == 0 {
-		t.Fatal("weigh bundle missing rowIds")
+	if len(bundle.RowIDs) != 0 {
+		t.Fatalf("flat weigh must not project map rowIds; got %#v", bundle.RowIDs)
 	}
-	found := false
-	for _, id := range bundle.RowIDs {
-		if id == loadID+".1" || id == loadID+".2" {
-			found = true
-		}
+	if bundle.ProjectionKey != "" {
+		t.Fatalf("flat weigh projectionKey must be empty; got %q", bundle.ProjectionKey)
 	}
-	if !found {
-		t.Fatalf("rowIds = %#v, want pallets for %s", bundle.RowIDs, loadID)
-	}
-	if bundle.ProjectionKey == "" {
-		t.Fatal("missing projectionKey")
-	}
-	if len(bundle.Derived) == 0 {
-		t.Fatal("expected expanded derived rules")
+	if rule, ok := bundle.Derived["panelCount"]; !ok || rule.Expr == "" {
+		t.Fatalf("derived panelCount = %#v", bundle.Derived)
 	}
 	domainBound, _ := bundle.Bindings["domain"].(map[string]any)
 	if _, has := domainBound["tareKinds"]; has {
@@ -212,15 +203,33 @@ func TestLoadTaskBundlePalletWeightRows(t *testing.T) {
 	if !ok || len(subs) == 0 {
 		t.Fatalf("bindings.domain.submissions = %#v", domainBound["submissions"])
 	}
-	if weights, has := bundle.InitialData["weights"]; has {
-		m, _ := weights.(map[string]any)
-		if len(m) != 0 {
-			t.Fatalf("object-map initialData must not densify; got %#v", weights)
-		}
+	if _, has := bundle.InitialData["weights"]; has {
+		t.Fatalf("flat weigh must not seed weights map; got %#v", bundle.InitialData)
+	}
+	if bundle.InitialData["averagePanelWeight"] != 20 {
+		t.Fatalf("averagePanelWeight default = %#v, want 20", bundle.InitialData["averagePanelWeight"])
+	}
+	if bundle.InitialData["tareKind"] != "euro" {
+		t.Fatalf("tareKind default = %#v, want euro", bundle.InitialData["tareKind"])
+	}
+	if bundle.InitialData["idoneita"] != "NIR" {
+		t.Fatalf("idoneita default = %#v, want NIR", bundle.InitialData["idoneita"])
 	}
 	props, _ := bundle.Schema["properties"].(map[string]any)
-	weightsSchema, _ := props["weights"].(map[string]any)
-	assertConcreteDynamicMap(t, weightsSchema, bundle.RowIDs, true)
+	if _, has := props["weights"]; has {
+		t.Fatalf("flat weigh schema must not include weights; got %#v", props)
+	}
+	palletProp, _ := props["palletId"].(map[string]any)
+	enumIDs, _ := palletProp["enum"].([]string)
+	found := false
+	for _, id := range enumIDs {
+		if id == loadID+".1" || id == loadID+".2" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("palletId enum = %#v, want unweighted pallets for %s", enumIDs, loadID)
+	}
 }
 
 func assertConcreteDynamicMap(t *testing.T, mapSchema map[string]any, rowIDs []string, fullMap bool) {
@@ -261,26 +270,13 @@ func assertConcreteDynamicMap(t *testing.T, mapSchema map[string]any, rowIDs []s
 	}
 }
 
-func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
-	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
+func TestLineLoadPartialMapAfterOnePalletWeighClose(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
 
-	weigh, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID)
-	if err != nil || weigh == nil {
-		t.Fatalf("missing weigh: %v", err)
-	}
-	if len(weigh.RowIDs) == 0 {
-		t.Fatal("weigh full-map needs Domain-read row ids")
-	}
-	weightsProps, _ := weigh.Schema["properties"].(map[string]any)
-	weightsSchema, _ := weightsProps["weights"].(map[string]any)
-	assertConcreteDynamicMap(t, weightsSchema, weigh.RowIDs, true)
-
-	_ = commitWeigh(t, c, lineID, map[string]any{
-		loadID + ".1": weighRow(11),
-		loadID + ".2": weighRow(22),
-	})
+	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
+	_ = commitWeigh(t, c, lineID, loadID+".2", 22)
 	closed, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
 		JobID: "line", JobInstanceID: lineID, GroupID: "palletWeight",
 	})
@@ -500,5 +496,274 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	inst, ok := worklistInstance(lineJobWL, lineID)
 	if !ok || inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg status = %#v, want available", inst)
+	}
+}
+
+func flatSchemaDefaultsProbeConfig() OrgConfig {
+	return OrgConfig{
+		ID:      "probe",
+		Version: "1",
+		Jobs: OrderedObject{
+			Keys: []string{"line"},
+			Values: map[string]any{
+				"line": Job{
+					Repeatable: true,
+					InstanceID: `"x"`,
+					Label:      `"x"`,
+					Tasks: []TaskConfig{
+						{
+							"id":    "weigh",
+							"roles": []any{"logistic"},
+							"schema": map[string]any{
+								"type":     "object",
+								"title":    "Pesa bancale",
+								"required": []any{"palletId", "averagePanelWeight", "tareKind", "weight", "idoneita"},
+								"properties": map[string]any{
+									"palletId":           map[string]any{"type": "string", "title": "Bancale"},
+									"averagePanelWeight": map[string]any{"type": "number", "exclusiveMinimum": 0, "title": "Peso medio", "default": 20},
+									"tareKind": map[string]any{
+										"type": "string", "title": "Tara",
+										"enum": []any{"euro", "industrial", "custom"}, "default": "euro",
+									},
+									"customTareWeight": map[string]any{"type": "number", "exclusiveMinimum": 0},
+									"weight":           map[string]any{"type": "number", "exclusiveMinimum": 0},
+									"idoneita": map[string]any{
+										"type": "string", "title": "IR / NIR",
+										"enum": []any{"NIR", "IR"}, "default": "NIR",
+									},
+									"panelCount": map[string]any{"type": "number"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestBuildTaskFormBundleFlatSeedsSchemaDefaults(t *testing.T) {
+	bundle, err := BuildTaskFormBundle(flatSchemaDefaultsProbeConfig(), EmptyDomain(), ActionableTaskRef{
+		JobID: "line", TaskID: "weigh",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := bundle.InitialData
+	if got["averagePanelWeight"] != 20 {
+		t.Fatalf("averagePanelWeight = %#v, want 20", got["averagePanelWeight"])
+	}
+	if got["tareKind"] != "euro" {
+		t.Fatalf("tareKind = %#v, want euro", got["tareKind"])
+	}
+	if got["idoneita"] != "NIR" {
+		t.Fatalf("idoneita = %#v, want NIR", got["idoneita"])
+	}
+	for _, key := range []string{"palletId", "weight", "customTareWeight", "panelCount"} {
+		if _, has := got[key]; has {
+			t.Fatalf("must not invent %q without default; got %#v", key, got)
+		}
+	}
+}
+
+func TestBuildTaskFormBundleFlatRequiredEnumFallsBackToFirst(t *testing.T) {
+	cfg := OrgConfig{
+		ID:      "probe",
+		Version: "1",
+		Jobs: OrderedObject{
+			Keys: []string{"job"},
+			Values: map[string]any{
+				"job": Job{
+					Repeatable: true,
+					InstanceID: `"x"`,
+					Label:      `"x"`,
+					Tasks: []TaskConfig{
+						{
+							"id":    "pick",
+							"roles": []any{"logistic"},
+							"schema": map[string]any{
+								"type":     "object",
+								"required": []any{"status"},
+								"properties": map[string]any{
+									"status": map[string]any{
+										"type": "string",
+										"enum": []any{"open", "closed"},
+									},
+									"note": map[string]any{
+										"type": "string",
+										"enum": []any{"a", "b"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
+		JobID: "job", TaskID: "pick",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.InitialData["status"] != "open" {
+		t.Fatalf("required enum without default = %#v, want first enum open", bundle.InitialData)
+	}
+	if _, has := bundle.InitialData["note"]; has {
+		t.Fatalf("optional enum without default must stay unset; got %#v", bundle.InitialData)
+	}
+}
+
+func TestBuildTaskFormBundleObjectMapKeepsRowAndFormDefaults(t *testing.T) {
+	cfg := OrgConfig{
+		ID:      "probe",
+		Version: "1",
+		Domain: map[string]any{
+			"entities": map[string]any{
+				"pallet": map[string]any{},
+			},
+		},
+		Jobs: OrderedObject{
+			Keys: []string{"line"},
+			Values: map[string]any{
+				"line": Job{
+					Repeatable: true,
+					InstanceID: `"x"`,
+					Label:      `"x"`,
+					Tasks: []TaskConfig{
+						{
+							"id":    "weigh",
+							"roles": []any{"logistic"},
+							"dynamicProperties": map[string]any{
+								"weights": map[string]any{"read": "rows"},
+							},
+							"reads": map[string]any{
+								"rows": map[string]any{"entity": "pallet", "key": "id"},
+							},
+							"schema": map[string]any{
+								"type":     "object",
+								"required": []any{"averagePanelWeight", "tareKind", "weights"},
+								"properties": map[string]any{
+									"averagePanelWeight": map[string]any{"type": "number", "default": 20},
+									"tareKind": map[string]any{
+										"type": "string", "enum": []any{"euro", "industrial"}, "default": "euro",
+									},
+									"weights": map[string]any{
+										"type": "object",
+										"additionalProperties": map[string]any{
+											"type": "object",
+											"properties": map[string]any{
+												"tareKind": map[string]any{
+													"type": "string", "enum": []any{"euro", "industrial"}, "default": "euro",
+												},
+												"idoneita": map[string]any{
+													"type": "string", "enum": []any{"NIR", "IR"},
+												},
+												"weight": map[string]any{"type": "number"},
+											},
+										},
+									},
+								},
+							},
+							"uiSchema": map[string]any{
+								"weights": map[string]any{"ui:field": "mapTable"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	domain := domainFromKinds(map[string]EntityMap{
+		"pallet": {"P1": {}, "P2": {}},
+	})
+	bundle, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
+		JobID: "line", TaskID: "weigh", JobInstanceID: "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.InitialData["averagePanelWeight"] != 20 || bundle.InitialData["tareKind"] != "euro" {
+		t.Fatalf("form defaults = %#v", bundle.InitialData)
+	}
+	weights, _ := bundle.InitialData["weights"].(map[string]any)
+	if len(weights) != 2 {
+		t.Fatalf("row seed = %#v, want both rows", weights)
+	}
+	for _, id := range []string{"P1", "P2"} {
+		row, _ := weights[id].(map[string]any)
+		if row["tareKind"] != "euro" {
+			t.Fatalf("row %s = %#v, want authored tareKind default only", id, row)
+		}
+		if _, has := row["idoneita"]; has {
+			t.Fatalf("row %s must not invent first-enum idoneita; got %#v", id, row)
+		}
+	}
+}
+
+func TestBuildTaskFormBundleCellMapDoesNotInventCells(t *testing.T) {
+	cfg := OrgConfig{
+		ID:      "probe",
+		Version: "1",
+		Domain: map[string]any{
+			"entities": map[string]any{
+				"pallet": map[string]any{},
+			},
+		},
+		Jobs: OrderedObject{
+			Keys: []string{"line"},
+			Values: map[string]any{
+				"line": Job{
+					Repeatable: true,
+					InstanceID: `"x"`,
+					Label:      `"x"`,
+					Tasks: []TaskConfig{
+						{
+							"id":    "lineLoad",
+							"roles": []any{"line"},
+							"dynamicProperties": map[string]any{
+								"progress": map[string]any{"read": "rows"},
+							},
+							"reads": map[string]any{
+								"rows": map[string]any{"entity": "pallet", "key": "id"},
+							},
+							"schema": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"note": map[string]any{"type": "string", "default": "ready"},
+									"progress": map[string]any{
+										"type": "object",
+										"additionalProperties": map[string]any{
+											"type": "string",
+											"enum": []any{"partial", "done"},
+										},
+									},
+								},
+							},
+							"uiSchema": map[string]any{
+								"progress": map[string]any{"ui:field": "mapTable"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	domain := domainFromKinds(map[string]EntityMap{
+		"pallet": {"P1": {}, "P2": {"progress": "partial"}},
+	})
+	bundle, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
+		JobID: "line", TaskID: "lineLoad", JobInstanceID: "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.InitialData["note"] != "ready" {
+		t.Fatalf("cell-map form default = %#v", bundle.InitialData["note"])
+	}
+	progress, _ := bundle.InitialData["progress"].(map[string]any)
+	if len(progress) != 1 || progress["P2"] != "partial" {
+		t.Fatalf("cell seed = %#v, want only existing P2=partial", progress)
 	}
 }

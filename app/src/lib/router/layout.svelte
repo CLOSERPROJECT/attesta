@@ -1,15 +1,23 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import Scan from '@lucide/svelte/icons/scan';
 
 	import attestaMark from '#lib/assets/attesta-mark.svg';
 	import { living } from '#lib/living/living-app.svelte.js';
+	import LivingToast from '#lib/living/LivingToast.svelte';
+	import ScanDialog from '#lib/living/ScanDialog.svelte';
+	import { createHttpQrResolvePort } from '#lib/living/http-qr-resolve-port.js';
 	import {
 		livingRouteCoordsFromPath,
 		navPlaceKindFromRoute,
 		resolveNavPlace
 	} from '#lib/living/nav-place.js';
+	import { takeColdEntityIdRaw } from '#lib/living/qr-resolve-apply.js';
+	import { runQrScan } from '#lib/living/qr-scan-flow.js';
+	import { livingToast } from '#lib/living/toast.svelte.js';
 	import { Badge } from '#lib/shadcn/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
 	import { route } from '#lib/router/index.js';
@@ -47,6 +55,35 @@
 	);
 
 	const roles = $derived(living.result?.roles ?? []);
+
+	const qrPort = createHttpQrResolvePort();
+	let scanOpen = $state(false);
+	let scanBusy = $state(false);
+
+	async function handleRaw(raw: string) {
+		if (scanBusy) return;
+		scanBusy = true;
+		try {
+			await runQrScan(
+				{
+					resolve: qrPort.resolve,
+					drafts: living,
+					navigate: navigateLivingTarget,
+					toast: (message) => livingToast.show(message)
+				},
+				raw
+			);
+		} finally {
+			scanBusy = false;
+		}
+	}
+
+	onMount(() => {
+		const { raw, strippedHref } = takeColdEntityIdRaw(window.location.href);
+		if (!raw) return;
+		window.history.replaceState(window.history.state, '', strippedHref);
+		void handleRaw(raw);
+	});
 </script>
 
 <nav
@@ -86,15 +123,41 @@
 		</div>
 	</div>
 
-	{#if roles.length > 0}
-		<div class="flex shrink-0 flex-wrap justify-end gap-1" data-testid="nav-roles">
-			{#each roles as role (role)}
-				<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
-			{/each}
-		</div>
-	{/if}
+	<div class="flex shrink-0 items-center gap-2">
+		<Button
+			type="button"
+			variant="outline"
+			size="sm"
+			aria-label="Scan"
+			data-testid="nav-scan"
+			disabled={scanBusy}
+			onclick={() => {
+				scanOpen = true;
+			}}
+		>
+			<Scan class="size-4" />
+			Scan
+		</Button>
+		{#if roles.length > 0}
+			<div class="flex flex-wrap justify-end gap-1" data-testid="nav-roles">
+				{#each roles as role (role)}
+					<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
+				{/each}
+			</div>
+		{/if}
+	</div>
 </nav>
 
 <main class="p-4">
 	{@render children()}
 </main>
+
+<ScanDialog
+	open={scanOpen}
+	busy={scanBusy}
+	onOpenChange={(next) => {
+		scanOpen = next;
+	}}
+	onScan={handleRaw}
+/>
+<LivingToast />

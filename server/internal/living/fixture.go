@@ -93,6 +93,13 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 			cfg.Catalogs = m
 		}
 	}
+	if qrNode := child(doc, "qr"); qrNode != nil {
+		var qr QrConfig
+		if err := qrNode.Decode(&qr); err != nil {
+			return OrgConfig{}, fmt.Errorf("decode qr: %w", err)
+		}
+		cfg.QR = &qr
+	}
 	return cfg, nil
 }
 

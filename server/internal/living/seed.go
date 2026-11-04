@@ -167,24 +167,21 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if lineLoadReady.JobInstanceID != SeedLineLineLoadID {
 		return fmt.Errorf("living seed: lineLoad line id %q, want %q", lineLoadReady.JobInstanceID, SeedLineLineLoadID)
 	}
-	if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
-		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
-		JobInstanceID: lineLoadReady.JobInstanceID,
-		Value: map[string]any{
-			"averagePanelWeight": 10.0,
-			"tareKind":           "euro",
-			"weights": map[string]any{
-				loadID + ".1": map[string]any{
-					"weight": 125.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0,
-				},
-				loadID + ".2": map[string]any{
-					"weight": 100.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0,
-				},
-			},
-		},
-		Mint: spawningNewMint(),
-	}); err != nil {
-		return err
+	for _, row := range []struct {
+		id     string
+		weight float64
+	}{
+		{loadID + ".1", 125.0},
+		{loadID + ".2", 100.0},
+	} {
+		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
+			TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+			JobInstanceID: lineLoadReady.JobInstanceID,
+			Value:         weighValue(row.id, row.weight),
+			Mint:          spawningNewMint(),
+		}); err != nil {
+			return err
+		}
 	}
 	if _, err := c.CloseGroup(ctx, org, logistic, CloseGroupRequest{
 		JobID: "line", JobInstanceID: lineLoadReady.JobInstanceID, GroupID: "palletWeight",

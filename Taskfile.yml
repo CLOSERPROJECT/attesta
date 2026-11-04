@@ -34,6 +34,26 @@ tasks:
       - task: worktree:bootstrap
       - bash scripts/worktree-compose.sh up --build
 
+  living-http:rebuild:
+    desc: Rebuild and recreate only living-http (use after services/living-http changes).
+    cmds:
+      - task: worktree:bootstrap
+      - |
+          bash -c '
+          set -euo pipefail
+          ROOT_DIR="$(pwd)"
+          if [[ -f "${ROOT_DIR}/.env" ]]; then set -a; source "${ROOT_DIR}/.env"; set +a; fi
+          eval "$(bash "${ROOT_DIR}/scripts/worktree-env.sh" export)"
+          # Same ownership labels as scripts/worktree-compose.sh load_env (volume match).
+          ATTESTA_ROOT_DIR="${ROOT_DIR}"
+          ATTESTA_WORKTREE_ROOT="$(cd "${ROOT_DIR}" && pwd -P)"
+          ATTESTA_REPOSITORY_ID="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id)"
+          export ATTESTA_ROOT_DIR ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
+          docker compose --project-name "${COMPOSE_PROJECT_NAME}" \
+            -f "${ROOT_DIR}/deployment/docker-compose.local.yaml" \
+            up -d --build --force-recreate --no-deps living-http
+          '
+
   start:docker:
     desc: Bring up this worktree's full stack, including the containerized Attesta app.
     cmds:

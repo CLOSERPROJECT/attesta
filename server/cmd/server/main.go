@@ -2540,6 +2540,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.Handle("/api/living/task-recap", livingAPI)
 	mux.Handle("/api/living/commit", livingAPI)
 	mux.Handle("/api/living/close", livingAPI)
+	mux.Handle("/api/living/qr-resolve", livingAPI)
 	mux.Handle("/api/living/artifacts/", livingAPI)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)

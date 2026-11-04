@@ -14,17 +14,14 @@ const (
 	DemoLineShiftID     = "2026-10-19-1st"
 )
 
-func weighRow(weight float64) map[string]any {
+func weighValue(palletID string, weight float64) map[string]any {
 	return map[string]any{
-		"weight": weight, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0,
-	}
-}
-
-func palletWeightValue(weights map[string]any) map[string]any {
-	return map[string]any{
+		"palletId":           palletID,
 		"averagePanelWeight": 10.0,
 		"tareKind":           "euro",
-		"weights":            weights,
+		"weight":             weight,
+		"idoneita":           "NIR",
+		"panelCount":         1.0,
 	}
 }
 
@@ -91,16 +88,21 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *Committer, org stri
 	if err != nil {
 		return Domain{}, err
 	}
-	if _, err := c.Commit(ctx, org, op, CommitRequest{
-		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
-		JobInstanceID: line.JobInstanceID,
-		Value: palletWeightValue(map[string]any{
-			loadID + ".1": weighRow(11),
-			loadID + ".2": weighRow(22),
-		}),
-		Mint: spawningNewMint(),
-	}); err != nil {
-		return Domain{}, err
+	for _, row := range []struct {
+		id     string
+		weight float64
+	}{
+		{loadID + ".1", 11},
+		{loadID + ".2", 22},
+	} {
+		if _, err := c.Commit(ctx, org, op, CommitRequest{
+			TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+			JobInstanceID: line.JobInstanceID,
+			Value:         weighValue(row.id, row.weight),
+			Mint:          spawningNewMint(),
+		}); err != nil {
+			return Domain{}, err
+		}
 	}
 	if _, err := c.CloseGroup(ctx, org, op, CloseGroupRequest{
 		JobID: "line", JobInstanceID: line.JobInstanceID, GroupID: "palletWeight",

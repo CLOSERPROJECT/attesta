@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 (QR resolve — qr.rules + HTTP seam). Ticket 03 improves real-label demos but does not block this.
 
-**Status:** ready-for-agent
+**Status:** implement-done
 
-- [ ] Topbar Scan is reachable from home, overview, and task surfaces
-- [ ] Successful resolve navigates to nested weigh with `palletId` seeded
-- [ ] Failed resolve shows the server message as a toast (zero / many / ineligible)
-- [ ] Cold `/app?entityId=` triggers the same resolve path once
+- [x] Topbar Scan is reachable from home, overview, and task surfaces
+- [x] Successful resolve navigates to nested weigh with `palletId` seeded
+- [x] Failed resolve shows the server message as a toast (zero / many / ineligible)
+- [x] Cold `/app?entityId=` triggers the same resolve path once

@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** implemented — awaiting Cos review
 
-- [ ] Flat Task Load includes schema property defaults in `initialData`
-- [ ] Map / cell-map Tasks still seed as they do today (no regression)
-- [ ] Covered by unit tests for both shapes
+- [x] Flat Task Load includes schema property defaults in `initialData`
+- [x] Map / cell-map Tasks still seed as they do today (no regression)
+- [x] Covered by unit tests for both shapes

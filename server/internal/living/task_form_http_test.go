@@ -208,11 +208,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	pw, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
 		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
 		JobInstanceID: lineID,
-		Value: palletWeightValue(map[string]any{
-			loadID + ".1": weighRow(11),
-			loadID + ".2": weighRow(12),
-		}),
-		Mint: spawningNewMint(),
+		Value:         weighValue(loadID+".1", 11),
+		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)

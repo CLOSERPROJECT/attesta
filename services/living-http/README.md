@@ -39,3 +39,4 @@ enforce org match on proxy GET. Plant smoke may omit it until 01B sends it.
 
 Internal network only (`http://living-http:8090`). No host port by default.
 Attesta gets `LIVING_HTTP_URL` + `LIVING_HTTP_TOKEN`.
+After changing this package (e.g. `artifacts.go`), rebuild the image: `task living-http:rebuild`.

@@ -13,6 +13,7 @@ type OrgConfig struct {
 	Version  string         `json:"version"`
 	Domain   map[string]any `json:"domain,omitempty"`
 	Catalogs map[string]any `json:"catalogs,omitempty"`
+	QR       *QrConfig      `json:"qr,omitempty"`
 	Roles    []string       `json:"roles,omitempty"`
 	Jobs     OrderedObject  `json:"jobs"`
 }
@@ -26,6 +27,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 		Version  string          `json:"version"`
 		Domain   map[string]any  `json:"domain,omitempty"`
 		Catalogs map[string]any  `json:"catalogs,omitempty"`
+		QR       *QrConfig       `json:"qr,omitempty"`
 		Roles    []string        `json:"roles,omitempty"`
 		Jobs     json.RawMessage `json:"jobs"`
 	}
@@ -41,6 +43,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 	c.Version = wire.Version
 	c.Domain = wire.Domain
 	c.Catalogs = wire.Catalogs
+	c.QR = wire.QR
 	c.Roles = wire.Roles
 	c.Jobs = jobs
 	return nil

@@ -45,13 +45,18 @@ export default defineConfig({
 		}
 	},
 	server: {
+		host: true,
 		port: Number(process.env.APP_PORT) || 5180,
 		strictPort: true,
+		hmr: {
+			host: process.env.VITE_HMR_HOST || 'localhost'
+		},
 		fs: {
 			allow: [livingFixturesDir]
 		}
 	},
 	preview: {
+		host: true,
 		port: Number(process.env.APP_PORT) || 5180,
 		strictPort: true
 	},

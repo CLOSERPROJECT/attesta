@@ -1,69 +1,51 @@
 package living
 
 import (
-	"strings"
 	"testing"
 )
 
-func TestCommitWeighRejectsPartialRequiredMap(t *testing.T) {
-	c, domains, _ := testCommitter(t, AllowAllAuthorizer{})
-	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
-
-	_, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
-		JobInstanceID: lineID,
-		Value: palletWeightValue(map[string]any{
-			loadID + ".1": weighRow(11),
-		}),
-		Mint: spawningNewMint(),
-	})
-	var ce *CommitError
-	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("err = %v", err)
-	}
-	if !strings.Contains(ce.Message, "required map keys") {
-		t.Fatalf("message = %q", ce.Message)
-	}
-
-	domain, err := domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range domain.Submissions {
-		if s.TaskID == "weigh" {
-			t.Fatalf("partial must not append weigh Submission: %#v", domain.Submissions)
-		}
-	}
-	if _, has := domain.Kind("pallet")[loadID+".1"]["weight"]; has {
-		t.Fatal("partial reject must not patch pallets")
-	}
-}
-
-func TestCommitWeighCompleteThenCloseUnlocksLineLoad(t *testing.T) {
+func TestCommitWeighPatchesOnePalletLeavesOtherUnweighted(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
 
-	result := commitWeigh(t, c, lineID, map[string]any{
-		loadID + ".1": weighRow(11),
-		loadID + ".2": weighRow(22),
-	})
+	result := commitWeigh(t, c, lineID, loadID+".1", 11)
 	if result.Domain.Kind("pallet")[loadID+".1"]["weight"] != 11.0 {
 		t.Fatalf("pallet .1 = %#v", result.Domain.Kind("pallet")[loadID+".1"])
 	}
-	if result.Domain.Kind("pallet")[loadID+".2"]["weight"] != 22.0 {
-		t.Fatalf("pallet .2 = %#v", result.Domain.Kind("pallet")[loadID+".2"])
+	if _, has := result.Domain.Kind("pallet")[loadID+".2"]["weight"]; has {
+		t.Fatalf("pallet .2 must stay unweighted; got %#v", result.Domain.Kind("pallet")[loadID+".2"])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
 	if last.TaskID != "weigh" || last.GroupID != "palletWeight" {
 		t.Fatalf("weigh submission = %#v", last)
 	}
+	if last.Facts["palletId"] != loadID+".1" {
+		t.Fatalf("weigh facts = %#v, want palletId %s.1", last.Facts, loadID)
+	}
+	if _, has := last.Facts["averagePanelWeight"]; !has {
+		t.Fatal("averagePanelWeight must stay Submission fact")
+	}
+}
+
+func TestCommitWeighThenCloseUnlocksLineLoad(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
+
+	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
+	_ = commitWeigh(t, c, lineID, loadID+".2", 22)
 
 	closePalletWeight(t, c, lineID)
 	stored, err := c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if stored.Kind("pallet")[loadID+".1"]["weight"] != 11.0 {
+		t.Fatalf("pallet .1 = %#v", stored.Kind("pallet")[loadID+".1"])
+	}
+	if stored.Kind("pallet")[loadID+".2"]["weight"] != 22.0 {
+		t.Fatalf("pallet .2 = %#v", stored.Kind("pallet")[loadID+".2"])
 	}
 	line := lineJob(t)
 	if !IsTaskUnlocked(UnlockQuery{
@@ -72,5 +54,20 @@ func TestCommitWeighCompleteThenCloseUnlocksLineLoad(t *testing.T) {
 		ClosedGroups: stored.ClosedGroups,
 	}) {
 		t.Fatal("closing palletWeight must unlock lineLoad")
+	}
+}
+
+func TestClosePalletWeightRequiresChildSubmission(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	_, _, _ = commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
+
+	_, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
+		JobID: "line", JobInstanceID: lineID, GroupID: "palletWeight",
+	})
+	var ce *CommitError
+	// Committer gates on CanClose (false with zero children) before Domain CloseGroup.
+	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
+		t.Fatalf("err = %v, want prep cannot-close", err)
 	}
 }

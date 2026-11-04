@@ -229,40 +229,36 @@ func buildFormBindings(domain Domain, ref ActionableTaskRef, catalogs map[string
 func seedInitialData(domain Domain, payload map[string]any, projected projectedForm) map[string]any {
 	out := map[string]any{}
 	primary, ok := primaryDynamicProperty(payload)
-	if !ok || len(projected.RowIDs) == 0 {
-		return out
-	}
-	add := additionalPropertiesSchema(payload, primary)
-	if additionalPropertiesIsCellMap(add) {
-		enums := schemaStringEnum(add)
-		cells := map[string]any{}
-		entities := rowEntityMap(domain, payload)
-		for _, id := range projected.RowIDs {
-			facts, hit := entities[id]
-			if !hit {
-				continue
-			}
-			p, _ := facts[primary].(string)
-			if stringInList(p, enums) {
-				cells[id] = p
-			}
-		}
-		if len(cells) > 0 {
-			out[primary] = cells
-		}
-		return out
-	}
-	if schemaTypeIs(add["type"], "object") {
-		if template := seedRowFromAuthoredDefaults(add); len(template) > 0 {
-			rows := map[string]any{}
+	if ok && len(projected.RowIDs) > 0 {
+		add := additionalPropertiesSchema(payload, primary)
+		if additionalPropertiesIsCellMap(add) {
+			enums := schemaStringEnum(add)
+			cells := map[string]any{}
+			entities := rowEntityMap(domain, payload)
 			for _, id := range projected.RowIDs {
-				rows[id] = cloneMapJSON(template)
+				facts, hit := entities[id]
+				if !hit {
+					continue
+				}
+				p, _ := facts[primary].(string)
+				if stringInList(p, enums) {
+					cells[id] = p
+				}
 			}
-			out[primary] = rows
+			if len(cells) > 0 {
+				out[primary] = cells
+			}
+		} else if schemaTypeIs(add["type"], "object") {
+			if template := seedRowFromAuthoredDefaults(add); len(template) > 0 {
+				rows := map[string]any{}
+				for _, id := range projected.RowIDs {
+					rows[id] = cloneMapJSON(template)
+				}
+				out[primary] = rows
+			}
 		}
-		seedFormDefaultsFromSchema(out, payload)
-		return out
 	}
+	seedFormDefaultsFromSchema(out, payload)
 	return out
 }
 

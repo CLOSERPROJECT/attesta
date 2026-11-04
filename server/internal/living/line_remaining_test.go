@@ -254,7 +254,8 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 
 	open := post(`{"taskPath":"line/openTurno","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st"}}`)
 	lineID, _ := open["jobInstanceId"].(string)
-	post(`{"taskPath":"line/palletWeight/new/weigh","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"averagePanelWeight":10,"tareKind":"euro","weights":{"` + loadID + `.1":{"weight":400,"tareKind":"euro","idoneita":"NIR","panelCount":1},"` + loadID + `.2":{"weight":450,"tareKind":"euro","idoneita":"NIR","panelCount":1}}}}`)
+	post(`{"taskPath":"line/palletWeight/new/weigh","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"palletId":"` + loadID + `.1","averagePanelWeight":10,"tareKind":"euro","weight":400,"idoneita":"NIR","panelCount":1}}`)
+	post(`{"taskPath":"line/palletWeight/new/weigh","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"palletId":"` + loadID + `.2","averagePanelWeight":10,"tareKind":"euro","weight":450,"idoneita":"NIR","panelCount":1}}`)
 	postClose("line", lineID, "palletWeight")
 	post(`{"taskPath":"line/lineLoad","jobInstanceId":"` + lineID + `","value":{"progress":{"` + loadID + `.1":"done","` + loadID + `.2":"done"}}}`)
 	post(`{"taskPath":"line/containerReg","jobInstanceId":"` + lineID + `","value":{"sourceLoadId":"` + loadID + `","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)

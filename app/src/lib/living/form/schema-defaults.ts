@@ -61,8 +61,44 @@ function resolveNode(node: unknown, today: string): unknown {
 }
 
 /**
+ * Bundle initialData may still carry `$today` (Go seeds it verbatim). Rewrite
+ * those leaves on `format: date` fields so the date-picker never sees the sentinel.
+ * Real ISO drafts are left alone.
+ */
+export function resolveFormDataDateSentinels<T extends Record<string, unknown>>(
+	schema: Schema,
+	formData: T,
+	today: string = localCalendarDateISO()
+): T {
+	return resolveFormDataNode(schema, formData, today) as T;
+}
+
+function resolveFormDataNode(schema: Schema, data: unknown, today: string): unknown {
+	if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+		return data;
+	}
+	if (!schema.properties || typeof schema.properties !== 'object') {
+		return data;
+	}
+	const out: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+	for (const [key, prop] of Object.entries(schema.properties)) {
+		if (!(key in out)) continue;
+		const propSchema = prop as Schema;
+		if (propSchema.format === 'date' && out[key] === TODAY_DEFAULT_SENTINEL) {
+			out[key] = today;
+			continue;
+		}
+		if (propSchema.properties && typeof propSchema.properties === 'object') {
+			out[key] = resolveFormDataNode(propSchema, out[key], today);
+		}
+	}
+	return out;
+}
+
+/**
  * Merge JSON Schema defaults into formData (sjsf merger), after resolving
- * authored `$today` date sentinels. Preserves operator / partial drafts.
+ * authored `$today` date sentinels on schema defaults and formData leaves.
+ * Preserves operator / partial drafts with real ISO dates.
  */
 export function mergeSchemaDefaultsIntoFormData<T extends Record<string, unknown>>(
 	schema: Schema,
@@ -70,10 +106,11 @@ export function mergeSchemaDefaultsIntoFormData<T extends Record<string, unknown
 	today: string = localCalendarDateISO()
 ): T {
 	const resolvedSchema = resolveSchemaDateDefaultSentinels(schema, today);
+	const resolvedFormData = resolveFormDataDateSentinels(resolvedSchema, formData, today);
 	const validator = createAjvFormValidator<T>();
 	const merger = createFormMerger({ validator, schema: resolvedSchema });
 	return merger.mergeFormDataAndSchemaDefaults({
 		schema: resolvedSchema,
-		formData
+		formData: resolvedFormData
 	}) as T;
 }

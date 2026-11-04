@@ -15,6 +15,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	}
 	c, domains, _ := testCommitter(t, AllowAllAuthorizer{})
 	c.HttpPort = port
+	c.SubmitBindings = ExprBindings{"qrEndpoint": "https://plant.example/app"}
 
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
@@ -30,6 +31,29 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	}
 	if port.calls[1].URL != "/fake/register-csv" {
 		t.Fatalf("call1 = %#v", port.calls[1])
+	}
+	body0, _ := port.calls[0].Body.(map[string]any)
+	if body0["wasteCode"] != "191212" {
+		t.Fatalf("wasteCode = %#v, want 191212", body0["wasteCode"])
+	}
+	if body0["netWeight"] != 300.0 {
+		t.Fatalf("netWeight = %#v, want 300", body0["netWeight"])
+	}
+	if body0["palletCount"] != 2.0 {
+		t.Fatalf("palletCount = %#v, want 2", body0["palletCount"])
+	}
+	labels, _ := body0["labels"].([]any)
+	if len(labels) != 2 {
+		t.Fatalf("labels body = %#v", body0)
+	}
+	for _, raw := range labels {
+		rec, _ := raw.(map[string]any)
+		id, _ := rec["id"].(string)
+		qr, _ := rec["qr"].(string)
+		want := "https://plant.example/app?entityId=" + id
+		if qr != want {
+			t.Fatalf("label %#v qr = %q, want %q", rec, qr, want)
+		}
 	}
 	if len(result.Links) != 2 {
 		t.Fatalf("links = %#v", result.Links)
@@ -50,6 +74,52 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	}
 	if stored.Kind("load")[loadID]["client"] != "NO" {
 		t.Fatalf("persisted domain = %#v", stored)
+	}
+}
+
+func TestCommitRegisterOnePalletLabelsBodyIsArray(t *testing.T) {
+	port := &recordingHttpPort{
+		responses: []HttpPortResponse{
+			{URL: "blob:labels"},
+			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
+		},
+	}
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	c.HttpPort = port
+	c.SubmitBindings = ExprBindings{"qrEndpoint": "https://plant.example/app"}
+
+	truckID := commitTruckArrive(t, c)
+	value := registerLotValue()
+	value["palletCount"] = 1.0
+	result := commitLotRegister(t, c, truckID, value)
+	if len(result.Domain.Kind("pallet")) != 1 {
+		t.Fatalf("pallets = %#v", result.Domain.Kind("pallet"))
+	}
+	if len(port.calls) < 1 {
+		t.Fatal("expected labels http call")
+	}
+	body0, _ := port.calls[0].Body.(map[string]any)
+	if body0["wasteCode"] != "191212" {
+		t.Fatalf("wasteCode = %#v, want 191212", body0["wasteCode"])
+	}
+	if body0["netWeight"] != 300.0 {
+		t.Fatalf("netWeight = %#v, want 300", body0["netWeight"])
+	}
+	if body0["palletCount"] != 1.0 {
+		t.Fatalf("palletCount = %#v, want 1", body0["palletCount"])
+	}
+	labels, ok := body0["labels"].([]any)
+	if !ok {
+		t.Fatalf("labels must be []any after Config wrap, got %T %#v", body0["labels"], body0["labels"])
+	}
+	if len(labels) != 1 {
+		t.Fatalf("labels = %#v", body0)
+	}
+	rec, _ := labels[0].(map[string]any)
+	id, _ := rec["id"].(string)
+	qr, _ := rec["qr"].(string)
+	if id == "" || qr != "https://plant.example/app?entityId="+id {
+		t.Fatalf("label = %#v", rec)
 	}
 }
 

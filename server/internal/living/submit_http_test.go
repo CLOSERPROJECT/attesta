@@ -101,3 +101,51 @@ func TestFilenameFromContentDisposition(t *testing.T) {
 		t.Fatalf("star = %q", got)
 	}
 }
+
+func TestRunSubmitHTTPEffectsUsesQrEndpointBinding(t *testing.T) {
+	port := &recordingHttpPort{responses: []HttpPortResponse{{URL: "blob:labels"}}}
+	domain := EmptyDomain()
+	putKind(&domain, "pallet", EntityMap{
+		"acme-1.1": {"loadId": "acme-1"},
+		"acme-1.2": {"loadId": "acme-1"},
+	})
+
+	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
+		{
+			Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Stampa etichette"`, Action: "link",
+			Body: `{"labels": [$each(
+				$sift($domain.pallet, function($v){$v.loadId = "acme-1"}),
+				function($v, $id){{ "id": $id, "qr": $qrEndpoint & "?entityId=" & $id }}
+			)]}`,
+			HasBody: true,
+		},
+	}, map[string]any{}, ExprBindings{"qrEndpoint": "https://plant.example/app"}, domain, "truck-1", nil, "feragame")
+
+	if len(result.Errors) != 0 {
+		t.Fatalf("errors = %#v", result.Errors)
+	}
+	body, _ := port.calls[0].Body.(map[string]any)
+	labels, _ := body["labels"].([]any)
+	if len(labels) != 2 {
+		t.Fatalf("labels = %#v", body)
+	}
+	got := map[string]string{}
+	for _, raw := range labels {
+		rec, _ := raw.(map[string]any)
+		id, _ := rec["id"].(string)
+		qr, _ := rec["qr"].(string)
+		got[id] = qr
+	}
+	want := map[string]string{
+		"acme-1.1": "https://plant.example/app?entityId=acme-1.1",
+		"acme-1.2": "https://plant.example/app?entityId=acme-1.2",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got = %#v", got)
+	}
+	for id, qr := range want {
+		if got[id] != qr {
+			t.Fatalf("label %s qr = %q, want %q (all %#v)", id, got[id], qr, got)
+		}
+	}
+}

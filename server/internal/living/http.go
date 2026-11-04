@@ -20,7 +20,7 @@ type OperatorIdentity struct {
 // Gate authenticates the caller; on failure it writes the HTTP error and returns ok=false.
 type Gate func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool)
 
-// Handler serves Load, addressed Task form / recap, Commit, Close, and artifact proxy over HTTP seams.
+// Handler serves Load, addressed Task form / recap, Commit, Close, QR resolve, and artifact proxy over HTTP seams.
 type Handler struct {
 	Loader    *Loader
 	Committer *Committer
@@ -42,6 +42,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleCommit(w, r)
 	case path == "/api/living/close":
 		h.handleClose(w, r)
+	case path == "/api/living/qr-resolve":
+		h.handleQrResolve(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
 		h.handleArtifact(w, r, strings.TrimPrefix(path, ArtifactProxyPathPrefix))
 	default:
@@ -203,7 +205,7 @@ func (h *Handler) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleCommit(w http.ResponseWriter, r *http.Request) {
-	op, org, body, ok := h.preparePOSTAuth(w, r, "living commit not configured")
+	op, org, body, ok := h.preparePOSTAuth(w, r, "living commit not configured", h.Committer != nil)
 	if !ok {
 		return
 	}
@@ -223,7 +225,7 @@ func (h *Handler) handleCommit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleClose(w http.ResponseWriter, r *http.Request) {
-	op, org, body, ok := h.preparePOSTAuth(w, r, "living close not configured")
+	op, org, body, ok := h.preparePOSTAuth(w, r, "living close not configured", h.Committer != nil)
 	if !ok {
 		return
 	}
@@ -242,18 +244,56 @@ func (h *Handler) handleClose(w http.ResponseWriter, r *http.Request) {
 	writeCommitResult(w, result)
 }
 
+type qrResolveRequest struct {
+	Raw string `json:"raw"`
+}
+
+func (h *Handler) handleQrResolve(w http.ResponseWriter, r *http.Request) {
+	op, org, body, ok := h.preparePOSTAuth(w, r, "living qr-resolve not configured", h.Loader != nil)
+	if !ok {
+		return
+	}
+	var req qrResolveRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	loaded, err := h.Loader.Load(r.Context(), org, op)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "active config not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to resolve qr", http.StatusInternalServerError)
+		return
+	}
+	result := ResolveQR(loaded.Config, loaded.Domain, op, req.Raw)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if result.Error != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(result)
+}
+
 // preparePOSTAuth gates a POST, requires org, and reads the body (1 MiB).
-// notConfigured is the 500 body when Gate or Committer is unset.
+// depOK is the route-specific dependency (Committer or Loader); Gate is always required.
 func (h *Handler) preparePOSTAuth(
 	w http.ResponseWriter,
 	r *http.Request,
 	notConfigured string,
+	depOK bool,
 ) (op OperatorIdentity, org string, body []byte, ok bool) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if h.Gate == nil || h.Committer == nil {
+	if h.Gate == nil || !depOK {
 		http.Error(w, notConfigured, http.StatusInternalServerError)
 		return
 	}
