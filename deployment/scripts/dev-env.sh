@@ -24,10 +24,20 @@ fi
 
 _shell_has_port=0
 _shell_has_vite=0
+_shell_has_app=0
 [[ -n "${PORT+x}" ]] && _shell_has_port=1 && _shell_port="$PORT"
 [[ -n "${VITE_PORT+x}" ]] && _shell_has_vite=1 && _shell_vite="$VITE_PORT"
-unset PORT VITE_PORT 2>/dev/null || true
+[[ -n "${APP_PORT+x}" ]] && _shell_has_app=1 && _shell_app="$APP_PORT"
+unset PORT VITE_PORT APP_PORT 2>/dev/null || true
 load_env_file "$REPO_ROOT/.env"
+# worktree-env export always stamps localhost origins. Primary checkouts may
+# restore PUBLIC_BASE_URL from .env / shell (e.g. Tailscale); linked worktrees
+# keep the localhost stamp so Vite stays on loopback.
+_had_public_base_url=0
+_had_vite_dev_server=0
+[[ -n "${PUBLIC_BASE_URL+x}" ]] && _had_public_base_url=1 && _keep_public_base_url="$PUBLIC_BASE_URL"
+# Non-empty only: empty/unset → derive from PUBLIC_BASE_URL after ports resolve.
+[[ -n "${VITE_DEV_SERVER:-}" ]] && _had_vite_dev_server=1 && _keep_vite_dev_server="$VITE_DEV_SERVER"
 
 # Primary checkouts may intentionally point host processes at external dev
 # services. Linked worktrees always replace these with their isolated stack.
@@ -51,6 +61,7 @@ eval "$_worktree_exports"
 if [[ "$_is_primary" -eq 1 ]]; then
   [[ "$_shell_has_port" -eq 1 ]] && export PORT="$_shell_port"
   [[ "$_shell_has_vite" -eq 1 ]] && export VITE_PORT="$_shell_vite"
+  [[ "$_shell_has_app" -eq 1 ]] && export APP_PORT="$_shell_app"
   for _index in "${!_primary_endpoint_keys[@]}"; do
     if [[ "${_primary_endpoint_set[$_index]:-0}" -eq 1 ]]; then
       _key="${_primary_endpoint_keys[$_index]}"
@@ -60,8 +71,20 @@ if [[ "$_is_primary" -eq 1 ]]; then
 fi
 [[ -n "${ATTESTA_ROOT_DIR:-}" ]] || ATTESTA_ROOT_DIR="${REPO_ROOT}"
 export ATTESTA_ROOT_DIR
-export PORT VITE_PORT
-export PUBLIC_BASE_URL="http://localhost:${PORT}"
-export VITE_DEV_SERVER="http://localhost:${VITE_PORT}"
+export PORT VITE_PORT APP_PORT
+if [[ "$_is_primary" -eq 1 && "$_had_public_base_url" -eq 1 ]]; then
+  export PUBLIC_BASE_URL="$_keep_public_base_url"
+else
+  export PUBLIC_BASE_URL="http://localhost:${PORT}"
+fi
+if [[ "$_had_vite_dev_server" -eq 1 ]]; then
+  export VITE_DEV_SERVER="$_keep_vite_dev_server"
+elif public_base_url_is_loopback "$PUBLIC_BASE_URL"; then
+  export VITE_DEV_SERVER="http://localhost:${VITE_PORT}"
+else
+  # Non-loopback PUBLIC (Tailscale Serve, LAN): same-origin /static/assets.
+  export VITE_DEV_SERVER=
+fi
+export APP_DEV_SERVER="http://localhost:${APP_PORT}"
 
-echo "Attesta http://localhost:${PORT} (vite :${VITE_PORT})"
+echo "Attesta ${PUBLIC_BASE_URL} (vite :${VITE_PORT}, app :${APP_PORT} → /app)"

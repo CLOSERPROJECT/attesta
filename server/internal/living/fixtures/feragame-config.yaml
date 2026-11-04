@@ -1,0 +1,777 @@
+# Attesta Feragame demo fixture (steps / substeps).
+# Single source of truth: embedded by Go (LoadFeragameConfigFixture) and imported by SPA tests.
+# Plant tree: intake truckArrive → lots group → weightCheck; line openTurno → palletWeight group → …
+#
+# Authored tasks are ordered lists with required unique id (not maps).
+# openTurno is a Job-start mint leaf (date+turno); engine cannot startingNew on a group-first Job.
+
+id: feragame-config
+org: feragame
+domain:
+    entities:
+        truck:
+            fields: [date, turno, truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
+        load:
+            # fullyProcessed = register closure only; locked/issued = Passport lock (v1 once).
+            fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, fullyProcessed, locked, issued]
+        pallet:
+            # Per-row tare + IR/NIR at weigh time.
+            fields: [loadId, weight, tareKind, idoneita, panelCount, progress]
+        # weight = booked kg for sourceLoadId; incomplete freeze; secondarySourceLoadId from continued prior.
+        container:
+            fields: [weight, material, incomplete, sourceLoadId, secondarySourceLoadId]
+# Stable catalog vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
+catalogs:
+    clients:
+        CO: CO
+        DA: DA
+        DI: DI
+        EC: EC
+        EF: EF
+        EM: EM
+        ER: ER
+        HI: HI
+        MI: MI
+        MO: MO
+        NI: NI
+        PR: PR
+        RE: RE
+        SA: SA
+        SK: SK
+    turni:
+        1st: 1°
+        2nd: 2°
+        3rd: 3°
+        whole-day: giornata intera
+    tareKinds:
+        industrial: 25
+        euro: 20
+    materials:
+        - {key: polvereDiVetro, label: Polvere di vetro}
+        - {key: granellaDiVetro, label: Granella di vetro}
+        - {key: granellaDiVetro2, label: Granella di vetro 2}
+        - {key: polvereDiSilicio, label: Polvere di silicio}
+        - {key: plastica, label: Plastica}
+        - {key: alluminio, label: Alluminio}
+        - {key: sopravaglio, label: Sopravaglio}
+        - {key: polvereDiAspirazione, label: Polvere di aspirazione}
+# QR resolve (topbar Scan / cold ?entityId=). Encode stays on lots/register http body.
+qr:
+    rules:
+        - id: line-pallet-weigh
+          when: >-
+            $type($scan.entityId) = "string" and $length($trim($scan.entityId)) > 0
+          match:
+            jobId: line
+            groupId: palletWeight
+            taskId: weigh
+            allowSpawn: true
+          # jsonata-go: $exists($lookup(...)) is true for missing keys; probe a field / sift instead.
+          eligible: |
+            (
+              $count($sift($domain.pallet, function($v, $k){$k = $scan.entityId})) = 1
+              and $not($exists($lookup($domain.pallet, $scan.entityId).weight))
+            )
+          seed:
+            palletId: $scan.entityId
+          messages:
+            onZero: Nessuna pesatura disponibile per questo bancale
+            onMany: "Più destinazioni possibili: apri il turno giusto dalla lista lavori"
+            onIneligible: Bancale non pesabile (assente o già pesato)
+# Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
+# Active Config refresh after YAML edits needs: task seed -- --replace (human-gated wipe).
+passport:
+    subject:
+        entity: load
+    identity:
+        gtin: '"9506000134352"'
+        lot: '$lookup($domain.load, $subjectId).numeroFir'
+        serial: '$subjectId'
+        productName: '"Carico Feragame"'
+        description: >-
+            (
+              $load := $lookup($domain.load, $subjectId);
+              $client := $lookup($catalogs.clients, $load.client);
+              $client & " — CER " & $load.wasteCode
+            )
+    snapshot:
+        # dataReport-shaped; Lock Load chrome injects this expr live (same freeze on Commit).
+        expr: |-
+            (
+              $load := $lookup($domain.load, $subjectId);
+              $truck := $lookup($domain.truck, $load.truckId);
+              $palletMap := $sift($domain.pallet, function($v){$v.loadId = $subjectId});
+              $containerMap := $sift($domain.container, function($v){$v.sourceLoadId = $subjectId});
+              $palletIds := $sort($keys($palletMap));
+              $containerIds := $sort($keys($containerMap));
+              $pallets := $count($palletIds) = 0 ? [] : $append([], $map($palletIds, function($id){$merge([$lookup($palletMap, $id), {"id": $id}])}));
+              $containers := $count($containerIds) = 0 ? [] : $append([], $map($containerIds, function($id){$merge([$lookup($containerMap, $id), {"id": $id}])}));
+              $kg := function($v){ $type($v) = "number" ? $string($v) : null };
+              $str := function($v){ $type($v) = "string" and $length($trim($v)) > 0 ? $trim($v) : null };
+              $row := function($label, $value){ {"label": $label, "value": $value, "error": null, "tone": null} };
+              $palletRows := $count($pallets) = 0 ? [] : $map($pallets, function($p){(
+                $row(
+                  "Bancale " & $str($p.id),
+                  $kg($p.weight) & ($exists($p.progress) ? " (" & $string($p.progress) & ")" : "")
+                )
+              )});
+              $containerRows := $count($containers) = 0 ? [] : $map($containers, function($c){(
+                $row(
+                  $str($c.material) ? $str($c.material) : "Contenitore",
+                  $kg($c.weight) & ($c.incomplete = true ? " (incompleto)" : "")
+                )
+              )});
+              {
+                "title": "DPP carico",
+                "subjectId": $subjectId,
+                "load": $load,
+                "truck": $truck,
+                "pallets": $pallets,
+                "containers": $containers,
+                "rows": $append(
+                  [
+                    $row("Carico", $subjectId),
+                    $row("Cliente", $lookup($catalogs.clients, $load.client)),
+                    $row("FIR", $str($load.numeroFir)),
+                    $row("CER", $str($load.wasteCode)),
+                    $row("Netto lotto (kg)", $kg($load.netWeight)),
+                    $row("Camion", $str($load.truckId)),
+                    $row("Data turno", $str($truck.date) & " / " & $lookup($catalogs.turni, $truck.turno)),
+                    $row("Peso lordo camion (kg)", $kg($truck.truckWeight))
+                  ],
+                  $append($palletRows, $containerRows)
+                )
+              }
+            )
+steps:
+    intake:
+        repeatable: true
+        title: Ingresso
+        startLabel: Nuovo camion
+        color: '#ea580c'
+        instanceId: $truck.id
+        label: $truck.id
+        substeps:
+            - id: truckArrive
+              roles: [administration]
+              schema:
+                type: object
+                title: Registrazione camion
+                required: [date, turno, truckWeight]
+                properties:
+                    date:
+                        type: string
+                        format: date
+                        title: Data
+                        default: $today
+                    turno:
+                        type: string
+                        title: Turno
+                        enum: [1st, 2nd, 3rd, whole-day]
+                    truckWeight: {type: number, exclusiveMinimum: 0, title: Peso lordo camion}
+              uiSchema:
+                ui:options:
+                    order: [date, turno, truckWeight]
+                turno:
+                    ui:options:
+                        enumNames: ['1°', '2°', '3°', 'giornata intera']
+              onSubmit:
+                transform:
+                    - op: mint
+                      entity: truck
+                      as: truck
+                      id: >-
+                        $substring($replace($.date, '-', ''), 2) & '-' & $.turno & '-' & $string($count($filter($domain.truck.*, function($v){$v.date = $.date and $v.turno = $.turno})) + 1)
+                      set:
+                        date: $.date
+                        turno: $.turno
+                        truckWeight: $.truckWeight
+                        lastScaleReading: $.truckWeight
+            - id: lots
+              kind: group
+              title: Codici FIR
+              repeatable: true
+              startLabel: Nuovo lotto
+              closeLabel: Chiudi scarico
+              instanceLabelEntity: load
+              closeRequiresChildSubmission: true
+              substeps:
+                - id: register
+                  roles: [administration]
+                  schema:
+                    type: object
+                    required: [client, numeroFir, palletCount, truckWeightAfter]
+                    properties:
+                        client:
+                            type: string
+                            title: Cliente
+                            enum: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
+                        wasteCode:
+                            type: string
+                            title: Codice CER
+                            enum: ['160214']
+                            default: '160214'
+                        numeroFir: {type: string, minLength: 1, title: Numero FIR}
+                        palletCount: {type: integer, minimum: 1, title: Numero di bancali}
+                        truckWeightAfter: {type: number, exclusiveMinimum: 0, title: Peso camion dopo scarico}
+                        notes: {type: string, title: Note}
+                  uiSchema:
+                    ui:options:
+                        order: [client, wasteCode, numeroFir, palletCount, truckWeightAfter, notes]
+                    client:
+                        ui:options:
+                            enumNames: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
+                    wasteCode:
+                        ui:options:
+                            enumNames: ['16.02.14']
+                  chrome:
+                    progressiveNumber:
+                        kind: readonly
+                        title: Progressivo cliente
+                        after: client
+                        expr: >-
+                            (
+                              $truck := $lookup($domain.truck, $instance.id);
+                              $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).date = $truck.date})) + 1
+                            )
+                    lotNetWeight:
+                        kind: readonly
+                        title: Peso netto lotto
+                        after: truckWeightAfter
+                        expr: >-
+                            (
+                              $prev := $lookup($domain.truck, $instance.id).lastScaleReading;
+                              $type($prev) = 'number' and $type($.truckWeightAfter) = 'number' ? $prev - $.truckWeightAfter : null
+                            )
+                  onSubmit:
+                    transform:
+                        - op: mint
+                          entity: load
+                          as: load
+                          id: >-
+                            (
+                              $truck := $lookup($domain.truck, $instance.id);
+                              $n := $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).date = $truck.date})) + 1;
+                              $.client & '-' & $substring($replace($truck.date, '-', ''), 2) & '-' & $string($n)
+                            )
+                          set:
+                            client: $.client
+                            clientProgressive: >-
+                              (
+                                $truck := $lookup($domain.truck, $instance.id);
+                                $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).date = $truck.date})) + 1
+                              )
+                            numeroFir: $.numeroFir
+                            wasteCode: $.wasteCode
+                            palletCount: $.palletCount
+                            truckId: $instance.id
+                            notes: $.notes
+                            netWeight: >-
+                              $lookup($domain.truck, $instance.id).lastScaleReading - $.truckWeightAfter
+                        - op: mintMany
+                          entity: pallet
+                          count: $.palletCount
+                          id: "$load.id & '.' & $string($index + 1)"
+                          set:
+                            loadId: $load.id
+                        - op: patch
+                          entity: truck
+                          id: $instance.id
+                          set:
+                            lastScaleReading: $.truckWeightAfter
+                    http:
+                        - method: '"POST"'
+                          url: '"/fake/labels"'
+                          label: '"Stampa etichette"'
+                          action: link
+                          body: >-
+                            {
+
+                              "loadId": $load.id,
+                              "date": $substring($replace($lookup($domain.truck, $instance.id).date, '-', ''), 2),
+                              "client": $.client,
+                              "clientProgressive": $load.clientProgressive,
+                              "numeroFir": $.numeroFir,
+                              "wasteCode": $.wasteCode,
+                              "palletCount": $.palletCount,
+                              "netWeight": $load.netWeight,
+                              "labels": [$each(
+                                $sift($domain.pallet, function($v){$v.loadId = $load.id}),
+                                function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
+                              )]
+                            }
+                        - method: '"POST"'
+                          url: '"/fake/register-csv"'
+                          label: '"Scarica CSV registrazione"'
+                          action: download
+                          body: >-
+                            {
+
+                              "client": $.client,
+                              "numeroFir": $.numeroFir,
+                              "palletCount": $.palletCount,
+                              "truckWeightAfter": $.truckWeightAfter,
+                              "netWeight": $load.netWeight,
+                              "notes": $.notes,
+                              "loadId": $load.id,
+                              "truckId": $instance.id,
+                              "palletIds": [$each(
+                                $sift($domain.pallet, function($v){$v.loadId = $load.id}),
+                                function($v, $k){$k}
+                              )]
+                            }
+            - id: weightCheck
+              roles: [administration]
+              schema:
+                type: object
+                title: Controllo camion vs lotti
+                required: [checkedTruckWeight, checkedLotSum]
+                properties:
+                    checkedTruckWeight: {type: number, exclusiveMinimum: 0, title: Peso camion verificato}
+                    checkedLotSum: {type: number, exclusiveMinimum: 0, title: Somma pesi netti lotti verificata}
+              uiSchema:
+                ui:options:
+                    order: [checkedTruckWeight, checkedLotSum]
+              chrome:
+                registeredData:
+                    kind: dataReport
+                    title: Dati registrati
+                    before: checkedTruckWeight
+                    expr: |-
+                        (
+                          $truck := $lookup($domain.truck, $instance.id);
+                          $gross := $truck.truckWeight;
+                          $lotSum := $sum($append([], $domain.load.*[truckId=$instance.id].netWeight));
+                          $tare := $truck.lastScaleReading;
+                          $m := $max([$gross - $tare, $lotSum]);
+                          $pct := $m = 0 ? 0 : 100 * $min([$gross - $tare, $lotSum]) / $m;
+                          $tone := $pct >= 98 ? "green" : $pct >= 90 ? "warning" : "danger";
+                          $kg := function($v){ $type($v) = "number" ? $string($v) : null };
+                          {
+                            "value": null,
+                            "error": null,
+                            "rows": [
+                              {"label": "Peso lordo camion", "value": $kg($gross), "error": null, "tone": null},
+                              {"label": "Ultima lettura (tara)", "value": $kg($tare), "error": null, "tone": null},
+                              {"label": "Σ netti lotti", "value": $kg($lotSum), "error": null, "tone": null},
+                              {"label": "Corrispondenza %", "value": $string($pct), "error": null, "tone": $tone}
+                            ]
+                          }
+                        )
+                currentOperator:
+                    kind: readonly
+                    title: Operatore corrente
+                    expr: $operator.displayName
+                    after: checkedLotSum
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: truck
+                      id: '$instance.id'
+                      set:
+                        checkedTruckWeight: $.checkedTruckWeight
+                        checkedLotSum: $.checkedLotSum
+    line:
+        repeatable: true
+        title: Lavorazione
+        startLabel: Nuovo turno
+        color: '#0284c7'
+        # Job-start leaf: engine cannot mint a Job instance from a group-first Commit.
+        instanceId: $.date & '-' & $.turno
+        label: "$.date & ' Turno: ' & $lookup($catalogs.turni, $.turno)"
+        substeps:
+            - id: openTurno
+              roles: [line]
+              schema:
+                type: object
+                title: Apri turno
+                required: [date, turno]
+                properties:
+                    date:
+                        type: string
+                        format: date
+                        title: Data
+                        default: $today
+                    turno:
+                        type: string
+                        title: Turno
+                        enum: [1st, 2nd, 3rd, whole-day]
+              uiSchema:
+                ui:options:
+                    order: [date, turno]
+                turno:
+                    ui:options:
+                        enumNames: ['1°', '2°', '3°', 'giornata intera']
+              onSubmit:
+                transform: []
+            - id: palletWeight
+              kind: group
+              title: Pesatura bancali
+              repeatable: true
+              startLabel: Nuova pesata
+              closeLabel: Chiudi pesatura
+              closeRequiresChildSubmission: true
+              instanceLabelEntity: pallet
+              substeps:
+                - id: weigh
+                  roles: [logistic]
+                  reads:
+                    pallets:
+                        entity: pallet
+                        where: $not($exists(weight))
+                        key: id
+                  enumReads:
+                    palletId: pallets
+                  derived:
+                    panelCount:
+                        overridable: true
+                        expr: |
+                            (
+                              $avg := $data.averagePanelWeight;
+                              $kind := $data.tareKind;
+                              $tare := $kind = 'custom'
+                                ? $data.customTareWeight
+                                : $lookup($catalogs.tareKinds, $kind);
+                              $w := $data.weight;
+                              $avg > 0 and $type($tare) = "number" and $type($w) = "number"
+                                ? $floor(($w - $tare) / $avg)
+                                : undefined
+                            )
+                  schema:
+                    type: object
+                    title: Pesa bancale
+                    required: [palletId, averagePanelWeight, tareKind, weight, idoneita]
+                    properties:
+                        palletId: {type: string, title: Bancale}
+                        averagePanelWeight:
+                            type: number
+                            exclusiveMinimum: 0
+                            title: Peso medio pannello (kg)
+                            default: 20
+                        tareKind:
+                            type: string
+                            title: Tara
+                            enum: [industrial, euro, custom]
+                            default: industrial
+                        customTareWeight:
+                            type: number
+                            exclusiveMinimum: 0
+                            title: Tara personalizzata (kg)
+                        weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                        idoneita:
+                            type: string
+                            title: IR / NIR
+                            enum: [NIR, IR]
+                            default: NIR
+                        panelCount: {type: number, title: Pannelli}
+                  uiSchema:
+                    ui:options:
+                        order:
+                            [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
+                    tareKind:
+                        ui:options:
+                            enumNames: ['industriale (25 kg)', 'euro (20 kg)', 'personalizzato']
+                    idoneita:
+                        ui:options:
+                            enumNames: [NIR, IR]
+                    panelCount:
+                        ui:field: derivedLeaf
+                  onSubmit:
+                    transform:
+                        - op: patch
+                          entity: pallet
+                          id: $.palletId
+                          set:
+                            weight: $.weight
+                            tareKind: $.tareKind
+                            idoneita: $.idoneita
+                            panelCount: $.panelCount
+            - id: lineLoad
+              kind: group
+              title: Segna avanzamento
+              repeatable: true
+              startLabel: Nuovo avanzamento
+              closeLabel: Chiudi avanzamento
+              closeRequiresChildSubmission: true
+              instanceLabelEntity: pallet
+              unlockFrom: openTurno
+              readyWhen: >-
+                $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
+              substeps:
+                - id: mark
+                  roles: [line]
+                  readyWhen: >-
+                    $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
+                  dynamicProperties:
+                    progress:
+                        read: rows
+                  reads:
+                    rows:
+                        entity: pallet
+                        where: $exists(weight) and $not(progress = 'done')
+                        key: id
+                  schema:
+                    type: object
+                    title: Segna avanzamento
+                    properties:
+                        progress:
+                            type: object
+                            additionalProperties:
+                                enum: [partial, done]
+                  uiSchema:
+                    progress:
+                        ui:field: mapTable
+                        ui:options:
+                            expandable: false
+                            columns: {id: Bancale, value: Avanzamento}
+                        additionalProperties:
+                            ui:options:
+                                enumNames: [Parziale, Fatto]
+                                # U+2013 — empty / stock-clearable trigger; Go expands to shadcn4*
+                                placeholder: –
+                  onSubmit:
+                    transform:
+                        - op: patchEach
+                          entity: pallet
+                          set:
+                            progress: $value
+            - id: containerReg
+              kind: group
+              title: Registrazione contenitori
+              repeatable: true
+              startLabel: Nuova registrazione
+              closeLabel: Chiudi registrazione
+              instanceLabelEntity: load
+              closeRequiresChildSubmission: true
+              unlockFrom: openTurno
+              substeps:
+                - id: register
+                  roles: [logistic]
+                  enumReads:
+                    sourceLoadId: loads
+                  reads:
+                    loads:
+                        entity: load
+                        where: $not(fullyProcessed = true)
+                        key: id
+                  # Prefill still-open incompletes as continuation rows (hidden continuesContainerId).
+                  initialData: >-
+                    (
+                      $reduce($catalogs.materials, function($acc, $m){(
+                        $open := $sift($domain.container, function($v){$v.incomplete = true and $v.material = $m.label});
+                        $ids := $keys($open);
+                        $count($ids) = 0 ? $acc : $merge([$acc, {$m.key: $map($ids, function($id){{
+                          "continuesContainerId": $id,
+                          "incomplete": false,
+                          "weight": $lookup($open, $id).weight
+                        }})}])
+                      )}, {})
+                    )
+                  schema:
+                    type: object
+                    title: Registrazione contenitori
+                    required: [sourceLoadId]
+                    properties:
+                        sourceLoadId:
+                            type: string
+                            title: Carico sorgente
+                        polvereDiVetro:
+                            type: array
+                            title: Polvere di vetro
+                            items: &containerWeightRow
+                                type: object
+                                required: [weight]
+                                properties:
+                                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                                    incomplete:
+                                        type: boolean
+                                        title: Incompleto
+                                        default: false
+                                    continuesContainerId:
+                                        type: string
+                        granellaDiVetro:
+                            type: array
+                            title: Granella di vetro
+                            items: *containerWeightRow
+                        granellaDiVetro2:
+                            type: array
+                            title: Granella di vetro 2
+                            items: *containerWeightRow
+                        polvereDiSilicio:
+                            type: array
+                            title: Polvere di silicio
+                            items: *containerWeightRow
+                        plastica:
+                            type: array
+                            title: Plastica
+                            items: *containerWeightRow
+                        alluminio:
+                            type: array
+                            title: Alluminio
+                            items: *containerWeightRow
+                        sopravaglio:
+                            type: array
+                            title: Sopravaglio
+                            items: *containerWeightRow
+                        polvereDiAspirazione:
+                            type: array
+                            title: Polvere di aspirazione
+                            items: *containerWeightRow
+                  uiSchema:
+                    ui:options:
+                        order: [sourceLoadId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
+                    sourceLoadId:
+                        ui:components:
+                            stringField: enumField
+                    polvereDiVetro: &containerRegMaterialArrayUi
+                        ui:components:
+                            arrayItemField: compactArrayItemField
+                        ui:options:
+                            orderable: false
+                            copyable: false
+                            layouts:
+                                array-field:
+                                    class: 'gap-0 has-[[data-layout=array-items]>*]:gap-2 [&>button]:w-auto [&>button]:self-start has-[[data-layout=array-items]>*]:[&_[data-layout=array-field-title-row]]:mb-3'
+                                array-items:
+                                    class: gap-1
+                                array-field-title-row:
+                                    variant: label
+                                    class: mb-1
+                        items:
+                            ui:options:
+                                hideTitle: true
+                                order: [continuesContainerId, weight, incomplete]
+                                layouts:
+                                    object-properties:
+                                        class: flex w-full flex-row flex-nowrap items-stretch gap-2
+                            weight:
+                                ui:options:
+                                    hideTitle: true
+                            incomplete:
+                                ui:components:
+                                    booleanField: checkboxOnlyField
+                            continuesContainerId:
+                                ui:components:
+                                    stringField: hiddenField
+                                ui:options:
+                                    presenceMark: true
+                                    title: Continua
+                    granellaDiVetro: *containerRegMaterialArrayUi
+                    granellaDiVetro2: *containerRegMaterialArrayUi
+                    polvereDiSilicio: *containerRegMaterialArrayUi
+                    plastica: *containerRegMaterialArrayUi
+                    alluminio: *containerRegMaterialArrayUi
+                    sopravaglio: *containerRegMaterialArrayUi
+                    polvereDiAspirazione: *containerRegMaterialArrayUi
+                  onSubmit:
+                    transform:
+                        - op: bind
+                          expr: >-
+                            (
+                              $rows := $reduce($catalogs.materials, function($acc, $m){(
+                                $arr := $lookup($, $m.key) ? $lookup($, $m.key) : [];
+                                $type($arr) != "array" ? $acc : $append($acc, $map(
+                                  $arr[$type(weight)="number" and weight > 0],
+                                  function($r){(
+                                    $cid := $r.continuesContainerId;
+                                    $merge([
+                                      {
+                                        "weight": $cid ? $r.weight - $lookup($domain.container, $cid).weight : $r.weight,
+                                        "material": $m.label,
+                                        "incomplete": $r.incomplete = true,
+                                        "continuesContainerId": $cid
+                                      },
+                                      $cid ? {"secondarySourceLoadId": $lookup($domain.container, $cid).sourceLoadId} : {}
+                                    ])
+                                  )}
+                                ))
+                              )}, []);
+                              $cont := $append([], $rows[continuesContainerId].continuesContainerId);
+                              $supersede := $count($cont) = 0 ? {} : $reduce($cont, function($a, $id){$merge([$a, {$id: true}])}, {});
+                              {"sourceLoadId": sourceLoadId, "rows": $rows, "supersede": $supersede}
+                            )
+                        - op: mintMany
+                          entity: container
+                          count: $count($.rows)
+                          id: "'C-' & $string($count($domain.container.*) + 1)"
+                          set:
+                            weight: $.rows[$index].weight
+                            material: $.rows[$index].material
+                            incomplete: $.rows[$index].incomplete
+                            sourceLoadId: $.sourceLoadId
+                            secondarySourceLoadId: $.rows[$index].secondarySourceLoadId
+                        - op: patch
+                          entity: load
+                          id: $.sourceLoadId
+                          # Marks primary so next Spawn enums omit it; also touches for instanceLabelEntity.
+                          set:
+                            fullyProcessed: true
+                        - op: bind
+                          expr: $.supersede
+                        - op: patchEach
+                          entity: container
+                          set:
+                            incomplete: false
+    # Passport Lock: Job instance id = load id; select eligible load then approve freeze.
+    # Eligibility: fullyProcessed ∧ not locked (register closure ≠ passport closure).
+    passport:
+        repeatable: true
+        title: Verifica dati e DPP
+        startLabel: Emetti DPP
+        color: '#0f766e'
+        instanceId: $.loadId
+        label: "'DPP: ' & $.loadId"
+        substeps:
+            - id: select
+              roles: [administration]
+              # Gate Worklist canStart until ≥1 eligible load (enum where alone does not).
+              readyWhen: >-
+                $count($domain.load.*[fullyProcessed = true and $not(locked = true)]) >= 1
+              enumReads:
+                loadId: loads
+              reads:
+                loads:
+                    entity: load
+                    where: fullyProcessed = true and $not(locked = true)
+                    key: id
+              schema:
+                type: object
+                title: Seleziona carico
+                required: [loadId]
+                properties:
+                    loadId:
+                        type: string
+                        title: Carico
+              uiSchema:
+                loadId:
+                    ui:components:
+                        stringField: enumField
+              onSubmit:
+                transform: []
+            - id: lock
+              roles: [administration]
+              readyWhen: >-
+                $lookup($domain.load, $instance.id).fullyProcessed = true
+                and $not($lookup($domain.load, $instance.id).locked = true)
+              schema:
+                type: object
+                title: Emetti DPP
+                required: [ack]
+                properties:
+                    ack:
+                        type: boolean
+                        title: Confermo i dati del DPP
+                        const: true
+              uiSchema:
+                ack:
+                    ui:components:
+                        booleanField: checkboxOnlyField
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: load
+                      id: $instance.id
+                      set:
+                        locked: true
+                        issued: true
+                passport: {}

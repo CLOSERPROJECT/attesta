@@ -9,7 +9,12 @@ tasks:
   submodule:init:
     desc: Initialize git submodules required by embedded assets.
     cmds:
-      - git submodule update --init --recursive
+      - |
+          git submodule update --init --recursive || {
+            # Linked worktrees sometimes ship formata-arch files with a broken
+            # module gitdir; go generate only needs the tree on disk.
+            test -e server/cmd/server/formata-arch/package.json
+          }
 
   worktree:bootstrap:
     desc: Copy ignored dev state and initialize this worktree's ports.
@@ -28,6 +33,26 @@ tasks:
       - task: submodule:init
       - task: worktree:bootstrap
       - bash scripts/worktree-compose.sh up --build
+
+  living-http:rebuild:
+    desc: Rebuild and recreate only living-http (use after services/living-http changes).
+    cmds:
+      - task: worktree:bootstrap
+      - |
+          bash -c '
+          set -euo pipefail
+          ROOT_DIR="$(pwd)"
+          if [[ -f "${ROOT_DIR}/.env" ]]; then set -a; source "${ROOT_DIR}/.env"; set +a; fi
+          eval "$(bash "${ROOT_DIR}/scripts/worktree-env.sh" export)"
+          # Same ownership labels as scripts/worktree-compose.sh load_env (volume match).
+          ATTESTA_ROOT_DIR="${ROOT_DIR}"
+          ATTESTA_WORKTREE_ROOT="$(cd "${ROOT_DIR}" && pwd -P)"
+          ATTESTA_REPOSITORY_ID="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id)"
+          export ATTESTA_ROOT_DIR ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
+          docker compose --project-name "${COMPOSE_PROJECT_NAME}" \
+            -f "${ROOT_DIR}/deployment/docker-compose.local.yaml" \
+            up -d --build --force-recreate --no-deps living-http
+          '
 
   start:docker:
     desc: Bring up this worktree's full stack, including the containerized Attesta app.
@@ -99,7 +124,9 @@ tasks:
           server_pid=$!
           task dev:web &
           web_pid=$!
-          wait $server_pid $web_pid
+          task dev:app &
+          app_pid=$!
+          wait $server_pid $web_pid $app_pid
           '
 
   dev:server:
@@ -134,6 +161,24 @@ tasks:
           npm run dev -- --port "$VITE_PORT" --strictPort
           '
 
+  dev:app:
+    desc: SvelteKit app (HMR) on APP_PORT; Go proxies /app when APP_DEV_SERVER is set.
+    cmds:
+      - bash deployment/scripts/dev-stop-local.sh --app-only
+      - sh -c 'cd app && bun install'
+      - |
+          bash -c '
+          set -euo pipefail
+          source deployment/scripts/dev-env.sh
+          cd app
+          bun run dev -- --port "$APP_PORT" --strictPort
+          '
+
+  app:build:
+    desc: Build the SvelteKit /app static shell into app/build.
+    cmds:
+      - sh -c 'cd app && bun install && bun run build'
+
   run:server:
     desc: Generate Goa artifacts, sync Go deps, and run the backend on the configured worktree port.
     cmds:
@@ -167,6 +212,11 @@ tasks:
       - task: css:lint
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
+
+  test:integration:
+    desc: Run backend integration tests (requires Compose Mongo/Cerbos).
+    cmds:
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test -tags=integration $(go list ./... | grep -v "/gen")'
 
   test:worktree:
     desc: Run worktree lifecycle and Compose safety tests.
@@ -215,7 +265,27 @@ tasks:
           GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen") -coverprofile=coverage.out
           total=$(GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go tool cover -func=coverage.out | awk "/^total:/ {gsub(/%/, \"\", \$3); print \$3}")
           echo "total coverage: ${total}%"
-          awk -v total="$total" -v min="$min" "BEGIN { if ((total+0) < (min+0)) { printf(\"coverage gate failed (< %.1f%%)\\n\", min); exit 1 } }"
+          awk -v total="$total" -v min="$min" "BEGIN { exit ((total+0) < (min+0)) ? 1 : 0 }" || {
+            echo "lowest package coverage:"
+            awk "
+              /^mode:/ { next }
+              {
+                f = \$1
+                sub(/:[0-9].*/, \"\", f)
+                sub(/\\/[^\\/]+\\.go\$/, \"\", f)
+                stmts[f] += \$2
+                if (\$3 + 0 > 0) hit[f] += \$2
+              }
+              END {
+                for (p in stmts) {
+                  pct = stmts[p] ? 100.0 * hit[p] / stmts[p] : 100.0
+                  printf \"%7.1f%%  %s\\n\", pct, p
+                }
+              }
+            " coverage.out | sort -n | head -10
+            printf "coverage gate failed (< %.1f%%)\\n" "$min"
+            exit 1
+          }
           '
 
   seed:

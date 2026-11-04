@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "living"
+  rules:
+    - actions: ["commit"]
+      effect: EFFECT_ALLOW
+      roles: ["authenticated"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: request.principal.attr.orgSlug == request.resource.attr.orgSlug
+              - expr: request.principal.attr.roleSlugs.exists(r, r in request.resource.attr.rolesAllowed)
+              - expr: request.resource.attr.sequenceOk == true
+              - expr: request.resource.attr.readyWhenOk == true

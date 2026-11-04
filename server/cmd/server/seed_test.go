@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
 
 func TestSeedEmptyOnlyNoopsWhenMarkerOrgExists(t *testing.T) {
@@ -80,7 +82,10 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		t.Fatal("expected org roles on fixture organization")
 	}
 
-	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com"} {
+	for _, email := range []string{
+		"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com",
+		demoLivingUserEmail, demoLivingAdminUserEmail, demoLivingLogisticUserEmail, demoLivingLineUserEmail,
+	} {
 		user, err := identity.GetUserByEmail(t.Context(), email)
 		if err != nil {
 			t.Fatalf("user %s: %v", email, err)
@@ -96,6 +101,83 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 	}
 	if len(memberships) < 2 {
 		t.Fatalf("memberships = %d, want platform admin + org admin", len(memberships))
+	}
+
+	livingOrg, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug)
+	if err != nil {
+		t.Fatalf("living org: %v", err)
+	}
+	if livingOrg.Slug != demoLivingOrgSlug {
+		t.Fatalf("living org slug = %q", livingOrg.Slug)
+	}
+	livingMemberships, err := identity.ListOrganizationMemberships(t.Context(), demoLivingOrgSlug)
+	if err != nil {
+		t.Fatalf("living memberships: %v", err)
+	}
+	// platform admin + living all-roles + administration / logistic / line
+	if len(livingMemberships) < 5 {
+		t.Fatalf("living memberships = %d, want platform admin + 4 living operators", len(livingMemberships))
+	}
+}
+
+func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
+
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	seeded := living.EmptyDomain()
+	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
+	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), living.PassportRecord{
+		Org: "feragame", SubjectID: living.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := writeSeedTestConfigDir(t)
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:        newSeedFakeIdentity(),
+		Store:           NewMemoryStore(),
+		ConfigDir:       dir,
+		RNG:             &fixedCatalogRNG{n: 1},
+		Replace:         true,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.Kind("load")["L1"]; ok {
+		t.Fatal("pre-replace L1 must not survive staged rebuild")
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; !ok {
+		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+	}
+	if got.Kind("load")[living.SeedLoadCOID] == nil || got.Kind("load")[living.SeedLoadDAID] == nil {
+		t.Fatalf("staged Domain missing loads: %#v", got.Kind("load"))
+	}
+	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
+		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))
+	}
+	if _, err := passports.Get(t.Context(), "feragame", living.SeedLoadCOID); !errors.Is(err, living.ErrNotFound) {
+		t.Fatalf("passport after replace = %v, want ErrNotFound", err)
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
 	}
 }
 

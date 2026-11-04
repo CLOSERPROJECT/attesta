@@ -25,6 +25,7 @@ APPWRITE_ENDPOINT=https://appwrite.primary.example/v1
 SMTP_HOST=smtp.primary.example
 SMTP_PORT=2525
 COMPOSE_PROJECT_NAME=must-not-win
+PUBLIC_BASE_URL=https://funny-cat.tailbda341.ts.net
 EOF
 
 git -C "${primary}" init -q
@@ -60,6 +61,9 @@ primary_output="$({
       "SMTP_HOST=${SMTP_HOST}" \
       "SMTP_PORT=${SMTP_PORT}" \
       "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" \
+      "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}" \
+      "VITE_DEV_SERVER=${VITE_DEV_SERVER}" \
+      "APP_DEV_SERVER=${APP_DEV_SERVER}" \
       "ATTESTA_ROOT_DIR=${ATTESTA_ROOT_DIR}"
   '
 })"
@@ -75,6 +79,38 @@ grep -qx 'SMTP_HOST=smtp.primary.example' <<<"${primary_output}" \
   || fail "primary SMTP host was clobbered"
 grep -qx 'SMTP_PORT=2525' <<<"${primary_output}" \
   || fail "primary SMTP port was clobbered"
+grep -qx 'PUBLIC_BASE_URL=https://funny-cat.tailbda341.ts.net' <<<"${primary_output}" \
+  || fail "primary PUBLIC_BASE_URL from .env was clobbered"
+grep -qx 'VITE_DEV_SERVER=' <<<"${primary_output}" \
+  || fail "primary VITE_DEV_SERVER should derive empty from non-loopback PUBLIC_BASE_URL"
+grep -qx 'APP_DEV_SERVER=http://localhost:5180' <<<"${primary_output}" \
+  || fail "primary APP_DEV_SERVER should stay on loopback for Go proxy"
+
+# Explicit non-empty VITE_DEV_SERVER wins over PUBLIC_BASE_URL derivation.
+override_output="$({
+  cd "${primary}"
+  VITE_DEV_SERVER=http://localhost:9999 bash -c '
+    set -euo pipefail
+    source deployment/scripts/dev-env.sh
+    printf "%s\n" "VITE_DEV_SERVER=${VITE_DEV_SERVER}"
+  '
+})"
+grep -qx 'VITE_DEV_SERVER=http://localhost:9999' <<<"${override_output}" \
+  || fail "explicit VITE_DEV_SERVER should win over derivation"
+
+# Loopback PUBLIC_BASE_URL derives localhost Vite when unset.
+loopback_output="$({
+  cd "${primary}"
+  PUBLIC_BASE_URL=http://localhost:3000 bash -c '
+    set -euo pipefail
+    unset VITE_DEV_SERVER
+    source deployment/scripts/dev-env.sh
+    printf "%s\n" "VITE_DEV_SERVER=${VITE_DEV_SERVER}" "VITE_PORT=${VITE_PORT}"
+  '
+})"
+_loopback_vite_port="$(grep -E '^VITE_PORT=' <<<"${loopback_output}" | cut -d= -f2-)"
+grep -qx "VITE_DEV_SERVER=http://localhost:${_loopback_vite_port}" <<<"${loopback_output}" \
+  || fail "loopback PUBLIC_BASE_URL should derive localhost VITE_DEV_SERVER"
 if grep -qx 'COMPOSE_PROJECT_NAME=must-not-win' <<<"${primary_output}"; then
   fail "primary .env overrode persisted Compose identity"
 fi
@@ -86,12 +122,15 @@ linked_output="$({
     source deployment/scripts/dev-env.sh
     printf "%s\n" \
       "PORT=${PORT}" \
+      "VITE_PORT=${VITE_PORT}" \
       "MONGODB_URI=${MONGODB_URI}" \
       "CERBOS_URL=${CERBOS_URL}" \
       "APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}" \
       "SMTP_HOST=${SMTP_HOST}" \
       "SMTP_PORT=${SMTP_PORT}" \
       "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" \
+      "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}" \
+      "VITE_DEV_SERVER=${VITE_DEV_SERVER}" \
       "ATTESTA_ROOT_DIR=${ATTESTA_ROOT_DIR}"
   '
 })"
@@ -106,6 +145,12 @@ grep -qx 'APPWRITE_ENDPOINT=http://localhost:13005/v1' <<<"${linked_output}" \
   || fail "linked worktree retained an inherited Appwrite endpoint"
 grep -qx 'SMTP_HOST=localhost' <<<"${linked_output}" || fail "linked SMTP host is not isolated"
 grep -qx 'SMTP_PORT=13004' <<<"${linked_output}" || fail "linked SMTP port is not isolated"
+# Linked checkouts inherit a copied primary .env (Tailscale PUBLIC); they must
+# keep worktree-env localhost origins, not restore the Tailscale URL.
+grep -qx 'PUBLIC_BASE_URL=http://localhost:13000' <<<"${linked_output}" \
+  || fail "linked worktree restored primary Tailscale PUBLIC_BASE_URL"
+grep -qx 'VITE_DEV_SERVER=http://localhost:13001' <<<"${linked_output}" \
+  || fail "linked worktree should derive localhost VITE_DEV_SERVER from loopback PUBLIC"
 if grep -Eq 'COMPOSE_PROJECT_NAME=(unsafe|must-not-win)' <<<"${linked_output}"; then
   fail "linked worktree retained an inherited Compose identity"
 fi

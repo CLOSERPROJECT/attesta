@@ -1,0 +1,126 @@
+# Parked (non-live) loadedExtracted Task — Risultati finali dataReport chrome.
+# Not part of the live feragame line Job. Embedded for data_report tests / later relocate.
+
+id: loadedExtracted
+roles: [administration]
+schema:
+  type: object
+  title: Controllo caricato vs estratto
+  required: [checkedLoadedWeight, checkedContainerSum]
+  properties:
+      checkedLoadedWeight: {type: number, exclusiveMinimum: 0, title: Peso caricato verificato}
+      checkedContainerSum: {type: number, exclusiveMinimum: 0, title: Somma pesi contenitori verificata}
+uiSchema:
+  ui:options:
+      order: [checkedLoadedWeight, checkedContainerSum]
+chrome:
+  resultsReport:
+      kind: dataReport
+      title: Risultati finali
+      before: checkedLoadedWeight
+      expr: |-
+          (
+            $tareKinds := $catalogs.tareKinds;
+            $materials := $catalogs.materials;
+            $materialKeys := $map($materials, function($m){$m.key});
+            $safeSum := function($arr){ $reduce($arr ? $arr : [], function($a,$b){$a+$b}, 0) };
+            $num := function($v){ $type($v) = "number" ? $v : undefined };
+            $str := function($v){ $type($v) = "string" and $length($trim($v)) > 0 ? $trim($v) : undefined };
+            $matchPct := function($a,$b){ ($m := $max([$a,$b]); $m = 0 ? 0 : 100 * $min([$a,$b]) / $m) };
+            $matchTone := function($pct){ $pct >= 98 ? "green" : $pct >= 90 ? "warning" : "danger" };
+            $kgRow := function($label,$v){ {"label": $label, "value": $type($v)="number" ? $string($v) : null, "error": null, "tone": null} };
+            $resolveTare := function($facts){(
+              $kind := $str($facts.tareKind);
+              $type($kind) = "string" ? ($kind = "custom" ? $num($facts.customTareWeight) : $num($lookup($tareKinds, $kind))) : undefined
+            )};
+            $weighCount := function($facts){(
+              $w := $facts.weights;
+              $type($w) = "object" ? $count($keys($w)) : 0
+            )};
+            $sumPallet := function($loadId, $doneOnly){(
+              $vals := $domain.pallet.*[loadId=$loadId][$doneOnly ? progress="done" : true].weight[$type($)="number"];
+              $safeSum($vals)
+            )};
+            $totalTare := function($loadId){(
+              $subs := $append([], $domain.submissions[taskId="weigh"]);
+              $count($subs)=0 ? 0 : $safeSum($map($subs, function($s){(
+                $facts := $s.facts;
+                $type($facts.weights) = "object" ? (
+                  $t := $resolveTare($facts);
+                  $type($t) = "number" ? $t * $weighCount($facts) : 0
+                ) : (
+                  $rows := $append([], $facts.*[$type($) = "object"]);
+                  $count($rows)=0 ? 0 : $safeSum($map($rows, function($r){(
+                    $t := $resolveTare($r);
+                    $type($t) = "number" ? $t : 0
+                  )}))
+                )
+              )}))
+            )};
+            $secondaries := function($loadId){(
+              $ids := $append([], $domain.container.*[sourceLoadId=$loadId].secondarySourceLoadId[$type($)="string" and $length($trim($))>0 and $trim($) != $loadId].$trim($));
+              $count($ids)=0 ? [] : $distinct($ids)
+            )};
+            $extractedRows := function($loadId){(
+              $conts := $append([], $domain.container.*[sourceLoadId=$loadId][$type(weight)="number"]);
+              $keysPresent := $distinct($append([], $map($conts, function($r){ $str($r.material) ? $str($r.material) : "" })));
+              $weightFor := function($k){ $safeSum($conts[($str(material) ? $str(material) : "") = $k].weight) };
+              $knownIds := $append($materialKeys, $map($materials, function($m){$m.label}));
+              $knownRaw := $map($materials, function($m){(
+                $byKey := $count($keysPresent[$ = $m.key]) > 0;
+                $byLabel := $count($keysPresent[$ = $m.label]) > 0;
+                $byKey or $byLabel ? {"material": $m.key, "label": $m.label, "weightKg": $byKey ? $weightFor($m.key) : $weightFor($m.label)} : undefined
+              )});
+              $known := $append([], $knownRaw[$exists(material)]);
+              $extras := $sort($filter($keysPresent, function($k){ $count($knownIds[$ = $k]) = 0 }));
+              $extraRows := $count($extras)=0 ? [] : $map($extras, function($k){{"material": $k, "label": $k, "weightKg": $weightFor($k)}});
+              $append($known, $extraRows)
+            )};
+            $section := function($loadId){(
+              $load := $lookup($domain.load, $loadId);
+              $netLot := $num($load.netWeight);
+              $grossPallet := $sumPallet($loadId, false);
+              $actualPallet := $sumPallet($loadId, true);
+              $palletTare := $totalTare($loadId);
+              $netPanels := $grossPallet - $palletTare;
+              $matRows := $extractedRows($loadId);
+              $totalExtracted := $safeSum($map($matRows, function($r){$r.weightKg}));
+              $delta := $netPanels - $totalExtracted;
+              $pct := $matchPct($netPanels, $totalExtracted);
+              $rows := $append(
+                [
+                  $kgRow("Netto lotto", $netLot),
+                  $kgRow("Σ bancali lordi", $grossPallet),
+                  $kgRow("Σ bancali effettivi (fatti)", $actualPallet),
+                  $kgRow("Tara totale bancali", $palletTare),
+                  $kgRow("Massa netta pannelli", $netPanels)
+                ],
+                $append(
+                  $count($matRows)=0 ? [] : $map($matRows, function($r){{"label": $r.label, "value": $string($r.weightKg), "error": null, "tone": "info"}}),
+                  [
+                    $kgRow("Totale estratto", $totalExtracted),
+                    {"label": "Pannelli vs estratto", "value": $string($delta) & " kg (" & $string($pct) & "%)", "error": null, "tone": $matchTone($pct)}
+                  ]
+                )
+              );
+              {
+                "id": $loadId,
+                "secondaryIds": $secondaries($loadId),
+                "rows": $rows
+              }
+            )};
+            $count($keys($domain.container))=0 ? {
+              "value": null,
+              "error": null,
+              "sections": []
+            } : (
+              $primaryIds := $sort($distinct($append([], $domain.container.*.sourceLoadId[$type($)="string" and $length($trim($))>0].$trim($))));
+              {
+                "value": null,
+                "error": null,
+                "sections": $count($primaryIds)=0 ? [] : $map($primaryIds, function($id){$section($id)})
+              }
+            )
+          )
+onSubmit:
+  transform: []

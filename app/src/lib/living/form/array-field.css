@@ -1,0 +1,24 @@
+/*
+  Living array fieldsets: left-flush Add + tight label stack.
+  YAML ui:options.layouts Tailwind is not @sourced, so FieldSet gap-6 / stretch win without this.
+*/
+[data-layout='array-field'] {
+	gap: 0;
+}
+
+[data-layout='array-field']:has([data-layout='array-items'] > *) {
+	gap: 0.5rem;
+}
+
+[data-layout='array-field'] > button {
+	width: auto;
+	align-self: flex-start;
+}
+
+[data-layout='array-field'] [data-layout='array-field-title-row'] {
+	margin-bottom: 0.25rem;
+}
+
+[data-layout='array-field'] [data-layout='array-items'] {
+	gap: 0.25rem;
+}

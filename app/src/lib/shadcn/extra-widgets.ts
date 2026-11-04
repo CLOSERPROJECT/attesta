@@ -1,0 +1,12 @@
+import '@sjsf/shadcn4-theme/extra-widgets/checkboxes-include';
+import '@sjsf/shadcn4-theme/extra-widgets/combobox-include';
+import '@sjsf/shadcn4-theme/extra-widgets/date-picker-include';
+import '@sjsf/shadcn4-theme/extra-widgets/date-range-picker-include';
+import '@sjsf/shadcn4-theme/extra-widgets/file-include';
+import '@sjsf/shadcn4-theme/extra-widgets/multi-select-include';
+import '@sjsf/shadcn4-theme/extra-widgets/radio-buttons-include';
+import '@sjsf/shadcn4-theme/extra-widgets/radio-include';
+import '@sjsf/shadcn4-theme/extra-widgets/range-slider-include';
+import '@sjsf/shadcn4-theme/extra-widgets/range-include';
+import '@sjsf/shadcn4-theme/extra-widgets/switch-include';
+import '@sjsf/shadcn4-theme/extra-widgets/textarea-include';

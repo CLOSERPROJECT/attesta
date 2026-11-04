@@ -1,0 +1,4 @@
+# Parked Risultati finali / loadedExtracted chrome (ticket 02).
+# Canonical body (Go-embedded for data_report tests):
+#   server/internal/living/fixtures/parked-loaded-extracted.yaml
+# Not on the live line Job Task list. dataReport engine support stays in Go.

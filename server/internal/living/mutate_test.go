@@ -1,0 +1,95 @@
+package living
+
+import (
+	"strings"
+	"testing"
+)
+
+type unknownMutateOp struct{}
+
+func (unknownMutateOp) mutateOp() {}
+
+func TestMutateUnknownOpEmptyUserAndPatchKind(t *testing.T) {
+	noSub := false
+	_, err := Mutate(EmptyDomain(), MutateRequest{
+		AppendSubmission: &noSub,
+		Ops:              []MutateOp{PatchOp{Entity: EntityType(""), ID: "x", Set: map[string]any{"a": 1}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "empty entity kind") {
+		t.Fatalf("empty patch kind = %v", err)
+	}
+	_, err = Mutate(EmptyDomain(), MutateRequest{
+		AppendSubmission: &noSub,
+		Ops:              []MutateOp{unknownMutateOp{}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unknown mutate op") {
+		t.Fatalf("unknown op = %v", err)
+	}
+	_, err = Mutate(EmptyDomain(), MutateRequest{
+		UserID: "",
+		JobID:  "intake",
+		TaskID: "register",
+		Ops:    []MutateOp{MintOp{Entity: EntityType("load"), ID: "L1", Set: map[string]any{"x": 1}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "userId required") {
+		t.Fatalf("empty user = %v", err)
+	}
+}
+
+func TestMutateMintsAndAppendsSubmission(t *testing.T) {
+	got, err := Mutate(EmptyDomain(), MutateRequest{
+		UserID:        "ada",
+		JobID:         "intake",
+		TaskID:        "register",
+		JobInstanceID: "load-1",
+		Timestamp:     "2026-10-22T12:00:00.000Z",
+		Facts:         map[string]any{"palletCount": 2, "truckWeight": 900},
+		Ops: []MutateOp{
+			MintOp{Entity: EntityType("load"), ID: "load-1", Set: map[string]any{"truckWeight": 900, "palletCount": 2}},
+			MintOp{Entity: EntityType("pallet"), ID: "load-1.1", Set: map[string]any{"loadId": "load-1"}},
+		},
+		NewJobInstance: &JobInstance{JobID: "intake", ID: "load-1", Label: "load-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("load")["load-1"]["truckWeight"] != 900 {
+		t.Fatalf("load = %#v", got.Kind("load"))
+	}
+	if len(got.Submissions) != 1 || got.Submissions[0].TaskID != "register" {
+		t.Fatalf("submissions = %#v", got.Submissions)
+	}
+	if got.Submissions[0].JobID != "intake" || got.Submissions[0].JobInstanceID != "load-1" {
+		t.Fatalf("submission keys = %#v", got.Submissions[0])
+	}
+	if len(got.JobInstances) != 1 || got.JobInstances[0].ID != "load-1" {
+		t.Fatalf("jobInstances = %#v", got.JobInstances)
+	}
+}
+
+func TestMutateDuplicateID(t *testing.T) {
+	domain := EmptyDomain()
+	putKind(&domain, "load", EntityMap{"load-1": {"client": "NO"}})
+	_, err := Mutate(domain, MutateRequest{
+		UserID: "ada",
+		JobID:  "intake",
+		TaskID: "register",
+		Facts:  map[string]any{},
+		Ops:    []MutateOp{MintOp{Entity: EntityType("load"), ID: "load-1", Set: map[string]any{}}},
+	})
+	var me MutateError
+	if err == nil || !asMutateError(err, &me) || me.Kind != "duplicate-id" {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func asMutateError(err error, dest *MutateError) bool {
+	if err == nil {
+		return false
+	}
+	if me, ok := err.(MutateError); ok {
+		*dest = me
+		return true
+	}
+	return false
+}

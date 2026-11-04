@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Stop host-dev processes that belong to this checkout only.
-# Usage: dev-stop-local.sh [--ports-only|--server-only|--web-only] [repo_root]
-# Optional env: PORT, VITE_PORT — if set, fail when a foreign process holds them.
+# Usage: dev-stop-local.sh [--ports-only|--server-only|--web-only|--app-only] [repo_root]
+# Optional env: PORT, VITE_PORT, APP_PORT — if set, fail when a foreign process holds them.
 # --ports-only: skip path-scoped kills; only run port_holder_ok checks.
 # --server-only: kill air/server only (do not touch vite — needed when task:dev
-#   starts server+web in parallel; otherwise server startup races and kills vite).
-# --web-only: kill vite only.
+#   starts server+web+app in parallel; otherwise server startup races and kills vite).
+# --web-only: kill web/ vite only.
+# --app-only: kill app/ vite only.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=deployment/scripts/dev-lib.sh
@@ -14,16 +15,19 @@ source "$SCRIPT_DIR/dev-lib.sh"
 ports_only=false
 server_only=false
 web_only=false
+app_only=false
 case "${1:-}" in
   --ports-only) ports_only=true; shift ;;
   --server-only) server_only=true; shift ;;
   --web-only) web_only=true; shift ;;
+  --app-only) app_only=true; shift ;;
 esac
 
 repo_root="${1:-$(git rev-parse --show-toplevel)}"
 repo_root="$(cd "$repo_root" && pwd)"
 server_dir="${repo_root}/server"
 web_dir="${repo_root}/web"
+app_dir="${repo_root}/app"
 bin_path="${server_dir}/tmp/attesta-server"
 
 kill_matching() {
@@ -39,7 +43,7 @@ kill_matching() {
 }
 
 if [[ "$ports_only" != true ]]; then
-  if [[ "$web_only" != true ]]; then
+  if [[ "$web_only" != true && "$app_only" != true ]]; then
     # air in this server dir
     kill_matching 'air -c \.air\.toml' "$server_dir"
     # built binary for this tree
@@ -49,9 +53,12 @@ if [[ "$ports_only" != true ]]; then
       done
     fi
   fi
-  if [[ "$server_only" != true ]]; then
+  if [[ "$server_only" != true && "$app_only" != true ]]; then
     # vite for this web dir (node running vite with cwd=web)
     kill_matching 'vite' "$web_dir"
+  fi
+  if [[ "$server_only" != true && "$web_only" != true ]]; then
+    kill_matching 'vite' "$app_dir"
   fi
 
   sleep 1
@@ -65,7 +72,7 @@ port_holder_ok() {
   pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n1 || true)"
   [[ -n "$pid" ]] || return 0
   cwd="$(process_cwd "$pid")"
-  if [[ "$cwd" == "$want_cwd" || "$cwd" == "$server_dir" || "$cwd" == "$web_dir" ]]; then
+  if [[ "$cwd" == "$want_cwd" || "$cwd" == "$server_dir" || "$cwd" == "$web_dir" || "$cwd" == "$app_dir" ]]; then
     return 0
   fi
   # also accept if command line references this repo_root
@@ -75,7 +82,7 @@ port_holder_ok() {
     return 0
   fi
   echo "error: port ${port} is in use by pid ${pid} (cwd=${cwd:-unknown}), not this worktree" >&2
-  echo "  set PORT/VITE_PORT differently or stop that process" >&2
+  echo "  set PORT/VITE_PORT/APP_PORT differently or stop that process" >&2
   return 1
 }
 
@@ -84,4 +91,7 @@ if [[ -n "${PORT:-}" ]]; then
 fi
 if [[ -n "${VITE_PORT:-}" ]]; then
   port_holder_ok "$VITE_PORT" "$web_dir"
+fi
+if [[ -n "${APP_PORT:-}" ]]; then
+  port_holder_ok "$APP_PORT" "$app_dir"
 fi

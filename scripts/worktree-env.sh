@@ -5,16 +5,16 @@ ROOT_DIR="${ATTESTA_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 DEFAULTS_FILE="${ROOT_DIR}/scripts/dev-ports.env"
 WORKTREE_ENV_FILE="${ROOT_DIR}/.env.worktree"
 PORT_KEYS=(
-  PORT VITE_PORT MONGODB_PORT CERBOS_PORT MONGO_EXPRESS_PORT
+  PORT VITE_PORT APP_PORT MONGODB_PORT CERBOS_PORT MONGO_EXPRESS_PORT
   MAILPIT_SMTP_PORT MAILPIT_UI_PORT APPWRITE_HTTP_PORT
-  APPWRITE_HTTPS_PORT DOCKER_APP_PORT
+  APPWRITE_HTTPS_PORT DOCKER_APP_PORT LIVING_HTTP_PORT
 )
 RESOLVED_KEYS=(
   "${PORT_KEYS[@]}"
   MONGODB_URI CERBOS_URL APPWRITE_ENDPOINT APPWRITE_CONSOLE_URL
   MONGO_EXPRESS_URL MAILPIT_UI_URL PUBLIC_BASE_URL
-  VITE_DEV_SERVER SMTP_HOST
-  SMTP_PORT COMPOSE_PROJECT_NAME ATTESTA_SEED ATTESTA_ROOT_DIR
+  VITE_DEV_SERVER APP_DEV_SERVER SMTP_HOST
+  SMTP_PORT LIVING_HTTP_URL LIVING_HTTP_TOKEN COMPOSE_PROJECT_NAME ATTESTA_SEED ATTESTA_ROOT_DIR
 )
 
 sanitize_compose_project_name() {
@@ -323,6 +323,7 @@ allocate_ports() {
   done <<<"${reserved_output}"
   pick_port app PORT
   pick_port vite VITE_PORT
+  pick_port sveltekit APP_PORT
   pick_port mongodb MONGODB_PORT
   pick_port cerbos CERBOS_PORT
   pick_port mongo-express MONGO_EXPRESS_PORT
@@ -331,6 +332,7 @@ allocate_ports() {
   pick_port appwrite-http APPWRITE_HTTP_PORT
   pick_port appwrite-https APPWRITE_HTTPS_PORT
   pick_port docker-app DOCKER_APP_PORT
+  pick_port living-http LIVING_HTTP_PORT
 }
 
 load_resolved() {
@@ -363,8 +365,12 @@ load_resolved() {
   MAILPIT_UI_URL="http://localhost:${MAILPIT_UI_PORT}"
   PUBLIC_BASE_URL="http://localhost:${PORT}"
   VITE_DEV_SERVER="http://localhost:${VITE_PORT}"
+  APP_DEV_SERVER="http://localhost:${APP_PORT}"
   SMTP_HOST="localhost"
   SMTP_PORT="${MAILPIT_SMTP_PORT}"
+  # Host task:dev reaches the Compose sidecar via published LIVING_HTTP_PORT.
+  LIVING_HTTP_URL="http://localhost:${LIVING_HTTP_PORT}"
+  LIVING_HTTP_TOKEN="${LIVING_HTTP_TOKEN:-dev-living-http-token}"
   ATTESTA_SEED=true
   ATTESTA_ROOT_DIR="${ROOT_DIR}"
 }
