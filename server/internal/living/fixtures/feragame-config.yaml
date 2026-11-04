@@ -12,7 +12,8 @@ domain:
         truck:
             fields: [date, turno, truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
         load:
-            fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes]
+            # fullyProcessed = register closure only; locked/issued = Passport lock (v1 once).
+            fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, fullyProcessed, locked, issued]
         pallet:
             # Per-row tare + IR/NIR at weigh time.
             fields: [loadId, weight, tareKind, idoneita, panelCount, progress]
@@ -64,6 +65,71 @@ qr:
             onZero: Nessuna pesatura disponibile per questo bancale
             onMany: "Più destinazioni possibili: apri il turno giusto dal Worklist"
             onIneligible: Bancale non pesabile (assente o già pesato)
+# Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
+# Active Config refresh after YAML edits needs: task seed -- --replace (human-gated wipe).
+passport:
+    subject:
+        entity: load
+    identity:
+        gtin: '"9506000134352"'
+        lot: '$lookup($domain.load, $subjectId).numeroFir'
+        serial: '$subjectId'
+        productName: '"Carico Feragame"'
+        description: >-
+            (
+              $load := $lookup($domain.load, $subjectId);
+              $client := $lookup($catalogs.clients, $load.client);
+              $client & " — CER " & $load.wasteCode
+            )
+    snapshot:
+        # dataReport-shaped; Lock Load chrome injects this expr live (same freeze on Commit).
+        expr: |-
+            (
+              $load := $lookup($domain.load, $subjectId);
+              $truck := $lookup($domain.truck, $load.truckId);
+              $palletMap := $sift($domain.pallet, function($v){$v.loadId = $subjectId});
+              $containerMap := $sift($domain.container, function($v){$v.sourceLoadId = $subjectId});
+              $palletIds := $sort($keys($palletMap));
+              $containerIds := $sort($keys($containerMap));
+              $pallets := $count($palletIds) = 0 ? [] : $append([], $map($palletIds, function($id){$merge([$lookup($palletMap, $id), {"id": $id}])}));
+              $containers := $count($containerIds) = 0 ? [] : $append([], $map($containerIds, function($id){$merge([$lookup($containerMap, $id), {"id": $id}])}));
+              $kg := function($v){ $type($v) = "number" ? $string($v) : null };
+              $str := function($v){ $type($v) = "string" and $length($trim($v)) > 0 ? $trim($v) : null };
+              $row := function($label, $value){ {"label": $label, "value": $value, "error": null, "tone": null} };
+              $palletRows := $count($pallets) = 0 ? [] : $map($pallets, function($p){(
+                $row(
+                  "Bancale " & $str($p.id),
+                  $kg($p.weight) & ($exists($p.progress) ? " (" & $string($p.progress) & ")" : "")
+                )
+              )});
+              $containerRows := $count($containers) = 0 ? [] : $map($containers, function($c){(
+                $row(
+                  $str($c.material) ? $str($c.material) : "Contenitore",
+                  $kg($c.weight) & ($c.incomplete = true ? " (incompleto)" : "")
+                )
+              )});
+              {
+                "title": "Passaporto carico",
+                "subjectId": $subjectId,
+                "load": $load,
+                "truck": $truck,
+                "pallets": $pallets,
+                "containers": $containers,
+                "rows": $append(
+                  [
+                    $row("Carico", $subjectId),
+                    $row("Cliente", $lookup($catalogs.clients, $load.client)),
+                    $row("FIR", $str($load.numeroFir)),
+                    $row("CER", $str($load.wasteCode)),
+                    $row("Netto lotto (kg)", $kg($load.netWeight)),
+                    $row("Camion", $str($load.truckId)),
+                    $row("Data turno", $str($truck.date) & " / " & $lookup($catalogs.turni, $truck.turno)),
+                    $row("Peso lordo camion (kg)", $kg($truck.truckWeight))
+                  ],
+                  $append($palletRows, $containerRows)
+                )
+              }
+            )
 steps:
     intake:
         repeatable: true
@@ -616,3 +682,61 @@ steps:
                           entity: container
                           set:
                             incomplete: false
+    # Passport Lock: Job instance id = load id; select eligible load then approve freeze.
+    # Eligibility: fullyProcessed ∧ not locked (register closure ≠ passport closure).
+    passport:
+        repeatable: true
+        startLabel: Blocca passaporto
+        instanceId: $.loadId
+        label: "'Passaporto: ' & $.loadId"
+        substeps:
+            - id: select
+              roles: [administration]
+              enumReads:
+                loadId: loads
+              reads:
+                loads:
+                    entity: load
+                    where: fullyProcessed = true and $not(locked = true)
+                    key: id
+              schema:
+                type: object
+                title: Seleziona carico
+                required: [loadId]
+                properties:
+                    loadId:
+                        type: string
+                        title: Carico
+              uiSchema:
+                loadId:
+                    ui:components:
+                        stringField: enumField
+              onSubmit:
+                transform: []
+            - id: lock
+              roles: [administration]
+              readyWhen: >-
+                $lookup($domain.load, $instance.id).fullyProcessed = true
+                and $not($lookup($domain.load, $instance.id).locked = true)
+              schema:
+                type: object
+                title: Emetti passaporto
+                required: [ack]
+                properties:
+                    ack:
+                        type: boolean
+                        title: Confermo i dati del passaporto
+                        const: true
+              uiSchema:
+                ack:
+                    ui:components:
+                        booleanField: checkboxOnlyField
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: load
+                      id: $instance.id
+                      set:
+                        locked: true
+                        issued: true
+                passport: {}

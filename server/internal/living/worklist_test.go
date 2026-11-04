@@ -187,7 +187,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Worklist.Jobs) != 2 {
+	if len(got.Worklist.Jobs) != 3 {
 		t.Fatalf("worklist jobs = %#v", got.Worklist.Jobs)
 	}
 	intake, _ := worklistJobByID(got.Worklist, "intake")
@@ -197,6 +197,10 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	line, _ := worklistJobByID(got.Worklist, "line")
 	if line.CanStart {
 		t.Fatal("administration viewer must not canStart line (openTurno is line-only)")
+	}
+	passport, _ := worklistJobByID(got.Worklist, "passport")
+	if !passport.CanStart || passport.StartLabel != "Blocca passaporto" {
+		t.Fatalf("passport Job = %#v", passport)
 	}
 }
 
