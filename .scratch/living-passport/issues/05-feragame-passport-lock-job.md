@@ -4,7 +4,7 @@
 
 **Blocked by:** 02, 03, 04 (platform store/producer, public serve, live recap).
 
-**Status:** done (pending SHA at commit)
+**Status:** done (`42c8701`)
 
 - [x] Root `passport` block in feragame fixture; identity + snapshot projection match ADR Feragame shape
 - [x] Lock Job/Task authored in Org Config only; Job instance id = load subject id
