@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist } from './types.js';
 import {
-	commitHasDownloadLinks,
+	commitHasLinks,
 	resolveCommitFollowUp,
 	resolveGroupStartAnotherTarget,
 	resolvePostCommitNavigation,
@@ -224,18 +224,18 @@ describe('post-Commit stay-for-links', () => {
 		}
 	];
 
-	test('download links are detected; link-only is not', () => {
-		expect(commitHasDownloadLinks(downloadLinks)).toBe(true);
+	test('any non-empty links are detected', () => {
+		expect(commitHasLinks(downloadLinks)).toBe(true);
 		expect(
-			commitHasDownloadLinks([
+			commitHasLinks([
 				{ label: 'Open', url: 'https://example.test/x', action: 'link' }
 			])
-		).toBe(false);
-		expect(commitHasDownloadLinks([])).toBe(false);
-		expect(commitHasDownloadLinks(null)).toBe(false);
+		).toBe(true);
+		expect(commitHasLinks([])).toBe(false);
+		expect(commitHasLinks(null)).toBe(false);
 	});
 
-	test('with downloads → stay; without → existing next law', () => {
+	test('with any links → stay; empty → existing next law', () => {
 		expect(
 			resolveCommitFollowUp('overview', 'intake', 'T1', null, downloadLinks)
 		).toEqual({ kind: 'stay' });
@@ -244,17 +244,11 @@ describe('post-Commit stay-for-links', () => {
 			jobId: 'intake',
 			jobInstanceId: 'T1'
 		});
-		// Link-only is not stay — router must clearLinksStay before navigate.
 		expect(
 			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle, [
 				{ label: 'doc', url: 'https://example.test/d', action: 'link' }
 			])
-		).toEqual({
-			kind: 'task',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-advance',
-			taskId: 'codiceFir'
-		});
+		).toEqual({ kind: 'stay' });
 		expect(
 			resolveCommitFollowUp('overview', 'passport', 'L1', null, [
 				{
@@ -263,11 +257,7 @@ describe('post-Commit stay-for-links', () => {
 					action: 'link'
 				}
 			])
-		).toEqual({
-			kind: 'overview',
-			jobId: 'passport',
-			jobInstanceId: 'L1'
-		});
+		).toEqual({ kind: 'stay' });
 	});
 
 	test('Start another targets provisional first-leaf form', () => {

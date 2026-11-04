@@ -378,7 +378,7 @@ describe('LivingSession', () => {
 		expect(session.lastHttpLinks).toEqual([]);
 	});
 
-	test('link-only commit leaves stay inactive; clearLinksStay drops strip state', async () => {
+	test('link-only commit sets linksStayActive; clearLinksStay drops strip state', async () => {
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'L1',
@@ -406,7 +406,7 @@ describe('LivingSession', () => {
 			value: { ack: true },
 			mint: { kind: 'none' }
 		});
-		expect(session.linksStayActive).toBe(false);
+		expect(session.linksStayActive).toBe(true);
 		expect(session.lastHttpLinks).toHaveLength(1);
 		expect(session.lastHttpErrors).toEqual(['warn']);
 		session.clearLinksStay();
