@@ -13,6 +13,8 @@
 		availableRowsFromWorklist,
 		availableRowTarget,
 		canStartRowsFromWorklist,
+		completedRowKey,
+		completedRowsFromWorklist,
 		inProgressRowKey,
 		inProgressRowsFromWorklist,
 		taskRouteInstanceSegment
@@ -25,6 +27,7 @@
 	const available = $derived(availableRowsFromWorklist(living.result?.worklist));
 	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
 	const inProgress = $derived(inProgressRowsFromWorklist(living.result?.worklist));
+	const completed = $derived(completedRowsFromWorklist(living.result?.worklist));
 	const drafts = $derived(living.drafts);
 
 	function rowHasDirtyDraft(row: (typeof available)[number]): boolean {
@@ -179,6 +182,44 @@
 					<li>
 						<WorklistRow data-testid="in-progress-empty" class="text-sm text-zinc-500">
 							No jobs in progress.
+						</WorklistRow>
+					</li>
+				{/each}
+			</ul>
+		</section>
+
+		<section class="space-y-3" data-testid="worklist-completed">
+			<h2 class="text-lg font-semibold text-zinc-900">Completed</h2>
+			<ul class="flex flex-col gap-1">
+				{#each completed as row (completedRowKey(row))}
+					<li>
+						<WorklistRow
+							data-testid="completed-row"
+							data-job-id={row.jobId}
+							data-instance-id={row.jobInstanceId}
+							accentColor={row.jobColor}
+							href={hrefLivingTarget({
+								kind: 'overview',
+								jobId: row.jobId,
+								jobInstanceId: row.jobInstanceId
+							})}
+						>
+							<WorklistJobLine
+								mode="progress"
+								size="sm"
+								jobId={row.jobId}
+								jobTitle={row.jobTitle}
+								label={row.instanceLabel}
+								done={row.tasksDone}
+								total={row.tasksTotal}
+								progressTestId="completed-progress"
+							/>
+						</WorklistRow>
+					</li>
+				{:else}
+					<li>
+						<WorklistRow data-testid="completed-empty" class="text-sm text-zinc-500">
+							No completed jobs.
 						</WorklistRow>
 					</li>
 				{/each}
