@@ -30,7 +30,9 @@ _shell_has_app=0
 [[ -n "${APP_PORT+x}" ]] && _shell_has_app=1 && _shell_app="$APP_PORT"
 unset PORT VITE_PORT APP_PORT 2>/dev/null || true
 load_env_file "$REPO_ROOT/.env"
-# worktree-env export always stamps localhost origins; keep .env / shell values.
+# worktree-env export always stamps localhost origins. Primary checkouts may
+# restore PUBLIC_BASE_URL from .env / shell (e.g. Tailscale); linked worktrees
+# keep the localhost stamp so Vite stays on loopback.
 _had_public_base_url=0
 _had_vite_dev_server=0
 [[ -n "${PUBLIC_BASE_URL+x}" ]] && _had_public_base_url=1 && _keep_public_base_url="$PUBLIC_BASE_URL"
@@ -70,7 +72,7 @@ fi
 [[ -n "${ATTESTA_ROOT_DIR:-}" ]] || ATTESTA_ROOT_DIR="${REPO_ROOT}"
 export ATTESTA_ROOT_DIR
 export PORT VITE_PORT APP_PORT
-if [[ "$_had_public_base_url" -eq 1 ]]; then
+if [[ "$_is_primary" -eq 1 && "$_had_public_base_url" -eq 1 ]]; then
   export PUBLIC_BASE_URL="$_keep_public_base_url"
 else
   export PUBLIC_BASE_URL="http://localhost:${PORT}"

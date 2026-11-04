@@ -19,6 +19,9 @@ import {
 	availableRowsFromWorklist,
 	availableRowTarget,
 	canStartRowsFromWorklist,
+	inProgressRowKey,
+	inProgressRowsFromWorklist,
+	inProgressRowTarget,
 	instanceTaskProgress,
 	progressFraction,
 	taskRouteInstanceSegment
@@ -267,7 +270,97 @@ describe('worklist-home bands', () => {
 	test('empty Worklist yields empty bands', () => {
 		expect(availableRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(canStartRowsFromWorklist({ jobs: [] })).toEqual([]);
+		expect(inProgressRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(availableRowsFromWorklist(null)).toEqual([]);
+		expect(inProgressRowsFromWorklist(null)).toEqual([]);
+	});
+
+	test('inProgressRows include unfinished Job instances; finished excluded; Job → instance order', () => {
+		const mixed: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					title: 'Camion',
+					taskIds: ['register', 'palletWeight'],
+					tasks: [...chrome.intake],
+					instances: [
+						{
+							id: 'NIR-1',
+							label: 'NIR-1',
+							tasks: { register: 'done', palletWeight: 'actionable' }
+						},
+						{
+							id: 'NIR-done',
+							label: 'Finished truck',
+							tasks: { register: 'done', palletWeight: 'done' }
+						},
+						{
+							id: 'NIR-2',
+							label: 'Camion B',
+							tasks: { register: 'actionable', palletWeight: 'locked' }
+						}
+					]
+				},
+				{
+					jobId: 'line',
+					canStart: false,
+					repeatable: true,
+					title: 'Linea',
+					taskIds: ['shift', 'lineLoad'],
+					tasks: [...chrome.line],
+					instances: [
+						{
+							id: '1st',
+							label: 'Turno: 1st',
+							tasks: { shift: 'done', lineLoad: 'available' }
+						}
+					]
+				}
+			]
+		};
+
+		const rows = inProgressRowsFromWorklist(mixed);
+		expect(rows.map((r) => inProgressRowKey(r))).toEqual([
+			'intake/NIR-1',
+			'intake/NIR-2',
+			'line/1st'
+		]);
+		expect(rows[0]).toMatchObject({
+			jobId: 'intake',
+			jobInstanceId: 'NIR-1',
+			instanceLabel: 'NIR-1',
+			jobTitle: 'Camion',
+			tasksDone: 1,
+			tasksTotal: 2
+		});
+		expect(rows[1]).toMatchObject({
+			instanceLabel: 'Camion B',
+			tasksDone: 0,
+			tasksTotal: 2
+		});
+		expect(rows[2]).toMatchObject({
+			jobId: 'line',
+			jobInstanceId: '1st',
+			jobTitle: 'Linea',
+			tasksDone: 1,
+			tasksTotal: 2
+		});
+
+		// Overlap-friendly: instances with actionable Tasks still appear in In progress.
+		const availableKeys = availableRowsFromWorklist(mixed).map(
+			(r) => `${r.jobId}/${r.jobInstanceId}`
+		);
+		expect(availableKeys).toContain('intake/NIR-1');
+		expect(rows.map((r) => inProgressRowKey(r))).toContain('intake/NIR-1');
+
+		expect(inProgressRowTarget(rows[0]!)).toEqual({
+			kind: 'overview',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-1'
+		});
+		expect(hrefLivingTarget(inProgressRowTarget(rows[0]!))).toBe('/app/intake/NIR-1');
 	});
 
 	test('nested ready Tasks and canSpawn provisional first-leaf appear in Available', () => {

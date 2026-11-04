@@ -124,6 +124,13 @@
 	</div>
 
 	<div class="flex shrink-0 items-center gap-2">
+		{#if roles.length > 0}
+			<div class="hidden flex-wrap justify-end gap-1 md:flex" data-testid="nav-roles">
+				{#each roles as role (role)}
+					<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
+				{/each}
+			</div>
+		{/if}
 		<Button
 			type="button"
 			variant="outline"
@@ -138,13 +145,6 @@
 			<Scan class="size-4" />
 			Scan
 		</Button>
-		{#if roles.length > 0}
-			<div class="flex flex-wrap justify-end gap-1" data-testid="nav-roles">
-				{#each roles as role (role)}
-					<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
-				{/each}
-			</div>
-		{/if}
 	</div>
 </nav>
 

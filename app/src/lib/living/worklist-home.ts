@@ -32,6 +32,17 @@ export type CanStartRow = {
 	firstTaskId: string;
 };
 
+export type InProgressRow = {
+	jobId: string;
+	jobInstanceId: string;
+	/** Job instance label (product-facing name); falls back to instance id. */
+	instanceLabel: string;
+	/** Job display title; falls back to jobId when absent. */
+	jobTitle: string;
+	tasksDone: number;
+	tasksTotal: number;
+};
+
 function taskChrome(job: WorklistJob, taskId: string): WorklistTask | null {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
 }
@@ -151,6 +162,34 @@ export function canStartRowsFromWorklist(
 	return out;
 }
 
+/**
+ * Unfinished Job instances (Config taskIds via instanceTaskProgress:
+ * include when done < total). Order: Worklist Job → instance.
+ * Overlaps Available when an instance still has actionable Tasks.
+ */
+export function inProgressRowsFromWorklist(
+	worklist: Worklist | null | undefined
+): InProgressRow[] {
+	const jobs = worklist?.jobs;
+	if (!jobs?.length) return [];
+	const out: InProgressRow[] = [];
+	for (const job of jobs) {
+		for (const inst of job.instances ?? []) {
+			const progress = instanceTaskProgress(job, inst);
+			if (progress.done >= progress.total) continue;
+			out.push({
+				jobId: job.jobId,
+				jobInstanceId: inst.id,
+				instanceLabel: inst.label || inst.id,
+				jobTitle: job.title?.trim() || job.jobId,
+				tasksDone: progress.done,
+				tasksTotal: progress.total
+			});
+		}
+	}
+	return out;
+}
+
 /** SPA Task path segment: provisional Start uses `new`. */
 export function taskRouteInstanceSegment(jobInstanceId: string): string {
 	return jobInstanceId === '' ? 'new' : jobInstanceId;
@@ -180,5 +219,20 @@ export function availableRowTarget(row: AvailableRow): Extract<PostCommitTarget,
 		jobId: row.jobId,
 		jobInstanceId: row.jobInstanceId,
 		taskId: row.taskId
+	};
+}
+
+export function inProgressRowKey(row: InProgressRow): string {
+	return `${row.jobId}/${row.jobInstanceId}`;
+}
+
+/** Deep-link target for a home In progress row → Job instance overview. */
+export function inProgressRowTarget(
+	row: InProgressRow
+): Extract<PostCommitTarget, { kind: 'overview' }> {
+	return {
+		kind: 'overview',
+		jobId: row.jobId,
+		jobInstanceId: row.jobInstanceId
 	};
 }

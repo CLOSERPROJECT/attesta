@@ -3,6 +3,7 @@
 	import type { ClassValue } from 'svelte/elements';
 
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
 	import TaskStatusTag from './TaskStatusTag.svelte';
 	import type { TaskStatus } from './types.js';
@@ -42,12 +43,17 @@
 		<TaskStatusTag {status} />
 		<span
 			class={[
-				'inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-transform duration-[180ms] ease-out group-aria-expanded/accordion-trigger:rotate-180',
+				'inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-transform duration-[180ms] ease-out',
+				status !== 'actionable' && 'group-aria-expanded/accordion-trigger:rotate-180',
 				status === 'locked' && 'invisible'
 			]}
 			aria-hidden="true"
 		>
-			<ChevronDownIcon class="size-[18px]" strokeWidth={2.25} />
+			{#if status === 'actionable'}
+				<ChevronRightIcon class="size-[18px]" strokeWidth={2.25} />
+			{:else}
+				<ChevronDownIcon class="size-[18px]" strokeWidth={2.25} />
+			{/if}
 		</span>
 	</div>
 </div>

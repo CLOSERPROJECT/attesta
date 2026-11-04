@@ -122,12 +122,15 @@ linked_output="$({
     source deployment/scripts/dev-env.sh
     printf "%s\n" \
       "PORT=${PORT}" \
+      "VITE_PORT=${VITE_PORT}" \
       "MONGODB_URI=${MONGODB_URI}" \
       "CERBOS_URL=${CERBOS_URL}" \
       "APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}" \
       "SMTP_HOST=${SMTP_HOST}" \
       "SMTP_PORT=${SMTP_PORT}" \
       "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" \
+      "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}" \
+      "VITE_DEV_SERVER=${VITE_DEV_SERVER}" \
       "ATTESTA_ROOT_DIR=${ATTESTA_ROOT_DIR}"
   '
 })"
@@ -142,6 +145,12 @@ grep -qx 'APPWRITE_ENDPOINT=http://localhost:13005/v1' <<<"${linked_output}" \
   || fail "linked worktree retained an inherited Appwrite endpoint"
 grep -qx 'SMTP_HOST=localhost' <<<"${linked_output}" || fail "linked SMTP host is not isolated"
 grep -qx 'SMTP_PORT=13004' <<<"${linked_output}" || fail "linked SMTP port is not isolated"
+# Linked checkouts inherit a copied primary .env (Tailscale PUBLIC); they must
+# keep worktree-env localhost origins, not restore the Tailscale URL.
+grep -qx 'PUBLIC_BASE_URL=http://localhost:13000' <<<"${linked_output}" \
+  || fail "linked worktree restored primary Tailscale PUBLIC_BASE_URL"
+grep -qx 'VITE_DEV_SERVER=http://localhost:13001' <<<"${linked_output}" \
+  || fail "linked worktree should derive localhost VITE_DEV_SERVER from loopback PUBLIC"
 if grep -Eq 'COMPOSE_PROJECT_NAME=(unsafe|must-not-win)' <<<"${linked_output}"; then
   fail "linked worktree retained an inherited Compose identity"
 fi
