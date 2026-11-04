@@ -181,6 +181,19 @@ export function formatFactValue(value: unknown): string {
 }
 
 /**
+ * When Spawn is offered and the provisional first-child Draft is dirty, overview
+ * paints a linkable task row (groupInstanceId `new`) instead of the Spawn CTA.
+ */
+export function provisionalSpawnDraftRowVisible(
+	group: OverviewGroupChrome | undefined,
+	provisionalFirstChildDirty: boolean
+): boolean {
+	return Boolean(
+		group?.canSpawn && group.firstChildTaskId && provisionalFirstChildDirty
+	);
+}
+
+/**
  * Open-group Spawn/Close chrome for post-submit links loop (ticket 05).
  * Null when the group is missing on the Worklist instance.
  */

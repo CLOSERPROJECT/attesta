@@ -1,10 +1,40 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import { CommitDomainError } from './commit-port.js';
-import { LivingSession } from './session.svelte.js';
+import { draftAddressForTask, draftKey } from './drafts.js';
+import {
+	livingDraftStorageKey,
+	memoryStorage,
+	readStoredDraft
+} from './draft-storage.js';
 import type { LoadDomainPort } from './load-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
+import {
+	DEFAULT_DRAFT_DEBOUNCE_MS,
+	LivingSession,
+	type DraftPersistClock
+} from './session.svelte.js';
 import { emptyWorklist, type LoadResult, type Worklist } from './types.js';
+
+function manualClock(): DraftPersistClock & { flush: () => void } {
+	const pending = new Map<unknown, () => void>();
+	let nextId = 1;
+	return {
+		setTimeout(fn) {
+			const id = nextId++;
+			pending.set(id, fn);
+			return id;
+		},
+		clearTimeout(id) {
+			pending.delete(id);
+		},
+		flush() {
+			const runs = [...pending.values()];
+			pending.clear();
+			for (const run of runs) run();
+		}
+	};
+}
 
 const sample: LoadResult = {
 	org: 'feragame',
@@ -534,7 +564,257 @@ describe('LivingSession', () => {
 			client: 'NO',
 			notes: 'keep me'
 		});
+		expect(session.hasDirtyDraft('intake/register', '_new')).toBe(true);
 		expect(load).toHaveBeenCalledOnce();
 		expect(session.result?.worklist).toEqual(reloaded.worklist);
+	});
+
+	test('seedDraft is non-dirty; setDraft dirties; clearDraft clears both', () => {
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			hydrate: false
+		});
+		const path = 'intake/register';
+		const key = 'NIR-1';
+
+		session.seedDraft(path, key, { client: 'NO' });
+		expect(session.getDraft(path, key)).toEqual({ client: 'NO' });
+		expect(session.hasDirtyDraft(path, key)).toBe(false);
+
+		session.setDraft(path, key, { client: 'NO', notes: 'typed' });
+		expect(session.getDraft(path, key)).toEqual({ client: 'NO', notes: 'typed' });
+		expect(session.hasDirtyDraft(path, key)).toBe(true);
+
+		// Dirty sticks: later seed must not undirty.
+		session.seedDraft(path, key, { client: 'RESET' });
+		expect(session.getDraft(path, key)).toEqual({ client: 'RESET' });
+		expect(session.hasDirtyDraft(path, key)).toBe(true);
+
+		session.clearDraft(path, key);
+		expect(session.getDraft(path, key)).toBeNull();
+		expect(session.hasDirtyDraft(path, key)).toBe(false);
+	});
+
+	test('refreshKeepDrafts keeps seed and dirty Drafts in memory', async () => {
+		const load = vi.fn(async () => sample);
+		const session = new LivingSession({
+			load: { load },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		session.seedDraft('intake/register', 'NIR-1', { client: 'seed' });
+		session.setDraft('intake/register', '_new', { client: 'dirty' });
+
+		await session.refreshKeepDrafts();
+
+		expect(session.getDraft('intake/register', 'NIR-1')).toEqual({ client: 'seed' });
+		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(false);
+		expect(session.getDraft('intake/register', '_new')).toEqual({ client: 'dirty' });
+		expect(session.hasDirtyDraft('intake/register', '_new')).toBe(true);
+		expect(load).toHaveBeenCalledOnce();
+	});
+
+	test('successful commit clears dirty Draft via clearDraft', async () => {
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			worklist: sample.worklist,
+			next: 'overview' as const,
+			nextTaskFormBundle: null
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
+		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
+
+		await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: { client: 'NO' },
+			mint: { kind: 'none' }
+		});
+
+		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
+		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(false);
+	});
+
+	test('dirty Drafts debounce to storage; seed never persists', async () => {
+		const storage = memoryStorage();
+		const clock = manualClock();
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			hydrate: false,
+			storage,
+			clock,
+			debounceMs: DEFAULT_DRAFT_DEBOUNCE_MS,
+			flushOnHide: false
+		});
+		await session.hydrate();
+		const path = 'intake/register';
+		const bagKey = 'NIR-1';
+		const key = draftKey(path, bagKey);
+		const storageKey = livingDraftStorageKey('feragame', 'u1', key);
+
+		session.seedDraft(path, bagKey, { client: 'seed' });
+		clock.flush();
+		expect(storage.getItem(storageKey)).toBeNull();
+		expect(session.hasDirtyDraft(path, bagKey)).toBe(false);
+
+		session.setDraft(path, bagKey, { client: 'dirty' });
+		expect(storage.getItem(storageKey)).toBeNull();
+		clock.flush();
+		expect(readStoredDraft(storage, storageKey)).toEqual({ client: 'dirty' });
+		expect(session.hasDirtyDraft(path, bagKey)).toBe(true);
+	});
+
+	test('rehydrate on identity known; refreshKeepDrafts does not clobber memory', async () => {
+		const bagKey = draftKey('intake/register', 'NIR-1');
+		const storage = memoryStorage({
+			[livingDraftStorageKey('feragame', 'u1', bagKey)]: JSON.stringify({
+				client: 'from-storage'
+			})
+		});
+		const load = vi.fn(async () => sample);
+		const session = new LivingSession({
+			load: { load },
+			hydrate: false,
+			storage,
+			debounceMs: 0,
+			flushOnHide: false
+		});
+
+		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
+		await session.hydrate();
+		expect(session.getDraft('intake/register', 'NIR-1')).toEqual({ client: 'from-storage' });
+		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
+
+		session.setDraft('intake/register', 'NIR-1', { client: 'in-memory-wins' });
+		await session.refreshKeepDrafts();
+		expect(session.getDraft('intake/register', 'NIR-1')).toEqual({
+			client: 'in-memory-wins'
+		});
+		expect(load).toHaveBeenCalledTimes(2);
+	});
+
+	test('flushPendingDrafts writes pending debounce; commit clears memory and storage', async () => {
+		const storage = memoryStorage();
+		const clock = manualClock();
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			worklist: sample.worklist,
+			next: 'overview' as const,
+			nextTaskFormBundle: null
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false,
+			storage,
+			clock,
+			debounceMs: DEFAULT_DRAFT_DEBOUNCE_MS,
+			flushOnHide: false
+		});
+		await session.hydrate();
+		const path = 'intake/register';
+		const bagKey = 'NIR-1';
+		const storageKey = livingDraftStorageKey(
+			'feragame',
+			'u1',
+			draftKey(path, bagKey)
+		);
+
+		session.setDraft(path, bagKey, { client: 'pending' });
+		expect(storage.getItem(storageKey)).toBeNull();
+		session.flushPendingDrafts();
+		expect(readStoredDraft(storage, storageKey)).toEqual({ client: 'pending' });
+
+		await session.commit({
+			taskPath: path,
+			jobInstanceId: bagKey,
+			value: { client: 'pending' },
+			mint: { kind: 'none' }
+		});
+		expect(session.getDraft(path, bagKey)).toBeNull();
+		expect(storage.getItem(storageKey)).toBeNull();
+	});
+
+	test('identity switch clears memory bag; other users storage keys untouched', async () => {
+		const storage = memoryStorage();
+		const adaKey = livingDraftStorageKey(
+			'feragame',
+			'u1',
+			draftKey('intake/register', 'NIR-1')
+		);
+		const otherKey = livingDraftStorageKey(
+			'other-org',
+			'u9',
+			draftKey('intake/register', 'OTHER')
+		);
+		storage.setItem(otherKey, JSON.stringify({ client: 'untouched' }));
+
+		let current = structuredClone(sample);
+		const session = new LivingSession({
+			load: { load: async () => current },
+			hydrate: false,
+			storage,
+			debounceMs: 0,
+			flushOnHide: false
+		});
+		await session.hydrate();
+		session.setDraft('intake/register', 'NIR-1', { client: 'ada' });
+		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
+		expect(readStoredDraft(storage, adaKey)).toEqual({ client: 'ada' });
+
+		current = {
+			...structuredClone(sample),
+			org: 'other-org',
+			userId: 'u2',
+			displayName: 'Bob'
+		};
+		await session.hydrate();
+		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
+		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(false);
+		// Prior user's dirty key remains in storage; unrelated user key untouched.
+		expect(readStoredDraft(storage, adaKey)).toEqual({ client: 'ada' });
+		expect(readStoredDraft(storage, otherKey)).toEqual({ client: 'untouched' });
+	});
+
+	test('draftAddressForTask mark binding matches hasDirtyDraft for flat and provisional', () => {
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			hydrate: false,
+			storage: null,
+			flushOnHide: false
+		});
+		const flat = draftAddressForTask({
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: 'NIR-1'
+		});
+		session.setDraft(flat.taskPath, flat.draftBagInstanceKey, { client: 'NO' });
+		expect(session.hasDirtyDraft(flat.taskPath, flat.draftBagInstanceKey)).toBe(true);
+
+		const provisional = draftAddressForTask({
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: 'T1',
+			groupId: 'lots',
+			groupInstanceId: 'new'
+		});
+		expect(provisional.taskPath).toBe('intake/lots/new/register');
+		expect(provisional.draftBagInstanceKey).toBe('T1::lots::');
+		session.setDraft(
+			provisional.taskPath,
+			provisional.draftBagInstanceKey,
+			{ lotId: 'L1' }
+		);
+		expect(
+			session.hasDirtyDraft(provisional.taskPath, provisional.draftBagInstanceKey)
+		).toBe(true);
 	});
 });

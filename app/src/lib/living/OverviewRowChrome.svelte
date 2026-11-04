@@ -5,6 +5,7 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
+	import DraftBozzaMark from './DraftBozzaMark.svelte';
 	import TaskStatusTag from './TaskStatusTag.svelte';
 	import type { TaskStatus } from './types.js';
 
@@ -13,6 +14,8 @@
 		status: TaskStatus;
 		/** 1-based Config order; omit for group occurrences and child Tasks. */
 		orderNumber?: number;
+		/** Client overlay: dirty Draft beside status (not a Worklist TaskStatus). */
+		showDraft?: boolean;
 		class?: ClassValue;
 		children?: Snippet;
 	};
@@ -21,6 +24,7 @@
 		title,
 		status,
 		orderNumber,
+		showDraft = false,
 		class: className,
 		children
 	}: Props = $props();
@@ -39,7 +43,10 @@
 		<p class="truncate text-base font-medium leading-tight text-foreground">{title}</p>
 		{@render children?.()}
 	</div>
-	<div class="flex shrink-0 items-center gap-0">
+	<div class="flex shrink-0 items-center gap-1.5">
+		{#if showDraft}
+			<DraftBozzaMark />
+		{/if}
 		<TaskStatusTag {status} />
 		<span
 			class={[

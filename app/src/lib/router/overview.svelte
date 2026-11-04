@@ -5,13 +5,16 @@
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Dialog from '#lib/shadcn/ui/dialog/index.js';
 
+	import { draftAddressForTask } from '../living/drafts.js';
 	import OverviewRowChrome from '../living/OverviewRowChrome.svelte';
 	import TaskRecapPanel from '../living/TaskRecapPanel.svelte';
 	import { living } from '../living/living-app.svelte.js';
 	import type { TaskStatus } from '../living/types.js';
 	import {
 		formatHandoffCopy,
-		jobInstanceOverview
+		jobInstanceOverview,
+		provisionalSpawnDraftRowVisible,
+		type OverviewTaskRow
 	} from '../living/worklist-overview.js';
 	import { resolvePostCommitNavigation } from '../living/worklist-nav.js';
 	import { PROVISIONAL_GROUP_INSTANCE_ID } from '../living/types.js';
@@ -37,6 +40,56 @@
 	const model = $derived(
 		jobInstanceOverview(living.result?.worklist, jobId, jobInstanceId)
 	);
+	const drafts = $derived(living.drafts);
+
+	function leafShowDraft(taskId: string): boolean {
+		void drafts;
+		const addr = draftAddressForTask({ jobId, taskId, jobInstanceId });
+		return living.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
+	}
+
+	function childShowDraft(
+		groupId: string,
+		groupInstanceId: string,
+		taskId: string
+	): boolean {
+		void drafts;
+		const addr = draftAddressForTask({
+			jobId,
+			taskId,
+			jobInstanceId,
+			groupId,
+			groupInstanceId
+		});
+		return living.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
+	}
+
+	/** Dirty provisional first-child Draft while Spawn is offered — overview row, not Spawn CTA. */
+	function provisionalSpawnDraftShown(row: OverviewTaskRow): boolean {
+		void drafts;
+		const group = row.group;
+		const dirty = Boolean(
+			group?.firstChildTaskId &&
+				childShowDraft(row.taskId, '', group.firstChildTaskId)
+		);
+		return provisionalSpawnDraftRowVisible(group, dirty);
+	}
+
+	/** Provisional spawn (`new`) or any minted child occurrence has dirty Draft. */
+	function groupShowDraft(row: OverviewTaskRow): boolean {
+		void drafts;
+		if (provisionalSpawnDraftShown(row)) return true;
+		for (const gi of row.groupInstances ?? []) {
+			if (gi.flatChild) {
+				if (childShowDraft(row.taskId, gi.id, gi.flatChild.taskId)) return true;
+				continue;
+			}
+			for (const child of gi.children) {
+				if (childShowDraft(row.taskId, gi.id, child.taskId)) return true;
+			}
+		}
+		return false;
+	}
 
 	const confirmCloseGroup = $derived(
 		model && confirmCloseGroupId
@@ -211,6 +264,7 @@
 		doneExpanded: boolean;
 		recap: TaskRowRecap;
 		orderNumber?: number;
+		showDraft?: boolean;
 		doneItemClass: string;
 		doneTriggerClass: string;
 		doneContentClass: string;
@@ -228,6 +282,7 @@
 					orderNumber={opts.orderNumber}
 					title={opts.title}
 					status={opts.status}
+					showDraft={opts.showDraft}
 				/>
 			</Accordion.Trigger>
 			<Accordion.Content class={opts.doneContentClass}>
@@ -245,6 +300,7 @@
 				orderNumber={opts.orderNumber}
 				title={opts.title}
 				status={opts.status}
+				showDraft={opts.showDraft}
 			/>
 		</a>
 	{:else}
@@ -257,6 +313,7 @@
 				orderNumber={opts.orderNumber}
 				title={opts.title}
 				status={opts.status}
+				showDraft={opts.showDraft}
 			/>
 		</div>
 	{/if}
@@ -307,9 +364,11 @@
 									orderNumber={index + 1}
 									title={row.title}
 									status={row.status}
+									showDraft={groupShowDraft(row)}
 								/>
 							</Accordion.Trigger>
 							<Accordion.Content class="px-3 pb-3">
+								{@const showProvDraft = provisionalSpawnDraftShown(row)}
 								{#if (row.groupInstances ?? []).length > 0}
 									<Accordion.Root
 										type="multiple"
@@ -344,6 +403,11 @@
 															groupId: row.taskId,
 															groupInstanceId: gi.id
 														},
+														showDraft: childShowDraft(
+															row.taskId,
+															gi.id,
+															flatChild.taskId
+														),
 														doneItemClass: accordionItemClass(flatChild.status),
 														doneTriggerClass: accordionTriggerClass(
 															'px-3 py-2.5',
@@ -397,6 +461,11 @@
 																		groupId: row.taskId,
 																		groupInstanceId: gi.id
 																	},
+																	showDraft: childShowDraft(
+																		row.taskId,
+																		gi.id,
+																		child.taskId
+																	),
 																	doneItemClass: accordionItemClass(child.status),
 																	doneTriggerClass: accordionTriggerClass(
 																		'px-3 py-2.5',
@@ -413,9 +482,49 @@
 									</Accordion.Root>
 								{/if}
 
-								{#if row.group.canSpawn || row.group.canClose}
-									<div class="flex flex-wrap justify-end gap-2 pt-3">
-										{#if row.group.canSpawn}
+								{#if showProvDraft}
+									{@const firstChildTaskId = row.group.firstChildTaskId}
+									<div
+										class="pt-3"
+										data-testid="overview-group-instance"
+										data-group-instance-id={PROVISIONAL_GROUP_INSTANCE_ID}
+									>
+										{@render taskStatusRow({
+											taskId: firstChildTaskId,
+											title: row.group.startLabel,
+											status: 'actionable',
+											linkable: true,
+											href: childTaskHref(
+												row.taskId,
+												PROVISIONAL_GROUP_INSTANCE_ID,
+												firstChildTaskId
+											),
+											doneValue: occurrenceValue(
+												row.taskId,
+												PROVISIONAL_GROUP_INSTANCE_ID
+											),
+											doneExpanded: false,
+											recap: {
+												jobId,
+												jobInstanceId,
+												taskId: firstChildTaskId,
+												groupId: row.taskId,
+												groupInstanceId: PROVISIONAL_GROUP_INSTANCE_ID
+											},
+											showDraft: true,
+											doneItemClass: accordionItemClass('actionable'),
+											doneTriggerClass: accordionTriggerClass(
+												'px-3 py-2.5',
+												'actionable'
+											),
+											doneContentClass: 'px-3 pb-3'
+										})}
+									</div>
+								{/if}
+
+								{#if (row.group.canSpawn && !showProvDraft) || row.group.canClose}
+									<div class="flex flex-wrap items-center justify-end gap-2 pt-3">
+										{#if row.group.canSpawn && !showProvDraft}
 											<a
 												class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800"
 												data-testid="overview-spawn"
@@ -468,6 +577,7 @@
 								taskId: row.taskId
 							},
 							orderNumber: index + 1,
+							showDraft: leafShowDraft(row.taskId),
 							doneItemClass: accordionItemClass(row.status),
 							doneTriggerClass: accordionTriggerClass('px-3 py-3', row.status),
 							doneContentClass: 'px-3 pb-3'

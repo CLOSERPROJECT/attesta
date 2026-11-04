@@ -148,14 +148,14 @@
 
 	function seedBundleDraft(next: TaskFormBundle) {
 		if (seededFromBundle) return;
-		const current = readDraft();
-		if (Object.keys(current).length > 0) {
+		// Presence (not non-empty value) — dirty {} must not be overwritten by seed.
+		if (living.getDraft(path, draftInstanceKey) != null) {
 			seededFromBundle = true;
 			return;
 		}
 		const initial = next.initialData ?? {};
 		if (Object.keys(initial).length > 0) {
-			writeDraft({ ...initial });
+			living.seedDraft(path, draftInstanceKey, { ...initial });
 		}
 		seededFromBundle = true;
 	}

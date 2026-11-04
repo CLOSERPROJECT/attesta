@@ -7,6 +7,7 @@ import {
 	formatHandoffCopy,
 	jobInstanceOverview,
 	openGroupLoopChrome,
+	provisionalSpawnDraftRowVisible,
 	taskStatusLabel
 } from './worklist-overview.js';
 
@@ -130,6 +131,28 @@ describe('job instance overview model', () => {
 	test('unknown instance yields null', () => {
 		expect(jobInstanceOverview(adminWorklist, 'intake', 'missing')).toBeNull();
 		expect(jobInstanceOverview(adminWorklist, 'intake', 'new')).toBeNull();
+	});
+
+	test('provisionalSpawnDraftRowVisible when canSpawn + dirty provisional Draft', () => {
+		const group = {
+			canSpawn: true,
+			startLabel: 'Nuova registrazione',
+			firstChildTaskId: 'register',
+			canClose: false,
+			closeLabel: 'Close'
+		};
+		expect(provisionalSpawnDraftRowVisible(group, true)).toBe(true);
+		expect(provisionalSpawnDraftRowVisible(group, false)).toBe(false);
+		expect(
+			provisionalSpawnDraftRowVisible({ ...group, canSpawn: false }, true)
+		).toBe(false);
+		expect(
+			provisionalSpawnDraftRowVisible(
+				{ ...group, firstChildTaskId: '' },
+				true
+			)
+		).toBe(false);
+		expect(provisionalSpawnDraftRowVisible(undefined, true)).toBe(false);
 	});
 
 	test('group Spawn chrome when canSpawn; not linkable as flat Task', () => {
