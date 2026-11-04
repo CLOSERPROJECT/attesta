@@ -45,7 +45,18 @@ func syntheticPassportConfig() OrgConfig {
 				ProductName: `"Synth Widget"`,
 			},
 			Snapshot: PassportSnapshotConfig{
-				Expr: `{ "widget": $lookup($domain.widget, $subjectId), "subjectId": $subjectId }`,
+				// dataReport-shaped so Lock Load chrome paints the same object Commit freezes.
+				Expr: `{
+					"title": "Passport",
+					"rows": [
+						{"label": "Subject", "value": $subjectId, "error": null, "tone": null},
+						{"label": "Color", "value": $string($lookup($domain.widget, $subjectId).color), "error": null, "tone": null},
+						{"label": "Lot", "value": $lookup($domain.widget, $subjectId).lot, "error": null, "tone": null}
+					],
+					"subjectId": $subjectId,
+					"color": $lookup($domain.widget, $subjectId).color,
+					"lot": $lookup($domain.widget, $subjectId).lot
+				}`,
 			},
 		},
 		Jobs: OrderedObject{
@@ -157,9 +168,11 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 	if rec.ProductName != "Synth Widget" {
 		t.Fatalf("productName = %q", rec.ProductName)
 	}
-	widget, _ := rec.Snapshot["widget"].(map[string]any)
-	if widget["color"] != "blue" || rec.Snapshot["subjectId"] != "W-9" {
+	if rec.Snapshot["subjectId"] != "W-9" || rec.Snapshot["color"] != "blue" || rec.Snapshot["lot"] != "LOT-9" {
 		t.Fatalf("snapshot = %#v", rec.Snapshot)
+	}
+	if rec.Snapshot["title"] != "Passport" {
+		t.Fatalf("snapshot title = %#v", rec.Snapshot["title"])
 	}
 	if rec.DigitalLink != wantLink {
 		t.Fatalf("digitalLink = %q", rec.DigitalLink)

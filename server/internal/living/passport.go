@@ -280,6 +280,10 @@ func evalPassportString(raw any, label string, bindings ExprBindings) (string, e
 	return strings.TrimSpace(s), nil
 }
 
+// PassportSnapshotChromeID is the dataReport chrome id injected on Lock Load
+// when onSubmit.passport is set — same passport.snapshot.expr as Commit freeze.
+const PassportSnapshotChromeID = "passportSnapshot"
+
 // EvalPassportSnapshot evaluates passport.snapshot.expr against Domain bindings.
 // Exported for Lock Load recap (same projection as freeze).
 func EvalPassportSnapshot(expr string, domain Domain, subjectID string, catalogs map[string]any, extra ExprBindings) (map[string]any, error) {
