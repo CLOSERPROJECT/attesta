@@ -244,6 +244,7 @@ describe('post-Commit stay-for-links', () => {
 			jobId: 'intake',
 			jobInstanceId: 'T1'
 		});
+		// Link-only is not stay — router must clearLinksStay before navigate.
 		expect(
 			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle, [
 				{ label: 'doc', url: 'https://example.test/d', action: 'link' }
@@ -253,6 +254,19 @@ describe('post-Commit stay-for-links', () => {
 			jobId: 'intake',
 			jobInstanceId: 'NIR-advance',
 			taskId: 'codiceFir'
+		});
+		expect(
+			resolveCommitFollowUp('overview', 'passport', 'L1', null, [
+				{
+					label: 'Digital Product Passport',
+					url: 'https://example.test/dpp',
+					action: 'link'
+				}
+			])
+		).toEqual({
+			kind: 'overview',
+			jobId: 'passport',
+			jobInstanceId: 'L1'
 		});
 	});
 

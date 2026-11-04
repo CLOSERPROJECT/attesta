@@ -290,7 +290,7 @@ export class LivingSession {
 		}
 	};
 
-	/** Clear stay-for-links before navigating away (Continue / Start another / Close). */
+	/** Clear session HttpLinkStrip state (stay exit or non-stay post-Commit navigate). */
 	clearLinksStay = (): void => {
 		this.linksStayActive = false;
 		this.lastHttpLinks = [];

@@ -378,6 +378,43 @@ describe('LivingSession', () => {
 		expect(session.lastHttpLinks).toEqual([]);
 	});
 
+	test('link-only commit leaves stay inactive; clearLinksStay drops strip state', async () => {
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'L1',
+			worklist: emptyWorklist(),
+			next: 'overview' as const,
+			nextTaskFormBundle: null,
+			links: [
+				{
+					label: 'Digital Product Passport',
+					url: 'https://example.test/01/09506000134352',
+					action: 'link' as const
+				}
+			],
+			httpErrors: ['warn']
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		await session.commit({
+			taskPath: 'passport/lock',
+			jobInstanceId: 'L1',
+			value: { ack: true },
+			mint: { kind: 'none' }
+		});
+		expect(session.linksStayActive).toBe(false);
+		expect(session.lastHttpLinks).toHaveLength(1);
+		expect(session.lastHttpErrors).toEqual(['warn']);
+		session.clearLinksStay();
+		expect(session.lastHttpLinks).toEqual([]);
+		expect(session.lastHttpErrors).toEqual([]);
+		expect(session.linksStayActive).toBe(false);
+	});
+
 	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
 		const bundle: TaskFormBundle = {
 			jobId: 'intake',
