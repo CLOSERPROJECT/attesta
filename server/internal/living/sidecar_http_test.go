@@ -110,7 +110,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commit must succeed: %v", err)
 	}
-	if result.Domain.Kind("load")[firstLoadID(result.Domain)]["client"] != "NO" {
+	if result.Domain.Kind("load")[firstLoadID(result.Domain)]["client"] != "CO" {
 		t.Fatalf("domain missing: %#v", result.Domain.Kind("load"))
 	}
 	if len(result.Links) != 0 {
@@ -123,7 +123,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[firstLoadID(stored)]["client"] != "NO" {
+	if stored.Kind("load")[firstLoadID(stored)]["client"] != "CO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }
@@ -135,7 +135,7 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 		id := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		if n == 2 {
 			id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-			w.Header().Set("Content-Disposition", `attachment; filename="NIR-261019-NO-1.csv"`)
+			w.Header().Set("Content-Disposition", `attachment; filename="NIR-261019-CO-1.csv"`)
 		}
 		_, _ = io.WriteString(w, "/artifacts/"+id)
 	}))
@@ -166,7 +166,7 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 	if result.Links[1].URL != ArtifactProxyPathPrefix+"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
 		t.Fatalf("link1 = %#v", result.Links[1])
 	}
-	if result.Links[1].Filename != "NIR-261019-NO-1.csv" {
+	if result.Links[1].Filename != "NIR-261019-CO-1.csv" {
 		t.Fatalf("filename = %q", result.Links[1].Filename)
 	}
 	if n != 2 {

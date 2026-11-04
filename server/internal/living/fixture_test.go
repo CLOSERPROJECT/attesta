@@ -108,9 +108,15 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !ok || !pw.IsGroup() {
 		t.Fatalf("palletWeight group = %#v", pw)
 	}
+	if pw["instanceLabelEntity"] != "pallet" {
+		t.Fatalf("palletWeight.instanceLabelEntity = %#v, want pallet", pw["instanceLabelEntity"])
+	}
 	lineLoad, ok := TaskByID(line.Tasks, "lineLoad")
-	if !ok {
-		t.Fatal("missing lineLoad")
+	if !ok || !lineLoad.IsGroup() {
+		t.Fatalf("lineLoad group = %#v", lineLoad)
+	}
+	if lineLoad["instanceLabelEntity"] != "pallet" {
+		t.Fatalf("lineLoad.instanceLabelEntity = %#v, want pallet", lineLoad["instanceLabelEntity"])
 	}
 	if got, _ := lineLoad["unlockFrom"].(string); got != "openTurno" {
 		t.Fatalf("lineLoad.unlockFrom = %#v, want openTurno", lineLoad["unlockFrom"])
@@ -118,6 +124,10 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	readyWhen, _ := lineLoad["readyWhen"].(string)
 	if !strings.Contains(readyWhen, "$exists(weight)") || !strings.Contains(readyWhen, "progress = 'done'") {
 		t.Fatalf("lineLoad.readyWhen = %q, want locked Domain leftover expr", readyWhen)
+	}
+	mark, ok := TaskByID(lineLoad.ChildTasks(), "mark")
+	if !ok || mark.IsGroup() {
+		t.Fatalf("lineLoad.mark leaf = %#v", mark)
 	}
 	if _, has := pw["unlockFrom"]; has {
 		t.Fatalf("palletWeight must omit unlockFrom (linear), got %#v", pw["unlockFrom"])

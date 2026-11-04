@@ -74,7 +74,7 @@ func TestLoadTaskRecapNestedWithStoredLinks(t *testing.T) {
 	if recap.UserID != "ada" || recap.Timestamp == "" {
 		t.Fatalf("actor/time = %#v", recap)
 	}
-	if recap.Facts["client"] != "NO" {
+	if recap.Facts["client"] != "CO" {
 		t.Fatalf("facts = %#v", recap.Facts)
 	}
 	if recap.Titles["client"] != "Cliente" || recap.Titles["numeroFir"] != "Numero FIR" {

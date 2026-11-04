@@ -123,15 +123,22 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: lineID,
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
 				loadID + ".2": "partial",
 			},
 		},
+		Mint: spawningNewMint(),
 	})
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
+		JobID: "line", JobInstanceID: lineID, GroupID: "lineLoad",
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -162,7 +169,7 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 		t.Fatalf("openTurno = %q, want done", inst.Tasks["openTurno"])
 	}
 	if inst.Tasks["lineLoad"] != TaskStatusDone {
-		t.Fatalf("lineLoad after Submission = %q, want done", inst.Tasks["lineLoad"])
+		t.Fatalf("lineLoad after Close = %q, want done", inst.Tasks["lineLoad"])
 	}
 	// Group node chrome stays available (lots pattern); Spawn/child leaf is role-scoped.
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
@@ -276,13 +283,15 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	loadID, lineID := seedLineReadyForLineLoad(t, c)
 	lineOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	result, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: lineID,
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
 				loadID + ".2": "partial",
 			},
 		},
+		Mint: spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -298,8 +307,11 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing line instance %s", lineID)
 	}
-	if inst.Tasks["lineLoad"] != TaskStatusDone {
-		t.Fatalf("lineLoad = %q, want done after Submission", inst.Tasks["lineLoad"])
+	if inst.Tasks["lineLoad"] != TaskStatusAvailable {
+		t.Fatalf("lineLoad = %q, want available after mark (group still open)", inst.Tasks["lineLoad"])
+	}
+	if g := inst.Groups["lineLoad"]; !g.CanSpawn {
+		t.Fatalf("lineLoad CanSpawn = %#v, want true while partial leftovers remain", g)
 	}
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg = %q, want available for line viewer (unlockFrom openTurno)", inst.Tasks["containerReg"])
@@ -599,6 +611,35 @@ func TestProjectWorklistGroupInstanceLabelFromLoadAfterRegister(t *testing.T) {
 	}
 }
 
+func TestProjectWorklistGroupInstanceLabelFromPalletAfterWeigh(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
+	palletID := loadID + ".1"
+	result := commitWeigh(t, c, lineID, palletID, 400)
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic", "line", "administration"}}
+	wl := ProjectWorklist(mustActiveConfig(t, c), result.Domain, op)
+	inst, ok := worklistInstance(worklistMustJob(t, wl, "line"), lineID)
+	if !ok {
+		t.Fatal("missing line instance")
+	}
+	g, ok := inst.Groups["palletWeight"]
+	if !ok || len(g.Instances) != 1 {
+		t.Fatalf("palletWeight group = %#v", g)
+	}
+	gi := g.Instances[0]
+	if gi.Label != palletID {
+		t.Fatalf("label = %q, want weighed pallet %q", gi.Label, palletID)
+	}
+	if _, ok := result.Domain.Kind("pallet")[gi.Label]; !ok {
+		t.Fatalf("label %q not under Domain pallet: %#v", gi.Label, result.Domain.Kind("pallet"))
+	}
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.TaskID != "weigh" || last.GroupID != "palletWeight" || !containsString(last.IDsTouched, palletID) {
+		t.Fatalf("weigh submission must touch pallet %q: %#v", palletID, last)
+	}
+}
+
 func TestGroupInstanceEntityLabelIgnoresNonMatchingIDsTouched(t *testing.T) {
 	domain := EmptyDomain()
 	putKind(&domain, "load", EntityMap{"L-real": {"client": "NO"}})
@@ -610,7 +651,13 @@ func TestGroupInstanceEntityLabelIgnoresNonMatchingIDsTouched(t *testing.T) {
 	}}
 	got := groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "load")
 	if got != "L-real" {
-		t.Fatalf("label = %q, want L-real (first IDsTouched ∩ entity kind)", got)
+		t.Fatalf("label = %q, want L-real (IDsTouched ∩ entity kind)", got)
+	}
+	domain.Submissions[0].IDsTouched = []string{"L-a", "P1", "L-b"}
+	putKind(&domain, "load", EntityMap{"L-a": {"client": "CO"}, "L-b": {"client": "DA"}})
+	got = groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "load")
+	if got != "L-a, L-b" {
+		t.Fatalf("label = %q, want joined matching ids", got)
 	}
 	if groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-2", "load") != "" {
 		t.Fatal("unrelated group instance must omit label")

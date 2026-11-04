@@ -213,8 +213,8 @@ func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	if bundle.InitialData["averagePanelWeight"] != 20 {
 		t.Fatalf("averagePanelWeight default = %#v, want 20", bundle.InitialData["averagePanelWeight"])
 	}
-	if bundle.InitialData["tareKind"] != "euro" {
-		t.Fatalf("tareKind default = %#v, want euro", bundle.InitialData["tareKind"])
+	if bundle.InitialData["tareKind"] != "industrial" {
+		t.Fatalf("tareKind default = %#v, want industrial", bundle.InitialData["tareKind"])
 	}
 	if bundle.InitialData["idoneita"] != "NIR" {
 		t.Fatalf("idoneita default = %#v, want NIR", bundle.InitialData["idoneita"])
@@ -287,10 +287,17 @@ func TestLineLoadPartialMapAfterOnePalletWeighClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lineLoad := closed.NextTaskFormBundle
-	if lineLoad == nil || lineLoad.TaskID != "lineLoad" || lineLoad.JobInstanceID != lineID {
-		// readyWhen already true from weigh; Close is not the unlock gate but next advance still lands here.
-		t.Fatalf("after weigh (Close) next = %s, want lineLoad@%s", bundleAddress(lineLoad), lineID)
+	if closed.NextTaskFormBundle != nil {
+		t.Fatalf("after weigh Close next = %s, want overview (lineLoad is a Spawn group)", bundleAddress(closed.NextTaskFormBundle))
+	}
+	lineLoad, err := BuildTaskFormBundle(mustActiveConfig(t, c), closed.Domain, ActionableTaskRef{
+		JobID: "line", GroupID: "lineLoad", TaskID: "mark", JobInstanceID: lineID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lineLoad.TaskID != "mark" || lineLoad.GroupID != "lineLoad" || lineLoad.JobInstanceID != lineID {
+		t.Fatalf("spawn form = %s, want lineLoad/mark@%s", bundleAddress(lineLoad), lineID)
 	}
 	if len(lineLoad.RowIDs) == 0 {
 		t.Fatal("lineLoad partial-map still projects Domain-read row ids")
@@ -477,19 +484,21 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	}
 
 	loaded, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: lineID,
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
 				loadID + ".2": "partial",
 			},
 		},
+		Mint: spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if loaded.NextTaskFormBundle != nil {
-		t.Fatalf("line after lineLoad must hand off; got %s", bundleAddress(loaded.NextTaskFormBundle))
+		t.Fatalf("line after lineLoad mark must hand off; got %s", bundleAddress(loaded.NextTaskFormBundle))
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "containerReg", lineID, "", ""); err == nil {
 		t.Fatal("line viewer must not mount containerReg")

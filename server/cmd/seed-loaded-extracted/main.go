@@ -51,7 +51,9 @@ func main() {
 		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 33.0},
 	})
 	commit(c, lineOp, living.CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: living.DemoLineShiftID,
+		TaskPath: living.GroupTaskPath("line", "lineLoad", living.ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: living.DemoLineShiftID,
+		Mint: &living.CommitMint{Kind: living.MintKindSpawningNew},
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
@@ -59,6 +61,12 @@ func main() {
 			},
 		},
 	})
+	must(func() error {
+		_, err := c.CloseGroup(ctx, "feragame", lineOp, living.CloseGroupRequest{
+			JobID: "line", JobInstanceID: living.DemoLineShiftID, GroupID: "lineLoad",
+		})
+		return err
+	}())
 	res := commit(c, logOp, living.CommitRequest{
 		TaskPath: living.GroupTaskPath("line", "containerReg", living.ProvisionalGroupInstanceID, "register"),
 		JobInstanceID: living.DemoLineShiftID,
@@ -82,7 +90,7 @@ func main() {
 	commit(c, admin, living.CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: weightCheckID,
 		Value: map[string]any{
-			"client": "SU", "date": "2026-10-19", "wasteCode": "191212",
+			"client": "DA", "date": "2026-10-19", "wasteCode": "160214",
 			"idoneitaRiutilizzo": "NIR", "truckWeight": 800.0, "truckTare": 180.0,
 			"palletCount": 2.0, "notes": "",
 		},

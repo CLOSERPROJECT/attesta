@@ -68,8 +68,8 @@ type WorklistGroup struct {
 }
 
 // WorklistGroupInstance is one open group instance's viewer-scoped child leaf statuses.
-// Label is optional overview chrome: first nested Submission IDsTouched id
-// under Config instanceLabelEntity; omit when unset or no match.
+// Label is optional overview chrome: nested Submission IDsTouched ids that exist
+// under Config instanceLabelEntity (comma-joined when several); omit when unset or no match.
 type WorklistGroupInstance struct {
 	ID     string                `json:"id"`
 	Label  string                `json:"label,omitempty"`
@@ -309,9 +309,9 @@ func projectGroupChildStatus(
 	}, jobInstanceID))
 }
 
-// groupInstanceEntityLabel returns the first IDsTouched id present under
-// domain.Kind(entityKind) for a matching nested Submission; empty when
-// entityKind is unset or nothing intersects.
+// groupInstanceEntityLabel returns IDsTouched ids present under
+// domain.Kind(entityKind) for a matching nested Submission (stable touch order,
+// comma-joined); empty when entityKind is unset or nothing intersects.
 func groupInstanceEntityLabel(domain Domain, jobID, jobInstanceID, groupID, groupInstanceID, entityKind string) string {
 	if entityKind == "" {
 		return ""
@@ -325,10 +325,14 @@ func groupInstanceEntityLabel(domain Domain, jobID, jobInstanceID, groupID, grou
 			sub.GroupID != groupID || sub.GroupInstanceID != groupInstanceID {
 			continue
 		}
+		matched := make([]string, 0, len(sub.IDsTouched))
 		for _, id := range sub.IDsTouched {
 			if _, ok := entities[id]; ok {
-				return id
+				matched = append(matched, id)
 			}
+		}
+		if len(matched) > 0 {
+			return strings.Join(matched, ", ")
 		}
 	}
 	return ""

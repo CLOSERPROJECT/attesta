@@ -14,8 +14,8 @@ func truckArriveValue() map[string]any {
 
 func registerLotValue() map[string]any {
 	return map[string]any{
-		"client":           "NO",
-		"wasteCode":        "191212",
+		"client":           "CO",
+		"wasteCode":        "160214",
 		"numeroFir":        "FIR-1",
 		"palletCount":      2.0,
 		"truckWeightAfter": 700.0,
@@ -239,7 +239,7 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	}
 
 	lot2 := registerLotValue()
-	lot2["client"] = "SU"
+	lot2["client"] = "DA"
 	lot2["numeroFir"] = "FIR-2"
 	lot2["truckWeightAfter"] = 400.0
 	second := commitLotRegister(t, c, truckID, lot2)
@@ -307,6 +307,9 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if lineInst.Tasks["lineLoad"] != TaskStatusUnavailable {
 		t.Fatalf("lineLoad after openTurno (no weighed pallets) = %q, want unavailable", lineInst.Tasks["lineLoad"])
 	}
+	if g := lineInst.Groups["lineLoad"]; g.CanSpawn {
+		t.Fatalf("lineLoad CanSpawn after openTurno = %#v, want false", g)
+	}
 	if g := lineInst.Groups["palletWeight"]; !g.CanSpawn {
 		t.Fatalf("weigh group chrome = %#v", g)
 	}
@@ -337,8 +340,11 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if lineInst.Tasks["palletWeight"] != TaskStatusAvailable {
 		t.Fatalf("palletWeight still open after weigh = %q", lineInst.Tasks["palletWeight"])
 	}
-	if lineInst.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("lineLoad after weigh (group open) = %q, want actionable", lineInst.Tasks["lineLoad"])
+	if lineInst.Tasks["lineLoad"] != TaskStatusAvailable {
+		t.Fatalf("lineLoad after weigh (group open) = %q, want available (group chrome)", lineInst.Tasks["lineLoad"])
+	}
+	if g := lineInst.Groups["lineLoad"]; !g.CanSpawn {
+		t.Fatalf("lineLoad CanSpawn after weigh = %#v, want true", g)
 	}
 
 	closePalletWeight(t, c, lineID)
@@ -351,7 +357,10 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if lineInst.Tasks["palletWeight"] != TaskStatusDone {
 		t.Fatalf("palletWeight after close = %q", lineInst.Tasks["palletWeight"])
 	}
-	if lineInst.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("lineLoad after weigh close = %q, want actionable (Close not the gate)", lineInst.Tasks["lineLoad"])
+	if lineInst.Tasks["lineLoad"] != TaskStatusAvailable {
+		t.Fatalf("lineLoad after weigh close = %q, want available (Close not the gate)", lineInst.Tasks["lineLoad"])
+	}
+	if g := lineInst.Groups["lineLoad"]; !g.CanSpawn {
+		t.Fatalf("lineLoad CanSpawn after weigh close = %#v, want true", g)
 	}
 }

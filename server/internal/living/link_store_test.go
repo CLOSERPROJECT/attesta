@@ -124,14 +124,14 @@ func TestCommitLinkStoreFailureDoesNotFailOrRollback(t *testing.T) {
 		t.Fatalf("response must still return links: %#v", result.Links)
 	}
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["client"] != "NO" {
+	if result.Domain.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("domain missing after link store failure: %#v", result.Domain.Kind("load"))
 	}
 	stored, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[loadID]["client"] != "NO" {
+	if stored.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }

@@ -32,8 +32,8 @@ type SeedOptions struct {
 const (
 	SeedTruckID  = "261102-1st-1"
 	SeedLineID   = "2026-11-02-1st"
-	SeedLoadNOID = "NO-261102-1"
-	SeedLoadSUID = "SU-261102-1"
+	SeedLoadCOID = "CO-261102-1"
+	SeedLoadDAID = "DA-261102-1"
 )
 
 // SeedDemo puts the demo Feragame Org Config as the Active Config version and,
@@ -87,7 +87,7 @@ func domainSeedEmpty(d Domain) bool {
 }
 
 // seedStagedDemoDomain wipes then Commits one coherent plant story:
-// one intake with two loads (NO + SU), one line turn with all pallets weighed,
+// one intake with two loads (CO + DA), one line turn with all pallets weighed,
 // lineLoad done, and both loads register-closed (fullyProcessed) for Passport.
 // Leaves weightCheck open; Passport Can start is ready for both loads.
 // When passports is set, org rows are deleted before Domain Put so deterministic
@@ -129,8 +129,8 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		after       float64
 		wantLoad    string
 	}{
-		{"NO", "FIR-SEED-NO", 2, 700, SeedLoadNOID},
-		{"SU", "FIR-SEED-SU", 2, 400, SeedLoadSUID},
+		{"CO", "FIR-SEED-CO", 2, 700, SeedLoadCOID},
+		{"DA", "FIR-SEED-DA", 2, 400, SeedLoadDAID},
 	} {
 		res, err := seedCommit(ctx, c, org, admin, CommitRequest{
 			TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
@@ -166,10 +166,10 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		id     string
 		weight float64
 	}{
-		{SeedLoadNOID + ".1", 125.0},
-		{SeedLoadNOID + ".2", 100.0},
-		{SeedLoadSUID + ".1", 90.0},
-		{SeedLoadSUID + ".2", 85.0},
+		{SeedLoadCOID + ".1", 125.0},
+		{SeedLoadCOID + ".2", 100.0},
+		{SeedLoadDAID + ".1", 90.0},
+		{SeedLoadDAID + ".2", 85.0},
 	} {
 		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
 			TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
@@ -187,20 +187,26 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	}
 
 	if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
-		TaskPath:      "line/lineLoad",
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
 		JobInstanceID: SeedLineID,
 		Value: map[string]any{
 			"progress": map[string]any{
-				SeedLoadNOID + ".1": "done",
-				SeedLoadNOID + ".2": "done",
-				SeedLoadSUID + ".1": "done",
-				SeedLoadSUID + ".2": "done",
+				SeedLoadCOID + ".1": "done",
+				SeedLoadCOID + ".2": "done",
+				SeedLoadDAID + ".1": "done",
+				SeedLoadDAID + ".2": "done",
 			},
 		},
+		Mint: spawningNewMint(),
 	}); err != nil {
 		return err
 	}
-	for _, loadID := range []string{SeedLoadNOID, SeedLoadSUID} {
+	if _, err := c.CloseGroup(ctx, org, lineOp, CloseGroupRequest{
+		JobID: "line", JobInstanceID: SeedLineID, GroupID: "lineLoad",
+	}); err != nil {
+		return fmt.Errorf("living seed close lineLoad: %w", err)
+	}
+	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
 		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
 			TaskPath:      GroupTaskPath("line", "containerReg", ProvisionalGroupInstanceID, "register"),
 			JobInstanceID: SeedLineID,
@@ -237,7 +243,7 @@ func seedTruckArriveValue(turno string, truckWeight float64) map[string]any {
 func seedLotRegisterValue(client, numeroFir string, palletCount, truckWeightAfter float64) map[string]any {
 	return map[string]any{
 		"client":           client,
-		"wasteCode":        "191212",
+		"wasteCode":        "160214",
 		"numeroFir":        numeroFir,
 		"palletCount":      palletCount,
 		"truckWeightAfter": truckWeightAfter,

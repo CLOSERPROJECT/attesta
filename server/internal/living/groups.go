@@ -80,8 +80,13 @@ func EvaluateGroupLifecycle(q GroupLifecycleQuery) GroupLifecycle {
 	if v, ok := q.Group["repeatable"].(bool); ok {
 		repeatable = v
 	}
+	canSpawn := repeatable || n == 0
+	// Same readyWhen law as Worklist/Commit: omit ⇒ true; false hides Spawn.
+	if canSpawn && !readyWhenOkForCommit(q.Domain, taskPayload(q.Group), q.JobInstanceID, q.Cfg.Catalogs) {
+		canSpawn = false
+	}
 	return GroupLifecycle{
-		CanSpawn: repeatable || n == 0,
+		CanSpawn: canSpawn,
 		CanClose: groupCloseChildGateMet(q.Group, q.Domain.Submissions, q.JobID, q.JobInstanceID),
 	}
 }

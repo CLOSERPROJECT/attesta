@@ -81,7 +81,7 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryPassportStore()
 	if err := passports.Create(t.Context(), PassportRecord{
-		Org: "feragame", SubjectID: SeedLoadNOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := passports.Get(t.Context(), "feragame", SeedLoadNOID); !errors.Is(err, ErrNotFound) {
+	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("feragame passport after wipe = %v, want ErrNotFound", err)
 	}
 	if _, err := passports.Get(t.Context(), "other", "X"); err != nil {
@@ -306,8 +306,8 @@ func TestSeedDemoReplaceIsNotHarnessRunsAPI(t *testing.T) {
 func assertStagedDemoDomain(t *testing.T, got Domain) {
 	t.Helper()
 	loads := got.Kind("load")
-	if loads[SeedLoadNOID] == nil || loads[SeedLoadSUID] == nil {
-		t.Fatalf("staged loads = %#v, want %s and %s", loads, SeedLoadNOID, SeedLoadSUID)
+	if loads[SeedLoadCOID] == nil || loads[SeedLoadDAID] == nil {
+		t.Fatalf("staged loads = %#v, want %s and %s", loads, SeedLoadCOID, SeedLoadDAID)
 	}
 	if len(got.Kind("truck")) != 1 {
 		t.Fatalf("staged trucks = %#v, want 1", got.Kind("truck"))
@@ -350,7 +350,7 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if shift.Tasks["lineLoad"] != TaskStatusDone {
 		t.Fatalf("lineLoad = %q, want done", shift.Tasks["lineLoad"])
 	}
-	for _, loadID := range []string{SeedLoadNOID, SeedLoadSUID} {
+	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
 		facts := loads[loadID]
 		if facts["fullyProcessed"] != true {
 			t.Fatalf("load %s fullyProcessed = %#v, want true", loadID, facts["fullyProcessed"])

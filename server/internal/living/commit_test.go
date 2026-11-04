@@ -74,7 +74,7 @@ func TestCommitLotRegisterMintsLoadAndPallets(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	loadID := firstLoadID(result.Domain)
-	if loadID == "" || result.Domain.Kind("load")[loadID]["client"] != "NO" {
+	if loadID == "" || result.Domain.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("load = %#v", result.Domain.Kind("load"))
 	}
 	if result.Domain.Kind("load")[loadID]["numeroFir"] != "FIR-1" {

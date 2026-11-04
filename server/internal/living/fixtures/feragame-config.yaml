@@ -23,16 +23,29 @@ domain:
 # Stable catalog vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
 catalogs:
     clients:
-        NO: Nord
-        SU: Sud
+        CO: CO
+        DA: DA
+        DI: DI
+        EC: EC
+        EF: EF
+        EM: EM
+        ER: ER
+        HI: HI
+        MI: MI
+        MO: MO
+        NI: NI
+        PR: PR
+        RE: RE
+        SA: SA
+        SK: SK
     turni:
         1st: 1°
         2nd: 2°
         3rd: 3°
         whole-day: giornata intera
     tareKinds:
-        euro: 25
-        industrial: 30
+        industrial: 25
+        euro: 20
     materials:
         - {key: polvereDiVetro, label: Polvere di vetro}
         - {key: granellaDiVetro, label: Granella di vetro}
@@ -192,11 +205,12 @@ steps:
                         client:
                             type: string
                             title: Cliente
-                            enum: [NO, SU]
+                            enum: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
                         wasteCode:
                             type: string
                             title: Codice CER
-                            enum: ['150101', '150102', '150103', '150104', '191201', '191204', '191212']
+                            enum: ['160214']
+                            default: '160214'
                         numeroFir: {type: string, minLength: 1, title: Numero FIR}
                         palletCount: {type: integer, minimum: 1, title: Numero di bancali}
                         truckWeightAfter: {type: number, exclusiveMinimum: 0, title: Peso camion dopo scarico}
@@ -206,10 +220,10 @@ steps:
                         order: [client, wasteCode, numeroFir, palletCount, truckWeightAfter, notes]
                     client:
                         ui:options:
-                            enumNames: [Nord, Sud]
+                            enumNames: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
                     wasteCode:
                         ui:options:
-                            enumNames: ['15 01 01 — Imballaggi in carta e cartone', '15 01 02 — Imballaggi in plastica', '15 01 03 — Imballaggi in legno', '15 01 04 — Imballaggi metallici', '19 12 01 — Carta e cartone', '19 12 04 — Plastica e gomma', '19 12 12 — Altri rifiuti da trattamento meccanico']
+                            enumNames: ['16.02.14']
                   chrome:
                     progressiveNumber:
                         kind: readonly
@@ -397,6 +411,7 @@ steps:
               startLabel: Nuova pesata
               closeLabel: Chiudi pesatura
               closeRequiresChildSubmission: true
+              instanceLabelEntity: pallet
               substeps:
                 - id: weigh
                   roles: [logistic]
@@ -436,8 +451,8 @@ steps:
                         tareKind:
                             type: string
                             title: Tara
-                            enum: [euro, industrial, custom]
-                            default: euro
+                            enum: [industrial, euro, custom]
+                            default: industrial
                         customTareWeight:
                             type: number
                             exclusiveMinimum: 0
@@ -455,7 +470,7 @@ steps:
                             [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
                     tareKind:
                         ui:options:
-                            enumNames: ['euro (25 kg)', 'industriale (30 kg)', 'personalizzata']
+                            enumNames: ['industriale (25 kg)', 'euro (20 kg)', 'personalizzato']
                     idoneita:
                         ui:options:
                             enumNames: [NIR, IR]
@@ -472,43 +487,54 @@ steps:
                             idoneita: $.idoneita
                             panelCount: $.panelCount
             - id: lineLoad
+              kind: group
+              title: Segna avanzamento
+              repeatable: true
+              startLabel: Nuovo avanzamento
+              closeLabel: Chiudi avanzamento
+              closeRequiresChildSubmission: true
+              instanceLabelEntity: pallet
               unlockFrom: openTurno
               readyWhen: >-
                 $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
-              roles: [line]
-              dynamicProperties:
-                progress:
-                    read: rows
-              reads:
-                rows:
-                    entity: pallet
-                    where: $exists(weight) and $not(progress = 'done')
-                    key: id
-              schema:
-                type: object
-                title: Segna avanzamento
-                properties:
+              substeps:
+                - id: mark
+                  roles: [line]
+                  readyWhen: >-
+                    $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
+                  dynamicProperties:
                     progress:
-                        type: object
-                        additionalProperties:
-                            enum: [partial, done]
-              uiSchema:
-                progress:
-                    ui:field: mapTable
-                    ui:options:
-                        expandable: false
-                        columns: {id: Bancale, value: Avanzamento}
-                    additionalProperties:
+                        read: rows
+                  reads:
+                    rows:
+                        entity: pallet
+                        where: $exists(weight) and $not(progress = 'done')
+                        key: id
+                  schema:
+                    type: object
+                    title: Segna avanzamento
+                    properties:
+                        progress:
+                            type: object
+                            additionalProperties:
+                                enum: [partial, done]
+                  uiSchema:
+                    progress:
+                        ui:field: mapTable
                         ui:options:
-                            enumNames: [Parziale, Fatto]
-                            # U+2013 — empty / stock-clearable trigger; Go expands to shadcn4*
-                            placeholder: –
-              onSubmit:
-                transform:
-                    - op: patchEach
-                      entity: pallet
-                      set:
-                        progress: $value
+                            expandable: false
+                            columns: {id: Bancale, value: Avanzamento}
+                        additionalProperties:
+                            ui:options:
+                                enumNames: [Parziale, Fatto]
+                                # U+2013 — empty / stock-clearable trigger; Go expands to shadcn4*
+                                placeholder: –
+                  onSubmit:
+                    transform:
+                        - op: patchEach
+                          entity: pallet
+                          set:
+                            progress: $value
             - id: containerReg
               kind: group
               title: Registrazione contenitori

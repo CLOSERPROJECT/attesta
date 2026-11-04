@@ -12,13 +12,15 @@ func commitLineLoadDone(t *testing.T, c *Committer, lineID, loadID string) {
 	t.Helper()
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: lineID,
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: lineID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
 				loadID + ".2": "done",
 			},
 		},
+		Mint: spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -52,12 +54,12 @@ func seedSecondSULoad(t *testing.T, c *Committer) string {
 	t.Helper()
 	truckID := commitTruckArrive(t, c)
 	val := registerLotValue()
-	val["client"] = "SU"
+	val["client"] = "DA"
 	val["palletCount"] = 1.0
 	val["truckWeightAfter"] = 650.0
 	result := commitLotRegister(t, c, truckID, val)
 	for id, facts := range result.Domain.Kind("load") {
-		if facts["client"] == "SU" {
+		if facts["client"] == "DA" {
 			return id
 		}
 	}
@@ -420,7 +422,7 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 
 	arrive := post(`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`)
 	truckID, _ := arrive["jobInstanceId"].(string)
-	reg := post(`{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"NO","wasteCode":"191212","numeroFir":"FIR-E2E","palletCount":2,"truckWeightAfter":700,"notes":""}}`)
+	reg := post(`{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-E2E","palletCount":2,"truckWeightAfter":700,"notes":""}}`)
 	postClose("intake", truckID, "lots")
 
 	domain, err := c.Domains.Get(t.Context(), "feragame")
@@ -435,7 +437,8 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	post(`{"taskPath":"line/palletWeight/new/weigh","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"palletId":"` + loadID + `.1","averagePanelWeight":10,"tareKind":"euro","weight":400,"idoneita":"NIR","panelCount":1}}`)
 	post(`{"taskPath":"line/palletWeight/new/weigh","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"palletId":"` + loadID + `.2","averagePanelWeight":10,"tareKind":"euro","weight":450,"idoneita":"NIR","panelCount":1}}`)
 	postClose("line", lineID, "palletWeight")
-	post(`{"taskPath":"line/lineLoad","jobInstanceId":"` + lineID + `","value":{"progress":{"` + loadID + `.1":"done","` + loadID + `.2":"done"}}}`)
+	post(`{"taskPath":"line/lineLoad/new/mark","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"progress":{"` + loadID + `.1":"done","` + loadID + `.2":"done"}}}`)
+	postClose("line", lineID, "lineLoad")
 	post(`{"taskPath":"line/containerReg/new/register","jobInstanceId":"` + lineID + `","mint":{"kind":"spawningNew"},"value":{"sourceLoadId":"` + loadID + `","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)
 	postClose("line", lineID, "containerReg")
 
@@ -446,7 +449,7 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	if len(domain.Kind("container")) != 2 {
 		t.Fatalf("containers = %#v", domain.Kind("container"))
 	}
-	var sawOpen, sawLineLoad, sawRegister bool
+	var sawOpen, sawMark, sawRegister bool
 	for _, s := range domain.Submissions {
 		if s.JobID != "line" || s.JobInstanceID != lineID {
 			continue
@@ -454,15 +457,17 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		switch s.TaskID {
 		case "openTurno":
 			sawOpen = true
-		case "lineLoad":
-			sawLineLoad = true
+		case "mark":
+			if s.GroupID == "lineLoad" {
+				sawMark = true
+			}
 		case "register":
 			if s.GroupID == "containerReg" {
 				sawRegister = true
 			}
 		}
 	}
-	if !sawOpen || !sawLineLoad || !sawRegister {
+	if !sawOpen || !sawMark || !sawRegister {
 		t.Fatalf("line Submissions incomplete: %#v", domain.Submissions)
 	}
 	if !IsGroupClosed(domain.ClosedGroups, "line", lineID, "containerReg") {

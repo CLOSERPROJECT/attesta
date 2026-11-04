@@ -153,12 +153,12 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 		}
 	}
 	assertRow("Netto lotto", "800", nil)
-	assertRow("Massa netta pannelli", "175", nil)
+	assertRow("Massa netta pannelli", "185", nil)
 	assertRow("Plastica", "70", "info")
 	assertRow("Alluminio", "30", "info")
 	assertRow("mystery", "5", "info")
 	assertRow("Totale estratto", "105", nil)
-	assertRow("Pannelli vs estratto", "70 kg (60%)", "danger")
+	assertRow("Pannelli vs estratto", "80 kg (56.75675675675676%)", "danger")
 }
 
 func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {

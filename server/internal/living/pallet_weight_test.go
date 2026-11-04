@@ -68,8 +68,11 @@ func TestLineLoadUnlockFromOpenTurnoReadyWhenWeighNotClose(t *testing.T) {
 	weighWL := ProjectWorklist(cfg, weighed, lineOp)
 	weighLine, _ := worklistJobByID(weighWL, "line")
 	weighInst, ok := worklistInstance(weighLine, lineID)
-	if !ok || weighInst.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("weighed leftover + open weigh group: lineLoad = %#v, want actionable", weighInst)
+	if !ok || weighInst.Tasks["lineLoad"] != TaskStatusAvailable {
+		t.Fatalf("weighed leftover + open weigh group: lineLoad = %#v, want available", weighInst)
+	}
+	if g := weighInst.Groups["lineLoad"]; !g.CanSpawn {
+		t.Fatalf("lineLoad CanSpawn after weigh = %#v, want true", g)
 	}
 	if weighInst.Tasks["palletWeight"] != TaskStatusAvailable {
 		t.Fatalf("palletWeight still open = %q, want available", weighInst.Tasks["palletWeight"])
@@ -87,8 +90,11 @@ func TestLineLoadUnlockFromOpenTurnoReadyWhenWeighNotClose(t *testing.T) {
 	closeWL := ProjectWorklist(cfg, closed, lineOp)
 	closeLine, _ := worklistJobByID(closeWL, "line")
 	closeInst, ok := worklistInstance(closeLine, lineID)
-	if !ok || closeInst.Tasks["lineLoad"] != TaskStatusActionable {
+	if !ok || closeInst.Tasks["lineLoad"] != TaskStatusAvailable {
 		t.Fatalf("after Close weigh: lineLoad = %#v (Close must not special-case)", closeInst)
+	}
+	if g := closeInst.Groups["lineLoad"]; !g.CanSpawn {
+		t.Fatalf("lineLoad CanSpawn after Close weigh = %#v, want true", g)
 	}
 	if closeInst.Tasks["palletWeight"] != TaskStatusDone {
 		t.Fatalf("palletWeight after close = %q, want done", closeInst.Tasks["palletWeight"])

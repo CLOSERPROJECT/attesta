@@ -240,7 +240,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		t.Fatalf("truck jobInstanceId = %q", truckID)
 	}
 
-	body := `{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"NO","wasteCode":"191212","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
+	body := `{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()

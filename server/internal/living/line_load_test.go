@@ -5,14 +5,38 @@ import (
 	"testing"
 )
 
-func lineLoadTask(line Job) TaskConfig {
+func lineLoadGroup(line Job) TaskConfig {
 	v, _ := TaskByID(line.Tasks, "lineLoad")
 	return v
 }
 
+func lineLoadMarkTask(line Job) TaskConfig {
+	v, _ := TaskByID(lineLoadGroup(line).ChildTasks(), "mark")
+	return v
+}
+
+func commitLineLoadMark(t *testing.T, c *Committer, lineID string, progress map[string]any) CommitResult {
+	t.Helper()
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
+	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: lineID,
+		Value:         map[string]any{"progress": progress},
+		Mint:          spawningNewMint(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
 func TestFixtureLineLoadReadsDomainProgress(t *testing.T) {
 	line := lineJob(t)
-	task := lineLoadTask(line)
+	group := lineLoadGroup(line)
+	if !group.IsGroup() {
+		t.Fatalf("lineLoad must be a group, got %#v", group)
+	}
+	task := lineLoadMarkTask(line)
 	dyn := task["dynamicProperties"].(map[string]any)
 	progress := dyn["progress"].(map[string]any)
 	if progress["read"] != "rows" {
@@ -20,16 +44,19 @@ func TestFixtureLineLoadReadsDomainProgress(t *testing.T) {
 	}
 }
 
-func TestLineLoadSubmissionSatisfiesStartsWhen(t *testing.T) {
+func TestLineLoadMarkSubmissionDoesNotSatisfyGroupStartsWhen(t *testing.T) {
 	line := lineJob(t)
 	gate := &StartsWhen{
 		Task:       StartsWhenRef{JobID: "line", TaskID: "lineLoad"},
 		Quantifier: "some",
 	}
-	subs := []Submission{sub("line", "lineLoad", "2026-10-19-1st")}
 	instances := []JobInstance{{JobID: "line", ID: "2026-10-19-1st", Label: "2026-10-19 Turno: 1°"}}
-	if !IsStartsWhenSatisfied(gate, subs, instances, lineLoadTask(line)) {
-		t.Fatal("lineLoad Submission must satisfy startsWhen")
+	subs := []Submission{{
+		JobID: "line", TaskID: "mark", JobInstanceID: "2026-10-19-1st",
+		GroupID: "lineLoad", GroupInstanceID: "lineLoad-1",
+	}}
+	if IsStartsWhenSatisfied(gate, subs, instances, lineLoadGroup(line)) {
+		t.Fatal("child mark Submission must not satisfy startsWhen targeting group lineLoad")
 	}
 }
 
@@ -37,19 +64,10 @@ func TestCommitLineLoadSubmissionUnlocksNext(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	loadID, lineID := seedLineReadyForLineLoad(t, c)
 
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: lineID,
-		Value: map[string]any{
-			"progress": map[string]any{
-				loadID + ".1": "done",
-				loadID + ".2": "partial",
-			},
-		},
+	result := commitLineLoadMark(t, c, lineID, map[string]any{
+		loadID + ".1": "done",
+		loadID + ".2": "partial",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if result.Domain.Kind("pallet")[loadID+".1"]["progress"] != "done" {
 		t.Fatalf("pallet .1 = %#v", result.Domain.Kind("pallet")[loadID+".1"])
 	}
@@ -62,20 +80,34 @@ func TestCommitLineLoadSubmissionUnlocksNext(t *testing.T) {
 	}
 
 	line := lineJob(t)
-	tasks := []TaskConfig{lineLoadTask(line), {"id": "next"}}
+	// Group predecessor unlocks the next sibling only after Close.
+	if IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
+		JobInstanceID: lineID, Submissions: result.Domain.Submissions, Tasks: []TaskConfig{lineLoadGroup(line), {"id": "next"}},
+		ClosedGroups: result.Domain.ClosedGroups,
+	}) {
+		t.Fatal("next must stay locked until lineLoad Close")
+	}
+	closed, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
+		JobID: "line", JobInstanceID: lineID, GroupID: "lineLoad",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
-		JobInstanceID: lineID, Submissions: result.Domain.Submissions, Tasks: tasks,
+		JobInstanceID: lineID, Submissions: closed.Domain.Submissions, Tasks: []TaskConfig{lineLoadGroup(line), {"id": "next"}},
+		ClosedGroups: closed.Domain.ClosedGroups,
 	}) {
-		t.Fatal("lineLoad Submission must unlock next Task")
+		t.Fatal("lineLoad Close must unlock next Task")
 	}
-	// containerReg unlocks from openTurno (path), not lineLoad; still unlocked after lineLoad.
+	// containerReg unlocks from openTurno (path), not lineLoad; still unlocked after mark.
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "containerReg",
 		JobInstanceID: lineID, Submissions: result.Domain.Submissions, Tasks: line.Tasks,
 		ClosedGroups: result.Domain.ClosedGroups,
 	}) {
-		t.Fatal("containerReg must stay unlocked via openTurno after lineLoad Submission")
+		t.Fatal("containerReg must stay unlocked via openTurno after lineLoad mark")
 	}
 }
 
@@ -88,36 +120,19 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		t.Fatal("repeatable line must stay startable")
 	}
 
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	first, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: line1,
-		Value: map[string]any{
-			"progress": map[string]any{
-				loadID + ".1": "done",
-				loadID + ".2": "partial",
-			},
-		},
+	first := commitLineLoadMark(t, c, line1, map[string]any{
+		loadID + ".1": "done",
+		loadID + ".2": "partial",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	line2 := commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "2nd"})
 	// closeRequiresChildSubmission: need a weigh leaf on this Job instance before Close.
 	_ = commitWeigh(t, c, line2, loadID+".1", 11)
 	closePalletWeight(t, c, line2)
 
-	second, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: line2,
-		Value: map[string]any{
-			"progress": map[string]any{
-				loadID + ".2": nil,
-			},
-		},
+	second := commitLineLoadMark(t, c, line2, map[string]any{
+		loadID + ".2": nil,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	if _, has := second.Domain.Kind("pallet")[loadID+".2"]["progress"]; has {
 		t.Fatalf("second instance clear must unset progress: %#v", second.Domain.Kind("pallet")[loadID+".2"])
@@ -142,20 +157,20 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		t.Fatalf("job instances = %#v", second.Domain.JobInstances)
 	}
 
-	var lineLoadOn1st, lineLoadOn2nd int
+	var markOn1st, markOn2nd int
 	for _, s := range second.Domain.Submissions {
-		if s.JobID != "line" || s.TaskID != "lineLoad" {
+		if s.JobID != "line" || s.TaskID != "mark" || s.GroupID != "lineLoad" {
 			continue
 		}
 		switch s.JobInstanceID {
 		case line1:
-			lineLoadOn1st++
+			markOn1st++
 		case line2:
-			lineLoadOn2nd++
+			markOn2nd++
 		}
 	}
-	if lineLoadOn1st != 1 || lineLoadOn2nd != 1 {
-		t.Fatalf("lineLoad Submissions per instance: 1st=%d 2nd=%d", lineLoadOn1st, lineLoadOn2nd)
+	if markOn1st != 1 || markOn2nd != 1 {
+		t.Fatalf("mark Submissions per instance: 1st=%d 2nd=%d", markOn1st, markOn2nd)
 	}
 
 	rows := lineLoadRowIDs(second.Domain)
@@ -175,8 +190,10 @@ func TestCommitLineLoadRejectsEmptyBatch(t *testing.T) {
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: lineID,
-		Value: map[string]any{"progress": map[string]any{}},
+		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
+		JobInstanceID: lineID,
+		Value:         map[string]any{"progress": map[string]any{}},
+		Mint:          spawningNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
@@ -195,8 +212,47 @@ func TestCommitLineLoadRejectsEmptyBatch(t *testing.T) {
 	}
 }
 
+func TestCommitLineLoadAllowsMultipleMarks(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
+
+	_ = commitLineLoadMark(t, c, lineID, map[string]any{
+		loadID + ".1": "partial",
+		loadID + ".2": "partial",
+	})
+	second := commitLineLoadMark(t, c, lineID, map[string]any{
+		loadID + ".1": "done",
+		loadID + ".2": "done",
+	})
+	var marks int
+	for _, s := range second.Domain.Submissions {
+		if s.JobID == "line" && s.GroupID == "lineLoad" && s.TaskID == "mark" && s.JobInstanceID == lineID {
+			marks++
+		}
+	}
+	if marks != 2 {
+		t.Fatalf("mark submissions = %d, want 2", marks)
+	}
+	wl := ProjectWorklist(mustActiveConfig(t, c), second.Domain, adminOp())
+	inst, ok := worklistInstance(worklistMustJob(t, wl, "line"), lineID)
+	if !ok {
+		t.Fatal("missing line instance")
+	}
+	group := inst.Groups["lineLoad"]
+	if group.CanSpawn {
+		t.Fatal("CanSpawn must be false when no unfinished weighed pallets remain")
+	}
+	if len(group.Instances) != 2 {
+		t.Fatalf("group instances = %#v, want 2 marks", group.Instances)
+	}
+	wantLabel := loadID + ".1, " + loadID + ".2"
+	if group.Instances[1].Label != wantLabel {
+		t.Fatalf("second mark label = %q, want pallet ids %q", group.Instances[1].Label, wantLabel)
+	}
+}
+
 func TestFixtureLineLoadAdditionalPropertiesIsCellMap(t *testing.T) {
-	task := map[string]any(lineLoadTask(lineJob(t)))
+	task := map[string]any(lineLoadMarkTask(lineJob(t)))
 	add := additionalPropertiesSchema(task, "progress")
 	if !additionalPropertiesIsCellMap(add) {
 		t.Fatalf("additionalPropertiesIsCellMap = false (null|enum anyOf must still classify as cell map); schema=%#v", add)

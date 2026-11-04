@@ -20,7 +20,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["client"] != "NO" {
+	if result.Domain.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("domain rolled back? %#v", result.Domain.Kind("load"))
 	}
 	if len(port.calls) != 2 {
@@ -33,8 +33,8 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 		t.Fatalf("call1 = %#v", port.calls[1])
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)
-	if body0["wasteCode"] != "191212" {
-		t.Fatalf("wasteCode = %#v, want 191212", body0["wasteCode"])
+	if body0["wasteCode"] != "160214" {
+		t.Fatalf("wasteCode = %#v, want 160214", body0["wasteCode"])
 	}
 	if body0["netWeight"] != 300.0 {
 		t.Fatalf("netWeight = %#v, want 300", body0["netWeight"])
@@ -72,7 +72,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[loadID]["client"] != "NO" {
+	if stored.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("persisted domain = %#v", stored)
 	}
 }
@@ -99,8 +99,8 @@ func TestCommitRegisterOnePalletLabelsBodyIsArray(t *testing.T) {
 		t.Fatal("expected labels http call")
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)
-	if body0["wasteCode"] != "191212" {
-		t.Fatalf("wasteCode = %#v, want 191212", body0["wasteCode"])
+	if body0["wasteCode"] != "160214" {
+		t.Fatalf("wasteCode = %#v, want 160214", body0["wasteCode"])
 	}
 	if body0["netWeight"] != 300.0 {
 		t.Fatalf("netWeight = %#v, want 300", body0["netWeight"])
@@ -141,7 +141,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 		t.Fatalf("Commit must succeed when HttpPort fails: %v", err)
 	}
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["client"] != "NO" {
+	if result.Domain.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("domain missing after http failure: %#v", result.Domain.Kind("load"))
 	}
 	if len(result.Domain.Kind("pallet")) != 2 {
@@ -161,7 +161,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[loadID]["client"] != "NO" {
+	if stored.Kind("load")[loadID]["client"] != "CO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }

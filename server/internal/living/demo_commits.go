@@ -10,7 +10,7 @@ import (
 // Truck: YYMMDD-turno-n from truckArrive. Load: client-YYMMDD-n from lots/register.
 const (
 	DemoTruckInstanceID = "261019-1st-1"
-	DemoLoadInstanceID  = "NO-261019-1"
+	DemoLoadInstanceID  = "CO-261019-1"
 	DemoLineShiftID     = "2026-10-19-1st"
 )
 
@@ -51,7 +51,7 @@ func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *Committer, org str
 		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
 		JobInstanceID: truckID,
 		Value: map[string]any{
-			"client": "NO", "wasteCode": "191212", "numeroFir": "FIR-1",
+			"client": "CO", "wasteCode": "160214", "numeroFir": "FIR-1",
 			"palletCount": 2.0, "truckWeightAfter": 700.0, "notes": "",
 		},
 		Mint: spawningNewMint(),
