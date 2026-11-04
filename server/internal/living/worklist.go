@@ -77,8 +77,9 @@ type WorklistGroupInstance struct {
 }
 
 // ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
-// statuses, then scopes canStart to OperatorIdentity Config-role intersection
-// with the Job's first Task (board chrome; not Cerbos). A Task is done after
+// statuses, then scopes canStart to first-Task readyWhen (omit ⇒ true; same
+// Domain grammar as Commit) and OperatorIdentity Config-role intersection with
+// the Job's first Task (board chrome; not Cerbos). A Task is done after
 // Submission on the instance (Submission law). Unlocked leaves fold readyWhen
 // (false ⇒ unavailable), else split by role eligibility into available vs
 // actionable (ADR-0005).
@@ -113,6 +114,13 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 		}
 		children := tc.ChildTasks()
 		chrome = append(chrome, projectWorklistTasks(children, OrderedTaskIDs(children))...)
+	}
+	// Provisional start has no instance yet; evaluate first-Task readyWhen over Domain only.
+	if canStart && len(ordered) > 0 {
+		if tc, ok := TaskByID(job.Tasks, ordered[0]); ok &&
+			!readyWhenOkForCommit(domain, taskPayload(tc), "", cfg.Catalogs) {
+			canStart = false
+		}
 	}
 	if canStart && (len(chrome) == 0 || !rolesIntersect(op.Roles, chrome[0].Roles)) {
 		canStart = false

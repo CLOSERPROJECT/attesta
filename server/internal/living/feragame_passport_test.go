@@ -50,6 +50,10 @@ func TestFeragamePassportFixtureShape(t *testing.T) {
 	}
 	job := cfg.Jobs.Values["passport"].(Job)
 	selectTask, _ := TaskByID(job.Tasks, "select")
+	readyWhen, _ := selectTask["readyWhen"].(string)
+	if !strings.Contains(readyWhen, "fullyProcessed") || !strings.Contains(readyWhen, "locked") {
+		t.Fatalf("select readyWhen = %q, want eligible-load count", readyWhen)
+	}
 	reads, _ := selectTask["reads"].(map[string]any)
 	loads, _ := reads["loads"].(map[string]any)
 	where, _ := loads["where"].(string)
@@ -75,6 +79,14 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	c.Now = func() time.Time { return time.Date(2026, 11, 4, 14, 0, 0, 0, time.UTC) }
 	op := adminOp()
 
+	emptyWL, err := loader.Load(t.Context(), "feragame", op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if passportWL, ok := worklistJobByID(emptyWL.Worklist, "passport"); !ok || passportWL.CanStart {
+		t.Fatalf("passport canStart on empty Domain = %#v, want false", passportWL)
+	}
+
 	loadID, _ := seedFullyProcessedLoad(t, c)
 
 	wl, err := loader.Load(t.Context(), "feragame", op)
@@ -83,7 +95,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	}
 	passportWL, ok := worklistJobByID(wl.Worklist, "passport")
 	if !ok || !passportWL.CanStart {
-		t.Fatalf("passport Job canStart = %#v", passportWL)
+		t.Fatalf("passport Job canStart after eligible load = %#v", passportWL)
 	}
 
 	selectBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "select", "", "", "")
@@ -192,11 +204,12 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("second lock err = %v (want passport-exists)", err)
 	}
 
-	reselect, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "select", "", "", "")
+	// No eligible loads left ⇒ canStart false (provisional select is not mountable).
+	afterLock, err := loader.Load(t.Context(), "feragame", op)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if containsString(loadEnumIDs(t, reselect, "loadId"), loadID) {
-		t.Fatalf("locked load still in select enum")
+	if passportAfter, ok := worklistJobByID(afterLock.Worklist, "passport"); !ok || passportAfter.CanStart {
+		t.Fatalf("passport canStart after last lock = %#v, want false", passportAfter)
 	}
 }

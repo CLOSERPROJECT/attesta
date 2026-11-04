@@ -51,6 +51,14 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 	if !line.CanStart {
 		t.Fatal("line canStart want true (plant line has no startsWhen)")
 	}
+
+	passport, ok := worklistJobByID(result.Worklist, "passport")
+	if !ok {
+		t.Fatal("missing passport worklist job")
+	}
+	if passport.CanStart {
+		t.Fatal("passport canStart want false on empty Domain (select readyWhen)")
+	}
 }
 
 func TestLoadJSONWorklistIntakeUnlockOrder(t *testing.T) {
@@ -199,8 +207,8 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 		t.Fatal("administration viewer must not canStart line (openTurno is line-only)")
 	}
 	passport, _ := worklistJobByID(got.Worklist, "passport")
-	if !passport.CanStart || passport.StartLabel != "Blocca passaporto" {
-		t.Fatalf("passport Job = %#v", passport)
+	if passport.CanStart || passport.StartLabel != "Blocca passaporto" {
+		t.Fatalf("passport Job = %#v, want canStart false on empty Domain", passport)
 	}
 }
 
@@ -823,6 +831,49 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 		g := inst.Groups["bundle"]
 		if len(g.Instances) != 1 || g.Instances[0].Tasks["childGate"] != TaskStatusUnavailable {
 			t.Fatalf("group child readyWhen false = %#v", g.Instances)
+		}
+	})
+
+	t.Run("canStart_folds_first_task_readyWhen", func(t *testing.T) {
+		cfg := OrgConfig{
+			Jobs: OrderedObject{
+				Keys: []string{"startJob"},
+				Values: map[string]any{
+					"startJob": Job{
+						Repeatable: true,
+						Tasks: []TaskConfig{
+							leaf("starter", "$count($domain.widget.*) >= 1"),
+						},
+					},
+				},
+			},
+		}
+		wl := ProjectWorklist(cfg, EmptyDomain(), op)
+		job := worklistMustJob(t, wl, "startJob")
+		if job.CanStart {
+			t.Fatal("canStart want false when first-Task readyWhen fails")
+		}
+		withWidget := EmptyDomain()
+		putKind(&withWidget, "widget", EntityMap{"W1": {"n": 1}})
+		wl = ProjectWorklist(cfg, withWidget, op)
+		job = worklistMustJob(t, wl, "startJob")
+		if !job.CanStart {
+			t.Fatal("canStart want true when first-Task readyWhen holds")
+		}
+		omitCfg := OrgConfig{
+			Jobs: OrderedObject{
+				Keys: []string{"startJob"},
+				Values: map[string]any{
+					"startJob": Job{
+						Repeatable: true,
+						Tasks:      []TaskConfig{leaf("starter", nil)},
+					},
+				},
+			},
+		}
+		wl = ProjectWorklist(omitCfg, EmptyDomain(), op)
+		if !worklistMustJob(t, wl, "startJob").CanStart {
+			t.Fatal("omit readyWhen ⇒ canStart true")
 		}
 	})
 }

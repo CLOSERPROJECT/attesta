@@ -692,6 +692,9 @@ steps:
         substeps:
             - id: select
               roles: [administration]
+              # Gate Worklist canStart until ≥1 eligible load (enum where alone does not).
+              readyWhen: >-
+                $count($domain.load.*[fullyProcessed = true and $not(locked = true)]) >= 1
               enumReads:
                 loadId: loads
               reads:
