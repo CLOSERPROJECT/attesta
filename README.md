@@ -240,6 +240,7 @@ Use `Accept: application/json` or `?format=json` to retrieve the JSON export.
 ```text
 server/       Go server, templates, generated API docs, stream config
 web/          Vite frontend bundle source and build output
+app/          Svelte frontend bundle source and build output
 cerbos/       Cerbos config and policies
 deployment/   Dockerfiles and Docker Compose files
 Taskfile.yml  Common local development commands
