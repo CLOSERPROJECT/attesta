@@ -106,13 +106,25 @@
 		gap: 0;
 	}
 
-	/* Row: weight column grows; checkbox column hugs control size. */
-	.compact-array-item :global([data-layout='object-properties'] > *:first-child) {
+	/* Collapse empty hiddenField wrappers (still in order). Presence marks hug like checkbox. */
+	.compact-array-item :global([data-layout='object-properties'] > *:has([data-hidden-field])) {
+		display: none;
+	}
+
+	/* Weight grows; checkbox / presence-mark hug — not first/last-child (hidden siblings stay). */
+	.compact-array-item
+		:global(
+			[data-layout='object-properties']
+				> *:not(:has([data-hidden-field])):not(:has([data-testid='checkbox-only'])):not(
+					:has([data-presence-mark])
+				)
+		) {
 		flex: 1 1 0;
 		min-width: 0;
 	}
 
-	.compact-array-item :global([data-layout='object-properties'] > *:last-child) {
+	.compact-array-item :global([data-layout='object-properties'] > *:has([data-testid='checkbox-only'])),
+	.compact-array-item :global([data-layout='object-properties'] > *:has([data-presence-mark])) {
 		flex: 0 0 auto;
 		flex-shrink: 0;
 		width: auto;
@@ -122,7 +134,10 @@
 		align-items: center;
 	}
 
-	.compact-array-item :global([data-layout='object-properties'] > *:last-child [data-slot='field']) {
+	.compact-array-item
+		:global([data-layout='object-properties'] > *:has([data-testid='checkbox-only']) [data-slot='field']),
+	.compact-array-item
+		:global([data-layout='object-properties'] > *:has([data-presence-mark]) [data-slot='field']) {
 		width: auto;
 		align-items: center;
 		justify-content: center;

@@ -1,7 +1,7 @@
-// One-shot: wipe feragame Domain and Commit smoke jobs for /app dataReport:
-//   - intake NIR-…-NO-1 through weightCheck + line through containerReg → loadedExtracted
-//   - intake NIR-…-SU-1 through palletWeight only → weightCheck available
-// SeedDemo(--replace) already leaves NO-1 through palletWeight + line/shift 1st.
+// One-shot: wipe feragame Domain and Commit smoke jobs for /app dataReport.
+// loadedExtracted is parked off the live line (ticket 02); this seed stops at
+// containerReg/register and still prints weightCheck chrome when available.
+// Focused SeedDemo(--replace) leaves one truck × two loads + one line turn through palletWeight.
 package main
 
 import (
@@ -60,7 +60,9 @@ func main() {
 		},
 	})
 	res := commit(c, logOp, living.CommitRequest{
-		TaskPath: "line/containerReg", JobInstanceID: living.DemoLineShiftID,
+		TaskPath: living.GroupTaskPath("line", "containerReg", living.ProvisionalGroupInstanceID, "register"),
+		JobInstanceID: living.DemoLineShiftID,
+		Mint: &living.CommitMint{Kind: living.MintKindSpawningNew},
 		Value: map[string]any{
 			"sourceLoadId": loadID,
 			"polvereDiVetro": []any{
@@ -118,27 +120,19 @@ func main() {
 		}
 	}
 	refs := living.CollectActionableTaskRefs(cfg, wl)
-	var haveLE, haveWC bool
+	var haveWC bool
 	for _, ref := range refs {
 		b, err := living.BuildTaskFormBundle(cfg, res.Domain, ref)
 		must(err)
 		cd, _ := b.Bindings["chromeDisplay"].(map[string]any)
-		switch b.TaskID {
-		case "loadedExtracted":
-			disp, _ := cd["resultsReport"].(map[string]any)
-			secs, _ := disp["sections"].([]any)
-			fmt.Printf("loadedExtracted available; resultsReport sections=%d\n", len(secs))
-			haveLE = true
-		case "weightCheck":
+		if b.TaskID == "weightCheck" {
 			disp, _ := cd["registeredData"].(map[string]any)
 			rows, _ := disp["rows"].([]any)
 			fmt.Printf("weightCheck@%s available; registeredData rows=%d\n", b.JobInstanceID, len(rows))
 			haveWC = true
 		}
 	}
-	if !haveLE {
-		must(fmt.Errorf("loadedExtracted bundle missing"))
-	}
+	fmt.Println("loadedExtracted parked off live line (fixtures/parked-loaded-extracted.yaml)")
 	if !haveWC {
 		must(fmt.Errorf("weightCheck bundle missing"))
 	}

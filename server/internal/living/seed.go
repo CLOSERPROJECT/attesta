@@ -18,24 +18,25 @@ type SeedOptions struct {
 	WipeDomain bool
 	// SkipEmptyDomainStaging keeps a missing or empty Domain untouched when
 	// WipeDomain is false. Handler/smoke helpers that only want Active Config
-	// set this — without it, EmptyDomain() would pick up the stage matrix.
+	// set this — without it, EmptyDomain() would pick up the focused fixture.
 	SkipEmptyDomainStaging bool
 }
 
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
 // Truck grammar: YYMMDD-turno-n from seedTruckArriveValue (date 2026-11-02).
 // Line grammar: date-turno from openTurno.
+// Load grammar: client-YYMMDD-n from lots/register.
 const (
-	SeedTruckLotsOpenID    = "261102-1st-1"
-	SeedTruckWeightCheckID = "261102-1st-2"
-	SeedLineWeighOpenID    = "2026-11-02-1st"
-	SeedLineLineLoadID     = "2026-11-02-2nd"
+	SeedTruckID  = "261102-1st-1"
+	SeedLineID   = "2026-11-02-1st"
+	SeedLoadNOID = "NO-261102-1"
+	SeedLoadSUID = "SU-261102-1"
 )
 
 // SeedDemo puts the demo Feragame Org Config as the Active Config version and,
 // when WipeDomain is set or Domain is missing/empty, replaces the org Domain
-// with the staged multi-actor fixture (not EmptyDomain), unless
-// SkipEmptyDomainStaging opts out of the missing/empty path.
+// with the focused plant fixture (one intake × two loads + one line turn),
+// unless SkipEmptyDomainStaging opts out of the missing/empty path.
 // Demo/fixture only — product hosts must not require this demo seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
 func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opts SeedOptions) (OrgConfig, error) {
@@ -82,8 +83,9 @@ func domainSeedEmpty(d Domain) bool {
 	return len(d.JobInstances) == 0 && len(d.Submissions) == 0
 }
 
-// seedStagedDemoDomain wipes then Commits the plant stage matrix so split-role
-// Worklists diverge (administration / logistic / line) under Task groups.
+// seedStagedDemoDomain wipes then Commits one coherent plant story:
+// one intake with two loads (NO + SU), one line turn with all pallets weighed.
+// Leaves weightCheck / lineLoad / containerReg open for operators — no register yet.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
 	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
 		return err
@@ -98,7 +100,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	logistic := OperatorIdentity{UserID: "seed-logistic", Org: org, Roles: []string{"logistic"}}
 	lineOp := OperatorIdentity{UserID: "seed-line", Org: org, Roles: []string{"line"}}
 
-	lotsOpen, err := seedCommit(ctx, c, org, admin, CommitRequest{
+	arrive, err := seedCommit(ctx, c, org, admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    seedTruckArriveValue("1st", 1000),
 		Mint:     startingNewMint(),
@@ -106,45 +108,39 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if err != nil {
 		return err
 	}
-	if lotsOpen.JobInstanceID != SeedTruckLotsOpenID {
-		return fmt.Errorf("living seed: lots-open truck id %q, want %q", lotsOpen.JobInstanceID, SeedTruckLotsOpenID)
+	if arrive.JobInstanceID != SeedTruckID {
+		return fmt.Errorf("living seed: truck id %q, want %q", arrive.JobInstanceID, SeedTruckID)
 	}
 
-	wcTruck, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath: "intake/truckArrive",
-		Value:    seedTruckArriveValue("1st", 2000),
-		Mint:     startingNewMint(),
-	})
-	if err != nil {
-		return err
-	}
-	if wcTruck.JobInstanceID != SeedTruckWeightCheckID {
-		return fmt.Errorf("living seed: weightCheck truck id %q, want %q", wcTruck.JobInstanceID, SeedTruckWeightCheckID)
-	}
-	lot, err := seedCommit(ctx, c, org, admin, CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
-		JobInstanceID: wcTruck.JobInstanceID,
-		Value:         seedLotRegisterValue("NO", "FIR-SEED-WC", 2, 1400),
-		Mint:          spawningNewMint(),
-	})
-	if err != nil {
-		return err
-	}
-	var loadID string
-	for id := range lot.Domain.Kind("load") {
-		loadID = id
-		break
-	}
-	if loadID == "" {
-		return fmt.Errorf("living seed: expected minted load")
+	for _, lot := range []struct {
+		client, fir string
+		pallets     float64
+		after       float64
+		wantLoad    string
+	}{
+		{"NO", "FIR-SEED-NO", 2, 700, SeedLoadNOID},
+		{"SU", "FIR-SEED-SU", 2, 400, SeedLoadSUID},
+	} {
+		res, err := seedCommit(ctx, c, org, admin, CommitRequest{
+			TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+			JobInstanceID: SeedTruckID,
+			Value:         seedLotRegisterValue(lot.client, lot.fir, lot.pallets, lot.after),
+			Mint:          spawningNewMint(),
+		})
+		if err != nil {
+			return err
+		}
+		if _, ok := res.Domain.Kind("load")[lot.wantLoad]; !ok {
+			return fmt.Errorf("living seed: expected load %q, got %#v", lot.wantLoad, res.Domain.Kind("load"))
+		}
 	}
 	if _, err := c.CloseGroup(ctx, org, admin, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: wcTruck.JobInstanceID, GroupID: "lots",
+		JobID: "intake", JobInstanceID: SeedTruckID, GroupID: "lots",
 	}); err != nil {
 		return fmt.Errorf("living seed close lots: %w", err)
 	}
 
-	weighOpen, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+	line, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
 		TaskPath: "line/openTurno",
 		Value:    map[string]any{"date": "2026-11-02", "turno": "1st"},
 		Mint:     startingNewMint(),
@@ -152,31 +148,21 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if err != nil {
 		return err
 	}
-	if weighOpen.JobInstanceID != SeedLineWeighOpenID {
-		return fmt.Errorf("living seed: weigh-open line id %q, want %q", weighOpen.JobInstanceID, SeedLineWeighOpenID)
-	}
-
-	lineLoadReady, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
-		TaskPath: "line/openTurno",
-		Value:    map[string]any{"date": "2026-11-02", "turno": "2nd"},
-		Mint:     startingNewMint(),
-	})
-	if err != nil {
-		return err
-	}
-	if lineLoadReady.JobInstanceID != SeedLineLineLoadID {
-		return fmt.Errorf("living seed: lineLoad line id %q, want %q", lineLoadReady.JobInstanceID, SeedLineLineLoadID)
+	if line.JobInstanceID != SeedLineID {
+		return fmt.Errorf("living seed: line id %q, want %q", line.JobInstanceID, SeedLineID)
 	}
 	for _, row := range []struct {
 		id     string
 		weight float64
 	}{
-		{loadID + ".1", 125.0},
-		{loadID + ".2", 100.0},
+		{SeedLoadNOID + ".1", 125.0},
+		{SeedLoadNOID + ".2", 100.0},
+		{SeedLoadSUID + ".1", 90.0},
+		{SeedLoadSUID + ".2", 85.0},
 	} {
 		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
 			TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
-			JobInstanceID: lineLoadReady.JobInstanceID,
+			JobInstanceID: SeedLineID,
 			Value:         weighValue(row.id, row.weight),
 			Mint:          spawningNewMint(),
 		}); err != nil {
@@ -184,7 +170,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		}
 	}
 	if _, err := c.CloseGroup(ctx, org, logistic, CloseGroupRequest{
-		JobID: "line", JobInstanceID: lineLoadReady.JobInstanceID, GroupID: "palletWeight",
+		JobID: "line", JobInstanceID: SeedLineID, GroupID: "palletWeight",
 	}); err != nil {
 		return fmt.Errorf("living seed close palletWeight: %w", err)
 	}

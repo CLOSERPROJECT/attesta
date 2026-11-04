@@ -12,9 +12,10 @@ import FormThemeButton from './form-theme-button.svelte';
 import MapTableField from './map-table-field.svelte';
 import DataReportField from './data-report-field.svelte';
 import ReadonlyField from './readonly-field.svelte';
+import HiddenField from './hidden-field.svelte';
 
 // override (not extend): base shadcn already defines `button`; extend would never win.
-// dataReport / readonly / compactArrayItem are not AUTHORED_FIELD_REGISTRY —
+// dataReport / readonly / compactArrayItem / hidden are not AUTHORED_FIELD_REGISTRY —
 // register beside button (authoredFieldThemeOverrides drops unknown keys).
 const withAuthored = overrideByRecord(shadcnTheme, {
 	...authoredFieldThemeOverrides({
@@ -24,6 +25,7 @@ const withAuthored = overrideByRecord(shadcnTheme, {
 	}),
 	dataReportField: DataReportField,
 	readonlyField: ReadonlyField,
+	hiddenField: HiddenField,
 	compactArrayItemField: CompactArrayItemField,
 	button: FormThemeButton
 });

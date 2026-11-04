@@ -170,39 +170,36 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	logRefs := CollectActionableTaskRefs(logistic.Config, logistic.Worklist)
 	lineRefs := CollectActionableTaskRefs(line.Config, line.Worklist)
 
-	if !hasNestedActionableRef(adminRefs, "intake", "lots", SeedTruckLotsOpenID, "register") {
-		t.Fatalf("administration actionable missing lots/register@%s: %#v", SeedTruckLotsOpenID, adminRefs)
+	if !hasActionableRef(adminRefs, "intake", "weightCheck", SeedTruckID) {
+		t.Fatalf("administration actionable missing weightCheck@%s: %#v", SeedTruckID, adminRefs)
 	}
-	if !hasActionableRef(adminRefs, "intake", "weightCheck", SeedTruckWeightCheckID) {
-		t.Fatalf("administration actionable missing weightCheck@%s: %#v", SeedTruckWeightCheckID, adminRefs)
-	}
-	if hasNestedActionableRef(adminRefs, "line", "palletWeight", SeedLineWeighOpenID, "weigh") {
+	if hasNestedActionableRef(adminRefs, "line", "palletWeight", SeedLineID, "weigh") {
 		t.Fatalf("administration must not see weigh: %#v", adminRefs)
 	}
-	if hasActionableRef(adminRefs, "line", "lineLoad", SeedLineLineLoadID) {
+	if hasActionableRef(adminRefs, "line", "lineLoad", SeedLineID) {
 		t.Fatalf("administration must not see lineLoad: %#v", adminRefs)
 	}
+	if hasNestedActionableRef(adminRefs, "line", "containerReg", SeedLineID, "register") {
+		t.Fatalf("administration must not see register: %#v", adminRefs)
+	}
 
-	if !hasNestedActionableRef(logRefs, "line", "palletWeight", SeedLineWeighOpenID, "weigh") {
-		t.Fatalf("logistic actionable missing weigh@%s: %#v", SeedLineWeighOpenID, logRefs)
+	if !hasNestedActionableRef(logRefs, "line", "containerReg", SeedLineID, "register") {
+		t.Fatalf("logistic actionable missing register@%s: %#v", SeedLineID, logRefs)
 	}
-	if hasNestedActionableRef(logRefs, "intake", "lots", SeedTruckLotsOpenID, "register") {
-		t.Fatalf("logistic must not see lots/register: %#v", logRefs)
-	}
-	if hasActionableRef(logRefs, "intake", "weightCheck", SeedTruckWeightCheckID) {
+	if hasActionableRef(logRefs, "intake", "weightCheck", SeedTruckID) {
 		t.Fatalf("logistic must not see weightCheck: %#v", logRefs)
 	}
-	if hasActionableRef(logRefs, "line", "lineLoad", SeedLineLineLoadID) {
+	if hasActionableRef(logRefs, "line", "lineLoad", SeedLineID) {
 		t.Fatalf("logistic must not see lineLoad: %#v", logRefs)
 	}
 
-	if !hasActionableRef(lineRefs, "line", "lineLoad", SeedLineLineLoadID) {
-		t.Fatalf("line actionable missing lineLoad@%s: %#v", SeedLineLineLoadID, lineRefs)
+	if !hasActionableRef(lineRefs, "line", "lineLoad", SeedLineID) {
+		t.Fatalf("line actionable missing lineLoad@%s: %#v", SeedLineID, lineRefs)
 	}
-	if hasNestedActionableRef(lineRefs, "intake", "lots", SeedTruckLotsOpenID, "register") {
-		t.Fatalf("line must not see lots/register: %#v", lineRefs)
+	if hasNestedActionableRef(lineRefs, "line", "containerReg", SeedLineID, "register") {
+		t.Fatalf("line must not see register: %#v", lineRefs)
 	}
-	if hasNestedActionableRef(lineRefs, "line", "palletWeight", SeedLineWeighOpenID, "weigh") {
+	if hasNestedActionableRef(lineRefs, "line", "palletWeight", SeedLineID, "weigh") {
 		t.Fatalf("line must not see weigh: %#v", lineRefs)
 	}
 
@@ -273,17 +270,22 @@ func TestSeedDemoReplaceIsNotHarnessRunsAPI(t *testing.T) {
 
 func assertStagedDemoDomain(t *testing.T, got Domain) {
 	t.Helper()
-	if len(got.Kind("load")) < 1 {
-		t.Fatalf("staged loads = %#v, want >= 1", got.Kind("load"))
+	loads := got.Kind("load")
+	if loads[SeedLoadNOID] == nil || loads[SeedLoadSUID] == nil {
+		t.Fatalf("staged loads = %#v, want %s and %s", loads, SeedLoadNOID, SeedLoadSUID)
 	}
-	if len(got.Kind("truck")) < 2 {
-		t.Fatalf("staged trucks = %#v, want >= 2", got.Kind("truck"))
+	if len(got.Kind("truck")) != 1 {
+		t.Fatalf("staged trucks = %#v, want 1", got.Kind("truck"))
 	}
-	if len(got.JobInstances) < 4 {
-		t.Fatalf("jobInstances = %d, want >= 4 (2 intake + 2 line)", len(got.JobInstances))
+	if len(got.Kind("pallet")) != 4 {
+		t.Fatalf("staged pallets = %#v, want 4", got.Kind("pallet"))
 	}
-	if len(got.Submissions) < 5 {
-		t.Fatalf("submissions = %d, want >= 5", len(got.Submissions))
+	if len(got.JobInstances) != 2 {
+		t.Fatalf("jobInstances = %d, want 2 (1 intake + 1 line)", len(got.JobInstances))
+	}
+	// truckArrive + 2× lots/register + openTurno + 4× weigh
+	if len(got.Submissions) < 8 {
+		t.Fatalf("submissions = %d, want >= 8", len(got.Submissions))
 	}
 
 	cfg, err := LoadFeragameConfigFixture()
@@ -295,31 +297,28 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if !ok {
 		t.Fatal("missing intake worklist")
 	}
-	lotsOpen, ok := worklistInstance(intake, SeedTruckLotsOpenID)
-	if !ok || lotsOpen.Tasks["truckArrive"] != TaskStatusDone || lotsOpen.Tasks["lots"] != TaskStatusAvailable {
-		t.Fatalf("lots-open truck = %#v", lotsOpen)
+	truck, ok := worklistInstance(intake, SeedTruckID)
+	if !ok || truck.Tasks["truckArrive"] != TaskStatusDone || truck.Tasks["lots"] != TaskStatusDone {
+		t.Fatalf("intake truck = %#v", truck)
 	}
-	if g := lotsOpen.Groups["lots"]; !g.CanSpawn {
-		t.Fatalf("lots-open chrome = %#v", g)
-	}
-	wc, ok := worklistInstance(intake, SeedTruckWeightCheckID)
-	if !ok || wc.Tasks["lots"] != TaskStatusDone || wc.Tasks["weightCheck"] != TaskStatusActionable {
-		t.Fatalf("weightCheck ready = %#v", wc)
+	if truck.Tasks["weightCheck"] != TaskStatusActionable {
+		t.Fatalf("weightCheck = %q, want actionable", truck.Tasks["weightCheck"])
 	}
 	line, ok := worklistJobByID(wl, "line")
 	if !ok {
 		t.Fatal("missing line worklist")
 	}
-	weighOpen, ok := worklistInstance(line, SeedLineWeighOpenID)
-	if !ok || weighOpen.Tasks["openTurno"] != TaskStatusDone || weighOpen.Tasks["palletWeight"] != TaskStatusAvailable {
-		t.Fatalf("weigh-open line = %#v", weighOpen)
+	shift, ok := worklistInstance(line, SeedLineID)
+	if !ok || shift.Tasks["openTurno"] != TaskStatusDone || shift.Tasks["palletWeight"] != TaskStatusDone {
+		t.Fatalf("line shift = %#v", shift)
 	}
-	// Domain leftovers from the other shift make readyWhen true while weigh stays open.
-	if weighOpen.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("weigh-open lineLoad with Domain leftovers = %q, want actionable", weighOpen.Tasks["lineLoad"])
+	if shift.Tasks["lineLoad"] != TaskStatusActionable {
+		t.Fatalf("lineLoad = %q, want actionable", shift.Tasks["lineLoad"])
 	}
-	lineLoad, ok := worklistInstance(line, SeedLineLineLoadID)
-	if !ok || lineLoad.Tasks["palletWeight"] != TaskStatusDone || lineLoad.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("lineLoad ready = %#v", lineLoad)
+	if shift.Tasks["containerReg"] != TaskStatusAvailable {
+		t.Fatalf("containerReg = %q, want available", shift.Tasks["containerReg"])
+	}
+	if g := shift.Groups["containerReg"]; !g.CanSpawn {
+		t.Fatalf("containerReg CanSpawn = %#v, want true", g)
 	}
 }

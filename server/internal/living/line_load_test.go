@@ -69,12 +69,13 @@ func TestCommitLineLoadSubmissionUnlocksNext(t *testing.T) {
 	}) {
 		t.Fatal("lineLoad Submission must unlock next Task")
 	}
+	// containerReg unlocks from openTurno (path), not lineLoad; still unlocked after lineLoad.
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "containerReg",
 		JobInstanceID: lineID, Submissions: result.Domain.Submissions, Tasks: line.Tasks,
 		ClosedGroups: result.Domain.ClosedGroups,
 	}) {
-		t.Fatal("containerReg must unlock after lineLoad Submission")
+		t.Fatal("containerReg must stay unlocked via openTurno after lineLoad Submission")
 	}
 }
 

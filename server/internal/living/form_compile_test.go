@@ -42,9 +42,9 @@ func TestWithDefaultPlaceholdersNestedItemsWeight(t *testing.T) {
 							"type":  "number",
 							"title": "Peso",
 						},
-						"dualSources": map[string]any{
+						"incomplete": map[string]any{
 							"type":  "boolean",
-							"title": "Fonti doppie",
+							"title": "Incompleto",
 						},
 					},
 				},
@@ -62,8 +62,8 @@ func TestWithDefaultPlaceholdersNestedItemsWeight(t *testing.T) {
 	if got != want {
 		t.Fatalf("plastica.items.weight placeholder = %q, want %q", got, want)
 	}
-	if _, hasDual := items["dualSources"]; hasDual {
-		t.Fatal("boolean dualSources must not receive a default placeholder")
+	if _, hasBool := items["incomplete"]; hasBool {
+		t.Fatal("boolean incomplete must not receive a default placeholder")
 	}
 }
 

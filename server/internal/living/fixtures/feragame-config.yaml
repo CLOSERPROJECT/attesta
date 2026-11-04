@@ -16,9 +16,9 @@ domain:
         pallet:
             # Per-row tare + IR/NIR at weigh time.
             fields: [loadId, weight, tareKind, idoneita, panelCount, progress]
-        # C5/C6: weight, material, primary load; dual rows add secondarySourceLoadId (no secondaryWeight).
+        # weight = booked kg for sourceLoadId; incomplete freeze; secondarySourceLoadId from continued prior.
         container:
-            fields: [weight, material, sourceLoadId, secondarySourceLoadId]
+            fields: [weight, material, incomplete, sourceLoadId, secondarySourceLoadId]
 # Stable catalog vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
 catalogs:
     clients:
@@ -437,300 +437,178 @@ steps:
                       set:
                         progress: $value
             - id: containerReg
-              roles: [logistic]
-              enumReads:
-                sourceLoadId: loads
-                secondarySourceLoadId: loads
-              reads:
-                loads:
-                    entity: load
-                    key: id
-              schema:
-                type: object
-                title: Registrazione contenitori
-                required: [sourceLoadId]
-                properties:
-                    sourceLoadId:
-                        type: string
-                        title: Carico sorgente
-                    secondarySourceLoadId:
-                        type: string
-                        title: Carico sorgente secondario
-                        minLength: 1
-                        pattern: '.*\S.*'
-                        not:
-                            const:
-                                $data: '/sourceLoadId'
-                    polvereDiVetro:
-                        type: array
-                        title: Polvere di vetro
-                        items: &containerWeightRow
-                            type: object
-                            required: [weight]
-                            properties:
-                                weight: {type: number, exclusiveMinimum: 0, title: Peso}
-                                dualSources:
-                                    type: boolean
-                                    title: Fonti doppie
-                                    default: false
-                    granellaDiVetro:
-                        type: array
-                        title: Granella di vetro
-                        items: *containerWeightRow
-                    granellaDiVetro2:
-                        type: array
-                        title: Granella di vetro 2
-                        items: *containerWeightRow
-                    polvereDiSilicio:
-                        type: array
-                        title: Polvere di silicio
-                        items: *containerWeightRow
-                    plastica:
-                        type: array
-                        title: Plastica
-                        items: *containerWeightRow
-                    alluminio:
-                        type: array
-                        title: Alluminio
-                        items: *containerWeightRow
-                    sopravaglio:
-                        type: array
-                        title: Sopravaglio
-                        items: *containerWeightRow
-                    polvereDiAspirazione:
-                        type: array
-                        title: Polvere di aspirazione
-                        items: *containerWeightRow
-                if:
-                    anyOf:
-                        - required: [polvereDiVetro]
-                          properties:
-                            polvereDiVetro:
-                                contains: &dualContains
-                                    properties:
-                                        dualSources: {const: true}
-                                    required: [dualSources]
-                        - required: [granellaDiVetro]
-                          properties:
-                            granellaDiVetro:
-                                contains: *dualContains
-                        - required: [granellaDiVetro2]
-                          properties:
-                            granellaDiVetro2:
-                                contains: *dualContains
-                        - required: [polvereDiSilicio]
-                          properties:
-                            polvereDiSilicio:
-                                contains: *dualContains
-                        - required: [plastica]
-                          properties:
-                            plastica:
-                                contains: *dualContains
-                        - required: [alluminio]
-                          properties:
-                            alluminio:
-                                contains: *dualContains
-                        - required: [sopravaglio]
-                          properties:
-                            sopravaglio:
-                                contains: *dualContains
-                        - required: [polvereDiAspirazione]
-                          properties:
-                            polvereDiAspirazione:
-                                contains: *dualContains
-                then:
-                    required: [secondarySourceLoadId]
-              uiSchema:
-                ui:options:
-                    order: [sourceLoadId, secondarySourceLoadId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
-                sourceLoadId:
-                    ui:components:
-                        stringField: enumField
-                secondarySourceLoadId:
-                    ui:components:
-                        stringField: enumField
-                polvereDiVetro: &containerRegMaterialArrayUi
-                    ui:components:
-                        arrayItemField: compactArrayItemField
+              kind: group
+              repeatable: true
+              startLabel: Nuova registrazione
+              closeLabel: Chiudi registrazione
+              instanceLabelEntity: load
+              closeRequiresChildSubmission: true
+              unlockFrom: openTurno
+              substeps:
+                - id: register
+                  roles: [logistic]
+                  enumReads:
+                    sourceLoadId: loads
+                  reads:
+                    loads:
+                        entity: load
+                        where: $not(fullyProcessed = true)
+                        key: id
+                  # Prefill still-open incompletes as continuation rows (hidden continuesContainerId).
+                  initialData: >-
+                    (
+                      $reduce($catalogs.materials, function($acc, $m){(
+                        $open := $sift($domain.container, function($v){$v.incomplete = true and $v.material = $m.label});
+                        $ids := $keys($open);
+                        $count($ids) = 0 ? $acc : $merge([$acc, {$m.key: $map($ids, function($id){{
+                          "continuesContainerId": $id,
+                          "incomplete": false,
+                          "weight": $lookup($open, $id).weight
+                        }})}])
+                      )}, {})
+                    )
+                  schema:
+                    type: object
+                    title: Registrazione contenitori
+                    required: [sourceLoadId]
+                    properties:
+                        sourceLoadId:
+                            type: string
+                            title: Carico sorgente
+                        polvereDiVetro:
+                            type: array
+                            title: Polvere di vetro
+                            items: &containerWeightRow
+                                type: object
+                                required: [weight]
+                                properties:
+                                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                                    incomplete:
+                                        type: boolean
+                                        title: Incompleto
+                                        default: false
+                                    continuesContainerId:
+                                        type: string
+                        granellaDiVetro:
+                            type: array
+                            title: Granella di vetro
+                            items: *containerWeightRow
+                        granellaDiVetro2:
+                            type: array
+                            title: Granella di vetro 2
+                            items: *containerWeightRow
+                        polvereDiSilicio:
+                            type: array
+                            title: Polvere di silicio
+                            items: *containerWeightRow
+                        plastica:
+                            type: array
+                            title: Plastica
+                            items: *containerWeightRow
+                        alluminio:
+                            type: array
+                            title: Alluminio
+                            items: *containerWeightRow
+                        sopravaglio:
+                            type: array
+                            title: Sopravaglio
+                            items: *containerWeightRow
+                        polvereDiAspirazione:
+                            type: array
+                            title: Polvere di aspirazione
+                            items: *containerWeightRow
+                  uiSchema:
                     ui:options:
-                        orderable: false
-                        copyable: false
-                        layouts:
-                            array-field:
-                                class: 'gap-0 has-[[data-layout=array-items]>*]:gap-2 [&>button]:w-auto [&>button]:self-start has-[[data-layout=array-items]>*]:[&_[data-layout=array-field-title-row]]:mb-3'
-                            array-items:
-                                class: gap-1
-                            array-field-title-row:
-                                variant: label
-                                class: mb-1
-                    items:
+                        order: [sourceLoadId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
+                    sourceLoadId:
+                        ui:components:
+                            stringField: enumField
+                    polvereDiVetro: &containerRegMaterialArrayUi
+                        ui:components:
+                            arrayItemField: compactArrayItemField
                         ui:options:
-                            hideTitle: true
-                            order: [weight, dualSources]
+                            orderable: false
+                            copyable: false
                             layouts:
-                                object-properties:
-                                    class: flex w-full flex-row flex-nowrap items-stretch gap-2
-                        weight:
+                                array-field:
+                                    class: 'gap-0 has-[[data-layout=array-items]>*]:gap-2 [&>button]:w-auto [&>button]:self-start has-[[data-layout=array-items]>*]:[&_[data-layout=array-field-title-row]]:mb-3'
+                                array-items:
+                                    class: gap-1
+                                array-field-title-row:
+                                    variant: label
+                                    class: mb-1
+                        items:
                             ui:options:
                                 hideTitle: true
-                        dualSources:
-                            ui:components:
-                                booleanField: checkboxOnlyField
-                granellaDiVetro: *containerRegMaterialArrayUi
-                granellaDiVetro2: *containerRegMaterialArrayUi
-                polvereDiSilicio: *containerRegMaterialArrayUi
-                plastica: *containerRegMaterialArrayUi
-                alluminio: *containerRegMaterialArrayUi
-                sopravaglio: *containerRegMaterialArrayUi
-                polvereDiAspirazione: *containerRegMaterialArrayUi
-              onSubmit:
-                transform:
-                    - op: bind
-                      expr: >-
-                        (
-                          $rows := $reduce($catalogs.materials, function($acc, $m){(
-                            $arr := $lookup($, $m.key) ? $lookup($, $m.key) : [];
-                            $type($arr) != "array" ? $acc : $append($acc, $map(
-                              $arr[$type(weight)="number" and weight > 0],
-                              function($r){
-                                $merge([
-                                  {"weight": $r.weight, "material": $m.label},
-                                  $r.dualSources = true ? {"secondarySourceLoadId": secondarySourceLoadId} : {}
-                                ])
-                              }
-                            ))
-                          )}, []);
-                          {"sourceLoadId": sourceLoadId, "rows": $rows}
-                        )
-                    - op: mintMany
-                      entity: container
-                      count: $count($.rows)
-                      id: "'C-' & $string($count($domain.container.*) + 1)"
-                      set:
-                        weight: $.rows[$index].weight
-                        material: $.rows[$index].material
-                        sourceLoadId: $.sourceLoadId
-                        secondarySourceLoadId: $.rows[$index].secondarySourceLoadId
-            - id: loadedExtracted
-              roles: [administration]
-              schema:
-                type: object
-                title: Controllo caricato vs estratto
-                required: [checkedLoadedWeight, checkedContainerSum]
-                properties:
-                    checkedLoadedWeight: {type: number, exclusiveMinimum: 0, title: Peso caricato verificato}
-                    checkedContainerSum: {type: number, exclusiveMinimum: 0, title: Somma pesi contenitori verificata}
-              uiSchema:
-                ui:options:
-                    order: [checkedLoadedWeight, checkedContainerSum]
-              chrome:
-                resultsReport:
-                    kind: dataReport
-                    title: Risultati finali
-                    before: checkedLoadedWeight
-                    expr: |-
-                        (
-                          $tareKinds := $catalogs.tareKinds;
-                          $materials := $catalogs.materials;
-                          $materialKeys := $map($materials, function($m){$m.key});
-                          $safeSum := function($arr){ $reduce($arr ? $arr : [], function($a,$b){$a+$b}, 0) };
-                          $num := function($v){ $type($v) = "number" ? $v : undefined };
-                          $str := function($v){ $type($v) = "string" and $length($trim($v)) > 0 ? $trim($v) : undefined };
-                          $matchPct := function($a,$b){ ($m := $max([$a,$b]); $m = 0 ? 0 : 100 * $min([$a,$b]) / $m) };
-                          $matchTone := function($pct){ $pct >= 98 ? "green" : $pct >= 90 ? "warning" : "danger" };
-                          $kgRow := function($label,$v){ {"label": $label, "value": $type($v)="number" ? $string($v) : null, "error": null, "tone": null} };
-                          $resolveTare := function($facts){(
-                            $kind := $str($facts.tareKind);
-                            $type($kind) = "string" ? ($kind = "custom" ? $num($facts.customTareWeight) : $num($lookup($tareKinds, $kind))) : undefined
-                          )};
-                          $weighCount := function($facts){(
-                            $w := $facts.weights;
-                            $type($w) = "object" ? $count($keys($w)) : 0
-                          )};
-                          $sumPallet := function($loadId, $doneOnly){(
-                            $vals := $domain.pallet.*[loadId=$loadId][$doneOnly ? progress="done" : true].weight[$type($)="number"];
-                            $safeSum($vals)
-                          )};
-                          $totalTare := function($loadId){(
-                            $subs := $append([], $domain.submissions[taskId="weigh"]);
-                            $count($subs)=0 ? 0 : $safeSum($map($subs, function($s){(
-                              $facts := $s.facts;
-                              $type($facts.weights) = "object" ? (
-                                $t := $resolveTare($facts);
-                                $type($t) = "number" ? $t * $weighCount($facts) : 0
-                              ) : (
-                                $rows := $append([], $facts.*[$type($) = "object"]);
-                                $count($rows)=0 ? 0 : $safeSum($map($rows, function($r){(
-                                  $t := $resolveTare($r);
-                                  $type($t) = "number" ? $t : 0
-                                )}))
-                              )
-                            )}))
-                          )};
-                          $secondaries := function($loadId){(
-                            $ids := $append([], $domain.container.*[sourceLoadId=$loadId].secondarySourceLoadId[$type($)="string" and $length($trim($))>0 and $trim($) != $loadId].$trim($));
-                            $count($ids)=0 ? [] : $distinct($ids)
-                          )};
-                          $extractedRows := function($loadId){(
-                            $conts := $append([], $domain.container.*[sourceLoadId=$loadId][$type(weight)="number"]);
-                            $keysPresent := $distinct($append([], $map($conts, function($r){ $str($r.material) ? $str($r.material) : "" })));
-                            $weightFor := function($k){ $safeSum($conts[($str(material) ? $str(material) : "") = $k].weight) };
-                            $knownIds := $append($materialKeys, $map($materials, function($m){$m.label}));
-                            $knownRaw := $map($materials, function($m){(
-                              $byKey := $count($keysPresent[$ = $m.key]) > 0;
-                              $byLabel := $count($keysPresent[$ = $m.label]) > 0;
-                              $byKey or $byLabel ? {"material": $m.key, "label": $m.label, "weightKg": $byKey ? $weightFor($m.key) : $weightFor($m.label)} : undefined
-                            )});
-                            $known := $append([], $knownRaw[$exists(material)]);
-                            $extras := $sort($filter($keysPresent, function($k){ $count($knownIds[$ = $k]) = 0 }));
-                            $extraRows := $count($extras)=0 ? [] : $map($extras, function($k){{"material": $k, "label": $k, "weightKg": $weightFor($k)}});
-                            $append($known, $extraRows)
-                          )};
-                          $section := function($loadId){(
-                            $load := $lookup($domain.load, $loadId);
-                            $netLot := $num($load.netWeight);
-                            $grossPallet := $sumPallet($loadId, false);
-                            $actualPallet := $sumPallet($loadId, true);
-                            $palletTare := $totalTare($loadId);
-                            $netPanels := $grossPallet - $palletTare;
-                            $matRows := $extractedRows($loadId);
-                            $totalExtracted := $safeSum($map($matRows, function($r){$r.weightKg}));
-                            $delta := $netPanels - $totalExtracted;
-                            $pct := $matchPct($netPanels, $totalExtracted);
-                            $rows := $append(
-                              [
-                                $kgRow("Netto lotto", $netLot),
-                                $kgRow("Σ bancali lordi", $grossPallet),
-                                $kgRow("Σ bancali effettivi (fatti)", $actualPallet),
-                                $kgRow("Tara totale bancali", $palletTare),
-                                $kgRow("Massa netta pannelli", $netPanels)
-                              ],
-                              $append(
-                                $count($matRows)=0 ? [] : $map($matRows, function($r){{"label": $r.label, "value": $string($r.weightKg), "error": null, "tone": "info"}}),
-                                [
-                                  $kgRow("Totale estratto", $totalExtracted),
-                                  {"label": "Pannelli vs estratto", "value": $string($delta) & " kg (" & $string($pct) & "%)", "error": null, "tone": $matchTone($pct)}
-                                ]
-                              )
-                            );
-                            {
-                              "id": $loadId,
-                              "secondaryIds": $secondaries($loadId),
-                              "rows": $rows
-                            }
-                          )};
-                          $count($keys($domain.container))=0 ? {
-                            "value": null,
-                            "error": null,
-                            "sections": []
-                          } : (
-                            $primaryIds := $sort($distinct($append([], $domain.container.*.sourceLoadId[$type($)="string" and $length($trim($))>0].$trim($))));
-                            {
-                              "value": null,
-                              "error": null,
-                              "sections": $count($primaryIds)=0 ? [] : $map($primaryIds, function($id){$section($id)})
-                            }
-                          )
-                        )
-              onSubmit:
-                transform: []
+                                order: [continuesContainerId, weight, incomplete]
+                                layouts:
+                                    object-properties:
+                                        class: flex w-full flex-row flex-nowrap items-stretch gap-2
+                            weight:
+                                ui:options:
+                                    hideTitle: true
+                            incomplete:
+                                ui:components:
+                                    booleanField: checkboxOnlyField
+                            continuesContainerId:
+                                ui:components:
+                                    stringField: hiddenField
+                                ui:options:
+                                    presenceMark: true
+                                    title: Continua
+                    granellaDiVetro: *containerRegMaterialArrayUi
+                    granellaDiVetro2: *containerRegMaterialArrayUi
+                    polvereDiSilicio: *containerRegMaterialArrayUi
+                    plastica: *containerRegMaterialArrayUi
+                    alluminio: *containerRegMaterialArrayUi
+                    sopravaglio: *containerRegMaterialArrayUi
+                    polvereDiAspirazione: *containerRegMaterialArrayUi
+                  onSubmit:
+                    transform:
+                        - op: bind
+                          expr: >-
+                            (
+                              $rows := $reduce($catalogs.materials, function($acc, $m){(
+                                $arr := $lookup($, $m.key) ? $lookup($, $m.key) : [];
+                                $type($arr) != "array" ? $acc : $append($acc, $map(
+                                  $arr[$type(weight)="number" and weight > 0],
+                                  function($r){(
+                                    $cid := $r.continuesContainerId;
+                                    $merge([
+                                      {
+                                        "weight": $cid ? $r.weight - $lookup($domain.container, $cid).weight : $r.weight,
+                                        "material": $m.label,
+                                        "incomplete": $r.incomplete = true,
+                                        "continuesContainerId": $cid
+                                      },
+                                      $cid ? {"secondarySourceLoadId": $lookup($domain.container, $cid).sourceLoadId} : {}
+                                    ])
+                                  )}
+                                ))
+                              )}, []);
+                              $cont := $append([], $rows[continuesContainerId].continuesContainerId);
+                              $supersede := $count($cont) = 0 ? {} : $reduce($cont, function($a, $id){$merge([$a, {$id: true}])}, {});
+                              {"sourceLoadId": sourceLoadId, "rows": $rows, "supersede": $supersede}
+                            )
+                        - op: mintMany
+                          entity: container
+                          count: $count($.rows)
+                          id: "'C-' & $string($count($domain.container.*) + 1)"
+                          set:
+                            weight: $.rows[$index].weight
+                            material: $.rows[$index].material
+                            incomplete: $.rows[$index].incomplete
+                            sourceLoadId: $.sourceLoadId
+                            secondarySourceLoadId: $.rows[$index].secondarySourceLoadId
+                        - op: patch
+                          entity: load
+                          id: $.sourceLoadId
+                          # Marks primary so next Spawn enums omit it; also touches for instanceLabelEntity.
+                          set:
+                            fullyProcessed: true
+                        - op: bind
+                          expr: $.supersede
+                        - op: patchEach
+                          entity: container
+                          set:
+                            incomplete: false

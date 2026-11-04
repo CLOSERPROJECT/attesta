@@ -72,7 +72,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if line.StartsWhen != nil {
 		t.Fatalf("line must not have startsWhen, got %#v", line.StartsWhen)
 	}
-	wantLineTasks := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "loadedExtracted"}
+	wantLineTasks := []string{"openTurno", "palletWeight", "lineLoad", "containerReg"}
 	if got := OrderedTaskIDs(line.Tasks); strings.Join(got, ",") != strings.Join(wantLineTasks, ",") {
 		t.Fatalf("line tasks = %v", got)
 	}
@@ -94,9 +94,34 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if _, has := pw["unlockFrom"]; has {
 		t.Fatalf("palletWeight must omit unlockFrom (linear), got %#v", pw["unlockFrom"])
 	}
-	containerReg, _ := TaskByID(line.Tasks, "containerReg")
-	if _, has := containerReg["unlockFrom"]; has {
-		t.Fatalf("containerReg must omit unlockFrom (linear after lineLoad), got %#v", containerReg["unlockFrom"])
+	containerReg, ok := TaskByID(line.Tasks, "containerReg")
+	if !ok || !containerReg.IsGroup() {
+		t.Fatalf("containerReg group = %#v", containerReg)
+	}
+	if got, _ := containerReg["unlockFrom"].(string); got != "openTurno" {
+		t.Fatalf("containerReg.unlockFrom = %#v, want openTurno", containerReg["unlockFrom"])
+	}
+	if _, has := containerReg["readyWhen"]; has {
+		t.Fatalf("containerReg must omit readyWhen, got %#v", containerReg["readyWhen"])
+	}
+	if containerReg["instanceLabelEntity"] != "load" {
+		t.Fatalf("containerReg.instanceLabelEntity = %#v, want load", containerReg["instanceLabelEntity"])
+	}
+	if containerReg["closeRequiresChildSubmission"] != true {
+		t.Fatalf("containerReg.closeRequiresChildSubmission = %#v", containerReg["closeRequiresChildSubmission"])
+	}
+	reg, ok := TaskByID(containerReg.ChildTasks(), "register")
+	if !ok || reg.IsGroup() {
+		t.Fatalf("containerReg.register leaf = %#v", reg)
+	}
+	reads, _ := reg["reads"].(map[string]any)
+	loadsRead, _ := reads["loads"].(map[string]any)
+	where, _ := loadsRead["where"].(string)
+	if !strings.Contains(where, "fullyProcessed") {
+		t.Fatalf("register.reads.loads.where = %#v, want fullyProcessed filter", loadsRead["where"])
+	}
+	if _, has := TaskByID(line.Tasks, "loadedExtracted"); has {
+		t.Fatal("loadedExtracted must not be on the live line Task list")
 	}
 
 	raw, err := json.Marshal(cfg)

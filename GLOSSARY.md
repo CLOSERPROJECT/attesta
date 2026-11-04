@@ -122,6 +122,18 @@ _Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`; `ui
 Plant-style entity fact on some rows: unset; `partial`; `done`. Draft ≠ progress; Worklist done is Submission law. Not a form/map type — cell enums live on the JSON Schema cell (`additionalProperties`), rendered by sjsf.
 _Avoid_: boolean `processed` as a Worklist gate; treating progress enums as unlock grammar; form `progressEnums` / `valueType: "progress"` / table-owned enum paint
 
+**fullyProcessed** (entity field):
+Plant Domain fact on a **load**: container registration for that load is finished; register load enums omit it. Set by Org Config transform on successful register Commit—not a Worklist gate and not progress enum vocabulary.
+_Avoid_: boolean `processed` as Worklist status; using fullyProcessed as unlock grammar; synonym “complete” without naming this fact
+
+**incomplete** (entity field):
+Plant Domain fact on a **container**: booked weight for the current load is frozen while the physical bin may continue on a later register. Distinct from Task-group Close.
+_Avoid_: Treating incomplete as Worklist/progress; engine special-case on the name (Config transform + form only)
+
+**continuesContainerId** (Config form fact):
+Hidden row field on plant register: links a continuation row to a still-open incomplete Domain container. Load seeds it via Task `initialData`; Commit transform books delta weight and supersedes the prior incomplete. Not a Domain entity field. Operator visibility uses generic `ui:options.presenceMark` on `hiddenField` (Config title such as Continua)—not a second schema fact.
+_Avoid_: Engine special-case on the name; free-picked secondary load enum for continuity; storing continuesContainerId on minted containers; SPA branches on this field name beyond the generic hidden+presenceMark contract
+
 ### Operator and seams
 
 **OperatorIdentity**:

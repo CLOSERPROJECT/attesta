@@ -1,9 +1,35 @@
 package living
 
 import (
+	_ "embed"
 	"encoding/json"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
+
+//go:embed fixtures/parked-loaded-extracted.yaml
+var parkedLoadedExtractedYAML []byte
+
+func configWithParkedLoadedExtracted(t *testing.T) OrgConfig {
+	t.Helper()
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var task map[string]any
+	if err := yaml.Unmarshal(parkedLoadedExtractedYAML, &task); err != nil {
+		t.Fatal(err)
+	}
+	if task["id"] != "loadedExtracted" {
+		t.Fatalf("parked task id = %#v", task["id"])
+	}
+	lineVal, _ := cfg.Jobs.Get("line")
+	line, _ := AsJob(lineVal)
+	line.Tasks = append(append([]TaskConfig{}, line.Tasks...), TaskConfig(task))
+	cfg.Jobs.Set("line", line)
+	return cfg
+}
 
 func dataReportProbeDomain() Domain {
 	d := domainFromKinds(map[string]EntityMap{
@@ -39,10 +65,7 @@ func dataReportProbeDomain() Domain {
 }
 
 func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
-	cfg, err := LoadFeragameConfigFixture()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := configWithParkedLoadedExtracted(t)
 	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), ActionableTaskRef{
 		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
@@ -139,10 +162,7 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 }
 
 func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {
-	cfg, err := LoadFeragameConfigFixture()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := configWithParkedLoadedExtracted(t)
 	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
 		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
@@ -274,15 +294,12 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 }
 
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
-	cfg, err := LoadFeragameConfigFixture()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := configWithParkedLoadedExtracted(t)
 	lineVal, _ := cfg.Jobs.Get("line")
 	line, _ := AsJob(lineVal)
 	task, ok := TaskByID(line.Tasks, "loadedExtracted")
 	if !ok {
-		t.Fatal("missing loadedExtracted")
+		t.Fatal("missing parked loadedExtracted")
 	}
 	payload := taskPayload(task)
 	chrome, _ := payload["chrome"].(map[string]any)

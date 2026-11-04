@@ -156,8 +156,12 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 	if inst.Tasks["lineLoad"] != TaskStatusDone {
 		t.Fatalf("lineLoad after Submission = %q, want done", inst.Tasks["lineLoad"])
 	}
-	if inst.Tasks["containerReg"] != TaskStatusActionable {
-		t.Fatalf("containerReg = %q, want actionable after lineLoad Submission", inst.Tasks["containerReg"])
+	// Group node chrome stays available (lots pattern); Spawn/child leaf is role-scoped.
+	if inst.Tasks["containerReg"] != TaskStatusAvailable {
+		t.Fatalf("containerReg = %q, want available (unlockFrom openTurno)", inst.Tasks["containerReg"])
+	}
+	if g := inst.Groups["containerReg"]; !g.CanSpawn {
+		t.Fatalf("containerReg CanSpawn = %#v, want true for logistic-capable viewer", g)
 	}
 }
 
@@ -286,7 +290,7 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 		t.Fatalf("lineLoad = %q, want done after Submission", inst.Tasks["lineLoad"])
 	}
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
-		t.Fatalf("containerReg = %q, want available after lineLoad Submission", inst.Tasks["containerReg"])
+		t.Fatalf("containerReg = %q, want available for line viewer (unlockFrom openTurno)", inst.Tasks["containerReg"])
 	}
 	want := ProjectWorklist(mustActiveConfig(t, c), result.Domain, lineOp)
 	rawGot, _ := json.Marshal(result.Worklist)

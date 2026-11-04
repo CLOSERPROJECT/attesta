@@ -13,7 +13,7 @@ func TestFixtureLineHasNoStartsWhen(t *testing.T) {
 	if !line.Repeatable {
 		t.Fatal("line must stay repeatable")
 	}
-	want := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "loadedExtracted"}
+	want := []string{"openTurno", "palletWeight", "lineLoad", "containerReg"}
 	got := OrderedTaskIDs(line.Tasks)
 	if len(got) != len(want) {
 		t.Fatalf("line tasks = %v", got)

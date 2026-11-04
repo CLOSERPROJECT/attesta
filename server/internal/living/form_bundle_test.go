@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -700,6 +704,280 @@ func TestBuildTaskFormBundleObjectMapKeepsRowAndFormDefaults(t *testing.T) {
 		if _, has := row["idoneita"]; has {
 			t.Fatalf("row %s must not invent first-enum idoneita; got %#v", id, row)
 		}
+	}
+}
+
+// Fail closed: form seed stays generic — no plant Task id branches.
+func TestFormBundleSourceOmitsPlantTaskIDs(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "form_bundle.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(body)
+	for _, token := range []string{`"lineLoad"`, `"feragame"`, `"openTurno"`, `"palletWeight"`, `"containerReg"`} {
+		if strings.Contains(src, token) {
+			t.Fatalf("form_bundle.go must not hard-code plant token %s", token)
+		}
+	}
+}
+
+func authoredInitialDataProbeConfig(initialData any) OrgConfig {
+	task := TaskConfig{
+		"id":    "seedProbe",
+		"roles": []any{"logistic"},
+		"schema": map[string]any{
+			"type":  "object",
+			"title": "Seed probe",
+			"properties": map[string]any{
+				"note": map[string]any{"type": "string", "default": "schema-default"},
+				"tag":  map[string]any{"type": "string"},
+				"meta": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"source": map[string]any{"type": "string"},
+						"open":   map[string]any{"type": "boolean"},
+					},
+				},
+				"rows": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"continuesId": map[string]any{"type": "string"},
+							"label":       map[string]any{"type": "string"},
+							"flag":        map[string]any{"type": "boolean", "default": true},
+						},
+					},
+				},
+			},
+		},
+		"onSubmit": map[string]any{
+			"transform": []any{
+				map[string]any{
+					"op":     "mint",
+					"entity": "item",
+					"id":     `"I1"`,
+					"set": map[string]any{
+						"note": "$.note",
+						"tag":  "$.tag",
+					},
+				},
+			},
+		},
+	}
+	if initialData != nil {
+		task["initialData"] = initialData
+	}
+	return OrgConfig{
+		ID:      "seed-probe",
+		Org:     "seedorg",
+		Version: "1",
+		Domain: map[string]any{
+			"entities": map[string]any{
+				"item": map[string]any{},
+			},
+		},
+		Catalogs: map[string]any{
+			"materials": []any{
+				map[string]any{"key": "glass", "label": "Glass"},
+			},
+		},
+		Jobs: OrderedObject{
+			Keys: []string{"probe"},
+			Values: map[string]any{
+				"probe": Job{
+					Repeatable: true,
+					StartLabel: "Start probe",
+					InstanceID: `"P1"`,
+					Label:      `"probe"`,
+					Tasks:      []TaskConfig{task},
+				},
+			},
+		},
+	}
+}
+
+func TestBuildTaskFormBundleAuthoredInitialDataFromDomainAndCatalogs(t *testing.T) {
+	cfg := authoredInitialDataProbeConfig(`(
+  $open := $sift($domain.item, function($v){$v.open = true});
+  {
+    "tag": $catalogs.materials[0].key,
+    "rows": $map($keys($open), function($id){(
+      $facts := $lookup($open, $id);
+      {"continuesId": $id, "label": $facts.label, "flag": false}
+    )})
+  }
+)`)
+	domain := domainFromKinds(map[string]EntityMap{
+		"item": {
+			"A": {"open": true, "label": "alpha"},
+			"B": {"open": false, "label": "beta"},
+			"C": {"open": true, "label": "gamma"},
+		},
+	})
+	bundle, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
+		JobID: "probe", TaskID: "seedProbe", JobInstanceID: "P1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.InitialData["tag"] != "glass" {
+		t.Fatalf("catalog seed tag = %#v", bundle.InitialData["tag"])
+	}
+	if bundle.InitialData["note"] != "schema-default" {
+		t.Fatalf("schema default must fill gaps; note = %#v", bundle.InitialData["note"])
+	}
+	rows, _ := bundle.InitialData["rows"].([]any)
+	if len(rows) != 2 {
+		t.Fatalf("rows = %#v, want 2 open items", bundle.InitialData["rows"])
+	}
+	got := map[string]map[string]any{}
+	for _, raw := range rows {
+		row, _ := raw.(map[string]any)
+		id, _ := row["continuesId"].(string)
+		got[id] = row
+	}
+	for _, id := range []string{"A", "C"} {
+		row := got[id]
+		if row == nil || row["flag"] != false {
+			t.Fatalf("row %s = %#v, want flag false", id, row)
+		}
+	}
+	if _, has := got["B"]; has {
+		t.Fatalf("closed item B must not seed; got %#v", got)
+	}
+}
+
+func TestBuildTaskFormBundleOmitsBlankInitialDataExpr(t *testing.T) {
+	for _, expr := range []any{nil, "", "   "} {
+		cfg := authoredInitialDataProbeConfig(expr)
+		bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
+			JobID: "probe", TaskID: "seedProbe",
+		})
+		if err != nil {
+			t.Fatalf("expr=%#v: %v", expr, err)
+		}
+		if bundle.InitialData["note"] != "schema-default" {
+			t.Fatalf("expr=%#v note = %#v", expr, bundle.InitialData["note"])
+		}
+		if _, has := bundle.InitialData["rows"]; has {
+			t.Fatalf("expr=%#v must not invent rows; got %#v", expr, bundle.InitialData)
+		}
+		if _, has := bundle.InitialData["meta"]; has {
+			t.Fatalf("expr=%#v must not invent meta; got %#v", expr, bundle.InitialData)
+		}
+	}
+}
+
+func TestBuildTaskFormBundleInitialDataRejectsNonObject(t *testing.T) {
+	cfg := authoredInitialDataProbeConfig(`["not", "an", "object"]`)
+	_, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
+		JobID: "probe", TaskID: "seedProbe",
+	})
+	if err == nil {
+		t.Fatal("expected initialData non-object error")
+	}
+}
+
+func TestLoadTaskBundleAuthoredInitialDataEndToEnd(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	cfg := authoredInitialDataProbeConfig(`(
+  $facts := $lookup($domain.item, "X1");
+  {
+    "tag": $catalogs.materials[0].key,
+    "rows": [{"continuesId": "X1", "label": $facts.label, "flag": false}],
+    "meta": {"source": $facts.label, "open": $facts.open}
+  }
+)`)
+	if err := configs.Put(t.Context(), "seedorg", "1", cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.SetActiveVersion(t.Context(), "seedorg", "1"); err != nil {
+		t.Fatal(err)
+	}
+	domain := domainFromKinds(map[string]EntityMap{
+		"item": {
+			"X1": {"label": "from-domain", "open": true},
+		},
+	})
+	if err := domains.Put(t.Context(), "seedorg", domain); err != nil {
+		t.Fatal(err)
+	}
+	loader := &Loader{Domains: domains, Configs: configs}
+	op := OperatorIdentity{UserID: "bo", Org: "seedorg", Roles: []string{"logistic"}}
+	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.InitialData["tag"] != "glass" {
+		t.Fatalf("Load seed tag = %#v", bundle.InitialData["tag"])
+	}
+	rows, _ := bundle.InitialData["rows"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("Load seed rows = %#v", bundle.InitialData["rows"])
+	}
+	row, _ := rows[0].(map[string]any)
+	if row["continuesId"] != "X1" || row["flag"] != false {
+		t.Fatalf("Load seed row = %#v", row)
+	}
+	meta, _ := bundle.InitialData["meta"].(map[string]any)
+	if meta["source"] != "from-domain" || meta["open"] != true {
+		t.Fatalf("Load seed object meta = %#v", bundle.InitialData["meta"])
+	}
+	if bundle.InitialData["note"] != "schema-default" {
+		t.Fatalf("Load schema default note = %#v", bundle.InitialData["note"])
+	}
+}
+
+// Authored initialData is Load-only: Commit still applies client Value on the same Task.
+func TestCommitAuthoredInitialDataTaskUsesClientValue(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	cfg := authoredInitialDataProbeConfig(`{
+  "tag": "seed-tag",
+  "note": "seed-note",
+  "meta": {"source": "seed", "open": true}
+}`)
+	if err := configs.Put(t.Context(), "seedorg", "1", cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.SetActiveVersion(t.Context(), "seedorg", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := domains.Put(t.Context(), "seedorg", EmptyDomain()); err != nil {
+		t.Fatal(err)
+	}
+	loader := &Loader{Domains: domains, Configs: configs}
+	op := OperatorIdentity{UserID: "bo", Org: "seedorg", Roles: []string{"logistic"}}
+	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.InitialData["tag"] != "seed-tag" || bundle.InitialData["note"] != "seed-note" {
+		t.Fatalf("Load seed = %#v", bundle.InitialData)
+	}
+
+	c := &Committer{
+		Domains:    domains,
+		Configs:    configs,
+		Authorizer: AllowAllAuthorizer{},
+	}
+	result, err := c.Commit(t.Context(), "seedorg", op, CommitRequest{
+		TaskPath: "probe/seedProbe",
+		Value:    map[string]any{"note": "from-client", "tag": "client-tag"},
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := result.Domain.Kind("item")["I1"]
+	if item["note"] != "from-client" || item["tag"] != "client-tag" {
+		t.Fatalf("Commit must use client Value, not Load seed; item = %#v", item)
 	}
 }
 

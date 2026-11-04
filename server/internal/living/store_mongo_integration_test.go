@@ -178,13 +178,13 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := got.Kind("truck")[SeedTruckWeightCheckID]; !ok {
+	if _, ok := got.Kind("truck")[SeedTruckID]; !ok {
 		t.Fatalf("demo truck missing after wipe+seed: %#v", got.Kind("truck"))
 	}
-	if firstLoadID(got) == "" {
-		t.Fatalf("demo load missing after wipe+seed: %#v", got.Kind("load"))
+	if got.Kind("load")[SeedLoadNOID] == nil || got.Kind("load")[SeedLoadSUID] == nil {
+		t.Fatalf("demo loads missing after wipe+seed: %#v", got.Kind("load"))
 	}
-	if len(got.Submissions) < 4 {
+	if len(got.Submissions) < 8 {
 		t.Fatalf("demo submissions = %#v", got.Submissions)
 	}
 	active, err := configs.ActiveVersion(ctx, seeded.Org)

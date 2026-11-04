@@ -119,7 +119,10 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 		projectionKey = rowsIdentity(projected.RowIDs)
 	}
 
-	initial := seedInitialData(domain, payload, projected)
+	initial, err := seedInitialData(domain, payload, projected, ref.JobInstanceID, cfg.Catalogs)
+	if err != nil {
+		return nil, err
+	}
 	bindings := buildFormBindings(domain, ref, cfg.Catalogs)
 	if err := evaluateDataReports(chrome, bindings); err != nil {
 		return nil, err
@@ -226,7 +229,8 @@ func buildFormBindings(domain Domain, ref ActionableTaskRef, catalogs map[string
 	return bindings
 }
 
-func seedInitialData(domain Domain, payload map[string]any, projected projectedForm) map[string]any {
+// Omit/blank Task initialData ⇒ schema-default path only (plus map seeding).
+func seedInitialData(domain Domain, payload map[string]any, projected projectedForm, jobInstanceID string, catalogs map[string]any) (map[string]any, error) {
 	out := map[string]any{}
 	primary, ok := primaryDynamicProperty(payload)
 	if ok && len(projected.RowIDs) > 0 {
@@ -258,8 +262,41 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 			}
 		}
 	}
+	if err := mergeAuthoredInitialData(out, domain, payload, jobInstanceID, catalogs); err != nil {
+		return nil, err
+	}
 	seedFormDefaultsFromSchema(out, payload)
-	return out
+	return out, nil
+}
+
+// Result must be an object; keys overwrite prior seed.
+func mergeAuthoredInitialData(out map[string]any, domain Domain, payload map[string]any, jobInstanceID string, catalogs map[string]any) error {
+	raw, has := payload["initialData"]
+	if !has || raw == nil {
+		return nil
+	}
+	expr, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("living: initialData must be a JSONata string when present")
+	}
+	if strings.TrimSpace(expr) == "" {
+		return nil
+	}
+	value, err := evaluateExpr(expr, map[string]any{}, domainBindings(domain, jobInstanceID, catalogs))
+	if err != nil {
+		return fmt.Errorf("living: initialData: %w", err)
+	}
+	if value == nil {
+		return nil
+	}
+	obj, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Errorf("living: initialData: expected object, got %T", value)
+	}
+	for k, v := range obj {
+		out[k] = v
+	}
+	return nil
 }
 
 func rowEntityMap(domain Domain, payload map[string]any) EntityMap {

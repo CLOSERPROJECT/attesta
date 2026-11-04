@@ -5,6 +5,7 @@ import type { Schema } from '@sjsf/form';
 import feragameConfigYaml from '$living-fixtures/feragame-config.yaml?raw';
 import { loadFeragameConfig, substepConfig } from './load-feragame-config.js';
 import { createAjvFormValidator } from './ajv-form-validator.js';
+import type { TaskConfig } from '../types.js';
 
 /** Gated field: when mode is `dual`, `detail` is required (JSON Schema if/then). */
 const ifThenSchema = {
@@ -42,67 +43,70 @@ describe('Ajv Draft validator', () => {
 	});
 });
 
-describe('containerReg Ajv dual-load', () => {
-	const containerReg = substepConfig(
-		loadFeragameConfig(feragameConfigYaml).jobs.line,
-		'containerReg'
-	)!;
-	const schema = containerReg.schema as Schema;
+describe('containerReg register Ajv', () => {
+	const group = substepConfig(loadFeragameConfig(feragameConfigYaml).jobs.line, 'containerReg')!;
+	// Fixture groups still author nested leaves as `substeps` in YAML (SPA parse keeps that key).
+	const register = (
+		(group.substeps as TaskConfig[] | undefined) ??
+		(group.tasks as TaskConfig[] | undefined) ??
+		[]
+	).find((t) => t.id === 'register');
+	const schema = (register?.schema ?? null) as Schema | null;
+	const uiSchema = (register?.uiSchema ?? null) as Record<string, unknown> | null;
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
-	test('dual off on a row: sourceLoadId + weight is valid; form secondary optional', () => {
+	test('sourceLoadId + weight valid; dualSources / secondary enum gone', () => {
+		expect(schema).toBeTruthy();
+		expect(schema).not.toHaveProperty('if');
+		const props = (schema as { properties?: Record<string, unknown> }).properties ?? {};
+		expect(props).not.toHaveProperty('secondarySourceLoadId');
+		expect(props).not.toHaveProperty('dualSources');
+		const rowProps =
+			(
+				(props.polvereDiVetro as { items?: { properties?: Record<string, unknown> } } | undefined)
+					?.items?.properties
+			) ?? {};
+		expect(rowProps).not.toHaveProperty('dualSources');
+		expect(rowProps).toHaveProperty('continuesContainerId');
+
 		expect(
-			validator.isValid(schema, schema, {
+			validator.isValid(schema!, schema!, {
 				sourceLoadId: 'load-a',
-				polvereDiVetro: [{ weight: 10, dualSources: false }]
+				polvereDiVetro: [{ weight: 10, incomplete: false }]
 			})
 		).toBe(true);
 		expect(
-			validator.isValid(schema, schema, {
+			validator.isValid(schema!, schema!, {
 				sourceLoadId: 'load-a',
-				polvereDiVetro: [{ weight: 10 }]
+				polvereDiVetro: [{ weight: 10, continuesContainerId: 'C-1', incomplete: false }]
 			})
 		).toBe(true);
+		expect(
+			validator.isValid(schema!, schema!, {
+				sourceLoadId: 'load-a',
+				polvereDiVetro: [{ incomplete: false }]
+			})
+		).toBe(false);
 	});
 
-	test('dual on a row: requires form secondary ≠ primary; no secondaryWeight', () => {
-		expect(
-			validator.isValid(schema, schema, {
-				sourceLoadId: 'load-a',
-				polvereDiVetro: [{ weight: 10, dualSources: true }]
-			})
-		).toBe(false);
-
-		expect(
-			validator.isValid(schema, schema, {
-				sourceLoadId: 'load-a',
-				secondarySourceLoadId: 'load-a',
-				polvereDiVetro: [{ weight: 10, dualSources: true }]
-			})
-		).toBe(false);
-
-		expect(
-			validator.isValid(schema, schema, {
-				sourceLoadId: 'load-a',
-				secondarySourceLoadId: '',
-				polvereDiVetro: [{ weight: 10, dualSources: true }]
-			})
-		).toBe(false);
-
-		expect(
-			validator.isValid(schema, schema, {
-				sourceLoadId: 'load-a',
-				secondarySourceLoadId: '   ',
-				polvereDiVetro: [{ weight: 10, dualSources: true }]
-			})
-		).toBe(false);
-
-		expect(
-			validator.isValid(schema, schema, {
-				sourceLoadId: 'load-a',
-				secondarySourceLoadId: 'load-b',
-				polvereDiVetro: [{ weight: 10, dualSources: true }]
-			})
-		).toBe(true);
+	test('continuesContainerId authored as hiddenField (not RJSF ui:widget)', () => {
+		expect(uiSchema).toBeTruthy();
+		const contUi =
+			(
+				uiSchema!.polvereDiVetro as
+					| {
+							items?: {
+								continuesContainerId?: {
+									'ui:components'?: { stringField?: string };
+									'ui:widget'?: unknown;
+								};
+							};
+					  }
+					| undefined
+			)?.items?.continuesContainerId ?? {};
+		expect(contUi['ui:components']?.stringField).toBe('hiddenField');
+		expect(contUi).not.toHaveProperty('ui:widget');
+		const themeSrc = readFileSync(join(import.meta.dirname, 'form-theme.ts'), 'utf8');
+		expect(themeSrc).toContain('hiddenField: HiddenField');
 	});
 });
