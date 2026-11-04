@@ -20,6 +20,9 @@ type SeedOptions struct {
 	// WipeDomain is false. Handler/smoke helpers that only want Active Config
 	// set this — without it, EmptyDomain() would pick up the focused fixture.
 	SkipEmptyDomainStaging bool
+	// Passports is wiped for the org when Domain is rebuilt (seed --replace).
+	// Optional in tests that never lock; task seed must wire it.
+	Passports PassportStore
 }
 
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
@@ -71,7 +74,7 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 	if domains == nil {
 		return OrgConfig{}, fmt.Errorf("living: domain store required to seed Domain")
 	}
-	if err := seedStagedDemoDomain(ctx, domains, configs, cfg.Org); err != nil {
+	if err := seedStagedDemoDomain(ctx, domains, configs, opts.Passports, cfg.Org); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
@@ -87,7 +90,14 @@ func domainSeedEmpty(d Domain) bool {
 // one intake with two loads (NO + SU), one line turn with all pallets weighed,
 // lineLoad done, and both loads register-closed (fullyProcessed) for Passport.
 // Leaves weightCheck open; Passport Can start is ready for both loads.
-func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
+// When passports is set, org rows are deleted before Domain Put so deterministic
+// seed subject ids can Lock again after --replace.
+func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore, org string) error {
+	if passports != nil {
+		if err := passports.DeleteByOrg(ctx, org); err != nil {
+			return err
+		}
+	}
 	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
 		return err
 	}

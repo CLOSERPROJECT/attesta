@@ -126,21 +126,29 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 
 	domains := living.NewMemoryDomainStore()
 	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
 	seeded := living.EmptyDomain()
 	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
+	if err := passports.Create(t.Context(), living.PassportRecord{
+		Org: "feragame", SubjectID: living.SeedLoadNOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	dir := writeSeedTestConfigDir(t)
 	if err := Seed(t.Context(), SeedDeps{
-		Identity:      newSeedFakeIdentity(),
-		Store:         NewMemoryStore(),
-		ConfigDir:     dir,
-		RNG:           &fixedCatalogRNG{n: 1},
-		Replace:       true,
-		LivingDomains: domains,
-		LivingConfigs: configs,
+		Identity:        newSeedFakeIdentity(),
+		Store:           NewMemoryStore(),
+		ConfigDir:       dir,
+		RNG:             &fixedCatalogRNG{n: 1},
+		Replace:         true,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
 	}); err != nil {
 		t.Fatalf("Seed: %v", err)
 	}
@@ -160,6 +168,9 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	}
 	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
 		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))
+	}
+	if _, err := passports.Get(t.Context(), "feragame", living.SeedLoadNOID); !errors.Is(err, living.ErrNotFound) {
+		t.Fatalf("passport after replace = %v, want ErrNotFound", err)
 	}
 	version, err := configs.ActiveVersion(t.Context(), "feragame")
 	if err != nil {

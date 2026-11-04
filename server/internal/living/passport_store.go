@@ -14,6 +14,8 @@ type PassportStore interface {
 	GetByIdentity(ctx context.Context, gtin, lot, serial string) (PassportRecord, error)
 	// Create inserts once; returns ErrPassportExists when the subject is already locked.
 	Create(ctx context.Context, record PassportRecord) error
+	// DeleteByOrg removes every Passport for org (seed --replace / Domain rebuild).
+	DeleteByOrg(ctx context.Context, org string) error
 }
 
 var _ PassportStore = (*MemoryPassportStore)(nil)
@@ -81,5 +83,21 @@ func (s *MemoryPassportStore) Create(_ context.Context, record PassportRecord) e
 	record.Org = strings.TrimSpace(record.Org)
 	record.SubjectID = strings.TrimSpace(record.SubjectID)
 	s.byKey[key] = clonePassportRecord(record)
+	return nil
+}
+
+func (s *MemoryPassportStore) DeleteByOrg(_ context.Context, org string) error {
+	org = strings.TrimSpace(org)
+	if org == "" {
+		return fmt.Errorf("living: passport delete by org requires org")
+	}
+	prefix := org + "\x00"
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key := range s.byKey {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.byKey, key)
+		}
+	}
 	return nil
 }

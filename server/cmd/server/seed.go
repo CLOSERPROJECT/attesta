@@ -40,10 +40,12 @@ type SeedDeps struct {
 	// Rewrite even when the marker org exists (local only).
 	Replace bool
 	// Optional living stores. When set, SeedDemo runs after identity+catalog;
-	// Replace wipes Domain. Only the seed command / task seed wires these —
-	// product boot (ensureLivingStores) must not call SeedDemo.
-	LivingDomains living.DomainStore
-	LivingConfigs living.ConfigStore
+	// Replace wipes Domain (+ Passports when LivingPassports is set). Only the
+	// seed command / task seed wires these — product boot (ensureLivingStores)
+	// must not call SeedDemo.
+	LivingDomains   living.DomainStore
+	LivingConfigs   living.ConfigStore
+	LivingPassports living.PassportStore
 	// Nil picks a time-based source in Seed.
 	RNG     catalogStreamRNG
 	Fixture *demoFixture
@@ -117,6 +119,7 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if deps.LivingConfigs != nil {
 		if _, err := living.SeedDemo(ctx, deps.LivingDomains, deps.LivingConfigs, living.SeedOptions{
 			WipeDomain: deps.Replace,
+			Passports:  deps.LivingPassports,
 		}); err != nil {
 			return fmt.Errorf("seed: living: %w", err)
 		}

@@ -76,6 +76,37 @@ func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	}
 }
 
+func TestSeedDemoWipeClearsPassports(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	passports := NewMemoryPassportStore()
+	if err := passports.Create(t.Context(), PassportRecord{
+		Org: "feragame", SubjectID: SeedLoadNOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), PassportRecord{
+		Org: "other", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/2/b/t",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
+		WipeDomain: true,
+		Passports:  passports,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := passports.Get(t.Context(), "feragame", SeedLoadNOID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("feragame passport after wipe = %v, want ErrNotFound", err)
+	}
+	if _, err := passports.Get(t.Context(), "other", "X"); err != nil {
+		t.Fatalf("other org passport must survive: %v", err)
+	}
+}
+
 func TestSeedDemoFillsMissingDomainWithoutWipe(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()

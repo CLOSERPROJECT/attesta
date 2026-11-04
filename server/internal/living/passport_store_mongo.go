@@ -108,6 +108,18 @@ func (s *MongoPassportStore) Create(ctx context.Context, record PassportRecord) 
 	return nil
 }
 
+func (s *MongoPassportStore) DeleteByOrg(ctx context.Context, org string) error {
+	org = strings.TrimSpace(org)
+	if org == "" {
+		return fmt.Errorf("living: passport delete by org requires org")
+	}
+	_, err := s.coll().DeleteMany(ctx, bson.M{"org": org})
+	if err != nil {
+		return fmt.Errorf("living mongo passport delete by org: %w", err)
+	}
+	return nil
+}
+
 func passportFromMongoDoc(doc mongoPassportDoc) PassportRecord {
 	return PassportRecord{
 		Org:           doc.Org,
