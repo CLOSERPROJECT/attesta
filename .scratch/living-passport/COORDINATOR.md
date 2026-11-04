@@ -26,8 +26,9 @@
 | 10 | `issues/10-omit-passport-commit-links.md` | — |
 | 11 | `issues/11-clear-session-links-on-nonstay-navigate.md` | — |
 | 12 | `issues/12-stay-on-form-for-any-commit-links.md` | — |
+| 13 | `issues/13-httplinkstrip-button-chrome.md` | — |
 
-**Frontier:** none — **12** done
+**Frontier:** — (13 done)
 
 | # | Status |
 | --- | --- |
@@ -43,9 +44,9 @@
 | 10 | **reverted** by 11 — Commit.Links was OK |
 | 11 | done — `6666b5f` + `c386455` |
 | 12 | done — `0d946d5` |
+| 13 | done — (see Done notes) |
 
-**Active (2026-11-04):** none — **12** done (any non-empty Commit links → stay).
-
+**Active (2026-11-04):** — (13 complete).
 ### Investigation note (eligibility)
 Passport Can start always-on: no Job `startsWhen`; Domain gate only on select enum + lock readyWhen. Prefer Go fold of first-Task `readyWhen` into `canStart` + Feragame `select.readyWhen` count eligible loads.
 
@@ -64,14 +65,15 @@ Passport Can start always-on: no Job `startsWhen`; Domain gate only on select en
 | 09 | `f341c89` | Spec+Standards APPROVE |
 | 10 | `6a2f835` (reverted by 11 / `6666b5f`) | Spec+Standards APPROVE then human override |
 | 11 | `6666b5f` + `c386455` | Spec+Standards APPROVE (nits non-blocking) |
-| 12 | `0d946d5` | — |
+| 12 | `0d946d5` | Spec+Standards APPROVE (nits non-blocking) |
+| 13 | (pending SHA) | implementer — HttpLinkStrip button chrome |
 | board | `f217a86` ledger stamp | — |
 
 ## Human smoke (Compose, after seed refresh)
 
 1. `task seed -- --replace` (wipes Domain demo staging — human OK required)
 2. Register-close a load → Worklist **Blocca passaporto** → select → live recap → Invia
-3. Expect Commit DPP link on lock form only (not on next TaskForm); overview/Completed recap + public Digital Link/UNTP GET; locked load leaves select enum
+3. Expect stay on lock form with DPP strip → Continue → overview/home; overview/Completed still show link; public Digital Link/UNTP GET; locked load leaves select enum
 
 ## Verify (regression)
 
