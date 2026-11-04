@@ -3,11 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/CLOSERPROJECT/attesta/server/internal/untp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -133,90 +133,23 @@ func legacyDPPDataLookupKeys(sub WorkflowSub, key string) []string {
 }
 
 func parseDigitalLinkPath(path string) (string, string, string, error) {
-	trimmed := strings.Trim(strings.TrimSpace(path), "/")
-	parts := strings.Split(trimmed, "/")
-	return parseDigitalLinkParts(parts)
+	return untp.ParsePath(path)
 }
 
 func parseDigitalLinkAttachmentPath(path string) (string, string, string, string, bool, error) {
-	trimmed := strings.Trim(strings.TrimSpace(path), "/")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) != 9 || parts[6] != "attachment" || parts[8] != "file" {
-		return "", "", "", "", false, nil
-	}
-	gtin, lot, serial, err := parseDigitalLinkParts(parts[:6])
-	if err != nil {
-		return "", "", "", "", true, err
-	}
-	attachmentID, err := url.PathUnescape(parts[7])
-	if err != nil {
-		return "", "", "", "", true, err
-	}
-	attachmentID = strings.TrimSpace(attachmentID)
-	if attachmentID == "" {
-		return "", "", "", "", true, errors.New("missing attachment id")
-	}
-	return gtin, lot, serial, attachmentID, true, nil
+	return untp.ParseAttachmentPath(path)
 }
 
-// parseDigitalLinkEventsPath matches /01/{gtin}/10/{lot}/21/{serial}/events
-// (UNTP Digital Traceability Events endpoint). ok is true when the path
-// carries the /events suffix.
 func parseDigitalLinkEventsPath(path string) (string, string, string, bool, error) {
-	trimmed := strings.Trim(strings.TrimSpace(path), "/")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) != 7 || parts[6] != "events" {
-		return "", "", "", false, nil
-	}
-	gtin, lot, serial, err := parseDigitalLinkParts(parts[:6])
-	if err != nil {
-		return "", "", "", true, err
-	}
-	return gtin, lot, serial, true, nil
-}
-
-func parseDigitalLinkParts(parts []string) (string, string, string, error) {
-	if len(parts) != 6 || parts[0] != "01" || parts[2] != "10" || parts[4] != "21" {
-		return "", "", "", errors.New("invalid digital link path")
-	}
-	gtinRaw, err := url.PathUnescape(parts[1])
-	if err != nil {
-		return "", "", "", err
-	}
-	gtin, err := normalizeGTIN(gtinRaw)
-	if err != nil {
-		return "", "", "", err
-	}
-	lot, err := url.PathUnescape(parts[3])
-	if err != nil {
-		return "", "", "", err
-	}
-	serial, err := url.PathUnescape(parts[5])
-	if err != nil {
-		return "", "", "", err
-	}
-	lot = strings.TrimSpace(lot)
-	serial = strings.TrimSpace(serial)
-	if lot == "" || serial == "" {
-		return "", "", "", errors.New("missing lot or serial")
-	}
-	return gtin, lot, serial, nil
+	return untp.ParseEventsPath(path)
 }
 
 func digitalLinkURL(gtin, lot, serial string) string {
-	return "/01/" + url.PathEscape(strings.TrimSpace(gtin)) +
-		"/10/" + url.PathEscape(strings.TrimSpace(lot)) +
-		"/21/" + url.PathEscape(strings.TrimSpace(serial))
+	return untp.URL(gtin, lot, serial)
 }
 
 func gs1ElementString(gtin, lot, serial string) string {
-	trimmedGTIN := strings.TrimSpace(gtin)
-	trimmedLot := strings.TrimSpace(lot)
-	trimmedSerial := strings.TrimSpace(serial)
-	if trimmedGTIN == "" || trimmedLot == "" || trimmedSerial == "" {
-		return ""
-	}
-	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
+	return untp.GS1ElementString(gtin, lot, serial)
 }
 
 func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []TimelineStep {
@@ -365,10 +298,7 @@ func humanReadableTraceabilityTime(value time.Time) string {
 }
 
 func rfc3339UTC(value time.Time) string {
-	if value.IsZero() {
-		return ""
-	}
-	return value.UTC().Format(time.RFC3339)
+	return untp.FormatRFC3339UTC(value)
 }
 
 func dppTraceValues(sub WorkflowSub, progress ProcessStep) []SubstepKV {

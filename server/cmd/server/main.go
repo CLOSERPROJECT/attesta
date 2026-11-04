@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"github.com/CLOSERPROJECT/attesta/server/internal/untp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/yaml.v3"
@@ -8211,22 +8212,20 @@ func normalizeDPPConfig(cfg *DPPConfig) error {
 }
 
 func normalizeGTIN(raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", errors.New("dpp.gtin is required when dpp.enabled=true")
-	}
-	for _, char := range trimmed {
-		if char < '0' || char > '9' {
+	gtin, err := untp.NormalizeGTIN(raw)
+	if err != nil {
+		switch {
+		case errors.Is(err, untp.ErrGTINRequired):
+			return "", errors.New("dpp.gtin is required when dpp.enabled=true")
+		case errors.Is(err, untp.ErrGTINNonDigit):
 			return "", fmt.Errorf("dpp.gtin must contain only digits: %q", raw)
+		case errors.Is(err, untp.ErrGTINTooLong):
+			return "", fmt.Errorf("dpp.gtin must be at most 14 digits: %q", raw)
+		default:
+			return "", err
 		}
 	}
-	if len(trimmed) > 14 {
-		return "", fmt.Errorf("dpp.gtin must be at most 14 digits: %q", raw)
-	}
-	if len(trimmed) < 14 {
-		trimmed = strings.Repeat("0", 14-len(trimmed)) + trimmed
-	}
-	return trimmed, nil
+	return gtin, nil
 }
 
 func normalizeDPPSerialStrategy(raw string) (string, error) {
