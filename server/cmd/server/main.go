@@ -171,6 +171,7 @@ type Server struct {
 	livingDomains      living.DomainStore
 	livingConfigs      living.ConfigStore
 	livingLinks        living.LinkStore
+	livingPassports    living.PassportStore
 	livingAuthorizer   living.Authorizer
 	livingHttpPort     living.HttpPort
 }

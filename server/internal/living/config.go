@@ -8,14 +8,15 @@ import (
 
 // OrgConfig is one Config version of the org's authored operating picture.
 type OrgConfig struct {
-	ID       string         `json:"id"`
-	Org      string         `json:"org,omitempty"`
-	Version  string         `json:"version"`
-	Domain   map[string]any `json:"domain,omitempty"`
-	Catalogs map[string]any `json:"catalogs,omitempty"`
-	QR       *QrConfig      `json:"qr,omitempty"`
-	Roles    []string       `json:"roles,omitempty"`
-	Jobs     OrderedObject  `json:"jobs"`
+	ID       string          `json:"id"`
+	Org      string          `json:"org,omitempty"`
+	Version  string          `json:"version"`
+	Domain   map[string]any  `json:"domain,omitempty"`
+	Catalogs map[string]any  `json:"catalogs,omitempty"`
+	QR       *QrConfig       `json:"qr,omitempty"`
+	Passport *PassportConfig `json:"passport,omitempty"`
+	Roles    []string        `json:"roles,omitempty"`
+	Jobs     OrderedObject   `json:"jobs"`
 }
 
 // UnmarshalJSON decodes each Job from raw JSON so Jobs OrderedObject keeps
@@ -28,6 +29,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 		Domain   map[string]any  `json:"domain,omitempty"`
 		Catalogs map[string]any  `json:"catalogs,omitempty"`
 		QR       *QrConfig       `json:"qr,omitempty"`
+		Passport *PassportConfig `json:"passport,omitempty"`
 		Roles    []string        `json:"roles,omitempty"`
 		Jobs     json.RawMessage `json:"jobs"`
 	}
@@ -44,6 +46,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 	c.Domain = wire.Domain
 	c.Catalogs = wire.Catalogs
 	c.QR = wire.QR
+	c.Passport = wire.Passport
 	c.Roles = wire.Roles
 	c.Jobs = jobs
 	return nil

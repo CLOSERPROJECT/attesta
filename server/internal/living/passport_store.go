@@ -1,0 +1,66 @@
+package living
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"sync"
+)
+
+// PassportStore persists issued Passports keyed by org + subject.
+type PassportStore interface {
+	Get(ctx context.Context, org, subjectID string) (PassportRecord, error)
+	// Create inserts once; returns ErrPassportExists when the subject is already locked.
+	Create(ctx context.Context, record PassportRecord) error
+}
+
+var _ PassportStore = (*MemoryPassportStore)(nil)
+
+// MemoryPassportStore is an in-memory PassportStore.
+type MemoryPassportStore struct {
+	mu     sync.RWMutex
+	byKey  map[string]PassportRecord
+}
+
+func NewMemoryPassportStore() *MemoryPassportStore {
+	return &MemoryPassportStore{byKey: map[string]PassportRecord{}}
+}
+
+func passportStoreKey(org, subjectID string) (string, error) {
+	org = strings.TrimSpace(org)
+	subjectID = strings.TrimSpace(subjectID)
+	if org == "" || subjectID == "" {
+		return "", fmt.Errorf("living: passport store key requires org and subject id")
+	}
+	return org + "\x00" + subjectID, nil
+}
+
+func (s *MemoryPassportStore) Get(_ context.Context, org, subjectID string) (PassportRecord, error) {
+	key, err := passportStoreKey(org, subjectID)
+	if err != nil {
+		return PassportRecord{}, ErrNotFound
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rec, ok := s.byKey[key]
+	if !ok {
+		return PassportRecord{}, ErrNotFound
+	}
+	return clonePassportRecord(rec), nil
+}
+
+func (s *MemoryPassportStore) Create(_ context.Context, record PassportRecord) error {
+	key, err := passportStoreKey(record.Org, record.SubjectID)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.byKey[key]; exists {
+		return ErrPassportExists
+	}
+	record.Org = strings.TrimSpace(record.Org)
+	record.SubjectID = strings.TrimSpace(record.SubjectID)
+	s.byKey[key] = clonePassportRecord(record)
+	return nil
+}
