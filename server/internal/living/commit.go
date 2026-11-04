@@ -94,9 +94,8 @@ type Committer struct {
 	// SubmitBindings are ops/runtime JSONata vars merged into onSubmit.http evaluation
 	// (e.g. qrEndpoint from LivingAppBaseURL). Nil/empty is fine.
 	SubmitBindings ExprBindings
-	// LinkStore persists post-Commit links for TaskRecap (overview rediscovery). Includes
-	// Passport public URLs even when omitted from CommitResult.Links (no TaskForm flash).
-	// Nil skips persist; Put errors never fail Commit or roll back Domain.
+	// LinkStore persists Commit links[] after HttpPort. Nil skips persist; Put errors
+	// never fail Commit or roll back Domain (response still returns links for stay UI).
 	LinkStore LinkStore
 	// Passports persists Passport records when onSubmit.passport is set. Required for that hook.
 	Passports PassportStore
@@ -280,15 +279,12 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		Next:               next,
 		NextTaskFormBundle: nextBundle,
 	}
-	var storeLinks []HttpLinkItem
 	if wantsPassport {
 		issued, err := issuePassport(ctx, c.Passports, cfg, applied.Domain, applied.JobInstanceID, cfg.Catalogs, applied.Bindings, ts)
 		if err != nil {
 			return CommitResult{}, err
 		}
-		// Omit from response Links so TaskForm HttpLinkStrip does not flash the Passport URL;
-		// still persist for overview TaskRecap.
-		storeLinks = append(storeLinks, issued.Links...)
+		result.Links = append(result.Links, issued.Links...)
 	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
@@ -298,10 +294,9 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 			result.HttpErrors = httpResult.Errors
 		}
 	}
-	storeLinks = append(storeLinks, result.Links...)
-	if c.LinkStore != nil && len(storeLinks) > 0 {
+	if c.LinkStore != nil && len(result.Links) > 0 {
 		// Side record only — never roll back Domain or fail Commit on store error.
-		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), storeLinks)
+		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), result.Links)
 	}
 	return result, nil
 }
