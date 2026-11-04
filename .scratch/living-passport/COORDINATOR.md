@@ -42,7 +42,7 @@
 | 09 | done — `f341c89` |
 | 10 | **reverted** by 11 — Commit.Links was OK |
 | 11 | done — `6666b5f` + `c386455` |
-| 12 | done — stay on form for any Commit links |
+| 12 | done — `0d946d5` |
 
 **Active (2026-11-04):** none — **12** done (any non-empty Commit links → stay).
 
@@ -64,7 +64,7 @@ Passport Can start always-on: no Job `startsWhen`; Domain gate only on select en
 | 09 | `f341c89` | Spec+Standards APPROVE |
 | 10 | `6a2f835` (reverted by 11 / `6666b5f`) | Spec+Standards APPROVE then human override |
 | 11 | `6666b5f` + `c386455` | Spec+Standards APPROVE (nits non-blocking) |
-| 12 | (pending SHA) | — |
+| 12 | `0d946d5` | — |
 | board | `f217a86` ledger stamp | — |
 
 ## Human smoke (Compose, after seed refresh)
