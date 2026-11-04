@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '#lib/paraglide/messages.js';
+
 	import type { CommitOutcome } from '../living/commit-port.js';
 	import TaskForm from '../living/TaskForm.svelte';
 	import type { TaskFormBundle } from '../living/form/task-form-bundle.js';
@@ -169,7 +171,7 @@
 
 		if (!jid || !tid) {
 			bundle = null;
-			error = 'Missing Task address';
+			error = m.missing_task_address();
 			loading = false;
 			return;
 		}
@@ -256,14 +258,14 @@
 <div class="mx-auto max-w-3xl space-y-4" data-testid="task-route">
 	{#if living.commitError}
 		<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
-			{stayedOutcome && confirmClose ? 'Close denied' : 'Commit denied'}: {living.commitError}
+			{stayedOutcome && confirmClose ? m.close_denied() : m.commit_denied()}: {living.commitError}
 		</p>
 	{/if}
 
 	{#if redirected}
-		<p class="text-sm text-zinc-500" data-testid="task-redirecting">Redirecting…</p>
+		<p class="text-sm text-zinc-500" data-testid="task-redirecting">{m.redirecting()}</p>
 	{:else if loading}
-		<p class="text-sm text-zinc-500" data-testid="task-load-status">Loading…</p>
+		<p class="text-sm text-zinc-500" data-testid="task-load-status">{m.loading()}</p>
 	{:else if error}
 		<p class="text-sm text-red-700" data-testid="task-load-error" role="alert">
 			{error}
@@ -288,13 +290,13 @@
 							class="rounded-lg border border-zinc-200 bg-white px-4 py-3"
 							data-testid="task-close-confirm"
 							role="group"
-							aria-label="Confirm close"
+							aria-label={m.confirm_close()}
 						>
 							<p class="text-sm font-medium text-zinc-900">
 								{groupLoop.closeLabel}?
 							</p>
 							<p class="mt-0.5 text-xs text-zinc-500">
-								This finishes the group and unlocks the next step.
+								{m.close_group_help()}
 							</p>
 							<div class="mt-3 flex flex-wrap gap-2">
 								<button
@@ -304,7 +306,7 @@
 									disabled={living.committing}
 									onclick={cancelClose}
 								>
-									Cancel
+									{m.cancel()}
 								</button>
 								<button
 									type="button"
@@ -327,7 +329,7 @@
 									disabled={living.committing}
 									onclick={onStartAnother}
 								>
-									Start another
+									{m.start_another()}
 								</button>
 							{/if}
 							{#if groupLoop.canClose}
@@ -351,7 +353,7 @@
 						disabled={living.committing}
 						onclick={onContinue}
 					>
-						Continue
+						{m.continue()}
 					</button>
 				{/if}
 			</div>

@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import type { PostCommitTarget } from './worklist-nav.js';
 import {
 	PROVISIONAL_GROUP_INSTANCE_ID,
@@ -170,7 +172,7 @@ export function canStartRowsFromWorklist(
 			jobId: job.jobId,
 			jobTitle: job.title?.trim() || job.jobId,
 			...(jobColor ? { jobColor } : {}),
-			startLabel: job.startLabel?.trim() || 'Start',
+			startLabel: job.startLabel?.trim() || m.fallback_start(),
 			firstTaskId
 		});
 	}

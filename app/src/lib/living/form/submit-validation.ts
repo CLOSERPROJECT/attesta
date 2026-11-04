@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 /**
  * createForm skips onSubmit when Ajv fails; exact-path getFieldErrors
  * misses nested map/<id> errors. Helpers surface both.
@@ -48,7 +50,7 @@ export function messagesAtExactPath(
 
 export function formatSubmitValidationError(failure: SubmitValidationFailure): string {
 	const { errors } = failure;
-	if (errors.length === 0) return 'Validazione fallita';
+	if (errors.length === 0) return m.validation_failed();
 	return errors
 		.map((err) => {
 			const prefix = err.path.length > 0 ? `${err.path.join('.')}: ` : '';

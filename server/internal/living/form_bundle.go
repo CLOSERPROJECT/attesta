@@ -277,6 +277,10 @@ func taskTitle(payload map[string]any, taskID string) string {
 			return title
 		}
 	}
+	// Groups cannot author schema; optional top-level title for Worklist chrome.
+	if title, ok := payload["title"].(string); ok && title != "" {
+		return title
+	}
 	return taskID
 }
 

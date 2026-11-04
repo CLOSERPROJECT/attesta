@@ -63,7 +63,7 @@ qr:
             palletId: $scan.entityId
           messages:
             onZero: Nessuna pesatura disponibile per questo bancale
-            onMany: "Più destinazioni possibili: apri il turno giusto dal Worklist"
+            onMany: "Più destinazioni possibili: apri il turno giusto dalla lista lavori"
             onIneligible: Bancale non pesabile (assente o già pesato)
 # Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
 # Active Config refresh after YAML edits needs: task seed -- --replace (human-gated wipe).
@@ -143,6 +143,7 @@ steps:
               roles: [administration]
               schema:
                 type: object
+                title: Registrazione camion
                 required: [date, turno, truckWeight]
                 properties:
                     date:
@@ -175,6 +176,7 @@ steps:
                         lastScaleReading: $.truckWeight
             - id: lots
               kind: group
+              title: Codici FIR
               repeatable: true
               startLabel: Nuovo lotto
               closeLabel: Chiudi scarico
@@ -338,7 +340,7 @@ steps:
                               {"label": "Peso lordo camion", "value": $kg($gross), "error": null, "tone": null},
                               {"label": "Ultima lettura (tara)", "value": $kg($tare), "error": null, "tone": null},
                               {"label": "Σ netti lotti", "value": $kg($lotSum), "error": null, "tone": null},
-                              {"label": "Match %", "value": $string($pct), "error": null, "tone": $tone}
+                              {"label": "Corrispondenza %", "value": $string($pct), "error": null, "tone": $tone}
                             ]
                           }
                         )

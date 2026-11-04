@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import type { Worklist } from './types.js';
 import { worklistJobFor } from './types.js';
 import { resolveTaskExit, type PostCommitTarget } from './worklist-nav.js';
@@ -174,7 +176,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 		return {
 			showBack: false,
 			backTarget: { kind: 'home' },
-			primaryLabel: 'Home',
+			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		};
 	}
@@ -186,7 +188,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 		return {
 			showBack: true,
 			backTarget: { kind: 'home' },
-			primaryLabel: overview?.label ?? 'Job instance',
+			primaryLabel: overview?.label ?? m.fallback_job_instance(),
 			jobTitleLine
 		};
 	}

@@ -1,5 +1,7 @@
 import jsonata, { type ExprNode } from 'jsonata';
 
+import * as m from '#lib/paraglide/messages.js';
+
 /** ADR-0008 spirit: no non-deterministic or code-eval builtins in transforms. */
 const DENIED = new Set(['now', 'random', 'eval']);
 
@@ -76,6 +78,6 @@ export async function evaluateSafe(
 }
 
 export function formatJsonataError(error: JsonataSafeError): string {
-	if (error.kind === 'denied') return `jsonata denied: $${error.name}`;
-	return `jsonata ${error.kind}: ${error.message}`;
+	if (error.kind === 'denied') return m.jsonata_denied({ name: error.name });
+	return m.jsonata_error({ kind: error.kind, message: error.message });
 }

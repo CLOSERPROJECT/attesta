@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import * as m from '#lib/paraglide/messages.js';
+
 import type { Worklist } from './types.js';
 import {
 	aggregateGroupInstanceStatus,
@@ -67,12 +69,12 @@ const adminWorklist = worklistFor('admin');
 const logisticWorklist = worklistFor('logistic');
 
 describe('job instance overview model', () => {
-	test('taskStatusLabel maps five-value status to IT tags', () => {
-		expect(taskStatusLabel('locked')).toBe('Bloccato');
-		expect(taskStatusLabel('unavailable')).toBe('Non disponibile');
-		expect(taskStatusLabel('available')).toBe('Disponibile');
-		expect(taskStatusLabel('actionable')).toBe('Per te');
-		expect(taskStatusLabel('done')).toBe('Fatto');
+	test('taskStatusLabel maps five-value status via Paraglide', () => {
+		expect(taskStatusLabel('locked')).toBe(m.status_locked());
+		expect(taskStatusLabel('unavailable')).toBe(m.status_unavailable());
+		expect(taskStatusLabel('available')).toBe(m.status_available());
+		expect(taskStatusLabel('actionable')).toBe(m.status_actionable());
+		expect(taskStatusLabel('done')).toBe(m.status_done());
 	});
 
 	test('formatFactValue stringifies recap values', () => {

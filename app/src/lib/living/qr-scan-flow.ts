@@ -1,6 +1,8 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import { interpretQrResolve } from './qr-resolve-apply.js';
 import type { QrResolvePort, QrResolveResult } from './qr-resolve-port.js';
-import { QR_RESOLVE_FAILED, QrResolveHttpError } from './qr-resolve-port.js';
+import { qrResolveFailedMessage, QrResolveHttpError } from './qr-resolve-port.js';
 import type { PostCommitTarget } from './worklist-nav.js';
 
 export type QrScanDraftBag = {
@@ -28,7 +30,7 @@ export async function runQrScan(
 ): Promise<'navigated' | 'toasted'> {
 	const trimmed = raw.trim();
 	if (!trimmed) {
-		deps.toast('Empty scan');
+		deps.toast(m.empty_scan());
 		return 'toasted';
 	}
 	let result: QrResolveResult;
@@ -41,7 +43,7 @@ export async function runQrScan(
 				: err instanceof Error
 					? err.message
 					: String(err);
-		deps.toast(message || QR_RESOLVE_FAILED);
+		deps.toast(message || qrResolveFailedMessage());
 		return 'toasted';
 	}
 	const outcome = interpretQrResolve(result);

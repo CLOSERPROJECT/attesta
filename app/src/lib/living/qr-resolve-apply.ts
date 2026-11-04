@@ -1,6 +1,6 @@
 import { draftBagInstanceKey } from './drafts.js';
 import {
-	QR_RESOLVE_FAILED,
+	qrResolveFailedMessage,
 	type QrNavigate,
 	type QrResolveResult
 } from './qr-resolve-port.js';
@@ -77,7 +77,7 @@ export function interpretQrResolve(result: QrResolveResult): QrApplyOutcome {
 	}
 	const nav = result.navigate;
 	if (!nav) {
-		return { kind: 'error', message: QR_RESOLVE_FAILED };
+		return { kind: 'error', message: qrResolveFailedMessage() };
 	}
 	const coords = qrDraftCoords(nav);
 	return {

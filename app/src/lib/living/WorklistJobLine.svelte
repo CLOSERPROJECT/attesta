@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { ClassValue } from 'svelte/elements';
 
+	import * as m from '#lib/paraglide/messages.js';
+
 	import { progressFraction } from './worklist-home.js';
 
 	type Props = {
@@ -57,7 +59,7 @@
 		<span
 			class="inline-flex shrink-0 items-center gap-1"
 			role="img"
-			aria-label="{done} of {total} tasks done"
+			aria-label={m.tasks_done_of_total({ done, total })}
 			data-testid={progressTestId}
 			data-done={done}
 			data-total={total}

@@ -29,6 +29,8 @@ describe('Ajv Draft validator', () => {
 		const factory = readFileSync(join(import.meta.dirname, 'ajv-form-validator.ts'), 'utf8');
 		expect(factory).toContain('@sjsf/ajv8-validator');
 		expect(factory).toContain('$data: true');
+		expect(factory).toContain('messages: false');
+		expect(factory).toContain('ajv-i18n/localize');
 	});
 
 	test('if/then requires gated field only when condition holds', () => {
@@ -40,6 +42,26 @@ describe('Ajv Draft validator', () => {
 		).toBe(true);
 
 		expect(validator.isValid(ifThenSchema, ifThenSchema, { mode: 'dual' })).toBe(false);
+	});
+
+	test('ajv-i18n localizes required errors by locale', () => {
+		const schema = {
+			type: 'object',
+			properties: { name: { type: 'string' } },
+			required: ['name']
+		} as Schema;
+
+		const itResult = createAjvFormValidator<Record<string, unknown>>(
+			undefined,
+			'it'
+		).validateFormValue(schema, {});
+		expect(itResult.errors?.some((e) => /obbligator/i.test(e.message))).toBe(true);
+
+		const enResult = createAjvFormValidator<Record<string, unknown>>(
+			undefined,
+			'en'
+		).validateFormValue(schema, {});
+		expect(enResult.errors?.some((e) => /required/i.test(e.message))).toBe(true);
 	});
 });
 

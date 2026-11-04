@@ -290,7 +290,7 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 	assertRow("Peso lordo camion", "1000", nil)
 	assertRow("Ultima lettura (tara)", "200", nil)
 	assertRow("Σ netti lotti", "800", nil)
-	assertRow("Match %", "100", "green")
+	assertRow("Corrispondenza %", "100", "green")
 }
 
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {

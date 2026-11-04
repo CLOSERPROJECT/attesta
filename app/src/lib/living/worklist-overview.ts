@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import type {
 	TaskStatus,
 	Worklist,
@@ -87,10 +89,10 @@ function groupChrome(
 	const firstChildTaskId = group.childTaskIds?.[0] ?? '';
 	return {
 		canSpawn: Boolean(group.canSpawn && firstChildTaskId),
-		startLabel: group.startLabel?.trim() || chromeTitle || 'Spawn',
+		startLabel: group.startLabel?.trim() || chromeTitle || m.fallback_spawn(),
 		firstChildTaskId,
 		canClose: Boolean(group.canClose),
-		closeLabel: group.closeLabel?.trim() || 'Close'
+		closeLabel: group.closeLabel?.trim() || m.fallback_close()
 	};
 }
 
@@ -157,15 +159,15 @@ function projectGroupInstances(
 export function taskStatusLabel(status: TaskStatus): string {
 	switch (status) {
 		case 'locked':
-			return 'Bloccato';
+			return m.status_locked();
 		case 'unavailable':
-			return 'Non disponibile';
+			return m.status_unavailable();
 		case 'available':
-			return 'Disponibile';
+			return m.status_available();
 		case 'actionable':
-			return 'Per te';
+			return m.status_actionable();
 		case 'done':
-			return 'Fatto';
+			return m.status_done();
 	}
 }
 
@@ -273,9 +275,9 @@ export function jobInstanceOverview(
 
 export function formatHandoffCopy(roles: string[]): string {
 	const named = roles.filter((r) => r.length > 0);
-	if (!named.length) return 'Next work is waiting for another role.';
+	if (!named.length) return m.handoff_waiting_role_unknown();
 	if (named.length === 1) {
-		return `Next work waits for role: ${named[0]}.`;
+		return m.handoff_waiting_role_one({ role: named[0] });
 	}
-	return `Next work waits for roles: ${named.join(', ')}.`;
+	return m.handoff_waiting_roles({ roles: named.join(', ') });
 }

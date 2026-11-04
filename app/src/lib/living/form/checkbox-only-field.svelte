@@ -6,6 +6,8 @@
 		type ComponentProps
 	} from '@sjsf/form';
 
+	import * as m from '#lib/paraglide/messages.js';
+
 	let {
 		config,
 		value = $bindable(),
@@ -15,7 +17,7 @@
 	const ctx = getFormContext();
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
 	const errors = $derived(getFieldErrors(ctx, config.path));
-	const label = $derived(config.title || 'Fonti doppie');
+	const label = $derived(config.title || m.checkbox_dual_sources_default());
 </script>
 
 <Template

@@ -1,4 +1,8 @@
-export const QR_RESOLVE_FAILED = 'QR resolve failed';
+import * as m from '#lib/paraglide/messages.js';
+
+export function qrResolveFailedMessage(): string {
+	return m.qr_resolve_failed();
+}
 
 /** Wire navigate coords from POST /api/living/qr-resolve. */
 export type QrNavigate = {
@@ -75,6 +79,6 @@ export function parseQrResolveResult(raw: unknown): QrResolveResult {
 	const error = parseError(body.error);
 	if (error) return { error };
 	const navigate = parseNavigate(body.navigate);
-	if (!navigate) return { error: { code: 'invalid', message: QR_RESOLVE_FAILED } };
+	if (!navigate) return { error: { code: 'invalid', message: qrResolveFailedMessage() } };
 	return { navigate, seed: parseSeed(body.seed) };
 }

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
+	import * as m from '#lib/paraglide/messages.js';
+
 	import { p } from '../router/index.js';
 	import { hrefLivingTarget } from '../router/navigate-target.js';
 	import { draftAddressForTask } from './drafts.js';
@@ -45,28 +47,28 @@
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="living-shell">
 	{#if !living.result && living.loading}
-		<p class="text-sm text-zinc-500" data-testid="living-load-status">Loading…</p>
+		<p class="text-sm text-zinc-500" data-testid="living-load-status">{m.loading()}</p>
 	{:else if !living.result && living.error}
 		<p class="text-sm text-red-700" data-testid="living-load-error" role="alert">
 			{living.error}
 		</p>
 	{:else if !living.result}
 		<p class="text-sm text-zinc-500" data-testid="living-load-status">
-			Not loaded yet.
+			{m.not_loaded_yet()}
 		</p>
 	{/if}
 	{#if living.commitError}
 		<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
-			Commit denied: {living.commitError}
+			{m.commit_denied()}: {living.commitError}
 		</p>
 	{/if}
 	{#if living.committing}
-		<p class="text-sm text-zinc-500" data-testid="living-commit-status">Committing…</p>
+		<p class="text-sm text-zinc-500" data-testid="living-commit-status">{m.committing()}</p>
 	{/if}
 
 	{#if living.result}
 		<section class="space-y-3" data-testid="worklist-available">
-			<h2 class="text-lg font-semibold text-zinc-900">Available</h2>
+			<h2 class="text-lg font-semibold text-zinc-900">{m.available()}</h2>
 			<ul class="flex flex-col gap-1">
 				{#each available as row (availableRowKey(row))}
 					<li>
@@ -107,7 +109,7 @@
 				{:else}
 					<li>
 						<WorklistRow data-testid="available-empty" class="text-sm text-zinc-500">
-							No available Tasks.
+							{m.no_available_tasks()}
 						</WorklistRow>
 					</li>
 				{/each}
@@ -115,7 +117,7 @@
 		</section>
 
 		<section class="space-y-3" data-testid="worklist-can-start">
-			<h2 class="text-lg font-semibold text-zinc-900">Can start</h2>
+			<h2 class="text-lg font-semibold text-zinc-900">{m.can_start()}</h2>
 			<ul class="flex flex-col gap-1">
 				{#each canStart as row (row.jobId)}
 					<li>
@@ -143,7 +145,7 @@
 				{:else}
 					<li>
 						<WorklistRow data-testid="can-start-empty" class="text-sm text-zinc-500">
-							No Jobs to start.
+							{m.no_jobs_to_start()}
 						</WorklistRow>
 					</li>
 				{/each}
@@ -151,7 +153,7 @@
 		</section>
 
 		<section class="space-y-3" data-testid="worklist-in-progress">
-			<h2 class="text-lg font-semibold text-zinc-900">In progress</h2>
+			<h2 class="text-lg font-semibold text-zinc-900">{m.in_progress()}</h2>
 			<ul class="flex flex-col gap-1">
 				{#each inProgress as row (inProgressRowKey(row))}
 					<li>
@@ -181,7 +183,7 @@
 				{:else}
 					<li>
 						<WorklistRow data-testid="in-progress-empty" class="text-sm text-zinc-500">
-							No jobs in progress.
+							{m.no_jobs_in_progress()}
 						</WorklistRow>
 					</li>
 				{/each}
@@ -189,7 +191,7 @@
 		</section>
 
 		<section class="space-y-3" data-testid="worklist-completed">
-			<h2 class="text-lg font-semibold text-zinc-900">Completed</h2>
+			<h2 class="text-lg font-semibold text-zinc-900">{m.completed()}</h2>
 			<ul class="flex flex-col gap-1">
 				{#each completed as row (completedRowKey(row))}
 					<li>
@@ -219,7 +221,7 @@
 				{:else}
 					<li>
 						<WorklistRow data-testid="completed-empty" class="text-sm text-zinc-500">
-							No completed jobs.
+							{m.no_completed_jobs()}
 						</WorklistRow>
 					</li>
 				{/each}

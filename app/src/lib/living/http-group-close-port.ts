@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import { CommitDomainError } from './commit-port.js';
 import type { CloseGroupPort } from './group-close-port.js';
 import { parseCommitResult } from './http-commit-port.js';
@@ -27,7 +29,7 @@ export function createHttpCloseGroupPort(
 			if (!res.ok) {
 				const detail = (await res.text().catch(() => '')).trim();
 				throw new CommitDomainError(
-					detail || `living /api/living/close failed (${res.status})`,
+					detail || m.living_close_failed({ status: res.status }),
 					res.status
 				);
 			}

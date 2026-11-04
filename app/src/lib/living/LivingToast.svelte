@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '#lib/paraglide/messages.js';
+
 	import { livingToast } from './toast.svelte.js';
 </script>
 
@@ -18,7 +20,7 @@
 				data-testid="living-toast-dismiss"
 				onclick={() => livingToast.dismiss()}
 			>
-				Chiudi
+				{m.toast_dismiss()}
 			</button>
 		</div>
 	</div>

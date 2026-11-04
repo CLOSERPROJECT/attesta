@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { TaskFormError, type TaskFormPort, type TaskFormRequest } from './task-form-port.js';
 
@@ -41,7 +43,7 @@ export function createHttpTaskFormPort(
 			if (!res.ok) {
 				const detail = (await res.text().catch(() => '')).trim();
 				throw new TaskFormError(
-					detail || `living task-form failed (${res.status})`,
+					detail || m.living_task_form_failed({ status: res.status }),
 					res.status
 				);
 			}

@@ -90,10 +90,12 @@ async function stubLivingApis(page: Page) {
 	});
 }
 
-test('home route renders Worklist Home bands', async ({ page }) => {
+test('home route renders Worklist Home bands (Italian default)', async ({ page }) => {
 	await stubLivingApis(page);
 	await page.goto('/app');
+	await expect(page.locator('html')).toHaveAttribute('lang', 'it');
 	await expect(page.getByTestId('living-shell')).toBeVisible();
+	// fallback_home is "Home" in both it and en catalogs
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 	await expect(page.getByTestId('nav-back')).toHaveCount(0);
 	await expect(page.getByTestId('nav-role-chip')).toHaveText('administration');
@@ -101,11 +103,16 @@ test('home route renders Worklist Home bands', async ({ page }) => {
 	await expect(page.getByTestId('worklist-can-start')).toBeVisible();
 	await expect(page.getByTestId('available-row')).toBeVisible();
 	await expect(page.getByTestId('can-start-row')).toBeVisible();
-	await expect(page.getByRole('heading', { name: 'Available' })).toBeVisible();
-	await expect(page.getByRole('heading', { name: 'Can start' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Disponibili' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Avviabili' })).toBeVisible();
+	// First getLocale() seeds PARAGLIDE_LOCALE=it (cookie strategy); must not be en.
+	const localeCookie = (await page.context().cookies()).find(
+		(c) => c.name === 'PARAGLIDE_LOCALE'
+	);
+	expect(localeCookie?.value ?? 'it').toBe('it');
 });
 
-test('Home → Can start → nav-back → Home', async ({ page }) => {
+test('Home → Avviabili → nav-back → Home', async ({ page }) => {
 	await stubLivingApis(page);
 	await page.goto('/app');
 	await expect(page.getByTestId('worklist-can-start')).toBeVisible();
@@ -120,7 +127,7 @@ test('Home → Can start → nav-back → Home', async ({ page }) => {
 	await expect(page.getByTestId('worklist-can-start')).toBeVisible();
 });
 
-test('Home → Available row → nav-back → overview', async ({ page }) => {
+test('Home → Disponibili row → nav-back → overview', async ({ page }) => {
 	await stubLivingApis(page);
 	await page.goto('/app');
 	await expect(page.getByTestId('available-row')).toBeVisible();

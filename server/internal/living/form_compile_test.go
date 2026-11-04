@@ -58,7 +58,7 @@ func TestWithDefaultPlaceholdersNestedItemsWeight(t *testing.T) {
 	items, _ := plastica["items"].(map[string]any)
 	weight, _ := items["weight"].(map[string]any)
 	got := placeholderFromFieldUI(weight)
-	want := "Enter Peso…"
+	want := "Inserisci Peso…"
 	if got != want {
 		t.Fatalf("plastica.items.weight placeholder = %q, want %q", got, want)
 	}
@@ -139,12 +139,12 @@ func TestWithDefaultPlaceholdersEnumSelect(t *testing.T) {
 	ui := withDefaultPlaceholders(map[string]any{}, schema, nil)
 
 	source, _ := ui["sourceLoadId"].(map[string]any)
-	if got := placeholderFromFieldUI(source); got != "Select Carico sorgente…" {
-		t.Fatalf("enum placeholder = %q, want Select…", got)
+	if got := placeholderFromFieldUI(source); got != "Seleziona Carico sorgente…" {
+		t.Fatalf("enum placeholder = %q, want Seleziona…", got)
 	}
 	note, _ := ui["note"].(map[string]any)
-	if got := placeholderFromFieldUI(note); got != "Enter Nota…" {
-		t.Fatalf("plain string placeholder = %q, want Enter…", got)
+	if got := placeholderFromFieldUI(note); got != "Inserisci Nota…" {
+		t.Fatalf("plain string placeholder = %q, want Inserisci…", got)
 	}
 }
 

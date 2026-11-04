@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import * as m from '#lib/paraglide/messages.js';
+
 import { displayFromChromeDisplayBag } from './live-task-chrome.svelte.js';
 import {
 	bundleMatches,
@@ -184,7 +186,7 @@ describe('task-form-bundle', () => {
 			kind: 'dataReport',
 			title: 'Risultati finali'
 		});
-		expect(display.error).toBe('chrome-display-missing');
+		expect(display.error).toBe(m.chrome_display_missing());
 		expect(display.title).toBe('Risultati finali');
 		expect(display.sections).toEqual([]);
 	});

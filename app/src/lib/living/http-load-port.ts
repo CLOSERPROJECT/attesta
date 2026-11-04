@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import { LoadDomainError, type LoadDomainPort } from './load-port.js';
 import type { LoadResult } from './types.js';
 
@@ -24,7 +26,7 @@ export function createHttpLoadDomainPort(
 			if (!res.ok) {
 				const detail = (await res.text().catch(() => '')).trim();
 				throw new LoadDomainError(
-					detail || `living domain load failed (${res.status})`,
+					detail || m.living_domain_load_failed({ status: res.status }),
 					res.status
 				);
 			}

@@ -30,6 +30,8 @@
 		createObjectContext,
 		setObjectContext
 	} from '@sjsf/form/fields/object/context.svelte';
+	import * as m from '#lib/paraglide/messages.js';
+
 	import { MapTableCells } from './map-table-cells.svelte.js';
 	import { objectRowMapColumnKeys } from './object-row-weigh.js';
 	import { readColumns } from './read-columns.js';
@@ -105,7 +107,7 @@
 	});
 
 	const valueColumnTitle = $derived.by(() => {
-		if (columns.value !== 'Value') return columns.value;
+		if (columns.value !== m.column_value()) return columns.value;
 		const order = objCtx.propertiesOrder();
 		const sample = order[0];
 		if (!sample) return columns.value;

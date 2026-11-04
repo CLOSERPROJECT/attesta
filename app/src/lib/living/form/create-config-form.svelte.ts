@@ -3,20 +3,24 @@ import {
 	type FailureValidationResult,
 	type FormState,
 	type Schema,
-	type UiSchemaRoot
+	type UiSchemaRoot,
+	type ValidatorFactoryOptions
 } from '@sjsf/form';
 import { createFormIdBuilder } from '@sjsf/form/id-builders/modern';
 import { createFormMerger } from '@sjsf/form/mergers/modern';
+import { fromRecord } from '@sjsf/form/lib/resolver';
 import { resolver } from '@sjsf/form/resolvers/compat';
 import { icons } from '@sjsf/lucide-icons';
+import * as m from '#lib/paraglide/messages.js';
+import { getLocale } from '#lib/paraglide/runtime.js';
 import {
 	ConfigForm,
 	type ConfigFormDerivedEntry
 } from './config-form.svelte.js';
 import { syncDeepLocalToDraft } from './deep-local-draft-sync.svelte.js';
 import { theme } from './form-theme.js';
-import { translation } from '@sjsf/form/translations/en';
 import { createAjvFormValidator } from './ajv-form-validator.js';
+import { getSjsfTranslation } from './sjsf-translation.js';
 import {
 	mergeSchemaDefaultsIntoFormData,
 	resolveSchemaDateDefaultSentinels
@@ -70,6 +74,14 @@ export function createConfigForm<T extends Record<string, unknown>>(
 	// resolved date). Merger preserves operator / partial drafts in formData.
 	const schema = resolveSchemaDateDefaultSentinels(schemas.schema);
 	const seededValue = mergeSchemaDefaultsIntoFormData(schema, getValue());
+	const locale = getLocale();
+	const translation = getSjsfTranslation(locale);
+	const extraUiOptions = fromRecord({
+		shadcn4ComboboxEmptyText: m.form_combobox_empty({}, { locale }),
+		shadcn4DateRangePickerPlaceholder: m.form_date_range_placeholder({}, { locale })
+	});
+	const validator = (factoryOptions?: ValidatorFactoryOptions) =>
+		createAjvFormValidator<T>(factoryOptions, locale);
 
 	if (options.derived !== undefined) {
 		const engine = new ConfigForm<T>({
@@ -91,8 +103,9 @@ export function createConfigForm<T extends Record<string, unknown>>(
 			uiSchema,
 			resolver,
 			translation,
+			extraUiOptions,
 			merger: createFormMerger,
-			validator: createAjvFormValidator,
+			validator,
 			idBuilder: createFormIdBuilder,
 			icons,
 			fieldsValidationDebounceMs: 0,
@@ -120,8 +133,9 @@ export function createConfigForm<T extends Record<string, unknown>>(
 		uiSchema,
 		resolver,
 		translation,
+		extraUiOptions,
 		merger: createFormMerger,
-		validator: createAjvFormValidator,
+		validator,
 		idBuilder: createFormIdBuilder,
 		icons,
 		fieldsValidationDebounceMs: 0,

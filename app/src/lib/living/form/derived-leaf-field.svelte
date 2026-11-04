@@ -5,6 +5,9 @@
 		getFormContext,
 		type ComponentProps
 	} from '@sjsf/form';
+
+	import * as m from '#lib/paraglide/messages.js';
+
 	import { tryGetConfigFormContext } from './config-form-context.js';
 	import { configPathKey } from './derived-keys.js';
 
@@ -74,14 +77,14 @@
 			/>
 			{#if overridable}
 				<button type="button" data-testid="derived-restore" onclick={restore}>
-					restore
+					{m.derived_restore()}
 				</button>
 			{/if}
 		{:else}
 			<span data-testid="derived-formula">{displayFormula()}</span>
 			{#if overridable}
 				<button type="button" data-testid="derived-override-start" onclick={startOverride}>
-					override
+					{m.derived_override()}
 				</button>
 			{/if}
 		{/if}

@@ -1,5 +1,8 @@
 import type { FailureValidationResult } from '@sjsf/form';
 import { untrack } from 'svelte';
+
+import * as m from '#lib/paraglide/messages.js';
+
 import type {
 	ChromeDataReportSectionDisplay,
 	ChromeDisplay,
@@ -30,7 +33,7 @@ const EMPTY_DISPLAY: ChromeDisplay = { value: null, error: null };
 /** Stringify chrome expr results for readonly (display-only). */
 export function formatChromeEvalValue(value: unknown): ChromeDisplay {
 	if (value === undefined || (typeof value === 'number' && !Number.isFinite(value))) {
-		return { value: null, error: 'chrome-failed' };
+		return { value: null, error: m.chrome_failed() };
 	}
 	return { value: value == null ? null : String(value), error: null };
 }
@@ -114,7 +117,7 @@ export function displayFromChromeDisplayBag(
 	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
 		return {
 			value: null,
-			error: 'chrome-display-missing',
+			error: m.chrome_display_missing(),
 			title: fallbackTitle,
 			sections: []
 		};

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import * as m from '#lib/paraglide/messages.js';
+
 import {
 	livingRouteCoordsFromPath,
 	navPlaceKindFromRoute,
@@ -99,7 +101,7 @@ describe('resolveNavPlace', () => {
 		).toEqual({
 			showBack: false,
 			backTarget: { kind: 'home' },
-			primaryLabel: 'Home',
+			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		});
 	});

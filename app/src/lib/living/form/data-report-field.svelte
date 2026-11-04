@@ -28,6 +28,9 @@
 		getFormContext,
 		type ComponentProps
 	} from '@sjsf/form';
+
+	import * as m from '#lib/paraglide/messages.js';
+
 	import { getChromeContext, type ChromeRecapRowDisplay } from './chrome-context.js';
 	import type { ChromeTone } from './chrome-tone.js';
 
@@ -122,14 +125,14 @@
 		{:else if flatMode}
 			{@render reportRows(rows)}
 		{:else if sectionsEmpty}
-			<p class="data-report__empty">No primary load</p>
+			<p class="data-report__empty">{m.no_primary_load()}</p>
 		{:else}
 			{#each sections as section (section.id)}
 				<article class="data-report__section" data-section-id={section.id}>
 					<h4 class="data-report__load">{section.id}</h4>
 					{#if section.secondaryIds && section.secondaryIds.length > 0}
 						<p class="data-report__secondary">
-							anche: {section.secondaryIds.join(', ')}
+							{m.also_secondary({ ids: section.secondaryIds.join(', ') })}
 						</p>
 					{/if}
 					{#if section.rows && section.rows.length > 0}

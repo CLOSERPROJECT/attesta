@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '#lib/paraglide/messages.js';
+
 	import type { HttpLinkItem } from './commit-port.js';
 	import HttpLinkStrip from './form/HttpLinkStrip.svelte';
 	import { createHttpTaskRecapPort } from './http-task-recap-port.js';
@@ -54,7 +56,7 @@
 						? err.message
 						: err instanceof Error
 							? err.message
-							: 'Could not load recap';
+							: m.could_not_load_recap();
 			})
 			.finally(() => {
 				loading = false;
@@ -68,7 +70,7 @@
 
 <div class="space-y-3 px-1" data-testid={testId}>
 	{#if loading}
-		<p class="text-sm text-zinc-500">Loading recap…</p>
+		<p class="text-sm text-zinc-500">{m.loading_recap()}</p>
 	{:else if error}
 		<p class="text-sm text-red-700" role="alert">{error}</p>
 	{:else if facts}

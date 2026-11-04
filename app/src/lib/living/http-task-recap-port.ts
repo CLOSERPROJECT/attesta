@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import type { HttpLinkItem } from './commit-port.js';
 import { parseHttpLinkItem } from './parse-http-link-item.js';
 import {
@@ -30,7 +32,7 @@ function taskRecapUrl(base: string, req: TaskRecapRequest): string {
 
 function parseTaskRecap(raw: unknown): TaskRecap {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-		throw new TaskRecapError('invalid task-recap body', 500);
+		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
 	}
 	const body = raw as Record<string, unknown>;
 	const linksRaw = Array.isArray(body.links) ? body.links : [];
@@ -73,7 +75,7 @@ export function createHttpTaskRecapPort(
 			if (!res.ok) {
 				const detail = (await res.text().catch(() => '')).trim();
 				throw new TaskRecapError(
-					detail || `living task-recap failed (${res.status})`,
+					detail || m.living_task_recap_failed({ status: res.status }),
 					res.status
 				);
 			}

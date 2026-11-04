@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { ClassValue } from 'svelte/elements';
 
+	import * as m from '#lib/paraglide/messages.js';
+
 	type Props = {
 		class?: ClassValue;
 	};
@@ -15,5 +17,5 @@
 	]}
 	data-testid="draft-bozza-mark"
 >
-	Bozza
+	{m.draft_bozza()}
 </span>

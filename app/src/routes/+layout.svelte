@@ -1,13 +1,16 @@
 <script lang="ts">
-	import type { Path } from '$app/types';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
-	import { locales, localizeHref } from '#lib/paraglide/runtime.js';
+	import { onMount } from 'svelte';
+	import { getLocale, locales, setLocale } from '#lib/paraglide/runtime.js';
 	import './layout.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
+
+	// Go static bypasses paraglideMiddleware; sync lang after client locale resolve.
+	onMount(() => {
+		document.documentElement.lang = getLocale();
+	});
 </script>
 
 <svelte:head>
@@ -18,6 +21,6 @@
 
 <div style="display:none">
 	{#each locales as locale (locale)}
-		<a href={resolve(localizeHref(page.url.pathname, { locale }) as Path)}>{locale}</a>
+		<button type="button" onclick={() => setLocale(locale)}>{locale}</button>
 	{/each}
 </div>

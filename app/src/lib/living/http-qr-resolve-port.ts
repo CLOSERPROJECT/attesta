@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import {
 	parseQrResolveResult,
 	QrResolveHttpError,
@@ -34,7 +36,7 @@ export function createHttpQrResolvePort(
 			}
 			const detail = (await res.text().catch(() => '')).trim();
 			throw new QrResolveHttpError(
-				detail || `living qr-resolve failed (${res.status})`,
+				detail || m.living_qr_resolve_failed({ status: res.status }),
 				res.status
 			);
 		}

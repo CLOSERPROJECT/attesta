@@ -6,6 +6,7 @@
 	import Scan from '@lucide/svelte/icons/scan';
 
 	import attestaMark from '#lib/assets/attesta-mark.svg';
+	import * as m from '#lib/paraglide/messages.js';
 	import { living } from '#lib/living/living-app.svelte.js';
 	import LivingToast from '#lib/living/LivingToast.svelte';
 	import ScanDialog from '#lib/living/ScanDialog.svelte';
@@ -96,7 +97,7 @@
 				type="button"
 				variant="outline"
 				size="icon"
-				aria-label="Back"
+				aria-label={m.nav_back()}
 				data-testid="nav-back"
 				onclick={() => navigateLivingTarget(place.backTarget)}
 			>
@@ -107,7 +108,7 @@
 				class={buttonVariants({ variant: 'outline', size: 'icon' })}
 				data-testid="nav-home-mark"
 			>
-				<img src={attestaMark} alt="Attesta" class="size-5" />
+				<img src={attestaMark} alt={m.brand_attesta()} class="size-5" />
 			</span>
 		{/if}
 
@@ -135,7 +136,7 @@
 			type="button"
 			variant="outline"
 			size="sm"
-			aria-label="Scan"
+			aria-label={m.nav_scan()}
 			data-testid="nav-scan"
 			disabled={scanBusy}
 			onclick={() => {
@@ -143,7 +144,7 @@
 			}}
 		>
 			<Scan class="size-4" />
-			Scan
+			{m.nav_scan()}
 		</Button>
 	</div>
 </nav>

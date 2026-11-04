@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { FailureValidationResult } from '@sjsf/form';
+
+	import * as m from '#lib/paraglide/messages.js';
+
 	import type { CommitOutcome } from './commit-port.js';
 	import { living } from './living-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
@@ -198,7 +201,7 @@
 			</fieldset>
 		{/key}
 	{:else}
-		<p class="text-sm text-zinc-500" data-testid="live-form-missing">Modulo non disponibile</p>
+		<p class="text-sm text-zinc-500" data-testid="live-form-missing">{m.form_unavailable()}</p>
 	{/if}
 
 	{#if submitError}

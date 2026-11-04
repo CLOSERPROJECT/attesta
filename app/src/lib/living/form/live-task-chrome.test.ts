@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import * as m from '#lib/paraglide/messages.js';
+
 import {
 	evaluateChromeEntry,
 	formatChromeEvalValue
@@ -10,7 +12,7 @@ describe('formatChromeEvalValue', () => {
 	test('undefined → chrome-failed', () => {
 		expect(formatChromeEvalValue(undefined)).toEqual({
 			value: null,
-			error: 'chrome-failed'
+			error: m.chrome_failed()
 		});
 	});
 
@@ -39,7 +41,7 @@ describe('evaluateChromeEntry $operator', () => {
 
 	test('without operator → chrome-failed', async () => {
 		const got = await evaluateChromeEntry('$operator.displayName', {}, {}, undefined);
-		expect(got).toEqual({ value: null, error: 'chrome-failed' });
+		expect(got).toEqual({ value: null, error: m.chrome_failed() });
 	});
 });
 

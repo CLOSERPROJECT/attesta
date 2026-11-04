@@ -1,3 +1,5 @@
+import * as m from '#lib/paraglide/messages.js';
+
 import {
 	CommitDomainError,
 	type CommitDomainPort,
@@ -85,7 +87,7 @@ export function createHttpCommitDomainPort(
 			if (!res.ok) {
 				const detail = (await res.text().catch(() => '')).trim();
 				throw new CommitDomainError(
-					detail || `living commit failed (${res.status})`,
+					detail || m.living_commit_failed({ status: res.status }),
 					res.status
 				);
 			}

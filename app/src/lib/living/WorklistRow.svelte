@@ -2,6 +2,8 @@
 	import type { Snippet } from 'svelte';
 	import type { ClassValue, HTMLAnchorAttributes } from 'svelte/elements';
 
+	import * as m from '#lib/paraglide/messages.js';
+
 	type Props = {
 		href?: string | null;
 		ready?: boolean;
@@ -33,7 +35,7 @@
 			<span
 				class="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"
 				role="img"
-				aria-label="Available"
+				aria-label={m.available()}
 				data-testid="available-ready-dot"
 			></span>
 		{/if}

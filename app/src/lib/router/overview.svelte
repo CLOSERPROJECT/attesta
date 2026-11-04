@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
+	import * as m from '#lib/paraglide/messages.js';
 	import * as Accordion from '#lib/shadcn/ui/accordion/index.js';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Dialog from '#lib/shadcn/ui/dialog/index.js';
@@ -322,7 +323,7 @@
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="overview-route">
 	{#if living.loading && !living.result}
-		<p class="text-sm text-zinc-500" data-testid="overview-load-status">Loading…</p>
+		<p class="text-sm text-zinc-500" data-testid="overview-load-status">{m.loading()}</p>
 	{:else if living.error && !living.result}
 		<p class="text-sm text-red-700" data-testid="overview-load-error" role="alert">
 			{living.error}
@@ -330,7 +331,7 @@
 	{:else if model}
 		{#if living.commitError}
 			<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
-				Close denied: {living.commitError}
+				{m.close_denied()}: {living.commitError}
 			</p>
 		{/if}
 
@@ -599,10 +600,10 @@
 			>
 				<Dialog.Header>
 					<Dialog.Title>
-						{confirmCloseGroup?.closeLabel ?? 'Close'}?
+						{confirmCloseGroup?.closeLabel ?? m.fallback_close()}?
 					</Dialog.Title>
 					<Dialog.Description>
-						This finishes the group and unlocks the next step.
+						{m.close_group_help()}
 					</Dialog.Description>
 				</Dialog.Header>
 				<Dialog.Footer>
@@ -613,7 +614,7 @@
 						disabled={living.committing}
 						onclick={cancelClose}
 					>
-						Cancel
+						{m.cancel()}
 					</Button>
 					<Button
 						type="button"
@@ -623,7 +624,7 @@
 							if (confirmCloseGroupId) void confirmClose(confirmCloseGroupId);
 						}}
 					>
-						{confirmCloseGroup?.closeLabel ?? 'Close'}
+						{confirmCloseGroup?.closeLabel ?? m.fallback_close()}
 					</Button>
 				</Dialog.Footer>
 			</Dialog.Content>

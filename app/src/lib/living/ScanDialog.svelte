@@ -3,6 +3,7 @@
 	import { CameraError, type QrResult } from 'cam2qr';
 	import { createQrScanner } from 'cam2qr/svelte';
 
+	import * as m from '#lib/paraglide/messages.js';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Dialog from '#lib/shadcn/ui/dialog/index.js';
 
@@ -20,9 +21,9 @@
 
 	function hintForCameraError(err: CameraError): string {
 		if (err.code === 'permission-denied') {
-			return 'Camera permission denied — paste the code below.';
+			return m.camera_permission_denied();
 		}
-		return 'Camera not available — paste the code below.';
+		return m.camera_unavailable();
 	}
 
 	async function acceptScan(raw: string) {
@@ -68,9 +69,9 @@
 <Dialog.Root {open} onOpenChange={handleOpenChange}>
 	<Dialog.Content data-testid="scan-dialog" class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Scan</Dialog.Title>
+			<Dialog.Title>{m.nav_scan()}</Dialog.Title>
 			<Dialog.Description>
-				Point at a label QR, or paste the link / id.
+				{m.scan_description()}
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -103,7 +104,7 @@
 				<input
 					class="min-w-0 flex-1 rounded-md border border-zinc-200 px-3 py-2 text-sm"
 					data-testid="scan-manual-input"
-					placeholder="Paste entityId or URL"
+					placeholder={m.scan_paste_placeholder()}
 					autocomplete="off"
 					bind:value={manual}
 					disabled={busy}
@@ -117,7 +118,7 @@
 						…
 					{:else}
 						<Scan class="size-4" />
-						Go
+						{m.scan_go()}
 					{/if}
 				</Button>
 			</form>

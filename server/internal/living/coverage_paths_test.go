@@ -971,7 +971,7 @@ func TestProjectTaskFormErrorPathsAndPlaceholder(t *testing.T) {
 	if fieldHasPlaceholder(map[string]any{}) {
 		t.Fatal("no placeholder")
 	}
-	if defaultPlaceholderText("k", map[string]any{}) != "Enter k…" {
+	if defaultPlaceholderText("k", map[string]any{}) != "Inserisci k…" {
 		t.Fatal("default placeholder key")
 	}
 	painted := paintAuthoredFieldMarkers(map[string]any{
