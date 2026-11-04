@@ -57,7 +57,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatal("missing passport Job")
 	}
 	pj := passportJob.(Job)
-	if !pj.Repeatable || pj.StartLabel != "Blocca passaporto" || pj.InstanceID != "$.loadId" {
+	if !pj.Repeatable || pj.Title != "Verifica dati e DPP" || pj.StartLabel != "Emetti DPP" || pj.InstanceID != "$.loadId" {
 		t.Fatalf("passport Job = %#v", pj)
 	}
 	wantPassportTasks := []string{"select", "lock"}

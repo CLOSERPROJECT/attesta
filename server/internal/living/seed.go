@@ -84,8 +84,9 @@ func domainSeedEmpty(d Domain) bool {
 }
 
 // seedStagedDemoDomain wipes then Commits one coherent plant story:
-// one intake with two loads (NO + SU), one line turn with all pallets weighed.
-// Leaves weightCheck / lineLoad / containerReg open for operators — no register yet.
+// one intake with two loads (NO + SU), one line turn with all pallets weighed,
+// lineLoad done, and both loads register-closed (fullyProcessed) for Passport.
+// Leaves weightCheck open; Passport Can start is ready for both loads.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
 	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
 		return err
@@ -173,6 +174,36 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		JobID: "line", JobInstanceID: SeedLineID, GroupID: "palletWeight",
 	}); err != nil {
 		return fmt.Errorf("living seed close palletWeight: %w", err)
+	}
+
+	if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+		TaskPath:      "line/lineLoad",
+		JobInstanceID: SeedLineID,
+		Value: map[string]any{
+			"progress": map[string]any{
+				SeedLoadNOID + ".1": "done",
+				SeedLoadNOID + ".2": "done",
+				SeedLoadSUID + ".1": "done",
+				SeedLoadSUID + ".2": "done",
+			},
+		},
+	}); err != nil {
+		return err
+	}
+	for _, loadID := range []string{SeedLoadNOID, SeedLoadSUID} {
+		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
+			TaskPath:      GroupTaskPath("line", "containerReg", ProvisionalGroupInstanceID, "register"),
+			JobInstanceID: SeedLineID,
+			Value: map[string]any{
+				"sourceLoadId": loadID,
+				"polvereDiVetro": []any{
+					map[string]any{"weight": 100.0},
+				},
+			},
+			Mint: spawningNewMint(),
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

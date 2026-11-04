@@ -686,7 +686,9 @@ steps:
     # Eligibility: fullyProcessed ∧ not locked (register closure ≠ passport closure).
     passport:
         repeatable: true
-        startLabel: Blocca passaporto
+        title: Verifica dati e DPP
+        startLabel: Emetti DPP
+        color: '#0f766e'
         instanceId: $.loadId
         label: "'Passaporto: ' & $.loadId"
         substeps:

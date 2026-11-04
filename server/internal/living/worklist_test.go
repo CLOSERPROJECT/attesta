@@ -207,7 +207,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 		t.Fatal("administration viewer must not canStart line (openTurno is line-only)")
 	}
 	passport, _ := worklistJobByID(got.Worklist, "passport")
-	if passport.CanStart || passport.StartLabel != "Blocca passaporto" {
+	if passport.CanStart || passport.StartLabel != "Emetti DPP" {
 		t.Fatalf("passport Job = %#v, want canStart false on empty Domain", passport)
 	}
 }
