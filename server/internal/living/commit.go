@@ -97,6 +97,8 @@ type Committer struct {
 	// LinkStore persists Commit links[] after HttpPort. Nil skips persist; Put errors
 	// never fail Commit or roll back Domain (response still returns links for stay UI).
 	LinkStore LinkStore
+	// Passports persists Passport records when onSubmit.passport is set. Required for that hook.
+	Passports PassportStore
 	Now       func() time.Time
 }
 
@@ -170,6 +172,9 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	if err != nil {
 		return CommitResult{}, err
 	}
+	if err := ValidatePassportConfig(cfg); err != nil {
+		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}
+	}
 
 	job, task, err := lookupLeafTask(cfg, ref)
 	if err != nil {
@@ -182,6 +187,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 			Message: fmt.Sprintf("Task %q has no onSubmit.transform", taskPath),
 		}
 	}
+	wantsPassport := taskOnSubmitPassport(task)
 
 	domain, err := c.Domains.Get(ctx, org)
 	if err != nil {
@@ -244,6 +250,18 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, err
 	}
 
+	if wantsPassport {
+		if c.Passports == nil {
+			return CommitResult{}, &CommitError{Kind: "prep", Message: "passport store not configured"}
+		}
+		// Fail closed before Domain Put so a second lock does not rewrite Domain then error.
+		if _, err := c.Passports.Get(ctx, org, applied.JobInstanceID); err == nil {
+			return CommitResult{}, &CommitError{Kind: "passport-exists", Message: "passport already issued for subject"}
+		} else if !errors.Is(err, ErrNotFound) {
+			return CommitResult{}, err
+		}
+	}
+
 	if err := c.Domains.Put(ctx, org, applied.Domain); err != nil {
 		return CommitResult{}, err
 	}
@@ -261,11 +279,18 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		Next:               next,
 		NextTaskFormBundle: nextBundle,
 	}
+	if wantsPassport {
+		issued, err := issuePassport(ctx, c.Passports, cfg, applied.Domain, applied.JobInstanceID, cfg.Catalogs, applied.Bindings, ts)
+		if err != nil {
+			return CommitResult{}, err
+		}
+		result.Links = append(result.Links, issued.Links...)
+	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
 			httpBindings := mergeBindings(applied.Bindings, c.SubmitBindings)
 			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, httpBindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs, org)
-			result.Links = httpResult.Links
+			result.Links = append(result.Links, httpResult.Links...)
 			result.HttpErrors = httpResult.Errors
 		}
 	}

@@ -100,6 +100,16 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 		}
 		cfg.QR = &qr
 	}
+	if passportNode := child(doc, "passport"); passportNode != nil {
+		var passport PassportConfig
+		if err := passportNode.Decode(&passport); err != nil {
+			return OrgConfig{}, fmt.Errorf("decode passport: %w", err)
+		}
+		cfg.Passport = &passport
+	}
+	if err := ValidatePassportConfig(cfg); err != nil {
+		return OrgConfig{}, err
+	}
 	return cfg, nil
 }
 

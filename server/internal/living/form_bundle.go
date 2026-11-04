@@ -90,6 +90,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 
 	chrome := readChromeRules(payload)
 	chromeRaw, _ := payload["chrome"].(map[string]any)
+	chrome, chromeRaw = ensurePassportSnapshotChrome(cfg, payload, chrome, chromeRaw)
 	sealIDs := authoredPropertyKeys(projected.Schema)
 
 	for _, c := range chrome {
@@ -127,6 +128,9 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 	if err := evaluateDataReports(chrome, bindings); err != nil {
 		return nil, err
 	}
+	if err := evaluatePassportSnapshotChrome(cfg, payload, domain, ref, bindings); err != nil {
+		return nil, err
+	}
 
 	bundle := &TaskFormBundle{
 		JobID:           ref.JobID,
@@ -153,10 +157,11 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 
 // evaluateDataReports runs each dataReport chrome expr into bindings.chromeDisplay[id].
 // Input `$` is unused ({}); `$domain` / `$catalogs` (and `$instance` when present) come from bindings.
+// PassportSnapshotChromeID is skipped — filled by evaluatePassportSnapshotChrome (freeze parity).
 func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 	var reports []ChromeRule
 	for _, c := range chrome {
-		if c.Kind == "dataReport" {
+		if c.Kind == "dataReport" && c.ID != PassportSnapshotChromeID {
 			reports = append(reports, c)
 		}
 	}
@@ -190,6 +195,78 @@ func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 		display[c.ID] = dto
 	}
 	bindings["chromeDisplay"] = display
+	return nil
+}
+
+// ensurePassportSnapshotChrome injects dataReport chrome whose expr is root
+// passport.snapshot — one authored projection, no Lock-only recap expr.
+func ensurePassportSnapshotChrome(
+	cfg OrgConfig,
+	payload map[string]any,
+	chrome []ChromeRule,
+	chromeRaw map[string]any,
+) ([]ChromeRule, map[string]any) {
+	if !taskOnSubmitPassport(payload) || cfg.Passport == nil {
+		return chrome, chromeRaw
+	}
+	expr := strings.TrimSpace(cfg.Passport.Snapshot.Expr)
+	if expr == "" {
+		return chrome, chromeRaw
+	}
+	if chromeRaw == nil {
+		chromeRaw = map[string]any{}
+	}
+	for i, c := range chrome {
+		if c.ID != PassportSnapshotChromeID {
+			continue
+		}
+		chrome[i].Kind = "dataReport"
+		chrome[i].Expr = expr
+		entry, _ := chromeRaw[PassportSnapshotChromeID].(map[string]any)
+		if entry == nil {
+			entry = map[string]any{}
+		} else {
+			entry = cloneMapJSON(entry)
+		}
+		entry["kind"] = "dataReport"
+		entry["expr"] = expr
+		chromeRaw[PassportSnapshotChromeID] = entry
+		return chrome, chromeRaw
+	}
+	chrome = append(chrome, ChromeRule{
+		ID:   PassportSnapshotChromeID,
+		Kind: "dataReport",
+		Expr: expr,
+	})
+	chromeRaw[PassportSnapshotChromeID] = map[string]any{
+		"kind": "dataReport",
+		"expr": expr,
+	}
+	return chrome, chromeRaw
+}
+
+// evaluatePassportSnapshotChrome puts live passport.snapshot into chromeDisplay
+// via EvalPassportSnapshot — same projection Commit freezes.
+func evaluatePassportSnapshotChrome(
+	cfg OrgConfig,
+	payload map[string]any,
+	domain Domain,
+	ref ActionableTaskRef,
+	bindings map[string]any,
+) error {
+	if !taskOnSubmitPassport(payload) || cfg.Passport == nil {
+		return nil
+	}
+	snap, err := EvalPassportSnapshot(cfg.Passport.Snapshot.Expr, domain, ref.JobInstanceID, cfg.Catalogs, nil)
+	if err != nil {
+		return fmt.Errorf("living: passport snapshot chrome: %w", err)
+	}
+	display, _ := bindings["chromeDisplay"].(map[string]any)
+	if display == nil {
+		display = map[string]any{}
+		bindings["chromeDisplay"] = display
+	}
+	display[PassportSnapshotChromeID] = snap
 	return nil
 }
 

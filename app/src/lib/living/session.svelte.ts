@@ -25,7 +25,7 @@ import {
 	operatorFromLoad,
 	type OperatorIdentity
 } from './form/operator-identity.js';
-import { commitHasDownloadLinks } from './worklist-nav.js';
+import { commitHasLinks } from './worklist-nav.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 /** Debounce for dirty Draft localStorage writes. */
@@ -270,7 +270,7 @@ export class LivingSession {
 			}
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
-			this.linksStayActive = commitHasDownloadLinks(this.lastHttpLinks);
+			this.linksStayActive = commitHasLinks(this.lastHttpLinks);
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
@@ -290,7 +290,7 @@ export class LivingSession {
 		}
 	};
 
-	/** Clear stay-for-links before navigating away (Continue / Start another / Close). */
+	/** Clear session HttpLinkStrip state (stay exit or non-stay post-Commit navigate). */
 	clearLinksStay = (): void => {
 		this.linksStayActive = false;
 		this.lastHttpLinks = [];

@@ -40,11 +40,33 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if entities["truck"] == nil || entities["load"] == nil {
 		t.Fatalf("domain.entities missing truck/load: %#v", entities)
 	}
-	if cfg.Jobs.Len() != 2 {
+	if cfg.Jobs.Len() != 3 {
 		t.Fatalf("jobs len = %d, keys=%v", cfg.Jobs.Len(), cfg.Jobs.Keys)
 	}
-	if got := cfg.Jobs.Keys; len(got) < 2 || got[0] != "intake" || got[1] != "line" {
+	if got := cfg.Jobs.Keys; len(got) < 3 || got[0] != "intake" || got[1] != "line" || got[2] != "passport" {
 		t.Fatalf("job order = %v", got)
+	}
+	if cfg.Passport == nil || cfg.Passport.Subject.Entity != "load" {
+		t.Fatalf("passport.subject = %#v", cfg.Passport)
+	}
+	if strings.TrimSpace(cfg.Passport.Snapshot.Expr) == "" {
+		t.Fatal("passport.snapshot.expr missing")
+	}
+	passportJob, ok := cfg.Jobs.Get("passport")
+	if !ok {
+		t.Fatal("missing passport Job")
+	}
+	pj := passportJob.(Job)
+	if !pj.Repeatable || pj.Title != "Verifica dati e DPP" || pj.StartLabel != "Emetti DPP" || pj.InstanceID != "$.loadId" {
+		t.Fatalf("passport Job = %#v", pj)
+	}
+	wantPassportTasks := []string{"select", "lock"}
+	if got := OrderedTaskIDs(pj.Tasks); strings.Join(got, ",") != strings.Join(wantPassportTasks, ",") {
+		t.Fatalf("passport tasks = %v", got)
+	}
+	lock, ok := TaskByID(pj.Tasks, "lock")
+	if !ok || !taskOnSubmitPassport(map[string]any(lock)) {
+		t.Fatalf("lock onSubmit.passport = %#v", lock)
 	}
 
 	intakeAny, ok := cfg.Jobs.Get("intake")

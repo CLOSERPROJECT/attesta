@@ -21,18 +21,18 @@ export type PostCommitTarget =
 	| { kind: 'overview'; jobId: string; jobInstanceId: string }
 	| { kind: 'home' };
 
-/** Commit follow-up: stay for downloads, else ADR-0006 target. */
+/** Commit follow-up: stay when links present, else ADR-0006 target. */
 export type CommitFollowUp = { kind: 'stay' } | PostCommitTarget;
 
-/** True when Commit returned at least one download artifact. */
-export function commitHasDownloadLinks(
+/** True when Commit returned at least one HttpLink (link and/or download). */
+export function commitHasLinks(
 	links: readonly HttpLinkItem[] | null | undefined
 ): boolean {
-	return (links ?? []).some((item) => item.action === 'download');
+	return (links ?? []).length > 0;
 }
 
 /**
- * Post-Commit SPA decision: stay on read-only form when downloads are present;
+ * Post-Commit SPA decision: stay on read-only form when any links are present;
  * otherwise thin-adapt server `next` (ADR-0006 Task groups amend).
  */
 export function resolveCommitFollowUp(
@@ -42,7 +42,7 @@ export function resolveCommitFollowUp(
 	nextTaskFormBundle: TaskFormBundle | null | undefined,
 	links: readonly HttpLinkItem[] | null | undefined
 ): CommitFollowUp {
-	if (commitHasDownloadLinks(links)) return { kind: 'stay' };
+	if (commitHasLinks(links)) return { kind: 'stay' };
 	return resolvePostCommitNavigation(
 		next,
 		jobId,

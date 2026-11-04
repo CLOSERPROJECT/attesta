@@ -40,6 +40,9 @@ func TestEnsureLivingStoresUsesMemoryWithoutMongo(t *testing.T) {
 	if _, ok := server.livingLinks.(*living.MemoryLinkStore); !ok {
 		t.Fatalf("links = %T, want *living.MemoryLinkStore", server.livingLinks)
 	}
+	if _, ok := server.livingPassports.(*living.MemoryPassportStore); !ok {
+		t.Fatalf("passports = %T, want *living.MemoryPassportStore", server.livingPassports)
+	}
 }
 
 func TestEnsureLivingStoresDoesNotSeed(t *testing.T) {

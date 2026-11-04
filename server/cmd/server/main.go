@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"github.com/CLOSERPROJECT/attesta/server/internal/untp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/yaml.v3"
@@ -170,6 +171,7 @@ type Server struct {
 	livingDomains      living.DomainStore
 	livingConfigs      living.ConfigStore
 	livingLinks        living.LinkStore
+	livingPassports    living.PassportStore
 	livingAuthorizer   living.Authorizer
 	livingHttpPort     living.HttpPort
 }
@@ -5970,6 +5972,11 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		if _, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
+			// Living Passports do not expose Stream attachment downloads.
+			http.NotFound(w, r)
+			return
+		}
 		s.handleDigitalLinkDPPAttachment(w, r, gtin, lot, serial, attachmentID)
 		return
 	}
@@ -5978,12 +5985,20 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		if _, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
+			s.serveLivingPassportEventsGone(w)
+			return
+		}
 		s.handleDigitalLinkEvents(w, r, gtin, lot, serial)
 		return
 	}
 	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
 	if err != nil {
 		http.NotFound(w, r)
+		return
+	}
+	if rec, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
+		s.serveLivingPassport(w, r, rec)
 		return
 	}
 	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)
@@ -8211,22 +8226,20 @@ func normalizeDPPConfig(cfg *DPPConfig) error {
 }
 
 func normalizeGTIN(raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", errors.New("dpp.gtin is required when dpp.enabled=true")
-	}
-	for _, char := range trimmed {
-		if char < '0' || char > '9' {
+	gtin, err := untp.NormalizeGTIN(raw)
+	if err != nil {
+		switch {
+		case errors.Is(err, untp.ErrGTINRequired):
+			return "", errors.New("dpp.gtin is required when dpp.enabled=true")
+		case errors.Is(err, untp.ErrGTINNonDigit):
 			return "", fmt.Errorf("dpp.gtin must contain only digits: %q", raw)
+		case errors.Is(err, untp.ErrGTINTooLong):
+			return "", fmt.Errorf("dpp.gtin must be at most 14 digits: %q", raw)
+		default:
+			return "", err
 		}
 	}
-	if len(trimmed) > 14 {
-		return "", fmt.Errorf("dpp.gtin must be at most 14 digits: %q", raw)
-	}
-	if len(trimmed) < 14 {
-		trimmed = strings.Repeat("0", 14-len(trimmed)) + trimmed
-	}
-	return trimmed, nil
+	return gtin, nil
 }
 
 func normalizeDPPSerialStrategy(raw string) (string, error) {

@@ -528,6 +528,15 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	writeCommitError(httptest.NewRecorder(), &CommitError{Kind: "other", Message: "x"})
 	writeCommitError(httptest.NewRecorder(), ErrNotFound)
 	writeCommitError(httptest.NewRecorder(), errors.New("boom"))
+
+	rec = httptest.NewRecorder()
+	writeCommitError(rec, &CommitError{Kind: "passport-exists", Message: "passport already issued for subject"})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("passport-exists = %d, want 409", rec.Code)
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != "passport already issued for subject" {
+		t.Fatalf("passport-exists body = %q", body)
+	}
 }
 
 func TestCommitterValidationBranches(t *testing.T) {

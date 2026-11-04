@@ -76,6 +76,37 @@ func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	}
 }
 
+func TestSeedDemoWipeClearsPassports(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	passports := NewMemoryPassportStore()
+	if err := passports.Create(t.Context(), PassportRecord{
+		Org: "feragame", SubjectID: SeedLoadNOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), PassportRecord{
+		Org: "other", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/2/b/t",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
+		WipeDomain: true,
+		Passports:  passports,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := passports.Get(t.Context(), "feragame", SeedLoadNOID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("feragame passport after wipe = %v, want ErrNotFound", err)
+	}
+	if _, err := passports.Get(t.Context(), "other", "X"); err != nil {
+		t.Fatalf("other org passport must survive: %v", err)
+	}
+}
+
 func TestSeedDemoFillsMissingDomainWithoutWipe(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
@@ -193,14 +224,18 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 		t.Fatalf("logistic must not see lineLoad: %#v", logRefs)
 	}
 
-	if !hasActionableRef(lineRefs, "line", "lineLoad", SeedLineID) {
-		t.Fatalf("line actionable missing lineLoad@%s: %#v", SeedLineID, lineRefs)
+	if hasActionableRef(lineRefs, "line", "lineLoad", SeedLineID) {
+		t.Fatalf("line must not see lineLoad after staged close: %#v", lineRefs)
 	}
 	if hasNestedActionableRef(lineRefs, "line", "containerReg", SeedLineID, "register") {
 		t.Fatalf("line must not see register: %#v", lineRefs)
 	}
 	if hasNestedActionableRef(lineRefs, "line", "palletWeight", SeedLineID, "weigh") {
 		t.Fatalf("line must not see weigh: %#v", lineRefs)
+	}
+	adminPassport, _ := worklistJobByID(admin.Worklist, "passport")
+	if !adminPassport.CanStart || adminPassport.StartLabel != "Emetti DPP" {
+		t.Fatalf("administration passport CanStart = %#v, want true + Emetti DPP", adminPassport)
 	}
 
 	adminIntake, _ := worklistJobByID(admin.Worklist, "intake")
@@ -312,13 +347,20 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if !ok || shift.Tasks["openTurno"] != TaskStatusDone || shift.Tasks["palletWeight"] != TaskStatusDone {
 		t.Fatalf("line shift = %#v", shift)
 	}
-	if shift.Tasks["lineLoad"] != TaskStatusActionable {
-		t.Fatalf("lineLoad = %q, want actionable", shift.Tasks["lineLoad"])
+	if shift.Tasks["lineLoad"] != TaskStatusDone {
+		t.Fatalf("lineLoad = %q, want done", shift.Tasks["lineLoad"])
 	}
-	if shift.Tasks["containerReg"] != TaskStatusAvailable {
-		t.Fatalf("containerReg = %q, want available", shift.Tasks["containerReg"])
+	for _, loadID := range []string{SeedLoadNOID, SeedLoadSUID} {
+		facts := loads[loadID]
+		if facts["fullyProcessed"] != true {
+			t.Fatalf("load %s fullyProcessed = %#v, want true", loadID, facts["fullyProcessed"])
+		}
+		if facts["locked"] == true {
+			t.Fatalf("load %s must not be passport-locked", loadID)
+		}
 	}
-	if g := shift.Groups["containerReg"]; !g.CanSpawn {
-		t.Fatalf("containerReg CanSpawn = %#v, want true", g)
+	passport, ok := worklistJobByID(wl, "passport")
+	if !ok || !passport.CanStart {
+		t.Fatalf("passport CanStart = %#v, want true with two eligible loads", passport)
 	}
 }

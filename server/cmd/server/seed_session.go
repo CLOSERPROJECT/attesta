@@ -131,6 +131,7 @@ func runSeedSession(ctx context.Context, args []string, replace bool, creds *app
 		if ms, ok := sess.Store.(*MongoStore); ok && ms != nil && ms.db != nil {
 			deps.LivingDomains = living.NewMongoDomainStore(ms.db)
 			deps.LivingConfigs = living.NewMongoConfigStore(ms.db)
+			deps.LivingPassports = living.NewMongoPassportStore(ms.db)
 		}
 		if err := Seed(ctx, deps); err != nil {
 			return err

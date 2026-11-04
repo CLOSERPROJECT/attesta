@@ -20,12 +20,16 @@ func prepTaskSubmission(task map[string]any, value map[string]any, rowIDs []stri
 
 func stripChromeFields(task map[string]any, value map[string]any) map[string]any {
 	rules := readChromeRules(task)
-	if len(rules) == 0 {
+	if len(rules) == 0 && !taskOnSubmitPassport(task) {
 		return value
 	}
 	out := cloneFacts(value)
 	for _, rule := range rules {
 		delete(out, rule.ID)
+	}
+	// Injected on Load when onSubmit.passport — not present in authored chrome map.
+	if taskOnSubmitPassport(task) {
+		delete(out, PassportSnapshotChromeID)
 	}
 	return out
 }

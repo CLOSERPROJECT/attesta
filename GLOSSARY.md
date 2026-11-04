@@ -123,8 +123,8 @@ Plant-style entity fact on some rows: unset; `partial`; `done`. Draft ≠ progre
 _Avoid_: boolean `processed` as a Worklist gate; treating progress enums as unlock grammar; form `progressEnums` / `valueType: "progress"` / table-owned enum paint
 
 **fullyProcessed** (entity field):
-Plant Domain fact on a **load**: container registration for that load is finished; register load enums omit it. Set by Org Config transform on successful register Commit—not a Worklist gate and not progress enum vocabulary.
-_Avoid_: boolean `processed` as Worklist status; using fullyProcessed as unlock grammar; synonym “complete” without naming this fact
+Plant Domain fact on a **load**: container registration for that load is finished; register load enums omit it. Set by Org Config transform on successful register Commit—not a Worklist gate, not progress enum vocabulary, and not passport closure.
+_Avoid_: boolean `processed` as Worklist status; using fullyProcessed as unlock grammar; synonym “complete” without naming this fact; using fullyProcessed as “Passport done”
 
 **incomplete** (entity field):
 Plant Domain fact on a **container**: booked weight for the current load is frozen while the physical bin may continue on a later register. Distinct from Task-group Close.
@@ -133,6 +133,20 @@ _Avoid_: Treating incomplete as Worklist/progress; engine special-case on the na
 **continuesContainerId** (Config form fact):
 Hidden row field on plant register: links a continuation row to a still-open incomplete Domain container. Load seeds it via Task `initialData`; Commit transform books delta weight and supersedes the prior incomplete. Not a Domain entity field. Operator visibility uses generic `ui:options.presenceMark` on `hiddenField` (Config title such as Continua)—not a second schema fact.
 _Avoid_: Engine special-case on the name; free-picked secondary load enum for continuity; storing continuesContainerId on minted containers; SPA branches on this field name beyond the generic hidden+presenceMark contract
+
+### Passport (living)
+
+**Passport**:
+The issued Digital Product Passport for one Domain subject (in Feragame: one **load**). Public credential and human page are projections of a **Passport snapshot**, not a live Domain walk. **Passport production** is a core living platform capability. Org Config declares scheme in a root **`passport`** block (subject binding, identity, snapshot projection); a Lock leaf opts in with thin **`onSubmit.passport`** (not HttpPort).
+_Avoid_: Stream Process DPP as the living issue path; SPA-assembled passport payloads; treating Feragame YAML as the feature itself; gather graph only on the Task with no root scheme; Job-level “produces DPP” with no Commit leaf
+
+**Passport lock**:
+The operator Task that approves a subject’s gathered facts and issues its **Passport**: Load shows eligibility + recap; one Commit runs transform (Domain locked fact) then the Passport producer. Dedicated repeatable Job; Job instance id is the subject id. Distinct from Worklist status `locked` and from form seal. Post-Commit Digital Link / DPP links come from the producer, not **HttpPort** / `onSubmit.http`.
+_Avoid_: Auto-issue on Domain predicate alone; overloading `fullyProcessed`; Lock as a new HTTP Seam; conflating with Unlock-order `locked`; minting passport URLs via outbound HTTP; producer as sole writer of eligibility Domain facts
+
+**Passport snapshot**:
+Immutable projection of related Domain facts (and named Submissions) from the root `passport.snapshot` declaration. Evaluated live on **Passport lock** Load for the operator recap; frozen into the platform Passport record (org + subject) on Commit. Later Domain edits do not rewrite what the Passport claims.
+_Avoid_: Live Domain as the passport body; a second hand-authored recap expr that can drift from freeze; mutable “current view” credentials; “passport” as just another Feragame entity row
 
 ### Operator and seams
 

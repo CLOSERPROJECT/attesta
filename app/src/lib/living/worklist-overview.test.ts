@@ -122,10 +122,13 @@ describe('job instance overview model', () => {
 		);
 	});
 
-	test('finished model marks all done', () => {
+	test('finished model marks all done and remains projectable for overview', () => {
 		const done = jobInstanceOverview(adminWorklist, 'intake', 'NIR-done');
+		// Completed band deep-links need a finished overview model (not null).
+		expect(done).not.toBeNull();
 		expect(done?.finished).toBe(true);
 		expect(done?.handoffRoles).toBeNull();
+		expect(done?.tasks.every((t) => t.status === 'done')).toBe(true);
 	});
 
 	test('unknown instance yields null', () => {

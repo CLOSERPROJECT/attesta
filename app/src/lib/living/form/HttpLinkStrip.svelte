@@ -23,20 +23,18 @@
 </script>
 
 {#if items.length > 0}
-	<ul class="space-y-1 text-sm" data-testid="task-http-links">
+	<div class="flex flex-wrap gap-2" data-testid="task-http-links">
 		{#each items as item, index (`${item.label}:${item.url}:${index}`)}
-			<li>
-				<button
-					type="button"
-					class="text-sky-800 underline"
-					data-testid="task-http-link"
-					onclick={() => openLink(item)}
-				>
-					{item.label}
-				</button>
-			</li>
+			<button
+				type="button"
+				class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
+				data-testid="task-http-link"
+				onclick={() => openLink(item)}
+			>
+				{item.label}
+			</button>
 		{/each}
-	</ul>
+	</div>
 {/if}
 {#if errors.length > 0}
 	<ul class="space-y-1 text-sm text-amber-800" data-testid="task-http-errors">

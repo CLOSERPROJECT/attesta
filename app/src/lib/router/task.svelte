@@ -89,6 +89,8 @@
 			confirmClose = false;
 			return;
 		}
+		// Drop Commit links before navigate so the next TaskForm does not inherit them.
+		living.clearLinksStay();
 		stayedOutcome = null;
 		stayRouteKey = null;
 		navigateLivingTarget(followUp);

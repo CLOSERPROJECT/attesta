@@ -207,6 +207,39 @@ export function inProgressRowsFromWorklist(
 	return out;
 }
 
+/** Same shape as In progress; finished instances (done >= total). */
+export type CompletedRow = InProgressRow;
+
+/**
+ * Finished Job instances (Config taskIds via instanceTaskProgress:
+ * include when done >= total). Order: Worklist Job → instance.
+ * Inverse of In progress; no overlap with that band.
+ */
+export function completedRowsFromWorklist(
+	worklist: Worklist | null | undefined
+): CompletedRow[] {
+	const jobs = worklist?.jobs;
+	if (!jobs?.length) return [];
+	const out: CompletedRow[] = [];
+	for (const job of jobs) {
+		for (const inst of job.instances ?? []) {
+			const progress = instanceTaskProgress(job, inst);
+			if (progress.done < progress.total) continue;
+			const jobColor = jobColorOf(job);
+			out.push({
+				jobId: job.jobId,
+				jobInstanceId: inst.id,
+				instanceLabel: inst.label || inst.id,
+				jobTitle: job.title?.trim() || job.jobId,
+				...(jobColor ? { jobColor } : {}),
+				tasksDone: progress.done,
+				tasksTotal: progress.total
+			});
+		}
+	}
+	return out;
+}
+
 /** SPA Task path segment: provisional Start uses `new`. */
 export function taskRouteInstanceSegment(jobInstanceId: string): string {
 	return jobInstanceId === '' ? 'new' : jobInstanceId;
@@ -252,4 +285,15 @@ export function inProgressRowTarget(
 		jobId: row.jobId,
 		jobInstanceId: row.jobInstanceId
 	};
+}
+
+export function completedRowKey(row: CompletedRow): string {
+	return inProgressRowKey(row);
+}
+
+/** Deep-link target for a home Completed row → Job instance overview. */
+export function completedRowTarget(
+	row: CompletedRow
+): Extract<PostCommitTarget, { kind: 'overview' }> {
+	return inProgressRowTarget(row);
 }

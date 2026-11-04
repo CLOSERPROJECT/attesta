@@ -20,6 +20,9 @@ func (s *Server) ensureLivingStores() {
 	if s.livingLinks == nil {
 		s.livingLinks = s.newLivingLinkStore()
 	}
+	if s.livingPassports == nil {
+		s.livingPassports = s.newLivingPassportStore()
+	}
 }
 
 func (s *Server) livingMongoDB() *mongo.Database {
@@ -52,6 +55,13 @@ func (s *Server) newLivingLinkStore() living.LinkStore {
 		return living.NewMongoLinkStore(db)
 	}
 	return living.NewMemoryLinkStore()
+}
+
+func (s *Server) newLivingPassportStore() living.PassportStore {
+	if db := s.livingMongoDB(); db != nil {
+		return living.NewMongoPassportStore(db)
+	}
+	return living.NewMemoryPassportStore()
 }
 
 func (s *Server) livingProductAuthorizer() living.Authorizer {
@@ -101,6 +111,7 @@ func (s *Server) livingHandler() http.Handler {
 			HttpPort:       s.livingProductHttpPort(),
 			SubmitBindings: living.SubmitBindingsFromEnv(),
 			LinkStore:      s.livingLinks,
+			Passports:      s.livingPassports,
 		},
 		Gate:      s.livingVerifiedGate,
 		Artifacts: s.livingProductArtifacts(),
