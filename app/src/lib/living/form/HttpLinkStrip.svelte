@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import type { HttpLinkItem } from '../commit-port.js';
 
 	type Props = {
@@ -25,14 +26,16 @@
 {#if items.length > 0}
 	<div class="flex flex-wrap gap-2" data-testid="task-http-links">
 		{#each items as item, index (`${item.label}:${item.url}:${index}`)}
-			<button
+			<Button
 				type="button"
-				class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
+				variant="outline"
+				size="sm"
+				class="bg-[var(--input)]"
 				data-testid="task-http-link"
 				onclick={() => openLink(item)}
 			>
 				{item.label}
-			</button>
+			</Button>
 		{/each}
 	</div>
 {/if}

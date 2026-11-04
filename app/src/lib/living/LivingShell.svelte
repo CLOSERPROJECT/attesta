@@ -6,7 +6,6 @@
 	import { p } from '../router/index.js';
 	import { hrefLivingTarget } from '../router/navigate-target.js';
 	import { draftAddressForTask } from './drafts.js';
-	import DraftBozzaMark from './DraftBozzaMark.svelte';
 	import { living } from './living-app.svelte.js';
 	import WorklistJobLine from './WorklistJobLine.svelte';
 	import WorklistRow from './WorklistRow.svelte';
@@ -80,30 +79,22 @@
 							data-group-instance-id={row.groupInstanceId}
 							data-task-id={row.taskId}
 							ready
+							showDraft={rowHasDirtyDraft(row)}
 							accentColor={row.jobColor}
 							href={hrefLivingTarget(availableRowTarget(row))}
 						>
-							<div class="flex min-w-0 items-start gap-1.5">
-								<div class="min-w-0 flex-1">
-									<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
-									<WorklistJobLine
-										class="mt-1"
-										mode="progress"
-										size="xs"
-										jobId={row.jobId}
-										jobTitle={row.jobTitle}
-										label={row.instanceLabel}
-										done={row.tasksDone}
-										total={row.tasksTotal}
-										progressTestId="available-progress"
-									/>
-								</div>
-								{#if rowHasDirtyDraft(row)}
-									<span class="ml-auto inline-flex shrink-0 items-center self-center">
-										<DraftBozzaMark />
-									</span>
-								{/if}
-							</div>
+							<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
+							<WorklistJobLine
+								class="mt-1"
+								mode="progress"
+								size="xs"
+								jobId={row.jobId}
+								jobTitle={row.jobTitle}
+								label={row.instanceLabel}
+								done={row.tasksDone}
+								total={row.tasksTotal}
+								progressTestId="available-progress"
+							/>
 						</WorklistRow>
 					</li>
 				{:else}

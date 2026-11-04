@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as m from '#lib/paraglide/messages.js';
+	import { Button } from '#lib/shadcn/ui/button/index.js';
 
 	import type { CommitOutcome } from '../living/commit-port.js';
 	import TaskForm from '../living/TaskForm.svelte';
@@ -346,15 +347,17 @@
 						</div>
 					{/if}
 				{:else}
-					<button
+					<Button
 						type="button"
-						class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
+						variant="outline"
+						size="sm"
+						class="bg-[var(--input)]"
 						data-testid="task-links-continue"
 						disabled={living.committing}
 						onclick={onContinue}
 					>
 						{m.continue()}
-					</button>
+					</Button>
 				{/if}
 			</div>
 		{/if}

@@ -13,7 +13,10 @@
 -->
 <button
 	type="button"
-	class="border-border bg-background hover:bg-muted hover:text-foreground shadow-xs inline-flex h-9 items-center justify-center gap-1.5 rounded-md border px-2.5 text-sm font-medium disabled:pointer-events-none disabled:opacity-50"
+	class={[
+		'border-border bg-[var(--input)] hover:bg-muted hover:text-foreground shadow-xs inline-flex h-9 items-center justify-center gap-1.5 rounded-md border px-2.5 text-sm font-medium disabled:pointer-events-none disabled:opacity-50',
+		type === 'array-item-add' && 'self-start w-auto'
+	]}
 	{disabled}
 	{@attach (node) => {
 		if (!onclick) return;

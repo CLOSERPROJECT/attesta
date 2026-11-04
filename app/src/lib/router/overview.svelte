@@ -248,6 +248,11 @@
 			.join(' ');
 	}
 
+	// Cancels AccordionContent's prose `[&_a]:underline` for overview chrome links/CTAs.
+	function accordionContentClass(extra = 'px-3 pb-3') {
+		return [extra, '[&_a]:no-underline'].filter(Boolean).join(' ');
+	}
+
 	type TaskRowRecap = {
 		jobId: string;
 		jobInstanceId: string;
@@ -369,7 +374,7 @@
 									showDraft={groupShowDraft(row)}
 								/>
 							</Accordion.Trigger>
-							<Accordion.Content class="px-3 pb-3">
+							<Accordion.Content class={accordionContentClass()}>
 								{@const showProvDraft = provisionalSpawnDraftShown(row)}
 								{#if (row.groupInstances ?? []).length > 0}
 									<Accordion.Root
@@ -415,7 +420,7 @@
 															'px-3 py-2.5',
 															flatChild.status
 														),
-														doneContentClass: 'px-3 pb-3'
+														doneContentClass: accordionContentClass()
 													})}
 												</div>
 											{:else}
@@ -430,7 +435,7 @@
 													>
 														<OverviewRowChrome title={gi.displayId} status={gi.status} />
 													</Accordion.Trigger>
-													<Accordion.Content class="px-3 pb-3">
+													<Accordion.Content class={accordionContentClass()}>
 														<Accordion.Root
 															type="multiple"
 															value={expandedChildDone}
@@ -473,7 +478,7 @@
 																		'px-3 py-2.5',
 																		child.status
 																	),
-																	doneContentClass: 'px-3 pb-3'
+																	doneContentClass: accordionContentClass()
 																})}
 															{/each}
 														</Accordion.Root>
@@ -519,7 +524,7 @@
 												'px-3 py-2.5',
 												'actionable'
 											),
-											doneContentClass: 'px-3 pb-3'
+											doneContentClass: accordionContentClass()
 										})}
 									</div>
 								{/if}
@@ -582,7 +587,7 @@
 							showDraft: leafShowDraft(row.taskId),
 							doneItemClass: accordionItemClass(row.status),
 							doneTriggerClass: accordionTriggerClass('px-3 py-3', row.status),
-							doneContentClass: 'px-3 pb-3'
+							doneContentClass: accordionContentClass()
 						})}
 					{/if}
 				</div>

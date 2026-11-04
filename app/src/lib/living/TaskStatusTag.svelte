@@ -23,7 +23,7 @@
 
 <span
 	class={[
-		'shrink-0 rounded border px-2 py-0.5 text-xs font-semibold tracking-[0.04em] uppercase',
+		'inline-flex min-w-[15ch] shrink-0 items-center justify-center rounded border px-2 py-0.5 text-center text-xs font-normal tracking-[0.04em]',
 		tone,
 		className
 	]}

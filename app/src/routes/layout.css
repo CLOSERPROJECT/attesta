@@ -4,6 +4,7 @@
 @plugin '@tailwindcss/typography';
 @import '@sjsf/shadcn4-theme/styles.css';
 @source '../../node_modules/@sjsf/shadcn4-theme/dist';
+@import '../lib/living/form/array-field.css';
 @custom-variant dark (&:is(.dark *));
 
 /* Living FormPlan / sjsf light tokens */
@@ -31,8 +32,15 @@
 
 [data-slot='input'],
 [data-slot='textarea'],
-[data-slot='select-trigger'] {
+[data-slot='select-trigger'],
+[data-slot='input-group'] {
 	background-color: var(--input);
+	border-color: var(--border);
+}
+
+/* shadcn Field defaults to gap-3; tighten label↔control (gap-1). */
+[data-slot='field'] {
+	gap: 0.25rem;
 }
 
 @theme inline {
