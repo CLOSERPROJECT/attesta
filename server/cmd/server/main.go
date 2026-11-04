@@ -5972,6 +5972,11 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		if _, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
+			// Living Passports do not expose Stream attachment downloads.
+			http.NotFound(w, r)
+			return
+		}
 		s.handleDigitalLinkDPPAttachment(w, r, gtin, lot, serial, attachmentID)
 		return
 	}
@@ -5980,12 +5985,20 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		if _, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
+			s.serveLivingPassportEventsGone(w)
+			return
+		}
 		s.handleDigitalLinkEvents(w, r, gtin, lot, serial)
 		return
 	}
 	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
 	if err != nil {
 		http.NotFound(w, r)
+		return
+	}
+	if rec, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
+		s.serveLivingPassport(w, r, rec)
 		return
 	}
 	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)

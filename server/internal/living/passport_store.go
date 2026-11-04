@@ -10,6 +10,8 @@ import (
 // PassportStore persists issued Passports keyed by org + subject.
 type PassportStore interface {
 	Get(ctx context.Context, org, subjectID string) (PassportRecord, error)
+	// GetByIdentity resolves a public Digital Link (gtin/lot/serial) to a locked Passport.
+	GetByIdentity(ctx context.Context, gtin, lot, serial string) (PassportRecord, error)
 	// Create inserts once; returns ErrPassportExists when the subject is already locked.
 	Create(ctx context.Context, record PassportRecord) error
 }
@@ -47,6 +49,23 @@ func (s *MemoryPassportStore) Get(_ context.Context, org, subjectID string) (Pas
 		return PassportRecord{}, ErrNotFound
 	}
 	return clonePassportRecord(rec), nil
+}
+
+func (s *MemoryPassportStore) GetByIdentity(_ context.Context, gtin, lot, serial string) (PassportRecord, error) {
+	gtin = strings.TrimSpace(gtin)
+	lot = strings.TrimSpace(lot)
+	serial = strings.TrimSpace(serial)
+	if gtin == "" || lot == "" || serial == "" {
+		return PassportRecord{}, ErrNotFound
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, rec := range s.byKey {
+		if rec.GTIN == gtin && rec.Lot == lot && rec.Serial == serial {
+			return clonePassportRecord(rec), nil
+		}
+	}
+	return PassportRecord{}, ErrNotFound
 }
 
 func (s *MemoryPassportStore) Create(_ context.Context, record PassportRecord) error {

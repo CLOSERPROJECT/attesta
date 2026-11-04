@@ -58,6 +58,24 @@ func (s *MongoPassportStore) Get(ctx context.Context, org, subjectID string) (Pa
 	return passportFromMongoDoc(doc), nil
 }
 
+func (s *MongoPassportStore) GetByIdentity(ctx context.Context, gtin, lot, serial string) (PassportRecord, error) {
+	gtin = strings.TrimSpace(gtin)
+	lot = strings.TrimSpace(lot)
+	serial = strings.TrimSpace(serial)
+	if gtin == "" || lot == "" || serial == "" {
+		return PassportRecord{}, ErrNotFound
+	}
+	var doc mongoPassportDoc
+	err := s.coll().FindOne(ctx, bson.M{"gtin": gtin, "lot": lot, "serial": serial}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return PassportRecord{}, ErrNotFound
+	}
+	if err != nil {
+		return PassportRecord{}, fmt.Errorf("living mongo passport get by identity: %w", err)
+	}
+	return passportFromMongoDoc(doc), nil
+}
+
 func (s *MongoPassportStore) Create(ctx context.Context, record PassportRecord) error {
 	key, err := passportStoreKey(record.Org, record.SubjectID)
 	if err != nil {

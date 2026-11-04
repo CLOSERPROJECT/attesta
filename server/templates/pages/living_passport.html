@@ -1,0 +1,65 @@
+{{ define "living_passport_body" }}
+  <div class="stack dpp-page u-mx-auto">
+    <section class="page-header">
+      <div class="page-header-head">
+        <div class="page-header-body">
+          <h1>
+            {{ .ProductName }}
+            <br />
+            <span class="page-header-subtitle">Digital Product Passport</span>
+          </h1>
+        </div>
+        <div class="dpp-page-header-copy">
+          {{ if .Description }}
+            <p>{{ .Description }}</p>
+          {{ else }}
+            <p>
+              This Digital Product Passport is a frozen living Passport snapshot
+              served from a GS1 Digital Link.
+            </p>
+          {{ end }}
+          <div class="dpp-ids">
+            <span class="dpp-id"><strong>GTIN</strong> {{ .GTIN }}</span>
+            <span class="dpp-id"><strong>Lot</strong> {{ .Lot }}</span>
+            <span class="dpp-id"><strong>Serial</strong> {{ .Serial }}</span>
+            {{ if .IssuedAt }}
+              <span class="dpp-id"><strong>Issued</strong> {{ .IssuedAt }}</span>
+            {{ end }}
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button type="button"
+                  class="btn btn-primary js-share-link"
+                  data-share-url="{{ .DigitalLink }}"
+                  data-share-label="DPP link">{{ template "icon-share" . }} Share DPP link</button>
+        </div>
+      </div>
+    </section>
+    <hr class="u-divider-10" />
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>Passport snapshot</h2>
+      </div>
+      <pre class="dpp-integrity-hash-full">{{ .SnapshotJSON }}</pre>
+      <hr class="u-divider-10" />
+      <div class="dpp-untp">
+        <div class="panel-heading">
+          <h2>UNTP &amp; machine links</h2>
+        </div>
+        <ul class="dpp-untp-list">
+          <li class="dpp-untp-item">
+            <a href="{{ .DigitalLink }}?linkType=linkset">Identity resolver linkset</a>
+            <span class="dpp-untp-item-meta">RFC 9264 · linkset+json</span>
+          </li>
+          <li class="dpp-untp-item">
+            <a href="{{ .DigitalLink }}?format=json">UNTP Digital Product Passport</a>
+            <span class="dpp-untp-item-meta">W3C VC 2.0 · JSON</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+  </div>
+{{ end }}
+{{ define "living_passport.html" }}
+  {{ template "layout.html" . }}
+{{ end }}
