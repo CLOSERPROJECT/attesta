@@ -266,6 +266,19 @@ services:
       - server
       - --config=/config/config.yaml
 
+  # Plant HttpPort peer (labels PDF / register CSV). Internal only; Attesta proxies artifacts.
+  living-http:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.living-http
+    restart: unless-stopped
+    environment:
+      LIVING_HTTP_TOKEN: ${LIVING_HTTP_TOKEN}
+      LIVING_HTTP_DATA_DIR: /data
+      LIVING_HTTP_ADDR: ":8090"
+    volumes:
+      - living_http_data:/data
+
   attesta:
     build:
       context: .
@@ -295,11 +308,14 @@ services:
       SERVICE_FQDN_ATTESTA_3000:
       # Invite/reset/verify links derive from this origin + fixed paths.
       PUBLIC_BASE_URL: https://${SERVICE_FQDN_ATTESTA_3000}
+      LIVING_HTTP_URL: http://${SERVICE_NAME_LIVING_HTTP:-living-http}:8090
+      LIVING_HTTP_TOKEN: ${LIVING_HTTP_TOKEN}
 
     depends_on:
       - mongodb
       - cerbos
       - appwrite
+      - living-http
 
   mongoexpress:
     image: mongo-express:1.0.2
@@ -322,3 +338,4 @@ volumes:
   appwrite-sites:
   appwrite-builds:
   mongodb_data:
+  living_http_data:

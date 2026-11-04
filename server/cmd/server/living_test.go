@@ -113,8 +113,19 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	}
 	wl, _ := wire["worklist"].(map[string]any)
 	jobs, _ := wl["jobs"].([]any)
-	if len(jobs) != 2 {
+	if len(jobs) != 3 {
 		t.Fatalf("worklist jobs = %#v", wl)
+	}
+	var passportJob map[string]any
+	for _, raw := range jobs {
+		job, _ := raw.(map[string]any)
+		if job["jobId"] == "passport" {
+			passportJob = job
+			break
+		}
+	}
+	if passportJob == nil || passportJob["startLabel"] != "Emetti DPP" {
+		t.Fatalf("passport job = %#v", passportJob)
 	}
 }
 
