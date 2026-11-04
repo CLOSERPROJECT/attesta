@@ -128,7 +128,8 @@
 			return;
 		}
 		if (living.loading || !living.result) return;
-		if (!model || model.finished) {
+		// Finished instances stay on overview (Completed band / post-Commit deep-links).
+		if (!model) {
 			navigate('/');
 		}
 	});
