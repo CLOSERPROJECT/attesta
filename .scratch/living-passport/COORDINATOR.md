@@ -22,30 +22,24 @@
 
 | # | Status |
 | --- | --- |
-| 01 | done — `a83f91a` + `d1f3b25` |
-| 02 | done — `be99ffc` |
-| 03 | done — `1ac683b` |
-| 04 | done — `e863138` |
-| 05 | done — `42c8701` (+ stamp `810792a`) |
+| 01 | done — `cacde9f` + `2cade42` |
+| 02 | done — `59abb2b` |
+| 03 | done — `41df5a7` |
+| 04 | done — `bc5ed25` |
+| 05 | done — `b274121` (+ stamp `9080c00`) |
 
-**Active (2026-11-04):** tickets **01–05** APPROVE. **Rebase eval:** use `--onto` (not merge / not plain rebase). Awaiting human OK to run.
-
-```bash
-# after committing/stashing dirty .scratch/living-passport/*
-git rebase --onto origin/feat/attesta-rework 705bdab feat/living-passport
-```
-
-Then: Compose smoke (`task seed -- --replace`); later squash-merge PR into rework. Do not push without ask.
+**Active (2026-11-04):** rebased `--onto origin/feat/attesta-rework` (cutoff `705bdab`) — clean, 10 commits. Tip `f217a86` on `0e69179`. Next: Compose smoke (`task seed -- --replace`); later squash-merge PR into rework. Do not push without ask.
 
 ## Done notes
 
-| # | Commits | Review |
+| # | Commits (post-rebase) | Review |
 | --- | --- | --- |
-| 01 | `a83f91a`, `d1f3b25` | Spec+Standards APPROVE |
-| 02 | `be99ffc` | Spec+Standards APPROVE (soft: snapshot eval after Domain Put) |
-| 03 | `1ac683b` | Spec+Standards APPROVE |
-| 04 | `e863138` | Spec+Standards APPROVE |
-| 05 | `42c8701`, `810792a` | Spec+Standards APPROVE |
+| 01 | `cacde9f`, `2cade42` | Spec+Standards APPROVE |
+| 02 | `59abb2b` | Spec+Standards APPROVE |
+| 03 | `41df5a7` | Spec+Standards APPROVE |
+| 04 | `bc5ed25` | Spec+Standards APPROVE |
+| 05 | `b274121`, `9080c00` | Spec+Standards APPROVE |
+| board | `f217a86` ledger stamp | — |
 
 ## Human smoke (Compose, after seed refresh)
 
