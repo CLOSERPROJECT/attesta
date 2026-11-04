@@ -1,4 +1,7 @@
-// One-shot: wipe feragame Domain and Commit smoke jobs for /app dataReport.
+//go:build ignore
+
+// One-shot smoke helper (not product seed): wipe feragame Domain and Commit jobs
+// for /app dataReport. Run from this directory: go run main.go
 // loadedExtracted is parked off the live line (ticket 02); this seed stops at
 // containerReg/register and still prints weightCheck chrome when available.
 // Focused SeedDemo(--replace) leaves one truck × two loads + one line turn through palletWeight.
