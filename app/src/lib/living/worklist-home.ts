@@ -18,6 +18,8 @@ export type AvailableRow = {
 	instanceLabel: string;
 	/** Job display title; falls back to jobId when absent. */
 	jobTitle: string;
+	/** Authored Job color for card left border; omit when unset. */
+	jobColor?: string;
 	title: string;
 	roles: string[];
 	tasksDone: number;
@@ -28,6 +30,8 @@ export type CanStartRow = {
 	jobId: string;
 	/** Job display title; falls back to jobId when absent. */
 	jobTitle: string;
+	/** Authored Job color for card left border; omit when unset. */
+	jobColor?: string;
 	startLabel: string;
 	firstTaskId: string;
 };
@@ -39,6 +43,8 @@ export type InProgressRow = {
 	instanceLabel: string;
 	/** Job display title; falls back to jobId when absent. */
 	jobTitle: string;
+	/** Authored Job color for card left border; omit when unset. */
+	jobColor?: string;
 	tasksDone: number;
 	tasksTotal: number;
 };
@@ -71,6 +77,11 @@ export function progressFraction(done: number, total: number): number {
 	return Math.min(1, Math.max(0, done / total));
 }
 
+function jobColorOf(job: WorklistJob): string | undefined {
+	const color = job.color?.trim();
+	return color || undefined;
+}
+
 function pushAvailableRow(
 	out: AvailableRow[],
 	job: WorklistJob,
@@ -80,6 +91,7 @@ function pushAvailableRow(
 	group?: { groupId: string; groupInstanceId: string }
 ): void {
 	const chrome = taskChrome(job, taskId);
+	const jobColor = jobColorOf(job);
 	out.push({
 		jobId: job.jobId,
 		jobInstanceId: inst.id,
@@ -89,6 +101,7 @@ function pushAvailableRow(
 			: {}),
 		instanceLabel: inst.label || inst.id,
 		jobTitle: job.title?.trim() || job.jobId,
+		...(jobColor ? { jobColor } : {}),
 		title: chrome?.title || taskId,
 		roles: chrome?.roles ?? [],
 		tasksDone: progress.done,
@@ -152,9 +165,11 @@ export function canStartRowsFromWorklist(
 		if (!job.canStart) continue;
 		const firstTaskId = job.taskIds?.[0] ?? job.tasks?.[0]?.id;
 		if (!firstTaskId) continue;
+		const jobColor = jobColorOf(job);
 		out.push({
 			jobId: job.jobId,
 			jobTitle: job.title?.trim() || job.jobId,
+			...(jobColor ? { jobColor } : {}),
 			startLabel: job.startLabel?.trim() || 'Start',
 			firstTaskId
 		});
@@ -177,11 +192,13 @@ export function inProgressRowsFromWorklist(
 		for (const inst of job.instances ?? []) {
 			const progress = instanceTaskProgress(job, inst);
 			if (progress.done >= progress.total) continue;
+			const jobColor = jobColorOf(job);
 			out.push({
 				jobId: job.jobId,
 				jobInstanceId: inst.id,
 				instanceLabel: inst.label || inst.id,
 				jobTitle: job.title?.trim() || job.jobId,
+				...(jobColor ? { jobColor } : {}),
 				tasksDone: progress.done,
 				tasksTotal: progress.total
 			});

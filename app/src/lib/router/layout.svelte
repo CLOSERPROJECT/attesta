@@ -112,14 +112,14 @@
 		{/if}
 
 		<div class="min-w-0 text-left" data-testid="nav-place">
-			<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
-				{place.primaryLabel}
-			</p>
 			{#if place.jobTitleLine}
 				<p class="truncate text-xs text-zinc-500" data-testid="nav-place-job-title">
 					{place.jobTitleLine}
 				</p>
 			{/if}
+			<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
+				{place.primaryLabel}
+			</p>
 		</div>
 	</div>
 

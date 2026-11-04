@@ -67,7 +67,9 @@ qr:
 steps:
     intake:
         repeatable: true
+        title: Ingresso
         startLabel: Nuovo camion
+        color: '#ea580c'
         instanceId: $truck.id
         label: $truck.id
         substeps:
@@ -289,10 +291,12 @@ steps:
                         checkedLotSum: $.checkedLotSum
     line:
         repeatable: true
+        title: Lavorazione
         startLabel: Nuovo turno
+        color: '#0284c7'
         # Job-start leaf: engine cannot mint a Job instance from a group-first Commit.
         instanceId: $.date & '-' & $.turno
-        label: "'Turno: ' & $.date & ' ' & $lookup($catalogs.turni, $.turno)"
+        label: "$.date & ' Turno: ' & $lookup($catalogs.turni, $.turno)"
         substeps:
             - id: openTurno
               roles: [line]

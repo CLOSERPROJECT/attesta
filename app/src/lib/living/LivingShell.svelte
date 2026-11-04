@@ -4,6 +4,7 @@
 	import { p } from '../router/index.js';
 	import { hrefLivingTarget } from '../router/navigate-target.js';
 	import { living } from './living-app.svelte.js';
+	import WorklistJobLine from './WorklistJobLine.svelte';
 	import WorklistRow from './WorklistRow.svelte';
 	import {
 		availableRowKey,
@@ -12,7 +13,6 @@
 		canStartRowsFromWorklist,
 		inProgressRowKey,
 		inProgressRowsFromWorklist,
-		progressFraction,
 		taskRouteInstanceSegment
 	} from './worklist-home.js';
 
@@ -23,9 +23,6 @@
 	const available = $derived(availableRowsFromWorklist(living.result?.worklist));
 	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
 	const inProgress = $derived(inProgressRowsFromWorklist(living.result?.worklist));
-
-	const PROGRESS_RING_R = 5.5;
-	const PROGRESS_RING_C = 2 * Math.PI * PROGRESS_RING_R;
 </script>
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="living-shell">
@@ -54,8 +51,6 @@
 			<h2 class="text-lg font-semibold text-zinc-900">Available</h2>
 			<ul class="flex flex-col gap-1">
 				{#each available as row (availableRowKey(row))}
-					{@const ringFrac = progressFraction(row.tasksDone, row.tasksTotal)}
-					{@const ringOffset = PROGRESS_RING_C * (1 - ringFrac)}
 					<li>
 						<WorklistRow
 							data-testid="available-row"
@@ -65,58 +60,21 @@
 							data-group-instance-id={row.groupInstanceId}
 							data-task-id={row.taskId}
 							ready
+							accentColor={row.jobColor}
 							href={hrefLivingTarget(availableRowTarget(row))}
 						>
 							<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
-							<div class="mt-1 flex min-w-0 items-center gap-1.5">
-								<p class="min-w-0 truncate text-sm text-zinc-600">
-									{row.instanceLabel}
-									<span class="text-zinc-400">·</span>
-									{#if row.jobTitle === row.jobId}
-										<span class="font-mono text-xs text-zinc-500">{row.jobId}</span>
-									{:else}
-										<span class="text-xs text-zinc-500">{row.jobTitle}</span>
-									{/if}
-								</p>
-								<span
-									class="inline-flex shrink-0 items-center gap-1"
-									role="img"
-									aria-label="{row.tasksDone} of {row.tasksTotal} tasks done"
-									data-testid="available-progress"
-									data-done={row.tasksDone}
-									data-total={row.tasksTotal}
-								>
-									<svg
-										class="size-3.5 -rotate-90 text-zinc-200"
-										viewBox="0 0 14 14"
-										aria-hidden="true"
-									>
-										<circle
-											cx="7"
-											cy="7"
-											r={PROGRESS_RING_R}
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.75"
-										/>
-										<circle
-											class="text-zinc-700"
-											cx="7"
-											cy="7"
-											r={PROGRESS_RING_R}
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.75"
-											stroke-linecap="round"
-											stroke-dasharray={PROGRESS_RING_C}
-											stroke-dashoffset={ringOffset}
-										/>
-									</svg>
-									<span class="tabular-nums text-[11px] leading-none text-zinc-500">
-										{row.tasksDone}/{row.tasksTotal}
-									</span>
-								</span>
-							</div>
+							<WorklistJobLine
+								class="mt-1"
+								mode="progress"
+								size="xs"
+								jobId={row.jobId}
+								jobTitle={row.jobTitle}
+								label={row.instanceLabel}
+								done={row.tasksDone}
+								total={row.tasksTotal}
+								progressTestId="available-progress"
+							/>
 						</WorklistRow>
 					</li>
 				{:else}
@@ -137,6 +95,7 @@
 						<WorklistRow
 							data-testid="can-start-row"
 							data-job-id={row.jobId}
+							accentColor={row.jobColor}
 							href={p('/:jobId/:jobInstanceId/:taskId', {
 								params: {
 									jobId: row.jobId,
@@ -145,12 +104,13 @@
 								}
 							})}
 						>
-							<p class="text-sm font-medium text-zinc-900">{row.startLabel}</p>
-							{#if row.jobTitle === row.jobId}
-								<p class="mt-0.5 font-mono text-xs text-zinc-500">{row.jobId}</p>
-							{:else}
-								<p class="mt-0.5 text-xs text-zinc-500">{row.jobTitle}</p>
-							{/if}
+							<WorklistJobLine
+								mode="start"
+								size="sm"
+								jobId={row.jobId}
+								jobTitle={row.jobTitle}
+								label={row.startLabel}
+							/>
 						</WorklistRow>
 					</li>
 				{:else}
@@ -167,65 +127,28 @@
 			<h2 class="text-lg font-semibold text-zinc-900">In progress</h2>
 			<ul class="flex flex-col gap-1">
 				{#each inProgress as row (inProgressRowKey(row))}
-					{@const ringFrac = progressFraction(row.tasksDone, row.tasksTotal)}
-					{@const ringOffset = PROGRESS_RING_C * (1 - ringFrac)}
 					<li>
 						<WorklistRow
 							data-testid="in-progress-row"
 							data-job-id={row.jobId}
 							data-instance-id={row.jobInstanceId}
+							accentColor={row.jobColor}
 							href={hrefLivingTarget({
 								kind: 'overview',
 								jobId: row.jobId,
 								jobInstanceId: row.jobInstanceId
 							})}
 						>
-							<p class="min-w-0 text-sm font-bold text-zinc-900">{row.instanceLabel}</p>
-							<div class="mt-1 flex min-w-0 items-center gap-1.5">
-								{#if row.jobTitle === row.jobId}
-									<p class="min-w-0 truncate font-mono text-xs text-zinc-500">{row.jobId}</p>
-								{:else}
-									<p class="min-w-0 truncate text-xs text-zinc-500">{row.jobTitle}</p>
-								{/if}
-								<span
-									class="inline-flex shrink-0 items-center gap-1"
-									role="img"
-									aria-label="{row.tasksDone} of {row.tasksTotal} tasks done"
-									data-testid="in-progress-progress"
-									data-done={row.tasksDone}
-									data-total={row.tasksTotal}
-								>
-									<svg
-										class="size-3.5 -rotate-90 text-zinc-200"
-										viewBox="0 0 14 14"
-										aria-hidden="true"
-									>
-										<circle
-											cx="7"
-											cy="7"
-											r={PROGRESS_RING_R}
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.75"
-										/>
-										<circle
-											class="text-zinc-700"
-											cx="7"
-											cy="7"
-											r={PROGRESS_RING_R}
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.75"
-											stroke-linecap="round"
-											stroke-dasharray={PROGRESS_RING_C}
-											stroke-dashoffset={ringOffset}
-										/>
-									</svg>
-									<span class="tabular-nums text-[11px] leading-none text-zinc-500">
-										{row.tasksDone}/{row.tasksTotal}
-									</span>
-								</span>
-							</div>
+							<WorklistJobLine
+								mode="progress"
+								size="sm"
+								jobId={row.jobId}
+								jobTitle={row.jobTitle}
+								label={row.instanceLabel}
+								done={row.tasksDone}
+								total={row.tasksTotal}
+								progressTestId="in-progress-progress"
+							/>
 						</WorklistRow>
 					</li>
 				{:else}

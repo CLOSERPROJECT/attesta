@@ -35,6 +35,8 @@ export type WorklistJob = {
 	/** Authored Job display name (chrome; not the instance-label CEL). */
 	title?: string;
 	startLabel?: string;
+	/** Authored CSS color for board Job card left border (chrome). */
+	color?: string;
 	/** Authored Task id order for chrome iteration (top-level only). */
 	taskIds: string[];
 	/**

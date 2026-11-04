@@ -153,7 +153,7 @@ describe('resolveNavPlace', () => {
 		});
 	});
 
-	test('task provisional Spawn: task title only, back overview', () => {
+	test('task provisional Spawn: job · instance muted, task primary, back overview', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
@@ -168,11 +168,11 @@ describe('resolveNavPlace', () => {
 			showBack: true,
 			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
 			primaryLabel: 'Registrazione',
-			jobTitleLine: 'Camion'
+			jobTitleLine: 'Camion · Camion B'
 		});
 	});
 
-	test('task minted: instance · task, back overview', () => {
+	test('task minted: job · instance muted, task primary, back overview', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
@@ -185,8 +185,8 @@ describe('resolveNavPlace', () => {
 		).toEqual({
 			showBack: true,
 			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
-			primaryLabel: 'Camion B · Registrazione',
-			jobTitleLine: 'Camion'
+			primaryLabel: 'Registrazione',
+			jobTitleLine: 'Camion · Camion B'
 		});
 	});
 
@@ -222,16 +222,16 @@ describe('resolveNavPlace', () => {
 				}
 			]
 		};
-		expect(
-			resolveNavPlace({
-				kind: 'task',
-				jobId: 'intake',
-				jobInstanceId: 'NIR-1',
-				taskId: 'codiceFir',
-				provisionalJob: false,
-				worklist: wl
-			}).primaryLabel
-		).toBe('NIR-1 · codiceFir');
+		const place = resolveNavPlace({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-1',
+			taskId: 'codiceFir',
+			provisionalJob: false,
+			worklist: wl
+		});
+		expect(place.primaryLabel).toBe('codiceFir');
+		expect(place.jobTitleLine).toBe('NIR-1');
 	});
 });
 

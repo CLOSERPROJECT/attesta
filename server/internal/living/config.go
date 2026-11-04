@@ -138,6 +138,8 @@ type Job struct {
 	Label      string       `json:"label"`
 	Title      string       `json:"title,omitempty"`
 	StartLabel string       `json:"startLabel,omitempty"`
+	// Color is optional board chrome (CSS color) for Job card left border.
+	Color      string       `json:"color,omitempty"`
 	StartsWhen *StartsWhen  `json:"startsWhen,omitempty"`
 	Tasks      []TaskConfig `json:"tasks"`
 }

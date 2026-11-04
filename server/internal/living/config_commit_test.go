@@ -73,7 +73,7 @@ func TestCommitOpenTurnoLabelFromConfigExpr(t *testing.T) {
 			label = inst.Label
 		}
 	}
-	if label != "Turno: 2026-10-19 1°" {
+	if label != "2026-10-19 Turno: 1°" {
 		t.Fatalf("label from config expr = %q", label)
 	}
 }

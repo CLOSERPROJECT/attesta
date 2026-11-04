@@ -29,7 +29,7 @@ type WorklistTask struct {
 }
 
 // WorklistJob is one Job's start affordance and per-instance Task statuses.
-// TaskIDs / Title / StartLabel / Repeatable / Tasks are chrome-only (not a second gate body).
+// TaskIDs / Title / StartLabel / Color / Repeatable / Tasks are chrome-only (not a second gate body).
 // Tasks lists top-level chrome in TaskIDs order, then nested group-child chrome
 // (lookup by id; TaskIDs stays top-level only).
 type WorklistJob struct {
@@ -38,6 +38,7 @@ type WorklistJob struct {
 	Repeatable bool               `json:"repeatable"`
 	Title      string             `json:"title,omitempty"`
 	StartLabel string             `json:"startLabel,omitempty"`
+	Color      string             `json:"color,omitempty"`
 	TaskIDs    []string           `json:"taskIds"`
 	Tasks      []WorklistTask     `json:"tasks"`
 	Instances  []WorklistInstance `json:"instances"`
@@ -158,6 +159,7 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 		Repeatable: job.Repeatable,
 		Title:      job.Title,
 		StartLabel: job.StartLabel,
+		Color:      job.Color,
 		TaskIDs:    ordered,
 		Tasks:      chrome,
 		Instances:  instances,

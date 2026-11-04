@@ -111,7 +111,7 @@ export type NavPlaceInput = {
 	taskId: string;
 	/** Job-level Start only — nested Spawn keeps a real jobInstanceId. */
 	provisionalJob: boolean;
-	/** Nested provisional Spawn — task title only, Back still overview. */
+	/** Nested provisional Spawn — same chrome as minted Task; Back still overview. */
 	provisionalSpawn?: boolean;
 	worklist: Worklist | null | undefined;
 };
@@ -120,7 +120,11 @@ export type NavPlaceChrome = {
 	showBack: boolean;
 	backTarget: Extract<PostCommitTarget, { kind: 'home' | 'overview' }>;
 	primaryLabel: string;
-	/** Authored Job.title only; null omits line 2 (never raw job id). */
+	/**
+	 * Muted top line: authored Job.title on overview; on Task pages
+	 * `title · instance` (title alone when provisional Start has no instance).
+	 * Null omits the line (never raw job id alone as a stand-in title).
+	 */
 	jobTitleLine: string | null;
 };
 
@@ -130,6 +134,18 @@ function authoredJobTitle(
 ): string | null {
 	const title = worklistJobFor(worklist, jobId)?.title?.trim();
 	return title || null;
+}
+
+/** Task muted line: Job.title · instance label when both exist. */
+function taskJobContextLine(
+	jobTitle: string | null,
+	instanceLabel: string
+): string | null {
+	const inst = instanceLabel.trim();
+	if (jobTitle && inst) return `${jobTitle} · ${inst}`;
+	if (jobTitle) return jobTitle;
+	if (inst) return inst;
+	return null;
 }
 
 function taskTitleFromWorklist(
@@ -152,15 +168,7 @@ function taskTitleFromWorklist(
  * Overview never composes `·` (instance label only); taskId is ignored when kind is overview.
  */
 export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
-	const {
-		kind,
-		jobId,
-		jobInstanceId,
-		taskId,
-		provisionalJob,
-		provisionalSpawn = false,
-		worklist
-	} = input;
+	const { kind, jobId, jobInstanceId, taskId, provisionalJob, worklist } = input;
 
 	if (kind === 'home') {
 		return {
@@ -189,7 +197,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 		{ kind: 'home' | 'overview' }
 	>;
 
-	if (provisionalJob || provisionalSpawn) {
+	if (provisionalJob) {
 		return {
 			showBack: true,
 			backTarget,
@@ -203,7 +211,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 	return {
 		showBack: true,
 		backTarget,
-		primaryLabel: `${instanceLabel} · ${taskTitle}`,
-		jobTitleLine
+		primaryLabel: taskTitle,
+		jobTitleLine: taskJobContextLine(jobTitleLine, instanceLabel)
 	};
 }

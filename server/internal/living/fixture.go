@@ -171,6 +171,9 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 	if startLabel, ok := optionalString(m, "startLabel"); ok {
 		job.StartLabel = startLabel
 	}
+	if color, ok := optionalString(m, "color"); ok {
+		job.Color = color
+	}
 	if swNode := child(m, "startsWhen"); swNode != nil {
 		sw, err := parseStartsWhen(jobID, swNode)
 		if err != nil {

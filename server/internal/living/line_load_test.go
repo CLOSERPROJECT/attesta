@@ -27,7 +27,7 @@ func TestLineLoadSubmissionSatisfiesStartsWhen(t *testing.T) {
 		Quantifier: "some",
 	}
 	subs := []Submission{sub("line", "lineLoad", "2026-10-19-1st")}
-	instances := []JobInstance{{JobID: "line", ID: "2026-10-19-1st", Label: "Turno: 2026-10-19 1°"}}
+	instances := []JobInstance{{JobID: "line", ID: "2026-10-19-1st", Label: "2026-10-19 Turno: 1°"}}
 	if !IsStartsWhenSatisfied(gate, subs, instances, lineLoadTask(line)) {
 		t.Fatal("lineLoad Submission must satisfy startsWhen")
 	}
