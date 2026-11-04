@@ -158,9 +158,10 @@ test('unknown Task instance redirects Home', async ({ page }) => {
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 });
 
-test('finished overview URL redirects Home', async ({ page }) => {
+test('finished overview URL stays on overview', async ({ page }) => {
 	await stubLivingApis(page);
 	await page.goto('/app/intake/NIR-done');
-	await expect(page.getByTestId('living-shell')).toBeVisible();
-	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
+	await expect(page.getByTestId('overview-route')).toBeVisible();
+	await expect(page.getByTestId('nav-place-primary')).toHaveText('Finished');
+	await expect(page.getByTestId('overview-tasks')).toBeVisible();
 });
