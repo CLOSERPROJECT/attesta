@@ -22,6 +22,7 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let facts = $state<Record<string, unknown> | null>(null);
+	let titles = $state<Record<string, string>>({});
 	let links = $state<HttpLinkItem[]>([]);
 	let fetchedKey = $state('');
 
@@ -43,11 +44,13 @@
 		loading = true;
 		error = null;
 		facts = null;
+		titles = {};
 		links = [];
 		void port
 			.fetch(request)
 			.then((recap) => {
 				facts = recap.facts;
+				titles = recap.titles ?? {};
 				links = recap.links;
 			})
 			.catch((err: unknown) => {
@@ -77,7 +80,7 @@
 		<dl class="grid gap-2 text-sm" data-testid="submission-summary">
 			{#each factEntries as [key, value] (key)}
 				<div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 border-b border-zinc-100 pb-2 last:border-0">
-					<dt class="font-medium text-zinc-600">{key}</dt>
+					<dt class="font-medium text-zinc-600">{titles[key] ?? key}</dt>
 					<dd class="text-zinc-900">{formatFactValue(value)}</dd>
 				</div>
 			{/each}

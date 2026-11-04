@@ -24,6 +24,11 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	if recap.Facts["date"] != "2026-10-19" || recap.Facts["turno"] != "1st" {
 		t.Fatalf("facts = %#v", recap.Facts)
 	}
+	if recap.Titles["date"] != "Data" ||
+		recap.Titles["turno"] != "Turno" ||
+		recap.Titles["truckWeight"] != "Peso lordo camion" {
+		t.Fatalf("titles = %#v", recap.Titles)
+	}
 	if len(recap.Links) != 0 {
 		t.Fatalf("truckArrive has no links: %#v", recap.Links)
 	}
@@ -71,6 +76,9 @@ func TestLoadTaskRecapNestedWithStoredLinks(t *testing.T) {
 	}
 	if recap.Facts["client"] != "NO" {
 		t.Fatalf("facts = %#v", recap.Facts)
+	}
+	if recap.Titles["client"] != "Cliente" || recap.Titles["numeroFir"] != "Numero FIR" {
+		t.Fatalf("nested titles = %#v", recap.Titles)
 	}
 	if len(recap.Links) != 2 || recap.Links[0].Label != "Stampa etichette" || recap.Links[1].Filename != "reg.csv" {
 		t.Fatalf("links = %#v", recap.Links)

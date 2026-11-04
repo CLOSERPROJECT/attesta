@@ -9,17 +9,20 @@ import (
 
 // TaskRecap is the thin overview expand payload for a done Task: Submission
 // facts + actor/time, plus any post-Commit links side record. No schema,
-// uiSchema, or Domain.
+// uiSchema, or Domain — only optional property titles from Active Org Config.
 type TaskRecap struct {
-	JobID           string         `json:"jobId"`
-	JobInstanceID   string         `json:"jobInstanceId"`
-	TaskID          string         `json:"taskId"`
-	GroupID         string         `json:"groupId,omitempty"`
-	GroupInstanceID string         `json:"groupInstanceId,omitempty"`
-	Timestamp       string         `json:"timestamp"`
-	UserID          string         `json:"userId"`
-	Facts           map[string]any `json:"facts"`
-	Links           []HttpLinkItem `json:"links,omitempty"`
+	JobID           string            `json:"jobId"`
+	JobInstanceID   string            `json:"jobInstanceId"`
+	TaskID          string            `json:"taskId"`
+	GroupID         string            `json:"groupId,omitempty"`
+	GroupInstanceID string            `json:"groupInstanceId,omitempty"`
+	Timestamp       string            `json:"timestamp"`
+	UserID          string            `json:"userId"`
+	Facts           map[string]any    `json:"facts"`
+	// Titles maps authored property keys → schema title (Italian plant copy).
+	// Omitted keys fall back to the raw fact key in the SPA.
+	Titles map[string]string `json:"titles,omitempty"`
+	Links  []HttpLinkItem    `json:"links,omitempty"`
 }
 
 // LoadTaskRecap returns Submission facts (+ timestamp, userId) and stored links
@@ -64,6 +67,7 @@ func (l *Loader) LoadTaskRecap(
 		Timestamp:       sub.Timestamp,
 		UserID:          sub.UserID,
 		Facts:           cloneFacts(sub.Facts),
+		Titles:          l.factTitlesFromConfig(ctx, org, addr),
 	}
 
 	if l.LinkStore != nil {
@@ -76,6 +80,68 @@ func (l *Loader) LoadTaskRecap(
 		}
 	}
 	return recap, nil
+}
+
+// factTitlesFromConfig reads property titles from the Active Org Config leaf
+// schema. Missing config / unknown path → nil (SPA falls back to keys).
+func (l *Loader) factTitlesFromConfig(ctx context.Context, org string, addr SubmissionAddress) map[string]string {
+	if l.Configs == nil {
+		return nil
+	}
+	version, err := l.Configs.ActiveVersion(ctx, org)
+	if err != nil {
+		return nil
+	}
+	cfg, err := l.Configs.Get(ctx, org, version)
+	if err != nil {
+		return nil
+	}
+	jobVal, ok := cfg.Jobs.Get(addr.JobID)
+	if !ok {
+		return nil
+	}
+	job, ok := AsJob(jobVal)
+	if !ok {
+		return nil
+	}
+	leaf, ok := LeafTaskByPath(job.Tasks, TaskPathRef{
+		JobID:           addr.JobID,
+		GroupID:         addr.GroupID,
+		GroupInstanceID: addr.GroupInstanceID,
+		TaskID:          addr.TaskID,
+	})
+	if !ok {
+		return nil
+	}
+	payload := taskPayload(leaf)
+	if payload == nil {
+		return nil
+	}
+	schema, _ := payload["schema"].(map[string]any)
+	return schemaPropertyTitles(schema)
+}
+
+func schemaPropertyTitles(schema map[string]any) map[string]string {
+	props, _ := schema["properties"].(map[string]any)
+	if len(props) == 0 {
+		return nil
+	}
+	out := make(map[string]string)
+	for key, raw := range props {
+		prop, _ := raw.(map[string]any)
+		if prop == nil {
+			continue
+		}
+		title, _ := prop["title"].(string)
+		title = strings.TrimSpace(title)
+		if title != "" {
+			out[key] = title
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func findSubmission(subs []Submission, addr SubmissionAddress) (Submission, bool) {

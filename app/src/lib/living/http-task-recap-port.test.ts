@@ -12,6 +12,7 @@ const sample = {
 	timestamp: '2026-10-29T15:00:00Z',
 	userId: 'ada',
 	facts: { client: 'NO' },
+	titles: { client: 'Cliente', numeroFir: 'Numero FIR' },
 	links: [
 		{ label: 'Stampa', url: 'blob:labels', action: 'link' },
 		{ label: 'CSV', url: 'blob:csv', action: 'download', filename: 'reg.csv' }
@@ -42,6 +43,7 @@ describe('HttpTaskRecapPort', () => {
 		});
 		expect(got.taskId).toBe('register');
 		expect(got.facts.client).toBe('NO');
+		expect(got.titles).toEqual({ client: 'Cliente', numeroFir: 'Numero FIR' });
 		expect(got.links).toHaveLength(2);
 		expect(got.links[1]?.filename).toBe('reg.csv');
 		expect(fetchFn).toHaveBeenCalledOnce();
@@ -72,6 +74,7 @@ describe('HttpTaskRecapPort', () => {
 		});
 		expect(got.links).toEqual([]);
 		expect(got.facts.date).toBe('2026-10-19');
+		expect(got.titles).toBeUndefined();
 	});
 
 	test('maps non-OK to TaskRecapError', async () => {

@@ -45,6 +45,20 @@ function parseTaskRecap(raw: unknown): TaskRecap {
 		body.facts && typeof body.facts === 'object' && !Array.isArray(body.facts)
 			? (body.facts as Record<string, unknown>)
 			: {};
+	const titlesRaw =
+		body.titles && typeof body.titles === 'object' && !Array.isArray(body.titles)
+			? (body.titles as Record<string, unknown>)
+			: undefined;
+	let titles: Record<string, string> | undefined;
+	if (titlesRaw) {
+		titles = {};
+		for (const [key, value] of Object.entries(titlesRaw)) {
+			if (typeof value === 'string' && value.trim() !== '') {
+				titles[key] = value;
+			}
+		}
+		if (Object.keys(titles).length === 0) titles = undefined;
+	}
 	return {
 		jobId: typeof body.jobId === 'string' ? body.jobId : '',
 		jobInstanceId: typeof body.jobInstanceId === 'string' ? body.jobInstanceId : '',
@@ -54,6 +68,7 @@ function parseTaskRecap(raw: unknown): TaskRecap {
 		timestamp: typeof body.timestamp === 'string' ? body.timestamp : '',
 		userId: typeof body.userId === 'string' ? body.userId : '',
 		facts,
+		titles,
 		links
 	};
 }

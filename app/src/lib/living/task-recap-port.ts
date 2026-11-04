@@ -9,7 +9,7 @@ export type TaskRecapRequest = {
 	groupInstanceId?: string;
 };
 
-/** Thin done-Task overview expand payload (no schema / Domain). */
+/** Thin done-Task overview expand payload (no full schema / Domain). */
 export type TaskRecap = {
 	jobId: string;
 	jobInstanceId: string;
@@ -19,6 +19,8 @@ export type TaskRecap = {
 	timestamp: string;
 	userId: string;
 	facts: Record<string, unknown>;
+	/** Authored schema property titles keyed by fact key; missing → use key. */
+	titles?: Record<string, string>;
 	links: HttpLinkItem[];
 };
 
