@@ -83,7 +83,7 @@
 
 {#snippet reportRows(rowList: readonly ChromeRecapRowDisplay[])}
 	<ul class="data-report__rows">
-		{#each rowList as row (row.label)}
+		{#each rowList as row, index (`${row.label}:${row.value ?? ''}:${row.error ?? ''}:${index}`)}
 			<li
 				class="data-report__row"
 				data-tone={row.tone ?? undefined}
