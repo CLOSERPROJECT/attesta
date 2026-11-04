@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (root `passport.snapshot` in Org Config and evaluation path for freeze).
 
-**Status:** ready-for-agent
+**Status:** done (`e863138`; Spec+Standards APPROVE 2026-11-04)
 
-- [ ] Load bundle / dataReport exposes live snapshot for Lock Task from Org Config `passport.snapshot`
-- [ ] Commit freeze uses identical projection input as operator saw on Load (tests or fixture assert parity)
-- [ ] No hand-authored Lock-only recap separate from snapshot block
-- [ ] Dumb executor: no Feragame Lock Task id special cases in Go or SPA
+- [x] Load bundle / dataReport exposes live snapshot for Lock Task from Org Config `passport.snapshot`
+- [x] Commit freeze uses identical projection input as operator saw on Load (tests or fixture assert parity)
+- [x] No hand-authored Lock-only recap separate from snapshot block
+- [x] Dumb executor: no Feragame Lock Task id special cases in Go or SPA

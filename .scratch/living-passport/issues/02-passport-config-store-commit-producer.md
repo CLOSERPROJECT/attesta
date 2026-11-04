@@ -4,11 +4,11 @@
 
 **Blocked by:** 01 (shared Digital Link / UNTP helpers available for link shaping).
 
-**Status:** ready-for-agent
+**Status:** done (`be99ffc`; Spec+Standards APPROVE 2026-11-04)
 
-- [ ] Root `passport` block validated; Lock opt-in requires it; `onSubmit.passport` is a thin hook after transform (transform owns Domain locked/issued facts for eligibility)
-- [ ] Passport store API: get by org+subject; create-once semantics for v1 lock
-- [ ] Commit producer runs only on successful Commit with `onSubmit.passport`; snapshot from authored `passport.snapshot` projection
-- [ ] Commit `Links` include Passport public URLs; no HttpPort side effects for issuance
-- [ ] Synthetic fixture proves end-to-end producer + store without Feragame Task ids
-- [ ] Go/SPA remain dumb executors—no plant-named branches
+- [x] Root `passport` block validated; Lock opt-in requires it; `onSubmit.passport` is a thin hook after transform (transform owns Domain locked/issued facts for eligibility)
+- [x] Passport store API: get by org+subject; create-once semantics for v1 lock
+- [x] Commit producer runs only on successful Commit with `onSubmit.passport`; snapshot from authored `passport.snapshot` projection
+- [x] Commit `Links` include Passport public URLs; no HttpPort side effects for issuance
+- [x] Synthetic fixture proves end-to-end producer + store without Feragame Task ids
+- [x] Go/SPA remain dumb executors—no plant-named branches

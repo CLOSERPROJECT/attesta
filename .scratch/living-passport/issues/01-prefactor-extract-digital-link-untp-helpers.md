@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done (`a83f91a` + `d1f3b25`; Spec+Standards APPROVE 2026-11-04)
 
-- [ ] Shared helpers cover what Stream DPP needs today (Digital Link + UNTP serve/issue adjacencies) without importing living engine types
-- [ ] Stream regression tests / existing DPP behavior green; no change to when Stream issues or finalizes processes
-- [ ] Living code does not yet mint Passports; extraction only
-- [ ] No Feragame- or Task-id branches introduced for extraction
+- [x] Shared helpers cover what Stream DPP needs today (Digital Link + UNTP serve/issue adjacencies) without importing living engine types
+- [x] Stream regression tests / existing DPP behavior green; no change to when Stream issues or finalizes processes
+- [x] Living code does not yet mint Passports; extraction only
+- [x] No Feragame- or Task-id branches introduced for extraction
