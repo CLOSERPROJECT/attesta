@@ -13,7 +13,6 @@ var (
 	ErrGTINTooLong  = errors.New("gtin must be at most 14 digits")
 )
 
-// NormalizeGTIN trims, validates digits, and left-pads to 14 digits.
 func NormalizeGTIN(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -106,7 +105,6 @@ func parseParts(parts []string) (string, string, string, error) {
 	return gtin, lot, serial, nil
 }
 
-// URL builds the relative GS1 Digital Link path for gtin/lot/serial.
 func URL(gtin, lot, serial string) string {
 	return "/01/" + url.PathEscape(strings.TrimSpace(gtin)) +
 		"/10/" + url.PathEscape(strings.TrimSpace(lot)) +
@@ -124,7 +122,9 @@ func GS1ElementString(gtin, lot, serial string) string {
 	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
 }
 
-// AbsoluteURL joins baseURL with a relative digital link path for credential IDs.
+// AbsoluteURL returns the fully qualified resolver URI for a digital link path.
+// Per the UNTP IDR, identifiers used inside credentials are resolver URIs, not
+// relative paths.
 func AbsoluteURL(baseURL, link string) string {
 	if baseURL == "" {
 		return link

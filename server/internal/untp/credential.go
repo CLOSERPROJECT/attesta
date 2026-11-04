@@ -51,7 +51,6 @@ type DTEInput struct {
 	Events  []EventInput
 }
 
-// FormatRFC3339UTC formats t in UTC RFC3339, or "" when zero.
 func FormatRFC3339UTC(value time.Time) string {
 	if value.IsZero() {
 		return ""
@@ -67,7 +66,6 @@ func issuer(baseURL, ownerName string) CredentialIssuer {
 	}
 }
 
-// BuildDPPCredential maps product identity to a UNTP Digital Product Passport credential.
 func BuildDPPCredential(in DPPInput) Credential {
 	productID := AbsoluteURL(in.BaseURL, in.Link)
 	name := strings.TrimSpace(in.Product.Name)
@@ -107,7 +105,6 @@ func BuildDPPCredential(in DPPInput) Credential {
 	return credential
 }
 
-// BuildModifyEvents maps EventInputs to UNTP ModifyEvents for a product.
 func BuildModifyEvents(baseURL, link string, product ProductIdentity, schemeName string, events []EventInput) []ModifyEvent {
 	productID := AbsoluteURL(baseURL, link)
 	productRef := ProductRef{
@@ -164,7 +161,6 @@ func BuildModifyEvents(baseURL, link string, product ProductIdentity, schemeName
 	return out
 }
 
-// BuildDTECredential wraps ModifyEvents in a Digital Traceability Event credential.
 func BuildDTECredential(in DTEInput) Credential {
 	productID := AbsoluteURL(in.BaseURL, in.Link)
 	name := strings.TrimSpace(in.Product.Name)
