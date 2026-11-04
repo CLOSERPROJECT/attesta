@@ -131,10 +131,12 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	links := NewMemoryLinkStore()
 	c := &Committer{
 		Domains:    domains,
 		Configs:    configs,
 		Passports:  passports,
+		LinkStore:  links,
 		Authorizer: AllowAllAuthorizer{},
 		Now:        func() time.Time { return time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC) },
 	}
@@ -150,12 +152,18 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 	if result.Domain.Kind("widget")["W-9"]["locked"] != true {
 		t.Fatalf("transform locked fact missing: %#v", result.Domain.Kind("widget")["W-9"])
 	}
-	if len(result.Links) != 1 {
-		t.Fatalf("links = %#v", result.Links)
+	if len(result.Links) != 0 {
+		t.Fatalf("Commit response must omit Passport links: %#v", result.Links)
 	}
 	wantLink := untp.URL("09506000134352", "LOT-9", "W-9")
-	if result.Links[0].URL != wantLink || result.Links[0].Action != HttpActionLink {
-		t.Fatalf("link = %#v, want %q", result.Links[0], wantLink)
+	stored, err := links.Get(t.Context(), "synth", SubmissionAddress{
+		JobID: "issue", JobInstanceID: "W-9", TaskID: "lock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || stored[0].URL != wantLink || stored[0].Action != HttpActionLink {
+		t.Fatalf("LinkStore = %#v, want %q", stored, wantLink)
 	}
 
 	rec, err := passports.Get(t.Context(), "synth", "W-9")

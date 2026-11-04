@@ -147,7 +147,8 @@ type passportIssue struct {
 }
 
 // issuePassport evaluates root passport identity + snapshot, create-once persists,
-// and returns Commit links (not HttpPort).
+// and returns public link items for LinkStore / TaskRecap (not HttpPort; Commit
+// omits them from response Links so TaskForm does not flash the Passport URL).
 func issuePassport(
 	ctx context.Context,
 	store PassportStore,

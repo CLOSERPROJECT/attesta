@@ -75,7 +75,9 @@ func TestFeragamePassportFixtureShape(t *testing.T) {
 func TestFeragamePassportLockJobFlow(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	passports := NewMemoryPassportStore()
+	links := NewMemoryLinkStore()
 	c.Passports = passports
+	c.LinkStore = links
 	c.Now = func() time.Time { return time.Date(2026, 11, 4, 14, 0, 0, 0, time.UTC) }
 	op := adminOp()
 
@@ -173,12 +175,18 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	if facts["fullyProcessed"] != true {
 		t.Fatalf("fullyProcessed must stay register closure: %#v", facts)
 	}
-	if len(locked.Links) != 1 {
-		t.Fatalf("Commit links = %#v", locked.Links)
+	if len(locked.Links) != 0 {
+		t.Fatalf("Commit response must omit Passport links: %#v", locked.Links)
 	}
 	wantLink := untp.URL("09506000134352", "FIR-1", loadID)
-	if locked.Links[0].URL != wantLink || locked.Links[0].Action != HttpActionLink {
-		t.Fatalf("link = %#v, want %q", locked.Links[0], wantLink)
+	stored, err := links.Get(t.Context(), "feragame", SubmissionAddress{
+		JobID: "passport", JobInstanceID: loadID, TaskID: "lock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || stored[0].URL != wantLink || stored[0].Action != HttpActionLink {
+		t.Fatalf("LinkStore = %#v, want %q", stored, wantLink)
 	}
 
 	rec, err := passports.Get(t.Context(), "feragame", loadID)
