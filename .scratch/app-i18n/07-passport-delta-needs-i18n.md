@@ -82,11 +82,11 @@ Parallel keys already exist for Available / Can start / In progress bands; this 
 | Change | Assessment |
 | --- | --- |
 | `passport.identity.productName: "Carico Feragame"` | Italian — **no gap** |
-| Snapshot row labels (`Passaporto carico`, `Carico`, `Cliente`, `FIR`, …) | Italian — **no gap** |
+| Snapshot row labels (`DPP carico`, `Carico`, `Cliente`, `FIR`, …) | Italian — **no gap** |
 | `steps.passport.title: Verifica dati e DPP` | Italian — **no gap** |
 | `startLabel: Emetti DPP` | Italian — **no gap** |
-| `label: 'Passaporto: ' & $.loadId` | Italian — **no gap** |
-| Schema titles (`Seleziona carico`, `Carico`, `Emetti passaporto`, `Confermo i dati del passaporto`) | Italian — **no gap** |
+| `label: 'DPP: ' & $.loadId` | Italian — **no gap** |
+| Schema titles (`Seleziona carico`, `Carico`, `Emetti DPP`, `Confermo i dati del DPP`) | Italian — **no gap** |
 | Domain field adds `fullyProcessed` / `locked` / `issued` | Field ids, not display labels |
 
 **Config label gaps introduced by this delta:** **0**

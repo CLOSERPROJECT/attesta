@@ -137,7 +137,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	if loadSnap == nil || loadSnap["subjectId"] != loadID {
 		t.Fatalf("live snapshot = %#v", loadSnap)
 	}
-	if loadSnap["title"] != "Passaporto carico" {
+	if loadSnap["title"] != "DPP carico" {
 		t.Fatalf("snapshot title = %#v", loadSnap["title"])
 	}
 	cfg, err := LoadFeragameConfigFixture()

@@ -109,7 +109,7 @@ passport:
                 )
               )});
               {
-                "title": "Passaporto carico",
+                "title": "DPP carico",
                 "subjectId": $subjectId,
                 "load": $load,
                 "truck": $truck,
@@ -392,6 +392,7 @@ steps:
                 transform: []
             - id: palletWeight
               kind: group
+              title: Pesatura bancali
               repeatable: true
               startLabel: Nuova pesata
               closeLabel: Chiudi pesatura
@@ -451,7 +452,7 @@ steps:
                   uiSchema:
                     ui:options:
                         order:
-                            [palletId, averagePanelWeight, tareKind, customTareWeight, weight, idoneita, panelCount]
+                            [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
                     tareKind:
                         ui:options:
                             enumNames: ['euro (25 kg)', 'industriale (30 kg)', 'personalizzata']
@@ -510,6 +511,7 @@ steps:
                         progress: $value
             - id: containerReg
               kind: group
+              title: Registrazione contenitori
               repeatable: true
               startLabel: Nuova registrazione
               closeLabel: Chiudi registrazione
@@ -692,7 +694,7 @@ steps:
         startLabel: Emetti DPP
         color: '#0f766e'
         instanceId: $.loadId
-        label: "'Passaporto: ' & $.loadId"
+        label: "'DPP: ' & $.loadId"
         substeps:
             - id: select
               roles: [administration]
@@ -727,12 +729,12 @@ steps:
                 and $not($lookup($domain.load, $instance.id).locked = true)
               schema:
                 type: object
-                title: Emetti passaporto
+                title: Emetti DPP
                 required: [ack]
                 properties:
                     ack:
                         type: boolean
-                        title: Confermo i dati del passaporto
+                        title: Confermo i dati del DPP
                         const: true
               uiSchema:
                 ack:
