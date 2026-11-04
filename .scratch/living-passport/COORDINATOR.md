@@ -61,7 +61,7 @@ Passport Can start always-on: no Job `startsWhen`; Domain gate only on select en
 | 08 | `e26e8af`, `0dd1165` | Spec+Standards APPROVE |
 | 09 | `f341c89` | Spec+Standards APPROVE |
 | 10 | `6a2f835` (reverted by 11 / `6666b5f`) | Spec+Standards APPROVE then human override |
-| 11 | `6666b5f` + SPA clear commit | implementer done |
+| 11 | `6666b5f` + `c386455` | implementer done |
 | board | `f217a86` ledger stamp | — |
 
 ## Human smoke (Compose, after seed refresh)
