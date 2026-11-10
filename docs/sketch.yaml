@@ -1,0 +1,541 @@
+# Feragame in the resource model. Concepts are decided, syntax is not:
+# see docs/interpretation-package.md. Today's config for comparison:
+# server/internal/living/fixtures/feragame-config.yaml.
+
+actors:
+  line:
+    label: Linea
+  logistic:
+    label: Logistica
+  administration:
+    label: Amministrazione
+
+agents:
+  clients:
+    kind: organization
+    ids: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
+
+catalogs:
+  waste_codes:
+    - ['160214', '16.02.14']
+  tare_kinds:
+    industrial: 25
+    euro: 20
+  materials:
+    - [polvereDiVetro, Polvere di vetro]
+    - [granellaDiVetro, Granella di vetro]
+    - [granellaDiVetro2, Granella di vetro 2]
+    - [polvereDiSilicio, Polvere di silicio]
+    - [plastica, Plastica]
+    - [alluminio, Alluminio]
+    - [sopravaglio, Sopravaglio]
+    - [polvereDiAspirazione, Polvere di aspirazione]
+
+scopes:
+
+  working_day:
+    label: Giorno di lavoro
+    display: $self.date
+    properties:
+      date: { type: date }
+      single_shift: { type: boolean }
+    initial: open
+    states:
+      open: { requires: [date, single_shift] }
+      closed: { requires: [date, single_shift] }
+
+  shift:
+    label: Turno
+    within: working_day
+    display: $self.kind
+    properties:
+      working_day: { type: reference, scope: working_day }
+      kind:
+        type: enum
+        options:
+          - [first, 1°]
+          - [second, 2°]
+          - [third, 3°]
+          - [whole_day, Giornata intera]
+    initial: open
+    states:
+      open: { requires: [working_day, kind] }
+      closed: { requires: [working_day, kind] }
+
+  truck:
+    label: Camion
+    within: shift
+    properties:
+      shift: { type: reference, scope: shift }
+      gross_weight: { type: number, unit: kg }
+      checked_truck_weight: { type: number, unit: kg }
+      checked_lot_sum: { type: number, unit: kg }
+    computed:
+      current_weight: $self.gross_weight - $sum($within(lot).net_weight)
+      lot_net_sum: $sum($within(lot).net_weight)
+    initial: unloading
+    states:
+      unloading: { requires: [shift, gross_weight] }
+      unloaded: { requires: [shift, gross_weight] }
+      checked: { requires: [shift, gross_weight, checked_truck_weight, checked_lot_sum] }
+
+resources:
+
+  lot:
+    label: Lotto
+    within: truck
+    display: $self.client & '-' & $self.truck.shift.working_day.date & '-' & $self.client_progressive
+    quantity: net_weight
+    properties:
+      truck: { type: reference, scope: truck }
+      client: { type: agent, of: clients }
+      waste_code: { type: enum, options: $catalogs.waste_codes }
+      fir_number: { type: string }
+      pallet_count: { type: integer }
+      net_weight: { type: number, unit: kg }
+      notes: { type: string }
+    computed:
+      client_progressive: position of this lot among the lots of the same client on the same working day
+      exhausted: every pallet of the lot is done
+    initial: registered
+    states:
+      registered: &registered { requires: [truck, client, waste_code, fir_number, pallet_count, net_weight] }
+      processing: *registered
+      processed: *registered
+
+  pallet:
+    label: Bancale
+    within: lot
+    display: $self.lot.display & '.' & $self.index
+    quantity: [net_weight, panel_count]
+    properties:
+      lot: { type: reference, resource: lot }
+      index: { type: integer }
+      gross_weight: { type: number, unit: kg }
+      tare_kind: { type: enum, options: [industrial, euro, custom] }
+      custom_tare: { type: number, unit: kg }
+      panel_count: { type: integer, unit: panel }
+      idoneita: { type: enum, options: [NIR, IR] }
+    computed:
+      tare: "$self.tare_kind = 'custom' ? $self.custom_tare : $lookup($catalogs.tare_kinds, $self.tare_kind)"
+      net_weight: $self.gross_weight - $self.tare
+    initial: created
+    states:
+      created: { requires: [lot, index] }
+      weighed: &weighed { requires: [lot, index, gross_weight, tare_kind, panel_count, idoneita] }
+      loading: *weighed
+      partially_loaded: *weighed
+      done: *weighed
+
+  container:
+    label: Contenitore
+    within: lot
+    display: "'C-' & $seq"
+    quantity: total_weight
+    properties:
+      lot: { type: reference, resource: lot }
+      material: { type: enum, options: $catalogs.materials }
+      total_weight: { type: number, unit: kg }
+      predecessor: { type: reference, resource: container }
+    computed:
+      weight_by_lot: per weighing (handed off or filled), total_weight minus the previous total, keyed by the weighing's lot
+      lots: the lot it was opened in, every lot it was taken over by, and every key of weight_by_lot
+      shared: lots has more than one lot
+    initial: open
+    states:
+      open: { requires: [lot, material] }
+      handed_off: { requires: [lot, material, total_weight] }
+      full: { requires: [lot, material, total_weight] }
+
+event_types:
+
+  working_day_started:
+    label: Inizio giorno di lavoro
+    roles: [line, logistic, administration]
+    input:
+      date: { type: date, label: Data, default: $today }
+      single_shift: { type: boolean, label: Turno singolo }
+    creates:
+      - scope: working_day
+        as: day
+        with: { date: $input.date, single_shift: $input.single_shift }
+      - scope: shift
+        when: $input.single_shift
+        with: { working_day: $day.id, kind: whole_day }
+
+  working_day_closed:
+    label: Chiusura giorno di lavoro
+    subject: working_day
+    from: [open]
+    to: closed
+    roles: [administration]
+
+  shift_started:
+    label: Inizio turno
+    subject: working_day
+    from: [open]
+    to: open
+    roles: [line, logistic, administration]
+    input:
+      kind:
+        type: enum
+        label: Tipo
+        options:
+          - [first, 1°]
+          - [second, 2°]
+          - [third, 3°]
+    creates:
+      - scope: shift
+        with: { working_day: $subject.id, kind: $input.kind }
+
+  shift_closed:
+    label: Chiusura turno
+    subject: shift
+    from: [open]
+    to: closed
+    roles: [line, logistic, administration]
+
+  truck_arrived:
+    label: Registrazione camion
+    subject: shift
+    from: [open]
+    to: open
+    roles: [administration]
+    input:
+      gross_weight: { type: number, unit: kg, label: Peso lordo camion }
+    creates:
+      - scope: truck
+        with: { shift: $subject.id, gross_weight: $input.gross_weight }
+
+  lot_registered:
+    label: Nuovo lotto
+    subject: truck
+    from: [unloading]
+    to: unloading
+    roles: [administration]
+    input:
+      client: { type: agent, of: clients, label: Cliente }
+      waste_code: { type: enum, options: $catalogs.waste_codes, default: '160214', label: Codice CER }
+      fir_number: { type: string, label: Numero FIR }
+      pallet_count: { type: integer, minimum: 1, label: Numero di bancali }
+      truck_weight_after_unload: { type: number, unit: kg, label: Peso camion dopo scarico }
+      notes: { type: string, label: Note }
+    derived:
+      net_weight:
+        label: Peso netto lotto
+        expr: $subject.current_weight - $input.truck_weight_after_unload
+    creates:
+      - resource: lot
+        as: lot
+        with:
+          truck: $subject.id
+          client: $input.client
+          waste_code: $input.waste_code
+          fir_number: $input.fir_number
+          pallet_count: $input.pallet_count
+          net_weight: $derived.net_weight
+          notes: $input.notes
+      - resource: pallet
+        count: $input.pallet_count
+        with: { lot: $lot.id, index: $index + 1 }
+    rea:
+      action: transfer
+      resource: $lot
+      quantity: $lot.net_weight
+      provider: $input.client
+      receiver: $org
+    effects:
+      - label: Stampa etichette
+        action: link
+        post: /labels
+        body: the lot, and one label per pallet with a QR code encoding the pallet ID
+      - label: Scarica CSV registrazione
+        action: download
+        post: /register-csv
+        body: the lot's fields and its pallet IDs
+
+  truck_unload_closed:
+    label: Chiudi scarico
+    subject: truck
+    from: [unloading]
+    to: unloaded
+    roles: [administration]
+
+  truck_weight_checked:
+    label: Controllo camion vs lotti
+    subject: truck
+    from: [unloaded]
+    to: checked
+    roles: [administration]
+    show:
+      gross_weight: $subject.gross_weight
+      last_scale_reading: $subject.current_weight
+      lot_net_sum: $subject.lot_net_sum
+      match_percent: 100 * min(gross_weight - last_scale_reading, lot_net_sum) / max(of the two)
+    input:
+      checked_truck_weight: { type: number, unit: kg, label: Peso camion verificato }
+      checked_lot_sum: { type: number, unit: kg, label: Somma pesi netti lotti verificata }
+    write:
+      checked_truck_weight: $input.checked_truck_weight
+      checked_lot_sum: $input.checked_lot_sum
+
+  lot_started:
+    label: Inizio lavorazione lotto
+    subject: lot
+    from: [registered]
+    to: processing
+    roles: [logistic]
+    on_board: false
+    references:
+      shift: $context.shift
+    also:
+      - event: container_taken_over
+        for_each: containers in handed_off
+
+  lot_processed:
+    label: Lotto lavorato
+    subject: lot
+    from: [processing]
+    to: processed
+    roles: [logistic]
+    references:
+      shift: $context.shift
+
+  pallet_weighed:
+    label: Pesa bancale
+    subject: pallet
+    from: [created]
+    to: weighed
+    roles: [logistic]
+    available_when: the pallet's lot is processing, or it is registered and no lot is processing
+    also:
+      - event: lot_started
+        subject: $subject.lot
+        when: "$subject.lot.state = 'registered'"
+    input:
+      gross_weight: { type: number, unit: kg, label: Peso }
+      average_panel_weight: { type: number, unit: kg, default: 20, label: Peso medio pannello }
+      tare_kind:
+        type: enum
+        label: Tara
+        default: industrial
+        options:
+          - [industrial, Industriale (25 kg)]
+          - [euro, Euro (20 kg)]
+          - [custom, Personalizzata]
+      custom_tare: { type: number, unit: kg, when: "$input.tare_kind = 'custom'", label: Tara personalizzata }
+      idoneita: { type: enum, options: [NIR, IR], default: NIR, label: IR / NIR }
+    derived:
+      panel_count:
+        label: Pannelli
+        overridable: true
+        expr: $floor(($input.gross_weight - tare) / $input.average_panel_weight)
+    write:
+      gross_weight: $input.gross_weight
+      tare_kind: $input.tare_kind
+      custom_tare: $input.custom_tare
+      panel_count: $derived.panel_count
+      idoneita: $input.idoneita
+
+  pallet_load_started:
+    label: Inizio carico in linea
+    subject: pallet
+    from: [weighed]
+    to: loading
+    roles: [line]
+    available_when: $subject.lot.state = 'processing'
+    references:
+      shift: $context.shift
+
+  pallet_left_partial:
+    label: Parzialmente caricato
+    subject: pallet
+    from: [loading]
+    to: partially_loaded
+    roles: [line]
+    available_when: $subject.lot.state = 'processing'
+    references:
+      shift: $context.shift
+
+  pallet_load_resumed:
+    label: Ripresa carico
+    subject: pallet
+    from: [partially_loaded]
+    to: loading
+    roles: [line]
+    available_when: $subject.lot.state = 'processing'
+    references:
+      shift: $context.shift
+
+  pallet_load_finished:
+    label: Bancale caricato
+    subject: pallet
+    from: [loading]
+    to: done
+    roles: [line]
+    available_when: $subject.lot.state = 'processing'
+    references:
+      shift: $context.shift
+    rea:
+      action: consume
+      resource: $subject
+      quantity: [$subject.net_weight, $subject.panel_count]
+
+  container_opened:
+    label: Nuovo contenitore
+    roles: [logistic]
+    available_when: $context.lot.state = 'processing'
+    input:
+      material: { type: enum, options: $catalogs.materials, label: Materiale }
+    creates:
+      - resource: container
+        with: { lot: $context.lot.id, material: $input.material }
+
+  container_handed_off:
+    label: Passa al lotto successivo
+    subject: container
+    from: [open]
+    to: handed_off
+    roles: [logistic]
+    available_when: $context.lot.state = 'processing'
+    references:
+      lot: $context.lot
+    input:
+      total_weight: { type: number, unit: kg, label: Peso totale }
+    write:
+      total_weight: $input.total_weight
+    rea:
+      action: produce
+      resource: $subject
+      quantity: $input.total_weight minus the container's previous total
+
+  container_taken_over:
+    label: Riprendi contenitore
+    subject: container
+    from: [handed_off]
+    to: open
+    roles: [logistic]
+    available_when: $context.lot.state = 'processing'
+    references:
+      lot: $context.lot
+
+  container_filled:
+    label: Contenitore pieno
+    subject: container
+    from: [open]
+    to: full
+    roles: [logistic]
+    available_when: $context.lot.state = 'processing'
+    references:
+      lot: $context.lot
+    input:
+      total_weight: { type: number, unit: kg, label: Peso totale }
+    write:
+      total_weight: $input.total_weight
+    creates:
+      - resource: container
+        with: { lot: $context.lot.id, material: $subject.material, predecessor: $subject.id }
+    rea:
+      action: produce
+      resource: $subject
+      quantity: $input.total_weight minus the container's previous total
+
+# Processes are a reading of events, not something operators act on: they
+# have no screen, no state, and no event types of their own.
+processes:
+
+  lot_processing:
+    label: Lavorazione lotto
+    per: lot
+    begins: lot_started
+    ends: lot_processed
+    inputs:
+      pallet_load_finished: $subject.lot
+    outputs:
+      container_handed_off: $references.lot
+      container_filled: $references.lot
+
+prompts:
+
+  settle_containers_before_lot_processed:
+    when: a lot in processing has no pallets left in weighed, loading, or partially_loaded, and containers are still open in it
+    raise: container_handed_off or container_filled on each of those containers, then lot_processed
+
+  take_over_missed_containers:
+    when: a lot is processing and containers are still handed_off, because the device that started the lot did not know about them
+    raise: container_taken_over on each of them
+
+  mark_partial_at_shift_end:
+    when: a shift is being closed while pallets are loading in it
+    raise: pallet_left_partial on those pallets
+
+checks:
+
+  lot_weight_balance:
+    for_each: lot in processed
+    expect: the weight credited to the lot across containers is within tolerance of the lot's net_weight
+
+  lot_containers_settled:
+    for_each: lot in processed
+    expect: every container that was open while the lot was processing has a handed_off or filled weighing that references the lot
+
+  lot_processed_when_exhausted:
+    for_each: lot in processed
+    expect: $self.exhausted
+
+  one_lot_processing:
+    expect: at most one lot is in processing at a time
+
+  handed_off_containers_taken_over:
+    for_each: container in handed_off
+    expect: no lot entered processing after it was handed off
+
+  captured_while_unavailable:
+    for_each: Observation
+    expect: its event type's available_when held when it was captured
+
+  truck_check_matches:
+    for_each: truck in checked
+    expect: checked_lot_sum matches lot_net_sum, and checked_truck_weight matches gross_weight minus current_weight
+
+  one_working_day_per_date:
+    for_each: working_day
+    expect: no other working day has the same date
+
+  one_open_shift:
+    expect: at most one shift is open at a time
+
+passports:
+
+  lot_passport:
+    subject: lot
+    eligible_when: $subject.state = 'processed'
+    # Open: building the snapshot from lot_processing flows instead.
+    identity_and_snapshot: same shape as today's passport block (feragame-config.yaml, lines 83-145), with the lot as subject
+    sealed_by: a Review case scoped to the lot (docs/vision.md, Review and sealing)
+
+views:
+
+  plant:
+    label: Impianto
+    # Only overrides are listed. Every other screen, list, tab, and action
+    # comes from the defaults in interpretation-package.md (Screens).
+    screens:
+
+      shift:
+        lists:
+          lot:
+            label: Lotti da lavorare
+            rows: lots in registered or processing, whichever shift registered them
+
+      lot:
+        tabs:
+          - label: Pesa bancali
+            actions: [pallet_weighed]
+          - label: Carico linea
+            actions: [pallet_load_started, pallet_left_partial, pallet_load_resumed, pallet_load_finished]
+          - label: Contenitori
+            rows: containers in open or handed_off, and containers whose lots include $context.lot
+            group_by: material
+            actions: [container_handed_off, container_taken_over, container_filled]
+            add: container_opened
