@@ -736,6 +736,9 @@ projection, human-triggered, Digital Link serving) carries over.
 
 ### Suggested sequence
 
+The delivery order now lives in [`roadmap.md`](roadmap.md), which puts the
+operator app first. This sequence records the dependency reasoning.
+
 1. **Fix lost updates.** Optimistic concurrency on the Domain document.
    Small, independent, protects production data today.
 2. **Observation envelope under the current Commit.** Store the raw payload,
