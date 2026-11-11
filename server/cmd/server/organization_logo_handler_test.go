@@ -47,6 +47,36 @@ func TestHandleOrganizationLogo(t *testing.T) {
 		}
 	})
 
+	t.Run("public without session when auth enforced", func(t *testing.T) {
+		server := &Server{
+			enforceAuth: true,
+			identity: &fakeIdentityStore{
+				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+					return &IdentityOrg{Slug: slug, LogoFileID: "logo-1"}, nil
+				},
+				getOrganizationLogoFunc: func(ctx context.Context, fileID string) (IdentityFile, error) {
+					return IdentityFile{
+						ID:          "logo-1",
+						Filename:    "logo.png",
+						ContentType: "image/png",
+						Data:        []byte{0x89, 'P', 'N', 'G'},
+					}, nil
+				},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/organization/logo/acme", nil)
+		rec := httptest.NewRecorder()
+		server.handleOrganizationLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if loc := rec.Header().Get("Location"); loc != "" {
+			t.Fatalf("unexpected redirect to %q", loc)
+		}
+	})
+
 	t.Run("method not allowed", func(t *testing.T) {
 		server := &Server{}
 		req := httptest.NewRequest(http.MethodPost, "/organization/logo/acme", nil)
