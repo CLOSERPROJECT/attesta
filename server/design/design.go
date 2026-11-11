@@ -544,7 +544,6 @@ var _ = Service("admin", func() {
 			GET("/organization/logo/{org_slug}")
 			Response(StatusOK)
 			Response(StatusNotFound)
-			Response(StatusUnauthorized)
 		})
 	})
 })

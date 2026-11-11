@@ -4693,9 +4693,6 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOrganizationLogo(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireVerifiedPage(w, r); !ok {
-		return
-	}
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
