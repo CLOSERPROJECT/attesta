@@ -46,9 +46,9 @@ type SeedDeps struct {
 	LivingDomains   living.DomainStore
 	LivingConfigs   living.ConfigStore
 	LivingPassports living.PassportStore
-	// LivingScope selects Feragame core/full or both (default full-stack).
-	// Feragame scopes hard-reset Feragame Appwrite + living, skip Formata and
-	// orgs 1–3, and always run (bypass the empty-only marker).
+	// LivingScope selects Feragame config/domain/identity/full or both (default).
+	// Feragame scopes always wipe Domain, skip Formata, bypass the empty-only
+	// marker. Identity/full also hard-reset Feragame Appwrite (not orgs 1–3).
 	LivingScope living.SeedScope
 	// Nil picks a time-based source in Seed.
 	RNG     catalogStreamRNG
@@ -56,15 +56,25 @@ type SeedDeps struct {
 	Now     func() time.Time
 }
 
-func seedScopeFeragameOnly(scope living.SeedScope) bool {
-	return scope == living.SeedScopeFeragameCore || scope == living.SeedScopeFeragameFull
+func seedScopeFeragame(scope living.SeedScope) bool {
+	switch scope {
+	case living.SeedScopeFeragameConfig, living.SeedScopeFeragameDomain,
+		living.SeedScopeFeragameIdentity, living.SeedScopeFeragameFull:
+		return true
+	default:
+		return false
+	}
+}
+
+func seedScopeFeragameNeedsIdentity(scope living.SeedScope) bool {
+	return scope == living.SeedScopeFeragameIdentity || scope == living.SeedScopeFeragameFull
 }
 
 // Empty-only (default): if the marker org already exists, returns nil without writing.
 // Pass Replace to rewrite.
 //
 // Apply order is intentional: identity → taxonomy → catalog streams → instances → living.
-// Feragame scopes hard-reset Feragame identity + living only (skip Formata).
+// Feragame scopes skip Formata; identity/full hard-reset Feragame Appwrite only.
 //
 // Seed does not create the Appwrite project or API key (use prepare for that) and
 // does not read ATTESTA_SEED (hosts gate via PrepareDemoStack / ADR-0004).
@@ -72,8 +82,8 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if seedScopeFeragameOnly(deps.LivingScope) {
-		return seedFeragameOnly(ctx, deps)
+	if seedScopeFeragame(deps.LivingScope) {
+		return seedFeragame(ctx, deps)
 	}
 
 	if deps.Identity == nil {
@@ -132,25 +142,25 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	return applyLivingSeed(ctx, deps)
 }
 
-func seedFeragameOnly(ctx context.Context, deps SeedDeps) error {
-	if deps.Identity == nil {
-		return fmt.Errorf("seed: identity is required for --feragame-core/--feragame-full")
-	}
+func seedFeragame(ctx context.Context, deps SeedDeps) error {
 	if deps.LivingConfigs == nil {
-		return fmt.Errorf("seed: living config store required for --feragame-core/--feragame-full")
+		return fmt.Errorf("seed: living config store required for Feragame scopes")
 	}
 	if deps.LivingDomains == nil {
-		return fmt.Errorf("seed: living domain store required for --feragame-core/--feragame-full")
+		return fmt.Errorf("seed: living domain store required for Feragame scopes")
 	}
-
-	fixture := feragameDemoFixture()
-	if deps.Fixture != nil {
-		fixture = *deps.Fixture
-	}
-	fixture = demoFixtureWithPlatformAdminFromEnv(fixture)
-
-	if err := seedDemoIdentity(ctx, deps.Identity, fixture, true); err != nil {
-		return err
+	if seedScopeFeragameNeedsIdentity(deps.LivingScope) {
+		if deps.Identity == nil {
+			return fmt.Errorf("seed: identity is required for --feragame-identity/--feragame-full")
+		}
+		fixture := feragameDemoFixture()
+		if deps.Fixture != nil {
+			fixture = *deps.Fixture
+		}
+		fixture = demoFixtureWithPlatformAdminFromEnv(fixture)
+		if err := seedDemoIdentity(ctx, deps.Identity, fixture, true); err != nil {
+			return err
+		}
 	}
 	return applyLivingSeed(ctx, deps)
 }

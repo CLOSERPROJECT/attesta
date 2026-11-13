@@ -4,26 +4,22 @@ import (
 	"testing"
 )
 
-func containerRegRegisterTask(t *testing.T) map[string]any {
+func containerRegLeafTask(t *testing.T) map[string]any {
 	t.Helper()
 	line := lineJob(t)
-	group, ok := TaskByID(line.Tasks, "containerReg")
-	if !ok || !group.IsGroup() {
-		t.Fatal("containerReg group missing")
-	}
-	task, ok := TaskByID(group.ChildTasks(), "register")
-	if !ok {
-		t.Fatal("containerReg.register missing")
+	task, ok := TaskByID(line.Tasks, "containerReg")
+	if !ok || task.IsGroup() {
+		t.Fatal("containerReg leaf missing")
 	}
 	return task
 }
 
 func containerRegSchema(t *testing.T) map[string]any {
 	t.Helper()
-	task := containerRegRegisterTask(t)
+	task := containerRegLeafTask(t)
 	schema, _ := task["schema"].(map[string]any)
 	if schema == nil {
-		t.Fatal("containerReg.register schema missing")
+		t.Fatal("containerReg schema missing")
 	}
 	return schema
 }
@@ -49,8 +45,8 @@ func TestContainerRegSchemaExposesIncompleteDefaultFalse(t *testing.T) {
 func TestContainerRegSchemaDropsDualSourcesAndExposesContinuesContainerId(t *testing.T) {
 	schema := containerRegSchema(t)
 	props, _ := schema["properties"].(map[string]any)
-	if _, has := props["secondarySourceLoadId"]; has {
-		t.Fatal("secondarySourceLoadId form enum must be removed")
+	if _, has := props["secondarySourceLotId"]; has {
+		t.Fatal("secondarySourceLotId form enum must be removed")
 	}
 	if _, has := schema["if"]; has {
 		t.Fatal("dualSources if/then must be removed")
@@ -66,24 +62,24 @@ func TestContainerRegSchemaDropsDualSourcesAndExposesContinuesContainerId(t *tes
 		t.Fatalf("continuesContainerId = %#v, want string", cont)
 	}
 
-	reg := containerRegRegisterTask(t)
+	reg := containerRegLeafTask(t)
 	enums, _ := reg["enumReads"].(map[string]any)
-	if _, has := enums["secondarySourceLoadId"]; has {
-		t.Fatal("enumReads.secondarySourceLoadId must be removed")
+	if _, has := enums["secondarySourceLotId"]; has {
+		t.Fatal("enumReads.secondarySourceLotId must be removed")
 	}
-	if _, has := enums["sourceLoadId"]; !has {
-		t.Fatal("enumReads.sourceLoadId missing")
+	if _, has := enums["sourceLotId"]; !has {
+		t.Fatal("enumReads.sourceLotId missing")
 	}
 	if _, has := reg["initialData"]; !has {
-		t.Fatal("register.initialData missing")
+		t.Fatal("containerReg.initialData missing")
 	}
 }
 
 func TestContainerRegUiSchemaHidesContinuesContainerId(t *testing.T) {
-	reg := containerRegRegisterTask(t)
+	reg := containerRegLeafTask(t)
 	ui, _ := reg["uiSchema"].(map[string]any)
 	if ui == nil {
-		t.Fatal("containerReg.register uiSchema missing")
+		t.Fatal("containerReg uiSchema missing")
 	}
 	mat, _ := ui["polvereDiVetro"].(map[string]any)
 	items, _ := mat["items"].(map[string]any)

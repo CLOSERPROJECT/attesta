@@ -33,6 +33,8 @@
 	"toast_dismiss": "Chiudi",
 	"loading_recap": "Caricamento riepilogo…",
 	"could_not_load_recap": "Impossibile caricare il riepilogo",
+	"submission_count_one": "{count} invio",
+	"submission_count_many": "{count} invii",
 	"form_unavailable": "Modulo non disponibile",
 	"validation_failed": "Validazione fallita",
 	"no_primary_load": "Nessun load primario",

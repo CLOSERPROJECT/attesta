@@ -121,20 +121,19 @@ func TestCommitLotRegisterAllowedViaCerbosInUnlockOrder(t *testing.T) {
 	}
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["numeroFir"] != "FIR-1" {
-		t.Fatalf("domain = %#v", result.Domain.Kind("load")[loadID])
+	if result.Domain.Kind("lot")[loadID]["numeroFir"] != "FIR-1" {
+		t.Fatalf("domain = %#v", result.Domain.Kind("lot")[loadID])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || last.GroupID != "lots" {
+	if last.TaskID != "register" || last.GroupID != "" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }
@@ -157,7 +156,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
-		t.Fatalf("weightCheck before lots close should deny via Unlock: %v", err)
+		t.Fatalf("weightCheck before register should deny via Unlock: %v", err)
 	}
 	after, err := domains.Get(t.Context(), "feragame")
 	if err != nil {

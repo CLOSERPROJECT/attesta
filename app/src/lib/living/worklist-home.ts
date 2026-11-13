@@ -60,17 +60,28 @@ function jobConfigTaskIds(job: WorklistJob): string[] {
 	return (job.tasks ?? []).map((t) => t.id);
 }
 
-/** done/total Task counts for one Job instance (Config taskIds order). */
+/** True when chrome counts toward instance completion (omit / once; not many). */
+export function taskCountsTowardCompletion(task: WorklistTask | null | undefined): boolean {
+	return task?.submit !== 'many';
+}
+
+/**
+ * done/total for one Job instance over submit: once Tasks only (Config taskIds
+ * order). submit: many never blocks Completed (ADR-0008 / Phase 1 remaining-work).
+ */
 export function instanceTaskProgress(
 	job: WorklistJob,
 	inst: WorklistInstance
 ): { done: number; total: number } {
 	const ids = jobConfigTaskIds(job);
 	let done = 0;
+	let total = 0;
 	for (const taskId of ids) {
+		if (!taskCountsTowardCompletion(taskChrome(job, taskId))) continue;
+		total += 1;
 		if (inst.tasks[taskId] === 'done') done += 1;
 	}
-	return { done, total: ids.length };
+	return { done, total };
 }
 
 /** Fraction for ring stroke; 0 when total is 0. */

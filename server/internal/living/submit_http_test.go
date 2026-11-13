@@ -34,21 +34,21 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 		},
 	}
 	domain := EmptyDomain()
-	putKind(&domain, "load", EntityMap{"acme-1": {"client": "acme"}})
-	putKind(&domain, "pallet", EntityMap{"acme-1.1": {"loadId": "acme-1"}})
+	putKind(&domain, "lot", EntityMap{"acme-1": {"client": "acme"}})
+	putKind(&domain, "pallet", EntityMap{"acme-1.1": {"lotId": "acme-1"}})
 
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{
 			Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Stampa etichette"`, Action: "link",
-			Body:    `{ "loadId": $load.id, "labels": [$keys($sift($domain.pallet, function($v){$v.loadId = $load.id}))] }`,
+			Body:    `{ "lotId": $lot.id, "labels": [$keys($sift($domain.pallet, function($v){$v.lotId = $lot.id}))] }`,
 			HasBody: true,
 		},
 		{
 			Method: `"POST"`, URL: `"/fake/register-csv"`, Label: `"Scarica CSV registrazione"`, Action: "download",
-			Body:    `{ "client": $.client, "loadId": $load.id }`,
+			Body:    `{ "client": $.client, "lotId": $lot.id }`,
 			HasBody: true,
 		},
-	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"load": map[string]any{"id": "acme-1"}}, domain, "acme-1", nil, "feragame")
+	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"lot": map[string]any{"id": "acme-1"}}, domain, "acme-1", nil, "feragame")
 
 	if len(result.Errors) != 0 {
 		t.Fatalf("errors = %#v", result.Errors)
@@ -60,7 +60,7 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 		t.Fatalf("call0 = %#v", port.calls[0])
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)
-	if body0["loadId"] != "acme-1" {
+	if body0["lotId"] != "acme-1" {
 		t.Fatalf("body0 = %#v", port.calls[0].Body)
 	}
 	if len(result.Links) != 2 {
@@ -106,15 +106,15 @@ func TestRunSubmitHTTPEffectsUsesQrEndpointBinding(t *testing.T) {
 	port := &recordingHttpPort{responses: []HttpPortResponse{{URL: "blob:labels"}}}
 	domain := EmptyDomain()
 	putKind(&domain, "pallet", EntityMap{
-		"acme-1.1": {"loadId": "acme-1"},
-		"acme-1.2": {"loadId": "acme-1"},
+		"acme-1.1": {"lotId": "acme-1"},
+		"acme-1.2": {"lotId": "acme-1"},
 	})
 
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{
 			Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Stampa etichette"`, Action: "link",
 			Body: `{"labels": [$each(
-				$sift($domain.pallet, function($v){$v.loadId = "acme-1"}),
+				$sift($domain.pallet, function($v){$v.lotId = "acme-1"}),
 				function($v, $id){{ "id": $id, "qr": $qrEndpoint & "?entityId=" & $id }}
 			)]}`,
 			HasBody: true,

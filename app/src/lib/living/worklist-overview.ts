@@ -2,6 +2,7 @@ import * as m from '#lib/paraglide/messages.js';
 
 import type {
 	TaskStatus,
+	TaskSubmit,
 	Worklist,
 	WorklistGroup,
 	WorklistGroupInstance,
@@ -23,11 +24,15 @@ export type OverviewChildTaskRow = {
 	title: string;
 	status: TaskStatus;
 	linkable: boolean;
+	/** Config submit cardinality; many-submit history chrome reads this. */
+	submit?: TaskSubmit;
+	/** Domain Submission N when `submit === 'many'` (from Worklist counts). */
+	submissionCount?: number;
 };
 
 export type OverviewGroupInstanceRow = {
 	id: string;
-	/** Projected load id when present; else group instance id. */
+	/** Projected lot id when present; else group instance id. */
 	displayId: string;
 	status: TaskStatus;
 	/**
@@ -49,6 +54,10 @@ export type OverviewTaskRow = {
 	roles: string[];
 	/** `actionable` leaf — link to Task route; else status-only. */
 	linkable: boolean;
+	/** Config submit cardinality; many-submit history chrome reads this. */
+	submit?: TaskSubmit;
+	/** Domain Submission N when `submit === 'many'` (from Worklist counts). */
+	submissionCount?: number;
 	/** Present when this Config node is a Task group (Spawn/Close chrome; not a leaf). */
 	group?: OverviewGroupChrome;
 	groupInstances?: OverviewGroupInstanceRow[];
@@ -111,6 +120,31 @@ export function aggregateGroupInstanceStatus(
 	return 'locked';
 }
 
+function manySubmitFields(
+	chromeSubmit: TaskSubmit | undefined,
+	counts: Record<string, number> | undefined,
+	taskId: string
+): Pick<OverviewChildTaskRow, 'submit' | 'submissionCount'> {
+	if (chromeSubmit !== 'many') return {};
+	return {
+		submit: 'many',
+		submissionCount: counts?.[taskId] ?? 0
+	};
+}
+
+/** Accordion under many-submit leaf when Load already reports N > 0. */
+export function manySubmitHistoryVisible(
+	submit: TaskSubmit | undefined,
+	submissionCount: number | undefined
+): boolean {
+	return submit === 'many' && (submissionCount ?? 0) > 0;
+}
+
+export function formatSubmissionCount(count: number): string {
+	if (count === 1) return m.submission_count_one({ count });
+	return m.submission_count_many({ count });
+}
+
 function projectChildTasks(
 	job: WorklistJob,
 	instance: WorklistGroupInstance,
@@ -123,7 +157,8 @@ function projectChildTasks(
 			taskId,
 			title: chrome?.title || taskId,
 			status,
-			linkable: status === 'actionable'
+			linkable: status === 'actionable',
+			...manySubmitFields(chrome?.submit, instance.submissionCounts, taskId)
 		};
 	});
 }
@@ -244,6 +279,9 @@ export function jobInstanceOverview(
 			status,
 			roles,
 			linkable,
+			...(group
+				? {}
+				: manySubmitFields(chrome?.submit, inst.submissionCounts, taskId)),
 			...(group ? { group } : {}),
 			...(groupInstances ? { groupInstances } : {})
 		};
@@ -263,13 +301,15 @@ export function jobInstanceOverview(
 			? [...firstOpen.roles]
 			: null;
 
+	// Completion ignores submit: many (same law as home instanceTaskProgress / Go remaining-work).
+	const onceRows = tasks.filter((t) => taskChrome(job, t.taskId)?.submit !== 'many');
 	return {
 		jobId,
 		jobInstanceId,
 		label: inst.label || inst.id,
 		tasks,
 		handoffRoles,
-		finished: tasks.length > 0 && tasks.every((t) => t.status === 'done')
+		finished: tasks.length > 0 && onceRows.every((t) => t.status === 'done')
 	};
 }
 

@@ -7,7 +7,9 @@ import {
 	aggregateGroupInstanceStatus,
 	formatFactValue,
 	formatHandoffCopy,
+	formatSubmissionCount,
 	jobInstanceOverview,
+	manySubmitHistoryVisible,
 	openGroupLoopChrome,
 	provisionalSpawnDraftRowVisible,
 	taskStatusLabel
@@ -131,6 +133,158 @@ describe('job instance overview model', () => {
 		expect(done?.finished).toBe(true);
 		expect(done?.handoffRoles).toBeNull();
 		expect(done?.tasks.every((t) => t.status === 'done')).toBe(true);
+	});
+
+	test('finished ignores submit: many; group chrome only when Worklist groups present', () => {
+		const flat: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['truckArrive', 'register', 'weightCheck'],
+					tasks: [
+						{
+							id: 'truckArrive',
+							title: 'Arrive',
+							roles: ['administration'],
+							submit: 'once'
+						},
+						{
+							id: 'register',
+							title: 'Register',
+							roles: ['administration'],
+							submit: 'many'
+						},
+						{
+							id: 'weightCheck',
+							title: 'Weight',
+							roles: ['administration'],
+							submit: 'once'
+						}
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: {
+								truckArrive: 'done',
+								register: 'actionable',
+								weightCheck: 'done'
+							}
+						}
+					]
+				}
+			]
+		};
+		const model = jobInstanceOverview(flat, 'intake', 'T1');
+		expect(model?.finished).toBe(true);
+		const register = model?.tasks.find((t) => t.taskId === 'register');
+		expect(register).toMatchObject({
+			status: 'actionable',
+			linkable: true,
+			submit: 'many',
+			submissionCount: 0
+		});
+		expect(register?.group).toBeUndefined();
+		expect(model?.tasks.every((t) => t.group == null)).toBe(true);
+		expect(model?.tasks.find((t) => t.taskId === 'truckArrive')?.submit).toBeUndefined();
+	});
+
+	test('many-submit leaf carries submissionCounts; history gate needs N > 0', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['register'],
+					tasks: [
+						{
+							id: 'register',
+							title: 'Register',
+							roles: ['administration'],
+							submit: 'many'
+						}
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { register: 'actionable' },
+							submissionCounts: { register: 2 }
+						}
+					]
+				}
+			]
+		};
+		const register = jobInstanceOverview(wl, 'intake', 'T1')?.tasks[0];
+		expect(register).toMatchObject({
+			submit: 'many',
+			submissionCount: 2,
+			linkable: true
+		});
+		expect(manySubmitHistoryVisible(register?.submit, register?.submissionCount)).toBe(
+			true
+		);
+		expect(manySubmitHistoryVisible('many', 0)).toBe(false);
+		expect(manySubmitHistoryVisible(undefined, 3)).toBe(false);
+		expect(formatSubmissionCount(1)).toBe(m.submission_count_one({ count: 1 }));
+		expect(formatSubmissionCount(2)).toBe(m.submission_count_many({ count: 2 }));
+	});
+
+	test('group child many-submit reads submissionCounts from group instance', () => {
+		const wl: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['lots'],
+					tasks: [
+						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
+						{
+							id: 'register',
+							title: 'Registrazione',
+							roles: ['administration'],
+							submit: 'many'
+						}
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { lots: 'available' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									repeatable: true,
+									canSpawn: false,
+									canClose: false,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'lots-1',
+											label: 'load-A',
+											tasks: { register: 'actionable' },
+											submissionCounts: { register: 3 }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const flatChild = jobInstanceOverview(wl, 'intake', 'T1')?.tasks[0]?.groupInstances?.[0]
+			?.flatChild;
+		expect(flatChild).toMatchObject({
+			taskId: 'register',
+			submit: 'many',
+			submissionCount: 3,
+			linkable: true
+		});
 	});
 
 	test('unknown instance yields null', () => {
@@ -281,7 +435,7 @@ describe('job instance overview model', () => {
 		expect(openGroupLoopChrome(wl, 'intake', 'T1', 'missing')).toBeNull();
 	});
 
-	test('groupInstances displayId prefers projected label (load id)', () => {
+	test('groupInstances displayId prefers projected label (lot id)', () => {
 		const wl: Worklist = {
 			jobs: [
 				{

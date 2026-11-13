@@ -108,6 +108,9 @@ func validateTaskConfigsAt(tasks []TaskConfig, path string) error {
 			if hasLeafCommitFields(t) {
 				return fmt.Errorf("%s %q: group must not declare leaf Commit fields (schema/onSubmit)", prefix, id)
 			}
+			if _, hasSubmit := t["submit"]; hasSubmit {
+				return fmt.Errorf("%s %q: group must not declare submit (leaf-only)", prefix, id)
+			}
 			for _, child := range children {
 				if child.IsGroup() {
 					return fmt.Errorf("%s %q: group children must be leaves (one nesting level)", prefix, id)
@@ -121,8 +124,59 @@ func validateTaskConfigsAt(tasks []TaskConfig, path string) error {
 		if len(children) > 0 {
 			return fmt.Errorf("%s %q: leaf must not declare nested tasks (set kind: group)", prefix, id)
 		}
+		if err := validateTaskSubmit(t, prefix); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+const (
+	submitOnce = "once"
+	submitMany = "many"
+)
+
+// taskSubmit returns authored submit cardinality: once (default) or many.
+func taskSubmit(t TaskConfig) string {
+	if t == nil {
+		return submitOnce
+	}
+	raw, ok := t["submit"]
+	if !ok || raw == nil {
+		return submitOnce
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return submitOnce
+	}
+	switch s {
+	case submitMany:
+		return submitMany
+	default:
+		return submitOnce
+	}
+}
+
+func taskSubmitMany(t TaskConfig) bool {
+	return taskSubmit(t) == submitMany
+}
+
+func validateTaskSubmit(t TaskConfig, prefix string) error {
+	raw, present := t["submit"]
+	if !present {
+		return nil
+	}
+	id := t.ID()
+	s, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("%s %q: submit must be %q or %q", prefix, id, submitOnce, submitMany)
+	}
+	switch s {
+	case submitOnce, submitMany:
+		return nil
+	default:
+		return fmt.Errorf("%s %q: submit must be %q or %q", prefix, id, submitOnce, submitMany)
+	}
 }
 
 // validateUnlockFrom: optional unlockFrom must name a strictly earlier sibling

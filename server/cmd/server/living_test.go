@@ -76,7 +76,7 @@ func TestEnsureLivingStoresUsesMemoryWithoutMongo(t *testing.T) {
 func TestEnsureLivingStoresDoesNotSeed(t *testing.T) {
 	domains := living.NewMemoryDomainStore()
 	seeded := living.EmptyDomain()
-	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
+	seeded.Entities["lot"] = living.EntityMap{"L1": {"client": "NO"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestEnsureLivingStoresDoesNotSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind("load")) != 1 {
+	if len(got.Kind("lot")) != 1 {
 		t.Fatalf("domain mutated by ensureLivingStores: %#v", got)
 	}
 	_, err = server.livingConfigs.ActiveVersion(t.Context(), "feragame")
@@ -252,7 +252,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	seedLivingDemo(t, server)
 	truckID := openWorkingDayThenArrive(t, server, sessionID)
 
-	body := `{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
+	body := `{"taskPath":"intake/register","jobInstanceId":"` + truckID + `","value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
@@ -278,8 +278,8 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if domain.Kind("truck")[truckID]["lastScaleReading"] != 700.0 {
 		t.Fatalf("stored truck = %#v", domain.Kind("truck"))
 	}
-	if len(domain.Kind("load")) != 1 {
-		t.Fatalf("loads = %#v", domain.Kind("load"))
+	if len(domain.Kind("lot")) != 1 {
+		t.Fatalf("loads = %#v", domain.Kind("lot"))
 	}
 	if len(domain.Submissions) < 2 || domain.Submissions[len(domain.Submissions)-1].TaskID != "register" {
 		t.Fatalf("submissions = %#v", domain.Submissions)
@@ -305,17 +305,17 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if len(committed.Worklist.Jobs) == 0 {
 		t.Fatal("Commit JSON missing worklist jobs")
 	}
-	var lotsOpen bool
+	var registerOpen bool
 	for _, j := range committed.Worklist.Jobs {
 		if j.JobID != "intake" || len(j.Instances) != 1 {
 			continue
 		}
-		if j.Instances[0].Tasks["lots"] == living.TaskStatusAvailable {
-			lotsOpen = true
+		if j.Instances[0].Tasks["register"] == living.TaskStatusActionable {
+			registerOpen = true
 		}
 	}
-	if !lotsOpen {
-		t.Fatalf("Commit worklist intake lots not open: %#v", committed.Worklist)
+	if !registerOpen {
+		t.Fatalf("Commit worklist intake register not actionable: %#v", committed.Worklist)
 	}
 
 	loadReq := httptest.NewRequest(http.MethodGet, "/api/living/domain", nil)
@@ -347,7 +347,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		if j.JobID == "intake" {
 			intakeCanStart = j.CanStart
 			if len(j.Instances) != 1 || j.Instances[0].Tasks["truckArrive"] != living.TaskStatusDone ||
-				j.Instances[0].Tasks["lots"] != living.TaskStatusAvailable {
+				j.Instances[0].Tasks["register"] != living.TaskStatusActionable {
 				t.Fatalf("intake worklist = %#v", j)
 			}
 		}
@@ -478,7 +478,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	if err != nil && !errors.Is(err, living.ErrNotFound) {
 		t.Fatal(err)
 	}
-	if err == nil && (len(domain.Submissions) != 0 || len(domain.Kind("load")) != 0) {
+	if err == nil && (len(domain.Submissions) != 0 || len(domain.Kind("lot")) != 0) {
 		t.Fatalf("domain should be unchanged after deny: %#v", domain)
 	}
 	var loaded living.LoadResult

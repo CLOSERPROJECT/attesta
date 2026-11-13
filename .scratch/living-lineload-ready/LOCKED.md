@@ -1,5 +1,11 @@
 # Locked — lineLoad readyWhen + Unlock fan-out (2026-11-04)
 
+**Superseded for Feragame plant law** by
+[`.scratch/living-task-submit-cardinality/LOCKED.md`](../living-task-submit-cardinality/LOCKED.md)
+(2026-11-13): no weigh→load Domain gate; no plant `unlockFrom`; multi-pass is
+`submit: many` leaves + lot session, not groups. Keep this file for Unlock
+grammar history (`unlockFrom` engine mechanic) only.
+
 Branch: `feat/attesta-rework` (tip includes squash `89eb056` one-pallet weigh + QR).  
 Grill + Config walk. **Do not re-litigate** without human. Board files only here — no engine code from the cutting session.
 

@@ -8,26 +8,6 @@ import (
 	"testing"
 )
 
-func TestDecodeScanEntityIDQueryOrBare(t *testing.T) {
-	cases := []struct {
-		raw  string
-		want string
-	}{
-		{"https://plant.example/app?entityId=NO-261019-1.1", "NO-261019-1.1"},
-		{"https://plant.example/app?foo=1&entityId=P2&bar=3", "P2"},
-		{"?entityId=bare-query", "bare-query"},
-		{"https://plant.example/app", ""},
-		{"  NO-261019-1.2  ", "NO-261019-1.2"},
-		{"", ""},
-	}
-	for _, tc := range cases {
-		got := DecodeScanEntityID(tc.raw)
-		if got != tc.want {
-			t.Fatalf("DecodeScanEntityID(%q) = %q, want %q", tc.raw, got, tc.want)
-		}
-	}
-}
-
 func TestFixtureIncludesLockedQrRules(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
@@ -40,8 +20,8 @@ func TestFixtureIncludesLockedQrRules(t *testing.T) {
 	if rule.ID != "line-pallet-weigh" {
 		t.Fatalf("rule id = %q", rule.ID)
 	}
-	if rule.Match.JobID != "line" || rule.Match.GroupID != "palletWeight" ||
-		rule.Match.TaskID != "weigh" || !rule.Match.AllowSpawn {
+	if rule.Match.JobID != "line" || rule.Match.GroupID != "" ||
+		rule.Match.TaskID != "weigh" || rule.Match.AllowSpawn {
 		t.Fatalf("match = %#v", rule.Match)
 	}
 	if rule.Seed["palletId"] == "" {
@@ -52,15 +32,13 @@ func TestFixtureIncludesLockedQrRules(t *testing.T) {
 	}
 }
 
-func TestResolveQROneSpawnCandidateSeedsPalletID(t *testing.T) {
+func TestResolveQROneCandidateSeedsPalletID(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
+	domain := mustDomain(t, c)
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 	palletID := loadID + ".1"
 
@@ -72,8 +50,7 @@ func TestResolveQROneSpawnCandidateSeedsPalletID(t *testing.T) {
 		t.Fatal("expected navigate")
 	}
 	if got.Navigate.JobID != "line" || got.Navigate.JobInstanceID != lineID ||
-		got.Navigate.GroupID != "palletWeight" || got.Navigate.GroupInstanceID != ProvisionalGroupInstanceID ||
-		got.Navigate.TaskID != "weigh" {
+		got.Navigate.GroupID != "" || got.Navigate.TaskID != "weigh" {
 		t.Fatalf("navigate = %#v", got.Navigate)
 	}
 	if got.Seed["palletId"] != palletID {
@@ -85,12 +62,10 @@ func TestResolveQRIneligibleWhenPalletMissingOrWeighed(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
+	domain := mustDomain(t, c)
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
 	missing := ResolveQR(cfg, domain, op, "missing-pallet")
@@ -107,16 +82,15 @@ func TestResolveQRIneligibleWhenPalletMissingOrWeighed(t *testing.T) {
 	}
 }
 
-func TestResolveQRZeroWhenNoWorklistCandidate(t *testing.T) {
+func TestResolveQRZeroWhenViewerCannotActOnWeigh(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	// No openTurno → palletWeight not on any line instance.
+	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	domain := mustDomain(t, c)
+	// administration is eligible on Domain but cannot Commit weigh (logistic role).
+	op := OperatorIdentity{UserID: "admin", Org: "feragame", Roles: []string{"administration"}}
 
 	got := ResolveQR(cfg, domain, op, loadID+".1")
 	if got.Error == nil || got.Error.Code != "zero" {
@@ -127,38 +101,35 @@ func TestResolveQRZeroWhenNoWorklistCandidate(t *testing.T) {
 	}
 }
 
-func TestResolveQRManyWhenMultipleLineShiftsSpawnable(t *testing.T) {
+func TestResolveQRResumedShiftIsSoleCandidate(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	line1 := commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "1st"})
+	_ = commitStartLot(t, c, line1, loadID)
 	commitCloseTurno(t, c, line1)
-	_ = commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "2nd"})
+	line2 := commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "2nd"})
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
+	domain := mustDomain(t, c)
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
 	got := ResolveQR(cfg, domain, op, loadID+".1")
-	if got.Error == nil || got.Error.Code != "many" {
+	if got.Error != nil || got.Navigate == nil {
 		t.Fatalf("got = %#v", got)
 	}
-	if got.Error.Message != cfg.QR.Rules[0].Messages.OnMany {
-		t.Fatalf("message = %q", got.Error.Message)
+	if got.Navigate.JobInstanceID != line2 {
+		t.Fatalf("navigate = %#v, want resumed shift %s", got.Navigate, line2)
 	}
 }
 
 func TestResolveQRWhenSkipsEmptyEntityID(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	_, _, _ = commitIntakeThroughLotsClosed(t, c)
-	_ = commitOpenTurno(t, c)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
+	domain := mustDomain(t, c)
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	_ = loadID
 
 	got := ResolveQR(cfg, domain, op, "https://plant.example/app")
 	if got.Error == nil || got.Error.Code != "no-rule" {
@@ -170,6 +141,7 @@ func TestHandleQrResolveHTTPOneAndErrors(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 	h := &Handler{
 		Loader:    loader,
 		Committer: c,

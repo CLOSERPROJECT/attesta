@@ -29,7 +29,7 @@ function sampleBundle(overrides: Partial<TaskFormBundle> = {}): TaskFormBundle {
 		chromeFieldIds: [],
 		sealFieldIds: ['codiceFir'],
 		bindings: {
-			domain: { load: {}, pallet: {}, container: {}, submissions: [] },
+			domain: { lot: {}, pallet: {}, container: {}, submissions: [] },
 			instance: { id: 'NIR-1', label: 'NIR-1' }
 		},
 		...overrides
@@ -112,7 +112,7 @@ describe('task-form-bundle', () => {
 			chromeFieldIds: ['resultsReport'],
 			bindings: {
 				domain: {
-					load: {},
+					lot: {},
 					pallet: {},
 					container: {},
 					submissions: []
@@ -149,7 +149,7 @@ describe('task-form-bundle', () => {
 		});
 
 		expect(domainFromBundleBindings(bundle.bindings)).toEqual({
-			load: {},
+			lot: {},
 			pallet: {},
 			container: {},
 			submissions: []
@@ -200,7 +200,7 @@ describe('task-form-bundle', () => {
 			chromeFieldIds: ['registeredData'],
 			bindings: {
 				domain: {
-					load: {},
+					lot: {},
 					pallet: {},
 					container: {},
 					submissions: []

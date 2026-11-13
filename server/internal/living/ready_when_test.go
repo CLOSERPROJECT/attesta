@@ -27,13 +27,13 @@ func TestEvaluateReadyWhenLiteralAndDomainExpr(t *testing.T) {
 	}
 
 	empty := EmptyDomain()
-	ok, err = evaluateReadyWhen(empty, "$count($domain.load.*) >= 1", "", nil)
+	ok, err = evaluateReadyWhen(empty, "$count($domain.lot.*) >= 1", "", nil)
 	if err != nil || ok {
 		t.Fatalf("no loads → false, got ok=%v err=%v", ok, err)
 	}
 	withLoad := empty
-	putKind(&withLoad, "load", EntityMap{"L1": {"client": "NO"}})
-	ok, err = evaluateReadyWhen(withLoad, "$count($domain.load.*) >= 1", "", nil)
+	putKind(&withLoad, "lot", EntityMap{"L1": {"client": "NO"}})
+	ok, err = evaluateReadyWhen(withLoad, "$count($domain.lot.*) >= 1", "", nil)
 	if err != nil || !ok {
 		t.Fatalf("one load → true, got ok=%v err=%v", ok, err)
 	}
@@ -115,7 +115,7 @@ func TestCommitWeightCheckAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
-	c, _ := committerWithReadyWhen(t, "weightCheck", "$count($domain.load.*) >= 1", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	c, _ := committerWithReadyWhen(t, "weightCheck", "$count($domain.lot.*) >= 1", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 

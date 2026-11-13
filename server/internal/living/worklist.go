@@ -3,9 +3,9 @@ package living
 import "strings"
 
 // TaskStatus is the Worklist chrome vocabulary for one Task on a Job instance.
-// Unlock/Submission yields locked / unlocked / done; unlocked-not-done folds
-// Task readyWhen (false ⇒ unavailable); else role eligibility splits into
-// available (not for this viewer) vs actionable.
+// Unlock + submit: once Submission yields locked / unlocked / done; submit: many
+// never done. Unlocked-not-done folds Task readyWhen (false ⇒ unavailable); else
+// role eligibility splits into available (not for this viewer) vs actionable.
 type TaskStatus string
 
 const (
@@ -21,11 +21,12 @@ type Worklist struct {
 	Jobs []WorklistJob `json:"jobs"`
 }
 
-// WorklistTask is Config-free Task chrome (title + roles) for board display.
+// WorklistTask is Config-free Task chrome (title + roles + submit) for board display.
 type WorklistTask struct {
-	ID    string   `json:"id"`
-	Title string   `json:"title"`
-	Roles []string `json:"roles"`
+	ID     string   `json:"id"`
+	Title  string   `json:"title"`
+	Roles  []string `json:"roles"`
+	Submit string   `json:"submit"` // once (default) | many — SPA completion ignores many
 }
 
 // WorklistJob is one Job's start affordance and per-instance Task statuses.
@@ -47,11 +48,14 @@ type WorklistJob struct {
 // WorklistInstance is one Job instance's viewer-scoped Task status map.
 // Leaf statuses are locked | unavailable | available | actionable | done;
 // Groups is omitted on flat Jobs (backward-compatible wire).
+// SubmissionCounts is Domain Submission N per flat leaf taskId (GroupID empty);
+// omitted when empty. Overview uses this for many-submit chrome without recap.
 type WorklistInstance struct {
-	ID     string                   `json:"id"`
-	Label  string                   `json:"label"`
-	Tasks  map[string]TaskStatus    `json:"tasks"`
-	Groups map[string]WorklistGroup `json:"groups,omitempty"`
+	ID               string                   `json:"id"`
+	Label            string                   `json:"label"`
+	Tasks            map[string]TaskStatus    `json:"tasks"`
+	SubmissionCounts map[string]int           `json:"submissionCounts,omitempty"`
+	Groups           map[string]WorklistGroup `json:"groups,omitempty"`
 }
 
 // WorklistGroup is server-projected chrome for one Task group on a Job instance.
@@ -70,19 +74,22 @@ type WorklistGroup struct {
 // WorklistGroupInstance is one open group instance's viewer-scoped child leaf statuses.
 // Label is optional overview chrome: nested Submission IDsTouched ids that exist
 // under Config instanceLabelEntity (comma-joined when several); omit when unset or no match.
+// SubmissionCounts is Domain Submission N per child leaf taskId on this group
+// instance address; omitted when empty.
 type WorklistGroupInstance struct {
-	ID     string                `json:"id"`
-	Label  string                `json:"label,omitempty"`
-	Tasks  map[string]TaskStatus `json:"tasks"`
+	ID               string                `json:"id"`
+	Label            string                `json:"label,omitempty"`
+	Tasks            map[string]TaskStatus `json:"tasks"`
+	SubmissionCounts map[string]int        `json:"submissionCounts,omitempty"`
 }
 
 // ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
 // statuses, then scopes canStart to first-Task readyWhen (omit ⇒ true; same
 // Domain grammar as Commit) and OperatorIdentity Config-role intersection with
-// the Job's first Task (board chrome; not Cerbos). A Task is done after
-// Submission on the instance (Submission law). Unlocked leaves fold readyWhen
-// (false ⇒ unavailable), else split by role eligibility into available vs
-// actionable (ADR-0005).
+// the Job's first Task (board chrome; not Cerbos). submit: once (default) is
+// done after Submission on the instance; submit: many never becomes done from
+// one Commit (ADR-0008). Unlocked leaves fold readyWhen (false ⇒ unavailable),
+// else split by role eligibility into available vs actionable (ADR-0005).
 func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
 	out := Worklist{Jobs: make([]WorklistJob, 0, cfg.Jobs.Len())}
 	for _, jobID := range cfg.Jobs.Keys {
@@ -154,10 +161,11 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 			tasks[taskID] = viewerScopedStatus(status, eligible)
 		}
 		instances = append(instances, WorklistInstance{
-			ID:     inst.ID,
-			Label:  inst.Label,
-			Tasks:  tasks,
-			Groups: groups,
+			ID:               inst.ID,
+			Label:            inst.Label,
+			Tasks:            tasks,
+			SubmissionCounts: countFlatLeafSubmissions(domain.Submissions, jobID, inst.ID),
+			Groups:           groups,
 		})
 	}
 
@@ -179,7 +187,9 @@ func projectWorklistTasks(tasks []TaskConfig, ordered []string) []WorklistTask {
 	for _, taskID := range ordered {
 		task, ok := TaskByID(tasks, taskID)
 		if !ok {
-			out = append(out, WorklistTask{ID: taskID, Title: taskID, Roles: []string{}})
+			out = append(out, WorklistTask{
+				ID: taskID, Title: taskID, Roles: []string{}, Submit: submitOnce,
+			})
 			continue
 		}
 		payload := taskPayload(task)
@@ -188,9 +198,10 @@ func projectWorklistTasks(tasks []TaskConfig, ordered []string) []WorklistTask {
 			roles = []string{}
 		}
 		out = append(out, WorklistTask{
-			ID:    taskID,
-			Title: taskTitle(payload, taskID),
-			Roles: roles,
+			ID:     taskID,
+			Title:  taskTitle(payload, taskID),
+			Roles:  roles,
+			Submit: taskSubmit(task),
 		})
 	}
 	return out
@@ -265,9 +276,10 @@ func projectWorklistGroup(
 			childStatus[childID] = viewerScopedStatus(status, eligible)
 		}
 		instances = append(instances, WorklistGroupInstance{
-			ID:    gi.ID,
-			Label: groupInstanceEntityLabel(domain, jobID, jobInstanceID, groupID, gi.ID, taskString(group, "instanceLabelEntity")),
-			Tasks: childStatus,
+			ID:               gi.ID,
+			Label:            groupInstanceEntityLabel(domain, jobID, jobInstanceID, groupID, gi.ID, taskString(group, "instanceLabelEntity")),
+			Tasks:            childStatus,
+			SubmissionCounts: countGroupLeafSubmissions(domain.Submissions, jobID, jobInstanceID, groupID, gi.ID),
 		})
 	}
 
@@ -342,6 +354,37 @@ func projectTaskStatus(cfg OrgConfig, domain Domain, jobID, taskID, jobInstanceI
 	return pathUnlockStatus(EvaluatePathUnlock(cfg, domain, TaskPathRef{JobID: jobID, TaskID: taskID}, jobInstanceID))
 }
 
+// Flat leaf only (GroupID empty) so nested addresses do not inflate overview N.
+func countFlatLeafSubmissions(subs []Submission, jobID, jobInstanceID string) map[string]int {
+	var out map[string]int
+	for _, s := range subs {
+		if s.JobID != jobID || s.JobInstanceID != jobInstanceID || s.GroupID != "" {
+			continue
+		}
+		if out == nil {
+			out = map[string]int{}
+		}
+		out[s.TaskID]++
+	}
+	return out
+}
+
+// Nested leaf address only; sibling group instances stay separate keys.
+func countGroupLeafSubmissions(subs []Submission, jobID, jobInstanceID, groupID, groupInstanceID string) map[string]int {
+	var out map[string]int
+	for _, s := range subs {
+		if s.JobID != jobID || s.JobInstanceID != jobInstanceID ||
+			s.GroupID != groupID || s.GroupInstanceID != groupInstanceID {
+			continue
+		}
+		if out == nil {
+			out = map[string]int{}
+		}
+		out[s.TaskID]++
+	}
+	return out
+}
+
 func taskString(t TaskConfig, key string) string {
 	if t == nil {
 		return ""
@@ -408,9 +451,10 @@ func worklistInstance(job WorklistJob, id string) (WorklistInstance, bool) {
 	return WorklistInstance{}, false
 }
 
-// worklistInstanceHasRemainingWork is true when any Task on the instance is not done
-// (ADR-0006 overview vs home after Commit when auto-advance does not apply).
-func worklistInstanceHasRemainingWork(wl Worklist, jobID, jobInstanceID string) bool {
+// worklistInstanceHasRemainingWork is true when any submit: once Task (or group
+// node) on the instance is not done. submit: many leaves are ignored — they
+// never become done and must not block Completed / home navigation (ADR-0008).
+func worklistInstanceHasRemainingWork(cfg OrgConfig, wl Worklist, jobID, jobInstanceID string) bool {
 	job, ok := worklistJobByID(wl, jobID)
 	if !ok {
 		return false
@@ -419,7 +463,16 @@ func worklistInstanceHasRemainingWork(wl Worklist, jobID, jobInstanceID string) 
 	if !ok {
 		return false
 	}
+	var cfgTasks []TaskConfig
+	if jobVal, ok := cfg.Jobs.Get(jobID); ok {
+		if j, ok := AsJob(jobVal); ok {
+			cfgTasks = j.Tasks
+		}
+	}
 	for _, tid := range job.TaskIDs {
+		if tc, ok := TaskByID(cfgTasks, tid); ok && !tc.IsGroup() && taskSubmitMany(tc) {
+			continue
+		}
 		if inst.Tasks[tid] != TaskStatusDone {
 			return true
 		}

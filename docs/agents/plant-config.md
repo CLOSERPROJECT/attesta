@@ -12,7 +12,15 @@ Checklist when changing the Feragame plant fixture
   [`GLOSSARY.md`](../../GLOSSARY.md).
 - **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over
   Domain (and `$domain.submissions` when bind-once matters). Do not encode
-  entity open/closed law in **`startsWhen`**.
+  entity open/closed law in **`startsWhen`**. Do not author plant **`unlockFrom`**
+  when Domain status already expresses the prerequisite (engine may still
+  support Unlock).
+- **Submit cardinality / lot session:** multi-pass plant work uses leaf Tasks
+  with `submit: many` (not repeatable Task groups). Lot entity + session status
+  `open | parked | fullyProcessed` are locked in
+  [`.scratch/living-task-submit-cardinality/LOCKED.md`](../../.scratch/living-task-submit-cardinality/LOCKED.md)
+  and [`docs/adr/0008-living-task-submit-cardinality.md`](../adr/0008-living-task-submit-cardinality.md);
+  implementation order in that folder’s `IMPLEMENTATION.md`.
 - **Same change:** every follower below lands in the same commit/PR as the YAML.
 
 ## Steps
@@ -37,9 +45,11 @@ Checklist when changing the Feragame plant fixture
 7. **Verify** — `go test ./internal/living/`, `go test ./cmd/server/ -run Living`,
    and `bun run test:unit -- --run src/lib/living` from `app/`.
 8. **Local stacks** — after fixture YAML shape changes, run
-   `task seed:feragame-core` (Active Config + empty Domain). If you need demo
-   Jobs, run `task seed:feragame-full`. Full-stack rewrite remains
-   `task seed -- --replace` (identity + catalog + config + Domain).
+   `task seed:feragame-config` (Active Config + empty Domain; no Appwrite).
+   Staged demo Domain: `task seed:feragame-domain`. With Feragame Appwrite
+   operators: `task seed:feragame-identity` (empty Domain) or
+   `task seed:feragame-full` (staged). Full-stack rewrite remains
+   `task seed -- --replace` (orgs 1–3 + Formata + Feragame).
 
 ## Commit navigation (`onCommit`)
 
@@ -81,7 +91,7 @@ onCommit:
   advanceTarget: false
 ```
 
-**HTTP link leave → stay** (intake `lots` and any Task with `onSubmit.http`
+**HTTP link leave → stay** (intake `register` and any Task with `onSubmit.http`
 `action: link`):
 
 ```yaml

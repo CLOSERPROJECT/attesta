@@ -37,11 +37,11 @@ chrome:
               $w := $facts.weights;
               $type($w) = "object" ? $count($keys($w)) : 0
             )};
-            $sumPallet := function($loadId, $doneOnly){(
-              $vals := $domain.pallet.*[loadId=$loadId][$doneOnly ? progress="done" : true].weight[$type($)="number"];
+            $sumPallet := function($lotId, $doneOnly){(
+              $vals := $domain.pallet.*[lotId=$lotId][$doneOnly ? progress="done" : true].weight[$type($)="number"];
               $safeSum($vals)
             )};
-            $totalTare := function($loadId){(
+            $totalTare := function($lotId){(
               $subs := $append([], $domain.submissions[taskId="weigh"]);
               $count($subs)=0 ? 0 : $safeSum($map($subs, function($s){(
                 $facts := $s.facts;
@@ -57,12 +57,12 @@ chrome:
                 )
               )}))
             )};
-            $secondaries := function($loadId){(
-              $ids := $append([], $domain.container.*[sourceLoadId=$loadId].secondarySourceLoadId[$type($)="string" and $length($trim($))>0 and $trim($) != $loadId].$trim($));
+            $secondaries := function($lotId){(
+              $ids := $append([], $domain.container.*[sourceLotId=$lotId].secondarySourceLotId[$type($)="string" and $length($trim($))>0 and $trim($) != $lotId].$trim($));
               $count($ids)=0 ? [] : $distinct($ids)
             )};
-            $extractedRows := function($loadId){(
-              $conts := $append([], $domain.container.*[sourceLoadId=$loadId][$type(weight)="number"]);
+            $extractedRows := function($lotId){(
+              $conts := $append([], $domain.container.*[sourceLotId=$lotId][$type(weight)="number"]);
               $keysPresent := $distinct($append([], $map($conts, function($r){ $str($r.material) ? $str($r.material) : "" })));
               $weightFor := function($k){ $safeSum($conts[($str(material) ? $str(material) : "") = $k].weight) };
               $knownIds := $append($materialKeys, $map($materials, function($m){$m.label}));
@@ -76,14 +76,14 @@ chrome:
               $extraRows := $count($extras)=0 ? [] : $map($extras, function($k){{"material": $k, "label": $k, "weightKg": $weightFor($k)}});
               $append($known, $extraRows)
             )};
-            $section := function($loadId){(
-              $load := $lookup($domain.load, $loadId);
-              $netLot := $num($load.netWeight);
-              $grossPallet := $sumPallet($loadId, false);
-              $actualPallet := $sumPallet($loadId, true);
-              $palletTare := $totalTare($loadId);
+            $section := function($lotId){(
+              $lot := $lookup($domain.lot, $lotId);
+              $netLot := $num($lot.netWeight);
+              $grossPallet := $sumPallet($lotId, false);
+              $actualPallet := $sumPallet($lotId, true);
+              $palletTare := $totalTare($lotId);
               $netPanels := $grossPallet - $palletTare;
-              $matRows := $extractedRows($loadId);
+              $matRows := $extractedRows($lotId);
               $totalExtracted := $safeSum($map($matRows, function($r){$r.weightKg}));
               $delta := $netPanels - $totalExtracted;
               $pct := $matchPct($netPanels, $totalExtracted);
@@ -104,8 +104,8 @@ chrome:
                 )
               );
               {
-                "id": $loadId,
-                "secondaryIds": $secondaries($loadId),
+                "id": $lotId,
+                "secondaryIds": $secondaries($lotId),
                 "rows": $rows
               }
             )};
@@ -114,7 +114,7 @@ chrome:
               "error": null,
               "sections": []
             } : (
-              $primaryIds := $sort($distinct($append([], $domain.container.*.sourceLoadId[$type($)="string" and $length($trim($))>0].$trim($))));
+              $primaryIds := $sort($distinct($append([], $domain.container.*.sourceLotId[$type($)="string" and $length($trim($))>0].$trim($))));
               {
                 "value": null,
                 "error": null,

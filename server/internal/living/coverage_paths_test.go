@@ -59,7 +59,7 @@ func TestErrorStringsAndMarkerMethods(t *testing.T) {
 	if !strings.Contains((&CommitError{Kind: "prep", Message: "x"}).Error(), "prep: x") {
 		t.Fatal("CommitError with message")
 	}
-	if (MutateError{Kind: "missing-id", Entity: EntityType("load"), ID: "L1"}).Error() == "" {
+	if (MutateError{Kind: "missing-id", Entity: EntityType("lot"), ID: "L1"}).Error() == "" {
 		t.Fatal("MutateError")
 	}
 	if (InstanceExprError{Kind: "type", Message: "boom"}).Error() == "" {
@@ -257,7 +257,7 @@ func TestEntityMapsCloneDomainMutateEntities(t *testing.T) {
 	}
 	_, err = Mutate(EmptyDomain(), MutateRequest{
 		AppendSubmission: &noSub,
-		Ops:              []MutateOp{PatchOp{Entity: EntityType("load"), ID: "missing", Set: map[string]any{"x": 1}}},
+		Ops:              []MutateOp{PatchOp{Entity: EntityType("lot"), ID: "missing", Set: map[string]any{"x": 1}}},
 	})
 	var me MutateError
 	if !asMutateError(err, &me) || me.Kind != "missing-id" {
@@ -266,7 +266,7 @@ func TestEntityMapsCloneDomainMutateEntities(t *testing.T) {
 
 	_, err = Mutate(Domain{}, MutateRequest{
 		UserID: "u", JobID: "j", TaskID: "t", JobInstanceID: "i", Timestamp: "ts",
-		Ops: []MutateOp{MintOp{Entity: EntityType("load"), ID: "L1", Set: map[string]any{"x": 1}}},
+		Ops: []MutateOp{MintOp{Entity: EntityType("lot"), ID: "L1", Set: map[string]any{"x": 1}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -275,7 +275,7 @@ func TestEntityMapsCloneDomainMutateEntities(t *testing.T) {
 
 func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 	props := map[string]any{
-		"sourceLoadId": map[string]any{"type": "string"},
+		"sourceLotId": map[string]any{"type": "string"},
 		"rows": map[string]any{
 			"type": "array",
 			"items": map[string]any{
@@ -287,10 +287,10 @@ func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 		},
 		"noise": "skip",
 	}
-	if !injectEnumOnSchemaProperty(props, "sourceLoadId", []string{"A", "B"}) {
+	if !injectEnumOnSchemaProperty(props, "sourceLotId", []string{"A", "B"}) {
 		t.Fatal("root enum")
 	}
-	root := props["sourceLoadId"].(map[string]any)
+	root := props["sourceLotId"].(map[string]any)
 	if got, _ := root["enum"].([]string); len(got) != 2 || got[0] != "A" {
 		// json-ish: enum may be []string from assignment
 		enum, _ := root["enum"].([]string)
@@ -313,23 +313,23 @@ func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 	}
 
 	projected, err := projectTaskForm(domainFromKinds(map[string]EntityMap{
-		"load": {"L1": {"client": "NO"}},
+		"lot": {"L1": {"client": "NO"}},
 	}), map[string]any{
-		"enumReads": map[string]any{"sourceLoadId": "loads"},
+		"enumReads": map[string]any{"sourceLotId": "lots"},
 		"reads": map[string]any{
-			"loads": map[string]any{"entity": "load", "key": "id"},
+			"lots": map[string]any{"entity": "lot", "key": "id"},
 		},
 		"schema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"sourceLoadId": map[string]any{"type": "string"},
+				"sourceLotId": map[string]any{"type": "string"},
 			},
 		},
 	}, "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prop := projected.Schema["properties"].(map[string]any)["sourceLoadId"].(map[string]any)
+	prop := projected.Schema["properties"].(map[string]any)["sourceLotId"].(map[string]any)
 	if enum, _ := prop["enum"].([]string); len(enum) != 1 || enum[0] != "L1" {
 		t.Fatalf("projected enum = %#v", prop["enum"])
 	}
@@ -615,15 +615,15 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 	if _, err := parseReadDef(map[string]any{}); err == nil {
 		t.Fatal("missing entity")
 	}
-	if _, err := parseReadDef(map[string]any{"entity": "load"}); err == nil {
+	if _, err := parseReadDef(map[string]any{"entity": "lot"}); err == nil {
 		t.Fatal("missing key")
 	}
-	def, err := parseReadDef(map[string]any{"entity": "load", "key": "client", "where": "client = 'NO'"})
+	def, err := parseReadDef(map[string]any{"entity": "lot", "key": "client", "where": "client = 'NO'"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	domain := domainFromKinds(map[string]EntityMap{
-		"load": {"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}},
+		"lot": {"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}},
 	})
 	ids, err := ResolveRead(domain, def, "inst", "label", nil)
 	if err != nil {
@@ -632,7 +632,7 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 	if len(ids) != 1 || ids[0] != "NO" {
 		t.Fatalf("keyed ids = %#v", ids)
 	}
-	ids, err = ResolveRead(domain, ReadDef{Entity: EntityType("load"), Key: "id"}, "", "", nil)
+	ids, err = ResolveRead(domain, ReadDef{Entity: EntityType("lot"), Key: "id"}, "", "", nil)
 	if err != nil || len(ids) != 3 {
 		t.Fatalf("id key = %#v %v", ids, err)
 	}
@@ -643,7 +643,7 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 }
 
 func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
-	allowed := map[string]struct{}{"load": {}, "pallet": {}}
+	allowed := map[string]struct{}{"lot": {}, "pallet": {}}
 	if _, err := parseTransformOps("nope", allowed); err == nil {
 		t.Fatal("non-array")
 	}
@@ -659,19 +659,19 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 	if _, err := parseTransformOps([]any{map[string]any{"op": "mint", "entity": "nope", "set": map[string]any{}}}, allowed); err == nil {
 		t.Fatal("entity not allowed")
 	}
-	if _, err := parseTransformOps([]any{map[string]any{"op": "mint", "entity": "load"}}, allowed); err == nil {
+	if _, err := parseTransformOps([]any{map[string]any{"op": "mint", "entity": "lot"}}, allowed); err == nil {
 		t.Fatal("missing set")
 	}
 	if _, err := parseTransformOps([]any{map[string]any{"op": "mint", "set": map[string]any{}}}, nil); err == nil {
 		t.Fatal("missing entity")
 	}
-	if _, err := parseTransformOps([]any{map[string]any{"op": "patch", "entity": "load", "set": map[string]any{}}}, nil); err == nil {
+	if _, err := parseTransformOps([]any{map[string]any{"op": "patch", "entity": "lot", "set": map[string]any{}}}, nil); err == nil {
 		t.Fatal("patch missing id")
 	}
 	ops, err := parseTransformOps([]any{
-		map[string]any{"op": "mint", "entity": "load", "id": `"L1"`, "as": "load", "set": map[string]any{"client": `"NO"`}},
-		map[string]any{"op": "mintMany", "entity": "pallet", "count": "2", "id": `"L1." & $string($index+1)`, "set": map[string]any{"loadId": `"L1"`}},
-		map[string]any{"op": "patch", "entity": "load", "id": `"L1"`, "set": map[string]any{"client": `"SU"`}},
+		map[string]any{"op": "mint", "entity": "lot", "id": `"L1"`, "as": "lot", "set": map[string]any{"client": `"NO"`}},
+		map[string]any{"op": "mintMany", "entity": "pallet", "count": "2", "id": `"L1." & $string($index+1)`, "set": map[string]any{"lotId": `"L1"`}},
+		map[string]any{"op": "patch", "entity": "lot", "id": `"L1"`, "set": map[string]any{"client": `"SU"`}},
 		map[string]any{"op": "patchEach", "entity": "pallet", "set": map[string]any{"marked": true}},
 	}, allowed)
 	if err != nil || len(ops) != 4 {
@@ -683,19 +683,19 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 		t.Fatal("RunTransform bad")
 	}
 	_, err = RunTransform(EmptyDomain(), RunTransformInput{
-		Transform: []any{map[string]any{"op": "mint", "entity": "load", "id": `""`, "set": map[string]any{"x": 1}}},
+		Transform: []any{map[string]any{"op": "mint", "entity": "lot", "id": `""`, "set": map[string]any{"x": 1}}},
 	})
 	if err == nil {
 		t.Fatal("empty mint id")
 	}
 	_, err = RunTransform(EmptyDomain(), RunTransformInput{
-		Transform: []any{map[string]any{"op": "mint", "entity": "load", "id": "1+", "set": map[string]any{"x": 1}}},
+		Transform: []any{map[string]any{"op": "mint", "entity": "lot", "id": "1+", "set": map[string]any{"x": 1}}},
 	})
 	if err == nil {
 		t.Fatal("bad mint id expr")
 	}
 	_, err = RunTransform(EmptyDomain(), RunTransformInput{
-		Transform: []any{map[string]any{"op": "patch", "entity": "load", "id": `""`, "set": map[string]any{"x": 1}}},
+		Transform: []any{map[string]any{"op": "patch", "entity": "lot", "id": `""`, "set": map[string]any{"x": 1}}},
 	})
 	if err == nil {
 		t.Fatal("empty patch id")
@@ -713,16 +713,16 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 		t.Fatal("bad count type")
 	}
 	domain := EmptyDomain()
-	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
-	putKind(&domain, "pallet", EntityMap{"L1.1": {"loadId": "L1"}})
+	putKind(&domain, "lot", EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, "pallet", EntityMap{"L1.1": {"lotId": "L1"}})
 	got, err := RunTransform(domain, RunTransformInput{
 		JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada",
 		Facts:   map[string]any{"L1.1": map[string]any{"weight": 1}},
 		Allowed: allowed,
 		Transform: []any{
-			map[string]any{"op": "mint", "entity": "load", "id": `"L2"`, "as": "load", "set": map[string]any{"client": `"X"`}},
-			map[string]any{"op": "mintMany", "entity": "pallet", "count": "1", "id": `"L2.1"`, "set": map[string]any{"loadId": `"L2"`}},
-			map[string]any{"op": "patch", "entity": "load", "id": `"L1"`, "set": map[string]any{"client": `"SU"`}},
+			map[string]any{"op": "mint", "entity": "lot", "id": `"L2"`, "as": "lot", "set": map[string]any{"client": `"X"`}},
+			map[string]any{"op": "mintMany", "entity": "pallet", "count": "1", "id": `"L2.1"`, "set": map[string]any{"lotId": `"L2"`}},
+			map[string]any{"op": "patch", "entity": "lot", "id": `"L1"`, "set": map[string]any{"client": `"SU"`}},
 			map[string]any{"op": "patchEach", "entity": "pallet", "set": map[string]any{"ok": true}},
 		},
 	})
@@ -733,7 +733,7 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 		t.Fatalf("ops = %#v", got.Request.Ops)
 	}
 	applyMintLocally(&Domain{}, EntityType(""), "x", nil) // empty kind no-op path
-	applyPatchLocally(&Domain{}, EntityType("load"), "missing", map[string]any{"a": 1})
+	applyPatchLocally(&Domain{}, EntityType("lot"), "missing", map[string]any{"a": 1})
 
 	if EntityKindsFromConfig(OrgConfig{}) != nil {
 		t.Fatal("nil domain")
@@ -744,8 +744,8 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 	if EntityKindsFromConfig(OrgConfig{Domain: map[string]any{"entities": "x"}}) != nil {
 		t.Fatal("bad entities")
 	}
-	kinds := EntityKindsFromConfig(OrgConfig{Domain: map[string]any{"entities": map[string]any{"load": map[string]any{}}}})
-	if _, ok := kinds["load"]; !ok {
+	kinds := EntityKindsFromConfig(OrgConfig{Domain: map[string]any{"entities": map[string]any{"lot": map[string]any{}}}})
+	if _, ok := kinds["lot"]; !ok {
 		t.Fatalf("kinds = %#v", kinds)
 	}
 }
@@ -926,28 +926,28 @@ func TestProjectTaskFormErrorPathsAndPlaceholder(t *testing.T) {
 		t.Fatal("missing read")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
-		"enumReads": map[string]any{"sourceLoadId": "loads"},
+		"enumReads": map[string]any{"sourceLotId": "lots"},
 	}, "", "", nil)
 	if err == nil {
 		t.Fatal("enumReads without reads")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
-		"enumReads": map[string]any{"sourceLoadId": ""},
+		"enumReads": map[string]any{"sourceLotId": ""},
 		"reads":     map[string]any{},
 	}, "", "", nil)
 	if err == nil {
 		t.Fatal("empty enum read name")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
-		"enumReads": map[string]any{"sourceLoadId": "loads"},
+		"enumReads": map[string]any{"sourceLotId": "lots"},
 		"reads":     map[string]any{},
 	}, "", "", nil)
 	if err == nil {
 		t.Fatal("missing enum read")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
-		"enumReads": map[string]any{"sourceLoadId": "loads"},
-		"reads":     map[string]any{"loads": map[string]any{"entity": "load", "key": "id"}},
+		"enumReads": map[string]any{"sourceLotId": "lots"},
+		"reads":     map[string]any{"lots": map[string]any{"entity": "lot", "key": "id"}},
 		"schema":    map[string]any{"type": "object", "properties": map[string]any{}},
 	}, "", "", nil)
 	if err == nil {
@@ -1040,7 +1040,7 @@ id: mini
 org: acme
 domain:
   entities:
-    load: {}
+    lot: {}
 steps:
   intake:
     repeatable: true
@@ -1331,9 +1331,13 @@ func TestReferencedStartsWhenAndRolesHelpers(t *testing.T) {
 	if len(roles) == 0 {
 		t.Fatal("truckArrive roles")
 	}
-	nestedRoles := rolesAllowedForPath(cfg, TaskPathRef{JobID: "intake", GroupID: "lots", TaskID: "register"})
-	if len(nestedRoles) == 0 {
-		t.Fatal("lots/register roles")
+	flatRoles := rolesAllowedForPath(cfg, TaskPathRef{JobID: "intake", TaskID: "register"})
+	if len(flatRoles) == 0 {
+		t.Fatal("intake/register roles")
+	}
+	lineWeighRoles := rolesAllowedForPath(cfg, TaskPathRef{JobID: "line", TaskID: "weigh"})
+	if len(lineWeighRoles) == 0 {
+		t.Fatal("line/weigh roles")
 	}
 }
 
@@ -1385,11 +1389,17 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	}
 	cfg, _ = LoadFeragameConfigFixture()
 	intake := cfg.Jobs.Values["intake"].(Job)
-	task := map[string]any(intake.Tasks[0])
-	task["chrome"] = map[string]any{
+	register, _ := TaskByID(intake.Tasks, "register")
+	regTask := map[string]any(register)
+	regTask["chrome"] = map[string]any{
 		"client": map[string]any{"kind": "readonly", "expr": `"x"`},
 	}
-	intake.Tasks[0] = TaskConfig(task)
+	for i, tc := range intake.Tasks {
+		if tc["id"] == "register" {
+			intake.Tasks[i] = TaskConfig(regTask)
+			break
+		}
+	}
 	cfg.Jobs.Values["intake"] = intake
 	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "register", JobInstanceID: ""}); err == nil {
 		t.Fatal("chrome collision")
@@ -1397,11 +1407,17 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 
 	cfg, _ = LoadFeragameConfigFixture()
 	intake = cfg.Jobs.Values["intake"].(Job)
-	task = map[string]any(intake.Tasks[0])
+	arrive, _ := TaskByID(intake.Tasks, "truckArrive")
+	task := map[string]any(arrive)
 	task["chrome"] = map[string]any{
 		"report": map[string]any{"kind": "dataReport", "expr": `"not-object"`, "title": "R"},
 	}
-	intake.Tasks[0] = TaskConfig(task)
+	for i, tc := range intake.Tasks {
+		if tc["id"] == "truckArrive" {
+			intake.Tasks[i] = TaskConfig(task)
+			break
+		}
+	}
 	cfg.Jobs.Values["intake"] = intake
 	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "truckArrive"}); err == nil {
 		t.Fatal("bad dataReport dto")
@@ -1409,7 +1425,12 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	task["chrome"] = map[string]any{
 		"report": map[string]any{"kind": "dataReport", "expr": "1+", "title": "R"},
 	}
-	intake.Tasks[0] = TaskConfig(task)
+	for i, tc := range intake.Tasks {
+		if tc["id"] == "truckArrive" {
+			intake.Tasks[i] = TaskConfig(task)
+			break
+		}
+	}
 	cfg.Jobs.Values["intake"] = intake
 	if _, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{JobID: "intake", TaskID: "truckArrive"}); err == nil {
 		t.Fatal("bad dataReport expr")
@@ -1678,9 +1699,9 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		t.Fatal("missing property schema")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
-		"enumReads": map[string]any{"sourceLoadId": "loads"},
-		"reads":     map[string]any{"loads": "bad"},
-		"schema":    map[string]any{"type": "object", "properties": map[string]any{"sourceLoadId": map[string]any{"type": "string"}}},
+		"enumReads": map[string]any{"sourceLotId": "lots"},
+		"reads":     map[string]any{"lots": "bad"},
+		"schema":    map[string]any{"type": "object", "properties": map[string]any{"sourceLotId": map[string]any{"type": "string"}}},
 	}, "", "", nil)
 	if err == nil {
 		t.Fatal("bad enum read def")

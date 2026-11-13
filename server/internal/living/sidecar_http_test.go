@@ -30,7 +30,7 @@ func TestSidecarHttpPortSuccessRewritesArtifactURL(t *testing.T) {
 		Method: "POST",
 		URL:    "/fake/register-csv",
 		Org:    "feragame",
-		Body:   map[string]any{"loadId": "NIR-1"},
+		Body:   map[string]any{"lotId": "NIR-1"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +38,7 @@ func TestSidecarHttpPortSuccessRewritesArtifactURL(t *testing.T) {
 	if gotAuth != "Bearer secret" || gotOrg != "feragame" || gotPath != "/fake/register-csv" {
 		t.Fatalf("request auth=%q org=%q path=%q", gotAuth, gotOrg, gotPath)
 	}
-	if gotCT != "application/json" || !strings.Contains(string(gotBody), `"loadId":"NIR-1"`) {
+	if gotCT != "application/json" || !strings.Contains(string(gotBody), `"lotId":"NIR-1"`) {
 		t.Fatalf("body ct=%q body=%s", gotCT, gotBody)
 	}
 	want := ArtifactProxyPathPrefix + "0123456789abcdef0123456789abcdef"
@@ -102,16 +102,15 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 
 	truckID := commitTruckArrive(t, c)
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatalf("Commit must succeed: %v", err)
 	}
-	if result.Domain.Kind("load")[firstLoadID(result.Domain)]["client"] != "CO" {
-		t.Fatalf("domain missing: %#v", result.Domain.Kind("load"))
+	if result.Domain.Kind("lot")[firstLoadID(result.Domain)]["client"] != "CO" {
+		t.Fatalf("domain missing: %#v", result.Domain.Kind("lot"))
 	}
 	if len(result.Links) != 0 {
 		t.Fatalf("links = %#v", result.Links)
@@ -123,7 +122,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[firstLoadID(stored)]["client"] != "CO" {
+	if stored.Kind("lot")[firstLoadID(stored)]["client"] != "CO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }
@@ -146,10 +145,9 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 
 	truckID := commitTruckArrive(t, c)
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)

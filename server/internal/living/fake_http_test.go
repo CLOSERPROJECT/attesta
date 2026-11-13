@@ -12,7 +12,7 @@ func TestFakeHttpPortLabelsAndRegisterCSV(t *testing.T) {
 		Method: "POST",
 		URL:    "/fake/labels",
 		Body: map[string]any{
-			"loadId": "NIR-1",
+			"lotId": "NIR-1",
 			"labels": []any{map[string]any{"id": "NIR-1.1"}},
 		},
 	})
@@ -28,7 +28,7 @@ func TestFakeHttpPortLabelsAndRegisterCSV(t *testing.T) {
 		URL:    "/fake/register-csv",
 		Body: map[string]any{
 			"client":    "NO",
-			"loadId":    "NIR-1",
+			"lotId":    "NIR-1",
 			"palletIds": []any{"NIR-1.1", "NIR-1.2"},
 		},
 	})

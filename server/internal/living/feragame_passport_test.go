@@ -9,8 +9,8 @@ import (
 	"github.com/CLOSERPROJECT/attesta/server/internal/untp"
 )
 
-// seedFullyProcessedLoad runs intake → line weigh → containerReg so the load is
-// register-closed (fullyProcessed) and eligible for Passport lock.
+// seedFullyProcessedLoad runs intake → startLot → weigh → markProgress →
+// containerReg → closeLot so the lot is terminal fullyProcessed for Passport.
 //
 // Active Config refresh after feragame YAML changes needs:
 //
@@ -24,15 +24,16 @@ func seedFullyProcessedLoad(t *testing.T, c *Committer) (loadID, lineID string) 
 	_ = commitContainerReg(t, c, lineID, containerRegValue(loadID, map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 100.0}},
 	}))
+	_ = commitCloseLot(t, c, lineID)
 	stored, err := c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[loadID]["fullyProcessed"] != true {
-		t.Fatalf("load after register = %#v, want fullyProcessed", stored.Kind("load")[loadID])
+	if stored.Kind("lot")[loadID]["status"] != "fullyProcessed" {
+		t.Fatalf("lot after closeLot = %#v, want fullyProcessed", stored.Kind("lot")[loadID])
 	}
-	if stored.Kind("load")[loadID]["locked"] == true {
-		t.Fatal("load must not be passport-locked before Lock Job")
+	if stored.Kind("lot")[loadID]["locked"] == true {
+		t.Fatal("lot must not be passport-locked before Lock Job")
 	}
 	return loadID, lineID
 }
@@ -45,7 +46,7 @@ func TestFeragamePassportFixtureShape(t *testing.T) {
 	if err := ValidatePassportConfig(cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Passport.Subject.Entity != "load" {
+	if cfg.Passport.Subject.Entity != "lot" {
 		t.Fatalf("subject.entity = %q", cfg.Passport.Subject.Entity)
 	}
 	job := cfg.Jobs.Values["passport"].(Job)
@@ -55,7 +56,7 @@ func TestFeragamePassportFixtureShape(t *testing.T) {
 		t.Fatalf("select readyWhen = %q, want eligible-load count", readyWhen)
 	}
 	reads, _ := selectTask["reads"].(map[string]any)
-	loads, _ := reads["loads"].(map[string]any)
+	loads, _ := reads["lots"].(map[string]any)
 	where, _ := loads["where"].(string)
 	if !strings.Contains(where, "fullyProcessed") || !strings.Contains(where, "locked") {
 		t.Fatalf("select eligibility where = %q", where)
@@ -102,20 +103,20 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !containsString(loadEnumIDs(t, selectBundle, "loadId"), loadID) {
+	if !containsString(loadEnumIDs(t, selectBundle, "lotId"), loadID) {
 		t.Fatalf("eligible load missing from select enum")
 	}
 
 	selected, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "passport/select",
-		Value:    map[string]any{"loadId": loadID},
+		Value:    map[string]any{"lotId": loadID},
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if selected.JobInstanceID != loadID {
-		t.Fatalf("Job instance id = %q, want load subject %q", selected.JobInstanceID, loadID)
+		t.Fatalf("Job instance id = %q, want lot subject %q", selected.JobInstanceID, loadID)
 	}
 
 	lockBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "lock", loadID, "", "")
@@ -166,11 +167,11 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	facts := locked.Domain.Kind("load")[loadID]
+	facts := locked.Domain.Kind("lot")[loadID]
 	if facts["locked"] != true || facts["issued"] != true {
 		t.Fatalf("transform locked/issued missing: %#v", facts)
 	}
-	if facts["fullyProcessed"] != true {
+	if facts["status"] != "fullyProcessed" {
 		t.Fatalf("fullyProcessed must stay register closure: %#v", facts)
 	}
 	if len(locked.Links) != 1 {

@@ -103,37 +103,17 @@ func TestNextAdvanceTaskRefSkipsAdvanceTargetFalse(t *testing.T) {
 	}
 }
 
-func TestCloseGroupWhenOnlyCloseTurnoLeftNavigatesOverview(t *testing.T) {
+func TestCloseLotStayLeavesCloseTurnoActionable(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	op := FixtureAllRolesOp()
-	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
-	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
-	_ = commitWeigh(t, c, lineID, loadID+".2", 22)
-	if _, err := c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "line", JobInstanceID: lineID, GroupID: "palletWeight",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	_ = commitLineLoadMark(t, c, lineID, map[string]any{
+	loadID, lineID := seedLineReadyForLineLoad(t, c)
+	_ = commitMarkProgress(t, c, lineID, map[string]any{
 		loadID + ".1": "done",
 		loadID + ".2": "done",
 	})
-	if _, err := c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "line", JobInstanceID: lineID, GroupID: "lineLoad",
-	}); err != nil {
-		t.Fatal(err)
-	}
 	_ = commitContainerReg(t, c, lineID, containerRegValue(loadID, map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 50.0}},
 	}))
-
-	closed, err := c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "line", JobInstanceID: lineID, GroupID: "containerReg",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	closed := commitCloseLot(t, c, lineID)
 	lineWL, ok := worklistJobByID(closed.Worklist, "line")
 	if !ok {
 		t.Fatal("missing line")
@@ -145,11 +125,8 @@ func TestCloseGroupWhenOnlyCloseTurnoLeftNavigatesOverview(t *testing.T) {
 	if inst.Tasks["closeTurno"] != TaskStatusActionable {
 		t.Fatalf("closeTurno = %q, want actionable remaining work", inst.Tasks["closeTurno"])
 	}
-	if closed.Navigation != CommitNextOverview {
-		t.Fatalf("after last group Close Navigation = %q, want overview (not closeTurno)", closed.Navigation)
-	}
-	if closed.NextTaskFormBundle != nil {
-		t.Fatalf("must not auto-advance to closeTurno, got %s", bundleAddress(closed.NextTaskFormBundle))
+	if closed.Navigation != CommitNextStay {
+		t.Fatalf("closeLot Navigation = %q, want stay", closed.Navigation)
 	}
 }
 
@@ -159,10 +136,9 @@ func TestCommitLinkStayContinueNavigationWire(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 
 	lot, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -170,8 +146,8 @@ func TestCommitLinkStayContinueNavigationWire(t *testing.T) {
 	if lot.Navigation != CommitNextStay {
 		t.Fatalf("link register Navigation = %q, want stay", lot.Navigation)
 	}
-	if lot.ContinueNavigation != CommitNextOverview {
-		t.Fatalf("ContinueNavigation = %q, want overview while lots open", lot.ContinueNavigation)
+	if lot.ContinueNavigation != CommitNextTask {
+		t.Fatalf("ContinueNavigation = %q, want task (weightCheck unlocked after register)", lot.ContinueNavigation)
 	}
 
 	raw, err := json.Marshal(lot)
@@ -188,7 +164,7 @@ func TestCommitLinkStayContinueNavigationWire(t *testing.T) {
 	if wire["navigation"] != string(CommitNextStay) {
 		t.Fatalf("JSON navigation = %#v", wire["navigation"])
 	}
-	if wire["continueNavigation"] != string(CommitNextOverview) {
+	if wire["continueNavigation"] != string(CommitNextTask) {
 		t.Fatalf("JSON continueNavigation = %#v", wire["continueNavigation"])
 	}
 }

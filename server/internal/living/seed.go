@@ -14,11 +14,16 @@ const (
 	// SeedScopeBoth puts Active Config then stages Domain per WipeDomain /
 	// empty-Domain rules (prior SeedDemo behavior).
 	SeedScopeBoth SeedScope = iota
-	// SeedScopeFeragameCore puts Active Config and wipes Domain (+ passports)
-	// to empty; never stages demo Jobs.
-	SeedScopeFeragameCore
-	// SeedScopeFeragameFull puts Active Config and wipes+stages Domain
-	// (+ passports) like a replace Domain rebuild.
+	// SeedScopeFeragameConfig puts Active Config and always wipes Domain
+	// (+ passports) to empty; never stages.
+	SeedScopeFeragameConfig
+	// SeedScopeFeragameDomain puts Active Config and always wipes+stages Domain.
+	SeedScopeFeragameDomain
+	// SeedScopeFeragameIdentity is living-identical to Config (empty wipe);
+	// cmd/server pairs it with Feragame Appwrite hard reset.
+	SeedScopeFeragameIdentity
+	// SeedScopeFeragameFull is living-identical to Domain (wipe+stage);
+	// cmd/server pairs it with Feragame Appwrite hard reset.
 	SeedScopeFeragameFull
 )
 
@@ -37,17 +42,16 @@ type SeedOptions struct {
 	// set this — without it, EmptyDomain() would pick up the focused fixture.
 	SkipEmptyDomainStaging bool
 	// Passports is wiped for the org when Domain is rebuilt (seed --replace /
-	// --feragame-core / --feragame-full). Optional in tests that never lock;
-	// task seed must wire it.
+	// Feragame scopes). Optional in tests that never lock; task seed must wire it.
 	Passports PassportStore
-	// Scope selects Feragame core/full or both (default full-stack living path).
+	// Scope selects Feragame config/domain/identity/full or both (default).
 	Scope SeedScope
 }
 
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
 // Truck grammar: YYMMDD-n from open workingDay date (2026-11-02 → 261102-1).
 // Line grammar: date-turno from openTurno.
-// Load grammar: client-YYMMDD-n from lots/register.
+// Lot grammar: client-YYMMDD-n from intake/register.
 const (
 	SeedTruckID  = "261102-1"
 	SeedLineID   = "2026-11-02-1st"
@@ -58,9 +62,9 @@ const (
 // SeedDemo applies the demo Feragame fixture per opts.Scope:
 //   - SeedScopeBoth (default): Active Config, then Domain when WipeDomain is set
 //     or Domain is missing/empty (unless SkipEmptyDomainStaging).
-//   - SeedScopeFeragameCore: Active Config + wipe Domain/passports to empty;
-//     never stages.
-//   - SeedScopeFeragameFull: Active Config + wipe + stage demo Domain.
+//   - SeedScopeFeragameConfig / Identity: Active Config + always wipe Domain
+//     (+ passports) to empty; never stages.
+//   - SeedScopeFeragameDomain / Full: Active Config + always wipe + stage.
 //
 // Demo/fixture only — product hosts must not require this demo seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
@@ -69,9 +73,9 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 		return OrgConfig{}, fmt.Errorf("living: config store required")
 	}
 	switch opts.Scope {
-	case SeedScopeFeragameCore:
-		return seedDemoFeragameCore(ctx, domains, configs, opts.Passports)
-	case SeedScopeFeragameFull:
+	case SeedScopeFeragameConfig, SeedScopeFeragameIdentity:
+		return seedDemoFeragameEmptyDomain(ctx, domains, configs, opts.Passports)
+	case SeedScopeFeragameDomain, SeedScopeFeragameFull:
 		return seedDemoBoth(ctx, domains, configs, SeedOptions{
 			WipeDomain: true,
 			Passports:  opts.Passports,
@@ -116,13 +120,13 @@ func seedDemoBoth(ctx context.Context, domains DomainStore, configs ConfigStore,
 	return cfg, nil
 }
 
-func seedDemoFeragameCore(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore) (OrgConfig, error) {
+func seedDemoFeragameEmptyDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore) (OrgConfig, error) {
 	cfg, err := SeedFixtureConfigStore(configs)
 	if err != nil {
 		return OrgConfig{}, err
 	}
 	if domains == nil {
-		return OrgConfig{}, fmt.Errorf("living: domain store required for Feragame core seed")
+		return OrgConfig{}, fmt.Errorf("living: domain store required for Feragame empty-Domain seed")
 	}
 	if passports != nil {
 		if err := passports.DeleteByOrg(ctx, cfg.Org); err != nil {
@@ -142,11 +146,11 @@ func domainSeedEmpty(d Domain) bool {
 }
 
 // seedStagedDemoDomain wipes then Commits one coherent plant story:
-// one intake with two loads (CO + DA), one line turn with all pallets weighed,
-// lineLoad done, and both loads register-closed (fullyProcessed) for Passport.
-// Leaves weightCheck open; Passport Can start is ready for both loads.
+// one intake with two lots (CO + DA), one line turn that startLot→weigh→markProgress→
+// containerReg→closeLot for each lot (sole fullyProcessed writer), for Passport.
+// Leaves weightCheck open; Passport Can start is ready for both lots.
 // When passports is set, org rows are deleted before Domain Put so deterministic
-// seed subject ids can Lock again after --replace / --feragame-full.
+// seed subject ids can Lock again after --replace / --feragame-domain / --feragame-full.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore, org string) error {
 	if passports != nil {
 		if err := passports.DeleteByOrg(ctx, org); err != nil {
@@ -190,28 +194,22 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		client, fir string
 		pallets     float64
 		after       float64
-		wantLoad    string
+		wantLot     string
 	}{
 		{"CO", "FIR-SEED-CO", 2, 700, SeedLoadCOID},
 		{"DA", "FIR-SEED-DA", 2, 400, SeedLoadDAID},
 	} {
 		res, err := seedCommit(ctx, c, org, admin, CommitRequest{
-			TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+			TaskPath:      "intake/register",
 			JobInstanceID: SeedTruckID,
 			Value:         seedLotRegisterValue(lot.client, lot.fir, lot.pallets, lot.after),
-			Mint:          spawningNewMint(),
 		})
 		if err != nil {
 			return err
 		}
-		if _, ok := res.Domain.Kind("load")[lot.wantLoad]; !ok {
-			return fmt.Errorf("living seed: expected load %q, got %#v", lot.wantLoad, res.Domain.Kind("load"))
+		if _, ok := res.Domain.Kind("lot")[lot.wantLot]; !ok {
+			return fmt.Errorf("living seed: expected lot %q, got %#v", lot.wantLot, res.Domain.Kind("lot"))
 		}
-	}
-	if _, err := c.CloseGroup(ctx, org, admin, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: SeedTruckID, GroupID: "lots",
-	}); err != nil {
-		return fmt.Errorf("living seed close lots: %w", err)
 	}
 
 	line, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
@@ -225,61 +223,63 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if line.JobInstanceID != SeedLineID {
 		return fmt.Errorf("living seed: line id %q, want %q", line.JobInstanceID, SeedLineID)
 	}
-	for _, row := range []struct {
-		id     string
-		weight float64
+	for _, lot := range []struct {
+		id string
+		pallets []struct {
+			id     string
+			weight float64
+		}
 	}{
-		{SeedLoadCOID + ".1", 125.0},
-		{SeedLoadCOID + ".2", 100.0},
-		{SeedLoadDAID + ".1", 90.0},
-		{SeedLoadDAID + ".2", 85.0},
+		{SeedLoadCOID, []struct {
+			id     string
+			weight float64
+		}{{SeedLoadCOID + ".1", 125.0}, {SeedLoadCOID + ".2", 100.0}}},
+		{SeedLoadDAID, []struct {
+			id     string
+			weight float64
+		}{{SeedLoadDAID + ".1", 90.0}, {SeedLoadDAID + ".2", 85.0}}},
 	} {
-		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
-			TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+		if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+			TaskPath:      "line/startLot",
 			JobInstanceID: SeedLineID,
-			Value:         weighValue(row.id, row.weight),
-			Mint:          spawningNewMint(),
+			Value:         map[string]any{"lotId": lot.id},
 		}); err != nil {
 			return err
 		}
-	}
-	if _, err := c.CloseGroup(ctx, org, logistic, CloseGroupRequest{
-		JobID: "line", JobInstanceID: SeedLineID, GroupID: "palletWeight",
-	}); err != nil {
-		return fmt.Errorf("living seed close palletWeight: %w", err)
-	}
-
-	if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
-		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
-		JobInstanceID: SeedLineID,
-		Value: map[string]any{
-			"progress": map[string]any{
-				SeedLoadCOID + ".1": "done",
-				SeedLoadCOID + ".2": "done",
-				SeedLoadDAID + ".1": "done",
-				SeedLoadDAID + ".2": "done",
-			},
-		},
-		Mint: spawningNewMint(),
-	}); err != nil {
-		return err
-	}
-	if _, err := c.CloseGroup(ctx, org, lineOp, CloseGroupRequest{
-		JobID: "line", JobInstanceID: SeedLineID, GroupID: "lineLoad",
-	}); err != nil {
-		return fmt.Errorf("living seed close lineLoad: %w", err)
-	}
-	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
+		progress := map[string]any{}
+		for _, row := range lot.pallets {
+			if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
+				TaskPath:      "line/weigh",
+				JobInstanceID: SeedLineID,
+				Value:         weighValue(row.id, row.weight),
+			}); err != nil {
+				return err
+			}
+			progress[row.id] = "done"
+		}
+		if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+			TaskPath:      "line/markProgress",
+			JobInstanceID: SeedLineID,
+			Value:         map[string]any{"progress": progress},
+		}); err != nil {
+			return err
+		}
 		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
-			TaskPath:      GroupTaskPath("line", "containerReg", ProvisionalGroupInstanceID, "register"),
+			TaskPath:      "line/containerReg",
 			JobInstanceID: SeedLineID,
 			Value: map[string]any{
-				"sourceLoadId": loadID,
+				"sourceLotId": lot.id,
 				"polvereDiVetro": []any{
 					map[string]any{"weight": 100.0},
 				},
 			},
-			Mint: spawningNewMint(),
+		}); err != nil {
+			return err
+		}
+		if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+			TaskPath:      "line/closeLot",
+			JobInstanceID: SeedLineID,
+			Value:         map[string]any{},
 		}); err != nil {
 			return err
 		}

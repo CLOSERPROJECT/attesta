@@ -18,7 +18,7 @@ export type Submission = {
 	idsTouched?: string[];
 };
 
-/** Server bag: kind names are Org Config vocabulary (e.g. load / pallet / container). */
+/** Server bag: kind names are Org Config vocabulary (e.g. lot / pallet / container). */
 export type DomainSnapshot = {
 	submissions: Submission[];
 	jobInstances?: unknown[];

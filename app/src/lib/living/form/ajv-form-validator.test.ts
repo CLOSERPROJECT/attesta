@@ -5,8 +5,6 @@ import type { Schema } from '@sjsf/form';
 import feragameConfigYaml from '$living-fixtures/feragame-config.yaml?raw';
 import { loadFeragameConfig, substepConfig } from './load-feragame-config.js';
 import { createAjvFormValidator } from './ajv-form-validator.js';
-import type { TaskConfig } from '../types.js';
-
 /** Gated field: when mode is `dual`, `detail` is required (JSON Schema if/then). */
 const ifThenSchema = {
 	type: 'object',
@@ -65,23 +63,17 @@ describe('Ajv Draft validator', () => {
 	});
 });
 
-describe('containerReg register Ajv', () => {
-	const group = substepConfig(loadFeragameConfig(feragameConfigYaml).jobs.line, 'containerReg')!;
-	// Fixture groups still author nested leaves as `substeps` in YAML (SPA parse keeps that key).
-	const register = (
-		(group.substeps as TaskConfig[] | undefined) ??
-		(group.tasks as TaskConfig[] | undefined) ??
-		[]
-	).find((t) => t.id === 'register');
-	const schema = (register?.schema ?? null) as Schema | null;
-	const uiSchema = (register?.uiSchema ?? null) as Record<string, unknown> | null;
+describe('containerReg leaf Ajv', () => {
+	const leaf = substepConfig(loadFeragameConfig(feragameConfigYaml).jobs.line, 'containerReg');
+	const schema = (leaf?.schema ?? null) as Schema | null;
+	const uiSchema = (leaf?.uiSchema ?? null) as Record<string, unknown> | null;
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
-	test('sourceLoadId + weight valid; dualSources / secondary enum gone', () => {
+	test('sourceLotId + weight valid; dualSources / secondary enum gone', () => {
 		expect(schema).toBeTruthy();
 		expect(schema).not.toHaveProperty('if');
 		const props = (schema as { properties?: Record<string, unknown> }).properties ?? {};
-		expect(props).not.toHaveProperty('secondarySourceLoadId');
+		expect(props).not.toHaveProperty('secondarySourceLotId');
 		expect(props).not.toHaveProperty('dualSources');
 		const rowProps =
 			(
@@ -93,19 +85,19 @@ describe('containerReg register Ajv', () => {
 
 		expect(
 			validator.isValid(schema!, schema!, {
-				sourceLoadId: 'load-a',
+				sourceLotId: 'lot-a',
 				polvereDiVetro: [{ weight: 10, incomplete: false }]
 			})
 		).toBe(true);
 		expect(
 			validator.isValid(schema!, schema!, {
-				sourceLoadId: 'load-a',
+				sourceLotId: 'lot-a',
 				polvereDiVetro: [{ weight: 10, continuesContainerId: 'C-1', incomplete: false }]
 			})
 		).toBe(true);
 		expect(
 			validator.isValid(schema!, schema!, {
-				sourceLoadId: 'load-a',
+				sourceLotId: 'lot-a',
 				polvereDiVetro: [{ incomplete: false }]
 			})
 		).toBe(false);

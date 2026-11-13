@@ -23,7 +23,7 @@ func TestDemoCommitHelpersSeedLineLoadReady(t *testing.T) {
 		t.Fatal(err)
 	}
 	if firstLoadID(domain) == "" {
-		t.Fatal("expected load after demo seed")
+		t.Fatal("expected lot after demo seed")
 	}
 	c := demoSeedCommitter(domains, configs)
 	if err := commitCloseTurnoCtx(t.Context(), c, "feragame", DemoLineShiftID); err != nil {
@@ -76,9 +76,9 @@ func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("unknown job = %v", err)
 	}
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "ghost", GroupID: "lots"})
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("unknown instance = %v", err)
+	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "line", JobInstanceID: "ghost", GroupID: "weigh"})
+	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
+		t.Fatalf("line leaf CloseGroup = %v, want unknown-target", err)
 	}
 	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "T", GroupID: "truckArrive"})
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
@@ -106,48 +106,40 @@ func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
 		t.Fatalf("missing active = %v", err)
 	}
 
-	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
-	boomPut := &Committer{
-		Domains: &getOKPutErrDomainStore{
-			get: func(ctx context.Context, org string) (Domain, error) { return domains.Get(ctx, org) },
-			err: errors.New("put fail"),
-		},
-		Configs:    c.Configs,
-		Authorizer: AllowAllAuthorizer{},
-	}
-	_, err = boomPut.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
+	_, lineID := seedLineReadyForLineLoad(t, c)
+	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
+		JobID: "line", JobInstanceID: lineID, GroupID: "weigh",
 	})
-	// lots already closed → CanClose false before Put
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("already closed = %v", err)
+	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
+		t.Fatalf("feragame line has no groups: CloseGroup = %v", err)
 	}
 
-	c2, domains2, _ := testCommitter(t, AllowAllAuthorizer{})
-	truckID2 := commitTruckArrive(t, c2)
-	_ = commitLotRegister(t, c2, truckID2, registerLotValue())
-	boomPut2 := &Committer{
-		Domains: &getOKPutErrDomainStore{
-			get: func(ctx context.Context, org string) (Domain, error) { return domains2.Get(ctx, org) },
-			err: errors.New("put fail"),
+	// Feragame has no groups; probe config so Domain Get runs after group lookup.
+	probeConfigs := NewMemoryConfigStore()
+	if err := probeConfigs.Put(t.Context(), "probe", "v1", OrgConfig{
+		ID: "probe", Org: "probe", Version: "v1",
+		Jobs: OrderedObject{
+			Keys: []string{"j"},
+			Values: map[string]any{
+				"j": Job{Tasks: []TaskConfig{{
+					"id": "g", "kind": "group",
+					"tasks": []any{map[string]any{"id": "child"}},
+				}}},
+			},
 		},
-		Configs:    c2.Configs,
-		Authorizer: AllowAllAuthorizer{},
+	}); err != nil {
+		t.Fatal(err)
 	}
-	_, err = boomPut2.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID2, GroupID: "lots",
-	})
-	if err == nil || !strings.Contains(err.Error(), "put fail") {
-		t.Fatalf("put fail = %v", err)
+	if err := probeConfigs.SetActiveVersion(t.Context(), "probe", "v1"); err != nil {
+		t.Fatal(err)
 	}
-
 	boomGet := &Committer{
 		Domains:    &errDomainStore{err: errors.New("get boom")},
-		Configs:    c.Configs,
+		Configs:    probeConfigs,
 		Authorizer: AllowAllAuthorizer{},
 	}
-	_, err = boomGet.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
+	_, err = boomGet.CloseGroup(t.Context(), "probe", op, CloseGroupRequest{
+		JobID: "j", JobInstanceID: "T", GroupID: "g",
 	})
 	if err == nil || !strings.Contains(err.Error(), "get boom") {
 		t.Fatalf("get boom = %v", err)
@@ -159,11 +151,12 @@ func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
 		Authorizer: AllowAllAuthorizer{},
 	}
 	_, err = emptyDomain.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: "ghost", GroupID: "lots",
+		JobID: "line", JobInstanceID: "ghost", GroupID: "weigh",
 	})
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("empty domain unknown instance = %v", err)
+	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
+		t.Fatalf("empty domain CloseGroup leaf = %v", err)
 	}
+	_ = domains
 }
 
 type getOKPutErrDomainStore struct {

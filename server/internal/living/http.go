@@ -180,7 +180,7 @@ func (h *Handler) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recap, err := h.Loader.LoadTaskRecap(r.Context(), org, addr)
+	list, err := h.Loader.LoadTaskRecap(r.Context(), org, addr)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "task recap not found", http.StatusNotFound)
@@ -201,7 +201,7 @@ func (h *Handler) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 	}
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	_ = enc.Encode(recap)
+	_ = enc.Encode(list)
 }
 
 func (h *Handler) handleCommit(w http.ResponseWriter, r *http.Request) {

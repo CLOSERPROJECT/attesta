@@ -25,7 +25,7 @@ func groupIntakeConfigWithLabels() OrgConfig {
 				"url":    `"/fake/labels"`,
 				"label":  `"Stampa etichette"`,
 				"action": "link",
-				"body":   `{"loadId":"lot-sidecar"}`,
+				"body":   `{"lotId":"lot-sidecar"}`,
 			},
 		},
 	}

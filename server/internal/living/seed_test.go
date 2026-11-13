@@ -9,7 +9,7 @@ import (
 func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
-	seeded := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
+	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{
 		{JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada"},
 	}
@@ -36,7 +36,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind("load")) != 1 || len(got.Submissions) != 1 {
+	if len(got.Kind("lot")) != 1 || len(got.Submissions) != 1 {
 		t.Fatalf("domain wiped without WipeDomain: %#v", got)
 	}
 }
@@ -44,7 +44,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
-	seeded := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
+	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := got.Kind("load")["L1"]; ok {
+	if _, ok := got.Kind("lot")["L1"]; ok {
 		t.Fatal("pre-wipe L1 must not survive staged rebuild")
 	}
 	assertStagedDemoDomain(t, got)
@@ -171,11 +171,11 @@ func TestSeedDemoSkipEmptyDomainStaging(t *testing.T) {
 	}
 }
 
-func TestSeedDemoFeragameCoreWipesToEmptyWithoutStaging(t *testing.T) {
+func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryPassportStore()
-	seeded := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
+	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "L1"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestSeedDemoFeragameCoreWipesToEmptyWithoutStaging(t *testing.T) {
 	}
 
 	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
-		Scope:     SeedScopeFeragameCore,
+		Scope:     SeedScopeFeragameConfig,
 		Passports: passports,
 	})
 	if err != nil {
@@ -208,19 +208,19 @@ func TestSeedDemoFeragameCoreWipesToEmptyWithoutStaging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 || len(got.Kind("load")) != 0 {
-		t.Fatalf("feragame-core Domain not empty: %#v", got)
+	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 || len(got.Kind("lot")) != 0 {
+		t.Fatalf("feragame-config Domain not empty: %#v", got)
 	}
 	if _, ok := got.Kind("truck")[SeedTruckID]; ok {
-		t.Fatal("feragame-core must not stage Domain")
+		t.Fatal("feragame-config must not stage Domain")
 	}
 	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("passport after feragame-core = %v, want ErrNotFound", err)
+		t.Fatalf("passport after feragame-config = %v, want ErrNotFound", err)
 	}
 }
 
-func TestSeedDemoFeragameCoreRequiresDomainStore(t *testing.T) {
-	_, err := SeedDemo(t.Context(), nil, NewMemoryConfigStore(), SeedOptions{Scope: SeedScopeFeragameCore})
+func TestSeedDemoFeragameConfigRequiresDomainStore(t *testing.T) {
+	_, err := SeedDemo(t.Context(), nil, NewMemoryConfigStore(), SeedOptions{Scope: SeedScopeFeragameConfig})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -233,7 +233,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryPassportStore()
-	marker := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
+	marker := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	marker.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
 	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := got.Kind("load")["L1"]; ok {
+	if _, ok := got.Kind("lot")["L1"]; ok {
 		t.Fatal("pre-wipe L1 must not survive feragame-full rebuild")
 	}
 	assertStagedDemoDomain(t, got)
@@ -302,34 +302,38 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	if !hasActionableRef(adminRefs, "intake", "weightCheck", SeedTruckID) {
 		t.Fatalf("administration actionable missing weightCheck@%s: %#v", SeedTruckID, adminRefs)
 	}
-	if hasNestedActionableRef(adminRefs, "line", "palletWeight", SeedLineID, "weigh") {
+	if hasActionableRef(adminRefs, "line", "weigh", SeedLineID) {
 		t.Fatalf("administration must not see weigh: %#v", adminRefs)
 	}
-	if hasActionableRef(adminRefs, "line", "lineLoad", SeedLineID) {
-		t.Fatalf("administration must not see lineLoad: %#v", adminRefs)
+	if hasActionableRef(adminRefs, "line", "markProgress", SeedLineID) {
+		t.Fatalf("administration must not see markProgress: %#v", adminRefs)
 	}
-	if hasNestedActionableRef(adminRefs, "line", "containerReg", SeedLineID, "register") {
-		t.Fatalf("administration must not see register: %#v", adminRefs)
+	if hasActionableRef(adminRefs, "line", "containerReg", SeedLineID) {
+		t.Fatalf("administration must not see containerReg: %#v", adminRefs)
 	}
 
-	if !hasNestedActionableRef(logRefs, "line", "containerReg", SeedLineID, "register") {
-		t.Fatalf("logistic actionable missing register@%s: %#v", SeedLineID, logRefs)
+	// Staged seed closed both lots; logistic peer Tasks are unavailable (no open lot).
+	if hasActionableRef(logRefs, "line", "containerReg", SeedLineID) {
+		t.Fatalf("logistic must not see containerReg after closeLot: %#v", logRefs)
 	}
 	if hasActionableRef(logRefs, "intake", "weightCheck", SeedTruckID) {
 		t.Fatalf("logistic must not see weightCheck: %#v", logRefs)
 	}
-	if hasActionableRef(logRefs, "line", "lineLoad", SeedLineID) {
-		t.Fatalf("logistic must not see lineLoad: %#v", logRefs)
+	if hasActionableRef(logRefs, "line", "weigh", SeedLineID) {
+		t.Fatalf("logistic must not see weigh after closeLot: %#v", logRefs)
 	}
 
-	if hasActionableRef(lineRefs, "line", "lineLoad", SeedLineID) {
-		t.Fatalf("line must not see lineLoad after staged close: %#v", lineRefs)
+	if hasActionableRef(lineRefs, "line", "markProgress", SeedLineID) {
+		t.Fatalf("line must not see markProgress after staged closeLot: %#v", lineRefs)
 	}
-	if hasNestedActionableRef(lineRefs, "line", "containerReg", SeedLineID, "register") {
-		t.Fatalf("line must not see register: %#v", lineRefs)
+	if hasActionableRef(lineRefs, "line", "containerReg", SeedLineID) {
+		t.Fatalf("line must not see containerReg: %#v", lineRefs)
 	}
-	if hasNestedActionableRef(lineRefs, "line", "palletWeight", SeedLineID, "weigh") {
+	if hasActionableRef(lineRefs, "line", "weigh", SeedLineID) {
 		t.Fatalf("line must not see weigh: %#v", lineRefs)
+	}
+	if !hasActionableRef(lineRefs, "line", "closeTurno", SeedLineID) {
+		t.Fatalf("line actionable missing closeTurno@%s: %#v", SeedLineID, lineRefs)
 	}
 	adminPassport, _ := worklistJobByID(admin.Worklist, "passport")
 	if !adminPassport.CanStart || adminPassport.StartLabel != "Emetti DPP" {
@@ -403,7 +407,7 @@ func TestSeedDemoReplaceIsNotHarnessRunsAPI(t *testing.T) {
 
 func assertStagedDemoDomain(t *testing.T, got Domain) {
 	t.Helper()
-	loads := got.Kind("load")
+	loads := got.Kind("lot")
 	if loads[SeedLoadCOID] == nil || loads[SeedLoadDAID] == nil {
 		t.Fatalf("staged loads = %#v, want %s and %s", loads, SeedLoadCOID, SeedLoadDAID)
 	}
@@ -419,7 +423,7 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if _, ok := got.Kind("workingDay")["2026-11-02"]; !ok {
 		t.Fatalf("staged workingDay missing: %#v", got.Kind("workingDay"))
 	}
-	// workingDay/open + truckArrive + 2× lots/register + openTurno + 4× weigh + …
+	// workingDay/open + truckArrive + 2× register + openTurno + 4× weigh + …
 	if len(got.Submissions) < 9 {
 		t.Fatalf("submissions = %d, want >= 9", len(got.Submissions))
 	}
@@ -434,7 +438,7 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 		t.Fatal("missing intake worklist")
 	}
 	truck, ok := worklistInstance(intake, SeedTruckID)
-	if !ok || truck.Tasks["truckArrive"] != TaskStatusDone || truck.Tasks["lots"] != TaskStatusDone {
+	if !ok || truck.Tasks["truckArrive"] != TaskStatusDone || truck.Tasks["register"] != TaskStatusActionable {
 		t.Fatalf("intake truck = %#v", truck)
 	}
 	if truck.Tasks["weightCheck"] != TaskStatusActionable {
@@ -445,19 +449,24 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 		t.Fatal("missing line worklist")
 	}
 	shift, ok := worklistInstance(line, SeedLineID)
-	if !ok || shift.Tasks["openTurno"] != TaskStatusDone || shift.Tasks["palletWeight"] != TaskStatusDone {
+	if !ok || shift.Tasks["openTurno"] != TaskStatusDone {
 		t.Fatalf("line shift = %#v", shift)
 	}
-	if shift.Tasks["lineLoad"] != TaskStatusDone {
-		t.Fatalf("lineLoad = %q, want done", shift.Tasks["lineLoad"])
+	for _, id := range []string{"weigh", "markProgress", "containerReg", "closeLot", "startLot"} {
+		if shift.Tasks[id] != TaskStatusUnavailable {
+			t.Fatalf("%s = %q, want unavailable after both lots closeLot", id, shift.Tasks[id])
+		}
+	}
+	if shift.Tasks["closeTurno"] != TaskStatusActionable {
+		t.Fatalf("closeTurno = %q, want actionable", shift.Tasks["closeTurno"])
 	}
 	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
 		facts := loads[loadID]
-		if facts["fullyProcessed"] != true {
-			t.Fatalf("load %s fullyProcessed = %#v, want true", loadID, facts["fullyProcessed"])
+		if facts["status"] != "fullyProcessed" {
+			t.Fatalf("lot %s status = %#v, want fullyProcessed", loadID, facts["status"])
 		}
 		if facts["locked"] == true {
-			t.Fatalf("load %s must not be passport-locked", loadID)
+			t.Fatalf("lot %s must not be passport-locked", loadID)
 		}
 	}
 	passport, ok := worklistJobByID(wl, "passport")

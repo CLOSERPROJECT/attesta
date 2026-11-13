@@ -5,6 +5,7 @@ import { parseHttpLinkItem } from './parse-http-link-item.js';
 import {
 	TaskRecapError,
 	type TaskRecap,
+	type TaskRecapList,
 	type TaskRecapPort,
 	type TaskRecapRequest
 } from './task-recap-port.js';
@@ -73,6 +74,18 @@ function parseTaskRecap(raw: unknown): TaskRecap {
 	};
 }
 
+function parseTaskRecapList(raw: unknown): TaskRecapList {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
+	}
+	const body = raw as Record<string, unknown>;
+	const itemsRaw = Array.isArray(body.items) ? body.items : null;
+	if (!itemsRaw) {
+		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
+	}
+	return { items: itemsRaw.map(parseTaskRecap) };
+}
+
 export function createHttpTaskRecapPort(
 	options: HttpTaskRecapPortOptions = {}
 ): TaskRecapPort {
@@ -94,7 +107,7 @@ export function createHttpTaskRecapPort(
 					res.status
 				);
 			}
-			return parseTaskRecap(await res.json());
+			return parseTaskRecapList(await res.json());
 		}
 	};
 }

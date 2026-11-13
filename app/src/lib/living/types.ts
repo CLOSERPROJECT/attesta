@@ -21,11 +21,19 @@ export type Worklist = {
 	jobs: WorklistJob[];
 };
 
+/** Authored submit cardinality on Worklist Task chrome (default once when omit). */
+export type TaskSubmit = 'once' | 'many';
+
 export type WorklistTask = {
 	id: string;
 	title: string;
 	/** Authored Config role slugs for board chrome (slug∩roles; not Cerbos). */
 	roles: string[];
+	/**
+	 * once (default) | many — In progress / Completed ignore many (ADR-0008).
+	 * Omit treated as once for older wires.
+	 */
+	submit?: TaskSubmit;
 };
 
 export type WorklistJob = {
@@ -52,6 +60,11 @@ export type WorklistInstance = {
 	label: string;
 	/** Viewer-scoped Unlock/Submission status. */
 	tasks: Record<string, TaskStatus>;
+	/**
+	 * Domain Submission N per flat leaf taskId (no group). Omitted when empty.
+	 * Overview many-submit chrome reads this without calling recap.
+	 */
+	submissionCounts?: Record<string, number>;
 	/** Present when the Job authors Task groups; omitted for flat Jobs. */
 	groups?: Record<string, WorklistGroup>;
 };
@@ -73,6 +86,8 @@ export type WorklistGroupInstance = {
 	/** Overview chrome from Config instanceLabelEntity ∩ nested IDsTouched. */
 	label?: string;
 	tasks: Record<string, TaskStatus>;
+	/** Domain Submission N per child leaf taskId on this group instance. */
+	submissionCounts?: Record<string, number>;
 };
 
 export type TaskStatus = 'locked' | 'unavailable' | 'available' | 'actionable' | 'done';

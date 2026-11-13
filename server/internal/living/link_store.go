@@ -7,7 +7,9 @@ import (
 	"sync"
 )
 
-// SubmissionAddress keys a Submission (and its post-Commit links side record).
+// SubmissionAddress keys a Submission path (job / instance / task [+ group]).
+// LinkStore also requires Submission.Timestamp so many-submit Commits under the
+// same address keep distinct link docs.
 type SubmissionAddress struct {
 	JobID           string
 	JobInstanceID   string
@@ -38,17 +40,17 @@ func (a SubmissionAddress) valid() bool {
 }
 
 // LinkStore persists post-Commit HTTP links separately from Submission facts.
-// Put/Get are keyed like the Submission address (job / instance / task [+ group]).
+// Put/Get are keyed by Submission address + timestamp (no address-only fallback).
 type LinkStore interface {
-	Put(ctx context.Context, org string, addr SubmissionAddress, links []HttpLinkItem) error
-	Get(ctx context.Context, org string, addr SubmissionAddress) ([]HttpLinkItem, error)
+	Put(ctx context.Context, org string, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error
+	Get(ctx context.Context, org string, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error)
 }
 
 var _ LinkStore = (*MemoryLinkStore)(nil)
 
 // MemoryLinkStore is an in-memory LinkStore.
 type MemoryLinkStore struct {
-	mu   sync.RWMutex
+	mu    sync.RWMutex
 	byKey map[string][]HttpLinkItem
 }
 
@@ -56,16 +58,18 @@ func NewMemoryLinkStore() *MemoryLinkStore {
 	return &MemoryLinkStore{byKey: map[string][]HttpLinkItem{}}
 }
 
-func linkStoreKey(org string, addr SubmissionAddress) (string, error) {
+func linkStoreKey(org string, addr SubmissionAddress, timestamp string) (string, error) {
 	org = strings.TrimSpace(org)
 	addr = addr.normalized()
-	if org == "" || !addr.valid() {
-		return "", fmt.Errorf("living: link store key requires org and submission address")
+	timestamp = strings.TrimSpace(timestamp)
+	if org == "" || !addr.valid() || timestamp == "" {
+		return "", fmt.Errorf("living: link store key requires org, submission address, and timestamp")
 	}
 	parts := []string{org, addr.JobID, addr.JobInstanceID, addr.TaskID}
 	if addr.GroupID != "" {
 		parts = append(parts, addr.GroupID, addr.GroupInstanceID)
 	}
+	parts = append(parts, timestamp)
 	return strings.Join(parts, "\x00"), nil
 }
 
@@ -78,8 +82,8 @@ func cloneHTTPLinks(in []HttpLinkItem) []HttpLinkItem {
 	return out
 }
 
-func (s *MemoryLinkStore) Put(_ context.Context, org string, addr SubmissionAddress, links []HttpLinkItem) error {
-	key, err := linkStoreKey(org, addr)
+func (s *MemoryLinkStore) Put(_ context.Context, org string, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
+	key, err := linkStoreKey(org, addr, timestamp)
 	if err != nil {
 		return err
 	}
@@ -89,8 +93,8 @@ func (s *MemoryLinkStore) Put(_ context.Context, org string, addr SubmissionAddr
 	return nil
 }
 
-func (s *MemoryLinkStore) Get(_ context.Context, org string, addr SubmissionAddress) ([]HttpLinkItem, error) {
-	key, err := linkStoreKey(org, addr)
+func (s *MemoryLinkStore) Get(_ context.Context, org string, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
+	key, err := linkStoreKey(org, addr, timestamp)
 	if err != nil {
 		return nil, err
 	}

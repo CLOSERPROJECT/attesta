@@ -75,7 +75,7 @@ func main() {
 		JobInstanceID: living.DemoLineShiftID,
 		Mint: &living.CommitMint{Kind: living.MintKindSpawningNew},
 		Value: map[string]any{
-			"sourceLoadId": loadID,
+			"sourceLotId": loadID,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 80.0},
 			},

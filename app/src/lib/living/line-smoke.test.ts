@@ -10,8 +10,18 @@ import {
 	type Worklist
 } from './types.js';
 
-/** Live line Task ids — plant fixture (no parked loadedExtracted). */
-const lineTaskIds = ['openTurno', 'palletWeight', 'lineLoad', 'containerReg', 'closeTurno'];
+/** Live line Task ids — flattened peer many-submit + lot session (ADR-0008). */
+const lineTaskIds = [
+	'openTurno',
+	'startLot',
+	'weigh',
+	'markProgress',
+	'containerReg',
+	'closeLot',
+	'closeTurno'
+];
+
+type TaskStatus = 'locked' | 'unavailable' | 'available' | 'actionable' | 'done';
 
 function sub(
 	jobId: string,
@@ -32,8 +42,8 @@ function sub(
 
 /**
  * Fixture Worklist — mirrors Go ProjectWorklist for this smoke path.
- * containerReg unlocks with openTurno (unlockFrom); lineLoad also needs openTurno.
- * Group stays available until Close (one register Submission does not mark done).
+ * Peer many-submit Tasks gate on open lot (readyWhen); markProgress also
+ * requires ≥1 weighted unfinished pallet ($exists(weight)); no Task groups.
  */
 function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 	const lineInst = domain.jobInstances.find((i) => i.jobId === 'line');
@@ -44,7 +54,7 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 					jobId: 'intake',
 					canStart: true,
 					repeatable: true,
-					taskIds: ['truckArrive', 'lots', 'weightCheck'],
+					taskIds: ['truckArrive', 'register', 'weightCheck'],
 					tasks: [],
 					instances: []
 				},
@@ -59,28 +69,42 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 			]
 		};
 	}
-	const tasks: Record<string, 'locked' | 'available' | 'actionable' | 'done'> = {
+	const tasks: Record<string, TaskStatus> = {
 		openTurno: 'locked',
-		palletWeight: 'locked',
-		lineLoad: 'locked',
+		startLot: 'locked',
+		weigh: 'locked',
+		markProgress: 'locked',
 		containerReg: 'locked',
+		closeLot: 'locked',
 		closeTurno: 'locked'
 	};
 	const lineSubs = domain.submissions.filter(
 		(s) => s.jobId === 'line' && s.jobInstanceId === lineInst.id
 	);
 	const has = (taskId: string) => lineSubs.some((s) => s.taskId === taskId);
+	const openLot = Object.values(domain.lot ?? {}).some((lot) => lot?.status === 'open');
+	const openLotIds = new Set(
+		Object.entries(domain.lot ?? {})
+			.filter(([, lot]) => lot?.status === 'open')
+			.map(([id]) => id)
+	);
+	const hasWeightedUnfinishedPallet = Object.entries(domain.pallet ?? {}).some(
+		([, facts]) =>
+			openLotIds.has(String(facts?.lotId ?? '')) &&
+			facts?.weight != null &&
+			facts?.progress !== 'done'
+	);
 
 	if (has('openTurno')) tasks.openTurno = 'done';
 	else tasks.openTurno = 'actionable';
 
 	if (has('openTurno')) {
-		// Smoke skips weigh; treat palletWeight as already closed (seed-shaped).
-		tasks.palletWeight = 'done';
-		tasks.lineLoad = has('lineLoad') ? 'done' : 'actionable';
-		// unlockFrom openTurno — group stays available until Close
-		tasks.containerReg = 'available';
-		// unlockFrom openTurno; smoke leaves shift open (no closeTurno Commit).
+		tasks.startLot = openLot ? 'unavailable' : 'actionable';
+		tasks.weigh = openLot ? 'actionable' : 'unavailable';
+		tasks.markProgress =
+			openLot && hasWeightedUnfinishedPallet ? 'actionable' : 'unavailable';
+		tasks.containerReg = openLot ? 'actionable' : 'unavailable';
+		tasks.closeLot = openLot ? 'unavailable' : 'unavailable';
 		tasks.closeTurno = has('closeTurno') ? 'done' : 'actionable';
 	}
 
@@ -90,7 +114,7 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 				jobId: 'intake',
 				canStart: true,
 				repeatable: true,
-				taskIds: ['truckArrive', 'lots', 'weightCheck'],
+				taskIds: ['truckArrive', 'register', 'weightCheck'],
 				tasks: [],
 				instances: []
 			},
@@ -112,20 +136,20 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 	};
 }
 
-describe('line Commit smoke (session + Worklist + group register)', () => {
-	test('intake gate then line through openTurno, lineLoad, and containerReg register', async () => {
+describe('line Commit smoke (session + Worklist + leaf many-submit)', () => {
+	test('intake gate then line through openTurno, startLot, markProgress, containerReg', async () => {
 		const loadId = 'NO-261019-1';
 		let domain: Domain = {
 			...emptyDomain(),
-			load: {
-				[loadId]: { client: 'NO', truckWeight: 900, truckTare: 50 }
+			lot: {
+				[loadId]: { client: 'NO', truckWeight: 900, zipTare: 50, status: 'fullyProcessed' }
 			},
 			pallet: {
-				[`${loadId}.1`]: { loadId, weight: 400 },
-				[`${loadId}.2`]: { loadId, weight: 450 }
+				[`${loadId}.1`]: { lotId: loadId, weight: 400 },
+				[`${loadId}.2`]: { lotId: loadId, weight: 450 }
 			},
 			jobInstances: [{ jobId: 'intake', id: '261019-1', label: '261019-1' }],
-			submissions: [sub('intake', 'lots', '261019-1')]
+			submissions: [sub('intake', 'register', '261019-1')]
 		};
 		let worklist = worklistFor(domain, true);
 
@@ -152,7 +176,20 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 							sub('line', 'openTurno', req.jobInstanceId, req.value)
 						]
 					};
-				} else if (req.taskPath === 'line/lineLoad') {
+				} else if (req.taskPath === 'line/startLot') {
+					const lotId = String(req.value.lotId ?? '');
+					domain = {
+						...domain,
+						lot: {
+							...domain.lot,
+							[lotId]: { ...domain.lot[lotId], status: 'open' }
+						},
+						submissions: [
+							...domain.submissions,
+							sub('line', 'startLot', req.jobInstanceId, req.value)
+						]
+					};
+				} else if (req.taskPath === 'line/markProgress') {
 					const progress = (req.value.progress ?? {}) as Record<string, string | null>;
 					const pallet = { ...domain.pallet };
 					for (const [id, cell] of Object.entries(progress)) {
@@ -166,40 +203,36 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 						pallet,
 						submissions: [
 							...domain.submissions,
-							sub('line', 'lineLoad', req.jobInstanceId, progress)
+							sub('line', 'markProgress', req.jobInstanceId, progress)
 						]
 					};
-				} else if (req.taskPath === 'line/containerReg/new/register') {
+				} else if (req.taskPath === 'line/containerReg') {
 					domain = {
 						...domain,
 						container: {
 							'C-1': {
 								weight: 120,
 								material: 'Polvere di vetro',
-								sourceLoadId: loadId,
+								sourceLotId: loadId,
 								incomplete: false
 							},
 							'C-2': {
 								weight: 40,
 								material: 'Plastica',
-								sourceLoadId: loadId,
+								sourceLotId: loadId,
 								incomplete: false
 							}
 						},
-						load: {
-							...domain.load,
-							[loadId]: { ...domain.load[loadId], fullyProcessed: true }
-						},
 						submissions: [
 							...domain.submissions,
-							sub('line', 'register', req.jobInstanceId, req.value)
+							sub('line', 'containerReg', req.jobInstanceId, req.value)
 						]
 					};
 				}
 				worklist = worklistFor(domain, true);
 				const lineInst = worklistJobFor(worklist, 'line')?.instances[0];
 				let nextTaskFormBundle = null;
-				let navigation: 'task' | 'overview' | 'home' = 'home';
+				let navigation: 'task' | 'overview' | 'home' | 'stay' = 'home';
 				if (lineInst) {
 					for (const taskId of lineTaskIds) {
 						if (lineInst.tasks[taskId] !== 'actionable') continue;
@@ -276,42 +309,58 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 
 		expect(session.result?.worklist).toEqual(worklist);
 		const afterOpen = worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks;
-		expect(afterOpen?.lineLoad).toBe('actionable');
-		expect(afterOpen?.containerReg).toBe('available');
+		expect(afterOpen?.startLot).toBe('actionable');
+		expect(afterOpen?.markProgress).toBe('unavailable');
+		expect(afterOpen?.containerReg).toBe('unavailable');
 
 		expect(
 			(
 				await session.commit({
-					taskPath: 'line/lineLoad',
+					taskPath: 'line/startLot',
+					jobInstanceId: '2026-10-19-1st',
+					value: { lotId: loadId }
+				})
+			)?.jobInstanceId
+		).toBe('2026-10-19-1st');
+		expect(domain.lot[loadId]?.status).toBe('open');
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.markProgress
+		).toBe('actionable');
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
+		).toBe('actionable');
+
+		expect(
+			(
+				await session.commit({
+					taskPath: 'line/markProgress',
 					jobInstanceId: '2026-10-19-1st',
 					value: {
 						progress: {
 							[`${loadId}.1`]: 'done',
 							[`${loadId}.2`]: 'done'
 						}
-					},
-					mint: { kind: 'none' }
+					}
 				})
 			)?.jobInstanceId
 		).toBe('2026-10-19-1st');
 		expect(
-			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
-		).toBe('done');
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.markProgress
+		).toBe('unavailable');
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
-		).toBe('available');
+		).toBe('actionable');
 
 		expect(
 			(
 				await session.commit({
-					taskPath: 'line/containerReg/new/register',
+					taskPath: 'line/containerReg',
 					jobInstanceId: '2026-10-19-1st',
 					value: {
-						sourceLoadId: loadId,
+						sourceLotId: loadId,
 						polvereDiVetro: [{ weight: 120 }],
 						plastica: [{ weight: 40 }]
-					},
-					mint: { kind: 'spawningNew' }
+					}
 				})
 			)?.jobInstanceId
 		).toBe('2026-10-19-1st');
@@ -319,15 +368,26 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 		const lineSubs = domain.submissions.filter(
 			(s) => s.jobId === 'line' && s.jobInstanceId === '2026-10-19-1st'
 		);
-		expect(lineSubs.map((s) => s.taskId)).toEqual(['openTurno', 'lineLoad', 'register']);
+		expect(lineSubs.map((s) => s.taskId)).toEqual([
+			'openTurno',
+			'startLot',
+			'markProgress',
+			'containerReg'
+		]);
 		expect(Object.keys(domain.container)).toHaveLength(2);
-		expect(domain.load[loadId]?.fullyProcessed).toBe(true);
+		expect(domain.lot[loadId]?.status).toBe('open');
 		expect(worklistJobFor(session.result!.worklist, 'line')?.canStart).toBe(true);
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
-		).toBe('available');
+		).toBe('actionable');
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks
 		).not.toHaveProperty('loadedExtracted');
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks
+		).not.toHaveProperty('palletWeight');
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks
+		).not.toHaveProperty('lineLoad');
 	});
 });

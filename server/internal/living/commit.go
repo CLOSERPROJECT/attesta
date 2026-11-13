@@ -300,7 +300,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	if c.LinkStore != nil && len(result.Links) > 0 {
 		// Side record only — never roll back Domain or fail Commit on store error.
-		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), result.Links)
+		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), ts, result.Links)
 	}
 	return result, nil
 }
@@ -358,7 +358,7 @@ func resolveDefaultCommitDestination(
 		}
 		return CommitNextTask, b, nil
 	}
-	if worklistInstanceHasRemainingWork(wl, jobID, jobInstanceID) {
+	if worklistInstanceHasRemainingWork(cfg, wl, jobID, jobInstanceID) {
 		return CommitNextOverview, nil, nil
 	}
 	return CommitNextHome, nil, nil

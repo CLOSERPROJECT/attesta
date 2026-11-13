@@ -17,8 +17,6 @@ describe('HttpQrResolvePort', () => {
 					navigate: {
 						jobId: 'line',
 						jobInstanceId: 'L1',
-						groupId: 'palletWeight',
-						groupInstanceId: 'new',
 						taskId: 'weigh'
 					},
 					seed: { palletId: 'P1' }

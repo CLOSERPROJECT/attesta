@@ -33,6 +33,8 @@
 	"toast_dismiss": "Close",
 	"loading_recap": "Loading recap…",
 	"could_not_load_recap": "Could not load recap",
+	"submission_count_one": "{count} submission",
+	"submission_count_many": "{count} submissions",
 	"form_unavailable": "Form unavailable",
 	"validation_failed": "Validation failed",
 	"no_primary_load": "No primary load",

@@ -81,14 +81,14 @@ func TestCommitLotRegisterMintsLoadAndPallets(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	loadID := firstLoadID(result.Domain)
-	if loadID == "" || result.Domain.Kind("load")[loadID]["client"] != "CO" {
-		t.Fatalf("load = %#v", result.Domain.Kind("load"))
+	if loadID == "" || result.Domain.Kind("lot")[loadID]["client"] != "CO" {
+		t.Fatalf("load = %#v", result.Domain.Kind("lot"))
 	}
-	if result.Domain.Kind("load")[loadID]["numeroFir"] != "FIR-1" {
-		t.Fatalf("numeroFir missing: %#v", result.Domain.Kind("load")[loadID])
+	if result.Domain.Kind("lot")[loadID]["numeroFir"] != "FIR-1" {
+		t.Fatalf("numeroFir missing: %#v", result.Domain.Kind("lot")[loadID])
 	}
-	if result.Domain.Kind("load")[loadID]["netWeight"] != 300.0 {
-		t.Fatalf("netWeight = %#v", result.Domain.Kind("load")[loadID]["netWeight"])
+	if result.Domain.Kind("lot")[loadID]["netWeight"] != 300.0 {
+		t.Fatalf("netWeight = %#v", result.Domain.Kind("lot")[loadID]["netWeight"])
 	}
 	if len(result.Domain.Kind("pallet")) != 2 {
 		t.Fatalf("pallets = %#v", result.Domain.Kind("pallet"))
@@ -97,7 +97,7 @@ func TestCommitLotRegisterMintsLoadAndPallets(t *testing.T) {
 		t.Fatalf("truck last reading = %#v", result.Domain.Kind("truck")[truckID])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || last.GroupID != "lots" {
+	if last.TaskID != "register" || last.GroupID != "" {
 		t.Fatalf("submission = %#v", last)
 	}
 }
@@ -132,7 +132,7 @@ func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	}
 }
 
-func TestCommitWeightCheckAfterLotsClose(t *testing.T) {
+func TestCommitWeightCheckAfterRegister(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
@@ -152,7 +152,7 @@ func TestCommitWeightCheckAfterLotsClose(t *testing.T) {
 	}
 }
 
-func TestCommitLotsUnlocksAfterArrive(t *testing.T) {
+func TestCommitRegisterUnlocksAfterArrive(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 	cfg, err := LoadFeragameConfigFixture()
@@ -165,17 +165,25 @@ func TestCommitLotsUnlocksAfterArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "lots",
+		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "register",
 		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
 	}) {
-		t.Fatal("truckArrive should unlock lots group")
+		t.Fatal("truckArrive should unlock register")
 	}
-	if IsTaskUnlocked(UnlockQuery{
+	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
 		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
 		ClosedGroups: domain.ClosedGroups,
 	}) {
-		t.Fatal("weightCheck must stay locked until lots close")
+		t.Fatal("weightCheck must unlock after truckArrive (many-skip over register)")
+	}
+	wl := ProjectWorklist(cfg, domain, OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}})
+	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), truckID)
+	if !ok {
+		t.Fatal("missing intake instance")
+	}
+	if inst.Tasks["weightCheck"] != TaskStatusUnavailable {
+		t.Fatalf("weightCheck = %q, want unavailable until ≥1 lot (readyWhen)", inst.Tasks["weightCheck"])
 	}
 }
 

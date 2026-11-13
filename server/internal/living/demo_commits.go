@@ -7,7 +7,7 @@ import (
 )
 
 // Demo instance ids for Oct-19 smoke / legacy Commit helpers (not SeedDemo stage matrix).
-// Truck: YYMMDD-n from open workingDay date. Load: client-YYMMDD-n from lots/register.
+// Truck: YYMMDD-n from open workingDay date. Lot: client-YYMMDD-n from intake/register.
 const (
 	DemoTruckInstanceID = "261019-1"
 	DemoLoadInstanceID  = "CO-261019-1"
@@ -73,28 +73,22 @@ func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *Committer, org str
 	}
 	truckID = arrive.JobInstanceID
 	lot, err := c.Commit(ctx, org, op, CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value: map[string]any{
 			"client": "CO", "wasteCode": "160214", "numeroFir": "FIR-1",
 			"palletCount": 2.0, "truckWeightAfter": 700.0, "notes": "",
 		},
-		Mint: spawningNewMint(),
 	})
 	if err != nil {
 		return "", "", err
 	}
-	for id := range lot.Domain.Kind("load") {
+	for id := range lot.Domain.Kind("lot") {
 		loadID = id
 		break
 	}
 	if loadID == "" {
-		return "", "", fmt.Errorf("living: expected minted load")
-	}
-	if _, err := c.CloseGroup(ctx, org, op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
-	}); err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("living: expected minted lot")
 	}
 	return truckID, loadID, nil
 }
@@ -116,6 +110,13 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *Committer, org stri
 	if err != nil {
 		return Domain{}, err
 	}
+	if _, err := c.Commit(ctx, org, op, CommitRequest{
+		TaskPath:      "line/startLot",
+		JobInstanceID: line.JobInstanceID,
+		Value:         map[string]any{"lotId": loadID},
+	}); err != nil {
+		return Domain{}, err
+	}
 	for _, row := range []struct {
 		id     string
 		weight float64
@@ -124,18 +125,12 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *Committer, org stri
 		{loadID + ".2", 22},
 	} {
 		if _, err := c.Commit(ctx, org, op, CommitRequest{
-			TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+			TaskPath:      "line/weigh",
 			JobInstanceID: line.JobInstanceID,
 			Value:         weighValue(row.id, row.weight),
-			Mint:          spawningNewMint(),
 		}); err != nil {
 			return Domain{}, err
 		}
-	}
-	if _, err := c.CloseGroup(ctx, org, op, CloseGroupRequest{
-		JobID: "line", JobInstanceID: line.JobInstanceID, GroupID: "palletWeight",
-	}); err != nil {
-		return Domain{}, err
 	}
 	return c.Domains.Get(ctx, org)
 }
@@ -170,8 +165,8 @@ func commitCloseTurnoCtx(ctx context.Context, c *Committer, org, lineID string) 
 	return err
 }
 
-// seedLineLoadReadyDomain wipes org Domain then Commits intake lots + line weigh
-// so lineLoad readyWhen is true (weighed pallet row ids).
+// seedLineLoadReadyDomain wipes org Domain then Commits intake + openTurno + startLot +
+// weigh so markProgress / containerReg see an open lot with weighed pallets.
 func seedLineLoadReadyDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
 	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
 		return err

@@ -30,12 +30,12 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	}
 
 	truckID := commitTruckArrive(t, c)
-	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
+	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spawn.TaskID != "register" || spawn.GroupID != "lots" || spawn.JobInstanceID != truckID {
-		t.Fatalf("lots/register = %#v", spawn)
+	if spawn.TaskID != "register" || spawn.GroupID != "" || spawn.JobInstanceID != truckID {
+		t.Fatalf("register = %#v", spawn)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
 
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 		t.Fatal(err)
 	}
 	loaded.TaskFormBundles = nil
-	again, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
+	again, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,17 +69,18 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 
 func TestLoadTaskBundleDeniesRoleOutsideBoardScope(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
-	_, _, _ = commitIntakeThroughLotsClosed(t, c)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	_, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID)
+	_, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "line", "weigh", lineID, "", "")
 	if !errors.Is(err, ErrTaskBundleForbidden) {
 		t.Fatalf("admin weigh err = %v, want forbidden", err)
 	}
 
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", logistic, "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", logistic, "line", "weigh", lineID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,12 +119,13 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 		t.Fatalf("new provisional = %d", rec.Code)
 	}
 
-	_, _, _ = commitIntakeThroughLotsClosed(t, c)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/living/task-form?jobId=line&taskId=weigh&jobInstanceId="+lineID+"&groupId=palletWeight&groupInstanceId="+ProvisionalGroupInstanceID, nil))
+		"/api/living/task-form?jobId=line&taskId=weigh&jobInstanceId="+lineID, nil))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("admin weigh = %d, want 403", rec.Code)
 	}
@@ -136,7 +138,7 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	logH.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/living/task-form?jobId=line&taskId=weigh&jobInstanceId="+lineID+"&groupId=palletWeight&groupInstanceId="+ProvisionalGroupInstanceID, nil))
+		"/api/living/task-form?jobId=line&taskId=weigh&jobInstanceId="+lineID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logistic weigh = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -167,36 +169,22 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	}
 
 	lot, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	loadID := firstLoadID(lot.Domain)
 	if loadID == "" {
-		t.Fatal("expected load")
+		t.Fatal("expected lot")
 	}
 	if lot.Navigation != CommitNextStay {
 		t.Fatalf("after lot Navigation = %q, want stay", lot.Navigation)
 	}
-	if lot.ContinueNavigation != CommitNextOverview {
-		t.Fatalf("after lot ContinueNavigation = %q, want overview", lot.ContinueNavigation)
-	}
-
-	closed, err := c.CloseGroup(t.Context(), "feragame", admin, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if closed.Navigation != CommitNextTask {
-		t.Fatalf("after close Navigation = %q, want task", closed.Navigation)
-	}
-	if closed.NextTaskFormBundle == nil || closed.NextTaskFormBundle.TaskID != "weightCheck" {
-		t.Fatalf("after close bundle = %s, want weightCheck", bundleAddress(closed.NextTaskFormBundle))
+	if lot.ContinueNavigation != CommitNextTask {
+		t.Fatalf("after lot ContinueNavigation = %q, want task (weightCheck)", lot.ContinueNavigation)
 	}
 
 	done, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
@@ -211,16 +199,16 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	}
 
 	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, lineID, loadID)
 	pw, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
-		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
+		TaskPath:      "line/weigh",
 		JobInstanceID: lineID,
 		Value:         weighValue(loadID+".1", 11),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pw.Navigation != CommitNextOverview && pw.Navigation != CommitNextTask {
+	if pw.Navigation != CommitNextStay && pw.Navigation != CommitNextOverview && pw.Navigation != CommitNextTask {
 		t.Fatalf("logistic Navigation = %q", pw.Navigation)
 	}
 }

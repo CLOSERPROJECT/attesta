@@ -83,4 +83,65 @@ describe('worklist helpers', () => {
 		expect(intake?.tasks[1]?.title).toBeTruthy();
 		expect(intake?.tasks[1]?.roles).toEqual(['logistic']);
 	});
+
+	test('WorklistInstance submissionCounts mirrors Go wire (0 omit / 1 / N)', () => {
+		const emptyCounts: Worklist = {
+			jobs: [
+				{
+					jobId: 'session',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['repeat'],
+					tasks: [{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }],
+					instances: [{ id: 'S1', label: 'Session', tasks: { repeat: 'actionable' } }]
+				}
+			]
+		};
+		expect(emptyCounts.jobs[0].instances[0].submissionCounts).toBeUndefined();
+
+		const one: Worklist = {
+			jobs: [
+				{
+					jobId: 'session',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['start', 'repeat'],
+					tasks: [
+						{ id: 'start', title: 'Start', roles: ['operator'] },
+						{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }
+					],
+					instances: [
+						{
+							id: 'S1',
+							label: 'Session',
+							tasks: { start: 'done', repeat: 'actionable' },
+							submissionCounts: { start: 1 }
+						}
+					]
+				}
+			]
+		};
+		expect(one.jobs[0].instances[0].submissionCounts).toEqual({ start: 1 });
+
+		const many: Worklist = {
+			jobs: [
+				{
+					jobId: 'session',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['repeat'],
+					tasks: [{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }],
+					instances: [
+						{
+							id: 'S1',
+							label: 'Session',
+							tasks: { repeat: 'actionable' },
+							submissionCounts: { repeat: 3 }
+						}
+					]
+				}
+			]
+		};
+		expect(many.jobs[0].instances[0].submissionCounts?.repeat).toBe(3);
+	});
 });

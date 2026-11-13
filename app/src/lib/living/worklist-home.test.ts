@@ -257,6 +257,54 @@ describe('worklist-home bands', () => {
 		expect(progressFraction(5, 3)).toBe(1);
 	});
 
+	test('instanceTaskProgress ignores submit: many for done/total and Completed band', () => {
+		const job: Worklist['jobs'][number] = {
+			jobId: 'intake',
+			canStart: false,
+			repeatable: true,
+			title: 'Camion',
+			taskIds: ['truckArrive', 'register', 'weightCheck'],
+			tasks: [
+				{ id: 'truckArrive', title: 'Arrive', roles: ['administration'], submit: 'once' },
+				{ id: 'register', title: 'Register', roles: ['administration'], submit: 'many' },
+				{ id: 'weightCheck', title: 'Weight', roles: ['administration'], submit: 'once' }
+			],
+			instances: [
+				{
+					id: 'T1',
+					label: 'Truck 1',
+					tasks: {
+						truckArrive: 'done',
+						register: 'actionable',
+						weightCheck: 'done'
+					}
+				},
+				{
+					id: 'T2',
+					label: 'Truck 2',
+					tasks: {
+						truckArrive: 'done',
+						register: 'actionable',
+						weightCheck: 'locked'
+					}
+				}
+			]
+		};
+		const wl: Worklist = { jobs: [job] };
+
+		expect(instanceTaskProgress(job, job.instances[0]!)).toEqual({ done: 2, total: 2 });
+		expect(instanceTaskProgress(job, job.instances[1]!)).toEqual({ done: 1, total: 2 });
+
+		expect(completedRowsFromWorklist(wl).map((r) => r.jobInstanceId)).toEqual(['T1']);
+		expect(inProgressRowsFromWorklist(wl).map((r) => r.jobInstanceId)).toEqual(['T2']);
+
+		// Flat many-submit still appears in Available while readyWhen keeps it actionable.
+		expect(
+			availableRowsFromWorklist(wl).map((r) => `${r.jobInstanceId}/${r.taskId}`)
+		).toEqual(['T1/register', 'T2/register']);
+		expect(availableRowsFromWorklist(wl).every((r) => !r.groupId)).toBe(true);
+	});
+
 	test('canStartRows use startLabel and first Task; provisional segment is new', () => {
 		expect(canStartRowsFromWorklist(adminWorklist)).toEqual([
 			{

@@ -1,11 +1,12 @@
 # Attesta Feragame demo fixture (steps / substeps).
 # Single source of truth: embedded by Go (LoadFeragameConfigFixture) and imported by SPA tests.
-# Plant tree: workingDay open → close; intake truckArrive → lots → weightCheck;
-# line openTurno → palletWeight / lineLoad / containerReg → closeTurno; passport.
+# Plant tree: workingDay open → close; intake truckArrive → register (many) → weightCheck;
+# line openTurno → startLot → weigh / markProgress / containerReg → closeLot → closeTurno; passport.
 #
 # Authored tasks are ordered lists with required unique id (not maps).
 # openTurno is a Job-start mint leaf (date+turno); engine cannot startingNew on a group-first Job.
 # whole-day is a workingDay.mode (and shift.turno id segment), not a turni catalog peer.
+# Line is leaf-only (submit once|many + readyWhen); no Task groups / unlockFrom.
 
 id: feragame-config
 org: feragame
@@ -17,15 +18,15 @@ domain:
             fields: [workingDayId, turno, status]
         truck:
             fields: [workingDayId, truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
-        load:
-            # fullyProcessed = register closure only; locked/issued = Passport lock (v1 once).
-            fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, fullyProcessed, locked, issued]
+        lot:
+            # status = open|parked|fullyProcessed (lot session); closeLot alone writes fullyProcessed; locked/issued = Passport lock.
+            fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, status, locked, issued]
         pallet:
             # Per-row tare + IR/NIR at weigh time.
-            fields: [loadId, weight, tareKind, idoneita, panelCount, progress]
-        # weight = booked kg for sourceLoadId; incomplete freeze; secondarySourceLoadId from continued prior.
+            fields: [lotId, weight, tareKind, idoneita, panelCount, progress]
+        # weight = booked kg for sourceLotId; incomplete freeze; secondarySourceLotId from continued prior.
         container:
-            fields: [weight, material, incomplete, sourceLoadId, secondarySourceLoadId]
+            fields: [weight, material, incomplete, sourceLotId, secondarySourceLotId]
 # Stable catalog vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
 catalogs:
     clients:
@@ -60,7 +61,7 @@ catalogs:
         - {key: alluminio, label: Alluminio}
         - {key: sopravaglio, label: Sopravaglio}
         - {key: polvereDiAspirazione, label: Polvere di aspirazione}
-# QR resolve (topbar Scan / cold ?entityId=). Encode stays on lots/register http body.
+# QR resolve (topbar Scan / cold ?entityId=). Encode stays on intake/register http body.
 qr:
     rules:
         - id: line-pallet-weigh
@@ -68,50 +69,49 @@ qr:
             $type($scan.entityId) = "string" and $length($trim($scan.entityId)) > 0
           match:
             jobId: line
-            groupId: palletWeight
             taskId: weigh
-            allowSpawn: true
           # jsonata-go: $exists($lookup(...)) is true for missing keys; probe a field / sift instead.
           eligible: |
             (
               $count($sift($domain.pallet, function($v, $k){$k = $scan.entityId})) = 1
               and $not($exists($lookup($domain.pallet, $scan.entityId).weight))
+              and $lookup($domain.lot, $lookup($domain.pallet, $scan.entityId).lotId).status = "open"
             )
           seed:
             palletId: $scan.entityId
           messages:
             onZero: Nessuna pesatura disponibile per questo bancale
             onMany: "Più destinazioni possibili: apri il turno giusto dalla lista lavori"
-            onIneligible: Bancale non pesabile (assente o già pesato)
+            onIneligible: Bancale non pesabile (assente, già pesato, o lotto non aperto)
 # Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
-# After YAML shape changes: task seed:feragame-core (empty Domain). Demo Jobs: task seed:feragame-full. Full rewrite: task seed -- --replace.
+# After YAML shape changes: task seed:feragame-config (empty Domain). Staged Domain: seed:feragame-domain. With Appwrite: seed:feragame-identity / seed:feragame-full. Full-stack: task seed -- --replace.
 passport:
     subject:
-        entity: load
+        entity: lot
     identity:
         gtin: '"9506000134352"'
-        lot: '$lookup($domain.load, $subjectId).numeroFir'
+        lot: '$lookup($domain.lot, $subjectId).numeroFir'
         serial: '$subjectId'
         productName: '"Carico Feragame"'
         description: >-
             (
-              $load := $lookup($domain.load, $subjectId);
-              $client := $lookup($catalogs.clients, $load.client);
-              $client & " — CER " & $load.wasteCode
+              $lot := $lookup($domain.lot, $subjectId);
+              $client := $lookup($catalogs.clients, $lot.client);
+              $client & " — CER " & $lot.wasteCode
             )
     snapshot:
         # dataReport-shaped; Lock Load chrome injects this expr live (same freeze on Commit).
         expr: |-
             (
-              $load := $lookup($domain.load, $subjectId);
-              $truck := $lookup($domain.truck, $load.truckId);
+              $lot := $lookup($domain.lot, $subjectId);
+              $truck := $lookup($domain.truck, $lot.truckId);
               $day := $lookup($domain.workingDay, $truck.workingDayId);
               $openShiftMap := $sift($domain.shift, function($v){$v.workingDayId = $truck.workingDayId and $v.status = "open"});
               $openShiftIds := $keys($openShiftMap);
               $openShift := $count($openShiftIds) = 1 ? $lookup($openShiftMap, $openShiftIds[0]) : null;
               $turnoLabel := $openShift.turno = "whole-day" ? "giornata intera" : $lookup($catalogs.turni, $openShift.turno);
-              $palletMap := $sift($domain.pallet, function($v){$v.loadId = $subjectId});
-              $containerMap := $sift($domain.container, function($v){$v.sourceLoadId = $subjectId});
+              $palletMap := $sift($domain.pallet, function($v){$v.lotId = $subjectId});
+              $containerMap := $sift($domain.container, function($v){$v.sourceLotId = $subjectId});
               $palletIds := $sort($keys($palletMap));
               $containerIds := $sort($keys($containerMap));
               $pallets := $count($palletIds) = 0 ? [] : $append([], $map($palletIds, function($id){$merge([$lookup($palletMap, $id), {"id": $id}])}));
@@ -134,18 +134,18 @@ passport:
               {
                 "title": "DPP carico",
                 "subjectId": $subjectId,
-                "load": $load,
+                "lot": $lot,
                 "truck": $truck,
                 "pallets": $pallets,
                 "containers": $containers,
                 "rows": $append(
                   [
                     $row("Carico", $subjectId),
-                    $row("Cliente", $lookup($catalogs.clients, $load.client)),
-                    $row("FIR", $str($load.numeroFir)),
-                    $row("CER", $str($load.wasteCode)),
-                    $row("Netto lotto (kg)", $kg($load.netWeight)),
-                    $row("Camion", $str($load.truckId)),
+                    $row("Cliente", $lookup($catalogs.clients, $lot.client)),
+                    $row("FIR", $str($lot.numeroFir)),
+                    $row("CER", $str($lot.wasteCode)),
+                    $row("Netto lotto (kg)", $kg($lot.netWeight)),
+                    $row("Camion", $str($lot.truckId)),
                     $row("Giornata", $str($day.date) & ($openShift ? " / " & $turnoLabel : "")),
                     $row("Peso lordo camion (kg)", $kg($truck.truckWeight))
                   ],
@@ -208,7 +208,6 @@ steps:
                         status: '"open"'
             - id: close
               roles: [administration]
-              unlockFrom: open
               onCommit:
                   advanceTarget: false
               readyWhen: >-
@@ -261,144 +260,144 @@ steps:
                           $keys($sift($domain.workingDay, function($v){$v.status = "open"}))[0]
                         truckWeight: $.truckWeight
                         lastScaleReading: $.truckWeight
-            - id: lots
-              kind: group
+            - id: register
+              roles: [administration]
+              submit: many
               title: Codici FIR
-              repeatable: true
-              startLabel: Nuovo lotto
-              closeLabel: Chiudi scarico
-              instanceLabelEntity: load
-              closeRequiresChildSubmission: true
-              substeps:
-                - id: register
-                  roles: [administration]
-                  onCommit:
-                      navigation: stay
-                  schema:
-                    type: object
-                    required: [client, numeroFir, palletCount, truckWeightAfter]
-                    properties:
-                        client:
-                            type: string
-                            title: Cliente
-                            enum: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
-                        wasteCode:
-                            type: string
-                            title: Codice CER
-                            enum: ['160214']
-                            default: '160214'
-                        numeroFir: {type: string, minLength: 1, title: Numero FIR}
-                        palletCount: {type: integer, minimum: 1, title: Numero di bancali}
-                        truckWeightAfter: {type: number, exclusiveMinimum: 0, title: Peso camion dopo scarico}
-                        notes: {type: string, title: Note}
-                  uiSchema:
-                    ui:options:
-                        order: [client, wasteCode, numeroFir, palletCount, truckWeightAfter, notes]
+              onCommit:
+                  navigation: stay
+              readyWhen: >-
+                (
+                  $type($lookup($domain.truck, $instance.id).workingDayId) = "string"
+                  and $count($domain.submissions[jobId = "intake" and taskId = "weightCheck" and jobInstanceId = $instance.id]) = 0
+                )
+              schema:
+                type: object
+                required: [client, numeroFir, palletCount, truckWeightAfter]
+                properties:
                     client:
-                        ui:options:
-                            enumNames: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
+                        type: string
+                        title: Cliente
+                        enum: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
                     wasteCode:
-                        ui:options:
-                            enumNames: ['16.02.14']
-                  chrome:
-                    progressiveNumber:
-                        kind: readonly
-                        title: Progressivo cliente
-                        after: client
-                        expr: >-
-                            (
-                              $truck := $lookup($domain.truck, $instance.id);
-                              $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1
-                            )
-                    lotNetWeight:
-                        kind: readonly
-                        title: Peso netto lotto
-                        after: truckWeightAfter
-                        expr: >-
-                            (
-                              $prev := $lookup($domain.truck, $instance.id).lastScaleReading;
-                              $type($prev) = 'number' and $type($.truckWeightAfter) = 'number' ? $prev - $.truckWeightAfter : null
-                            )
-                  onSubmit:
-                    transform:
-                        - op: mint
-                          entity: load
-                          as: load
-                          id: >-
-                            (
-                              $truck := $lookup($domain.truck, $instance.id);
-                              $day := $lookup($domain.workingDay, $truck.workingDayId);
-                              $n := $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1;
-                              $.client & '-' & $substring($replace($day.date, '-', ''), 2) & '-' & $string($n)
-                            )
-                          set:
-                            client: $.client
-                            clientProgressive: >-
-                              (
-                                $truck := $lookup($domain.truck, $instance.id);
-                                $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1
-                              )
-                            numeroFir: $.numeroFir
-                            wasteCode: $.wasteCode
-                            palletCount: $.palletCount
-                            truckId: $instance.id
-                            notes: $.notes
-                            netWeight: >-
-                              $lookup($domain.truck, $instance.id).lastScaleReading - $.truckWeightAfter
-                        - op: mintMany
-                          entity: pallet
-                          count: $.palletCount
-                          id: "$load.id & '.' & $string($index + 1)"
-                          set:
-                            loadId: $load.id
-                        - op: patch
-                          entity: truck
-                          id: $instance.id
-                          set:
-                            lastScaleReading: $.truckWeightAfter
-                    http:
-                        - method: '"POST"'
-                          url: '"/fake/labels"'
-                          label: '"Stampa etichette"'
-                          action: link
-                          body: >-
-                            {
+                        type: string
+                        title: Codice CER
+                        enum: ['160214']
+                        default: '160214'
+                    numeroFir: {type: string, minLength: 1, title: Numero FIR}
+                    palletCount: {type: integer, minimum: 1, title: Numero di bancali}
+                    truckWeightAfter: {type: number, exclusiveMinimum: 0, title: Peso camion dopo scarico}
+                    notes: {type: string, title: Note}
+              uiSchema:
+                ui:options:
+                    order: [client, wasteCode, numeroFir, palletCount, truckWeightAfter, notes]
+                client:
+                    ui:options:
+                        enumNames: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
+                wasteCode:
+                    ui:options:
+                        enumNames: ['16.02.14']
+              chrome:
+                progressiveNumber:
+                    kind: readonly
+                    title: Progressivo cliente
+                    after: client
+                    expr: >-
+                        (
+                          $truck := $lookup($domain.truck, $instance.id);
+                          $count($filter($domain.lot.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1
+                        )
+                lotNetWeight:
+                    kind: readonly
+                    title: Peso netto lotto
+                    after: truckWeightAfter
+                    expr: >-
+                        (
+                          $prev := $lookup($domain.truck, $instance.id).lastScaleReading;
+                          $type($prev) = 'number' and $type($.truckWeightAfter) = 'number' ? $prev - $.truckWeightAfter : null
+                        )
+              onSubmit:
+                transform:
+                    - op: mint
+                      entity: lot
+                      as: lot
+                      id: >-
+                        (
+                          $truck := $lookup($domain.truck, $instance.id);
+                          $day := $lookup($domain.workingDay, $truck.workingDayId);
+                          $n := $count($filter($domain.lot.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1;
+                          $.client & '-' & $substring($replace($day.date, '-', ''), 2) & '-' & $string($n)
+                        )
+                      set:
+                        client: $.client
+                        clientProgressive: >-
+                          (
+                            $truck := $lookup($domain.truck, $instance.id);
+                            $count($filter($domain.lot.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1
+                          )
+                        numeroFir: $.numeroFir
+                        wasteCode: $.wasteCode
+                        palletCount: $.palletCount
+                        truckId: $instance.id
+                        notes: $.notes
+                        netWeight: >-
+                          $lookup($domain.truck, $instance.id).lastScaleReading - $.truckWeightAfter
+                    - op: mintMany
+                      entity: pallet
+                      count: $.palletCount
+                      id: "$lot.id & '.' & $string($index + 1)"
+                      set:
+                        lotId: $lot.id
+                    - op: patch
+                      entity: truck
+                      id: $instance.id
+                      set:
+                        lastScaleReading: $.truckWeightAfter
+                http:
+                    - method: '"POST"'
+                      url: '"/fake/labels"'
+                      label: '"Stampa etichette"'
+                      action: link
+                      body: >-
+                        {
 
-                              "loadId": $load.id,
-                              "date": $substring($replace($lookup($domain.workingDay, $lookup($domain.truck, $instance.id).workingDayId).date, '-', ''), 2),
-                              "client": $.client,
-                              "clientProgressive": $load.clientProgressive,
-                              "numeroFir": $.numeroFir,
-                              "wasteCode": $.wasteCode,
-                              "palletCount": $.palletCount,
-                              "netWeight": $load.netWeight,
-                              "labels": [$each(
-                                $sift($domain.pallet, function($v){$v.loadId = $load.id}),
-                                function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
-                              )]
-                            }
-                        - method: '"POST"'
-                          url: '"/fake/register-csv"'
-                          label: '"Scarica CSV registrazione"'
-                          action: download
-                          body: >-
-                            {
+                          "lotId": $lot.id,
+                          "date": $substring($replace($lookup($domain.workingDay, $lookup($domain.truck, $instance.id).workingDayId).date, '-', ''), 2),
+                          "client": $.client,
+                          "clientProgressive": $lot.clientProgressive,
+                          "numeroFir": $.numeroFir,
+                          "wasteCode": $.wasteCode,
+                          "palletCount": $.palletCount,
+                          "netWeight": $lot.netWeight,
+                          "labels": [$each(
+                            $sift($domain.pallet, function($v){$v.lotId = $lot.id}),
+                            function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
+                          )]
+                        }
+                    - method: '"POST"'
+                      url: '"/fake/register-csv"'
+                      label: '"Scarica CSV registrazione"'
+                      action: download
+                      body: >-
+                        {
 
-                              "client": $.client,
-                              "numeroFir": $.numeroFir,
-                              "palletCount": $.palletCount,
-                              "truckWeightAfter": $.truckWeightAfter,
-                              "netWeight": $load.netWeight,
-                              "notes": $.notes,
-                              "loadId": $load.id,
-                              "truckId": $instance.id,
-                              "palletIds": [$each(
-                                $sift($domain.pallet, function($v){$v.loadId = $load.id}),
-                                function($v, $k){$k}
-                              )]
-                            }
+                          "client": $.client,
+                          "numeroFir": $.numeroFir,
+                          "palletCount": $.palletCount,
+                          "truckWeightAfter": $.truckWeightAfter,
+                          "netWeight": $lot.netWeight,
+                          "notes": $.notes,
+                          "lotId": $lot.id,
+                          "truckId": $instance.id,
+                          "palletIds": [$each(
+                            $sift($domain.pallet, function($v){$v.lotId = $lot.id}),
+                            function($v, $k){$k}
+                          )]
+                        }
             - id: weightCheck
               roles: [administration]
+              readyWhen: >-
+                $count($domain.lot.*[truckId = $instance.id]) >= 1
               schema:
                 type: object
                 title: Controllo camion vs lotti
@@ -418,7 +417,7 @@ steps:
                         (
                           $truck := $lookup($domain.truck, $instance.id);
                           $gross := $truck.truckWeight;
-                          $lotSum := $sum($append([], $domain.load.*[truckId=$instance.id].netWeight));
+                          $lotSum := $sum($append([], $domain.lot.*[truckId=$instance.id].netWeight));
                           $tare := $truck.lastScaleReading;
                           $m := $max([$gross - $tare, $lotSum]);
                           $pct := $m = 0 ? 0 : 100 * $min([$gross - $tare, $lotSum]) / $m;
@@ -535,317 +534,395 @@ steps:
                           $domain.workingDay.*[status = "open"].date
                         turno: $.turno
                         status: '"open"'
-            - id: palletWeight
-              kind: group
-              title: Pesatura bancali
-              repeatable: true
-              startLabel: Nuova pesata
-              closeLabel: Chiudi pesatura
-              closeRequiresChildSubmission: true
-              instanceLabelEntity: pallet
-              substeps:
-                - id: weigh
-                  roles: [logistic]
-                  reads:
-                    pallets:
-                        entity: pallet
-                        where: $not($exists(weight))
-                        key: id
-                  enumReads:
-                    palletId: pallets
-                  derived:
-                    panelCount:
-                        overridable: true
-                        expr: |
-                            (
-                              $avg := $data.averagePanelWeight;
-                              $kind := $data.tareKind;
-                              $tare := $kind = 'custom'
-                                ? $data.customTareWeight
-                                : $lookup($catalogs.tareKinds, $kind);
-                              $w := $data.weight;
-                              $avg > 0 and $type($tare) = "number" and $type($w) = "number"
-                                ? $floor(($w - $tare) / $avg)
-                                : undefined
-                            )
-                  schema:
-                    type: object
-                    title: Pesa bancale
-                    required: [palletId, averagePanelWeight, tareKind, weight, idoneita]
-                    properties:
-                        palletId: {type: string, title: Bancale}
-                        averagePanelWeight:
-                            type: number
-                            exclusiveMinimum: 0
-                            title: Peso medio pannello (kg)
-                            default: 20
-                        tareKind:
-                            type: string
-                            title: Tara
-                            enum: [industrial, euro, custom]
-                            default: industrial
-                        customTareWeight:
-                            type: number
-                            exclusiveMinimum: 0
-                            title: Tara personalizzata (kg)
-                        weight: {type: number, exclusiveMinimum: 0, title: Peso}
-                        idoneita:
-                            type: string
-                            title: IR / NIR
-                            enum: [NIR, IR]
-                            default: NIR
-                        panelCount: {type: number, title: Pannelli}
-                  uiSchema:
-                    ui:options:
-                        order:
-                            [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
-                    tareKind:
-                        ui:options:
-                            enumNames: ['industriale (25 kg)', 'euro (20 kg)', 'personalizzato']
-                    idoneita:
-                        ui:options:
-                            enumNames: [NIR, IR]
-                    panelCount:
-                        ui:field: derivedLeaf
-                  onSubmit:
-                    transform:
-                        - op: patch
-                          entity: pallet
-                          id: $.palletId
-                          set:
-                            weight: $.weight
-                            tareKind: $.tareKind
-                            idoneita: $.idoneita
-                            panelCount: $.panelCount
-            - id: lineLoad
-              kind: group
-              title: Segna avanzamento
-              repeatable: true
-              startLabel: Nuovo avanzamento
-              closeLabel: Chiudi avanzamento
-              closeRequiresChildSubmission: true
-              instanceLabelEntity: pallet
-              unlockFrom: openTurno
+                    # Auto-resume: parked → open (at most one parked under the open day).
+                    - op: bind
+                      expr: >-
+                        (
+                          $ids := $keys($sift($domain.lot, function($v){$v.status = "parked"}));
+                          $count($ids) = 0 ? {} : $reduce($ids, function($a, $id){$merge([$a, {$id: true}])}, {})
+                        )
+                    - op: patchEach
+                      entity: lot
+                      set:
+                        status: '"open"'
+            - id: startLot
+              roles: [line]
+              submit: many
+              title: Apri lotto
+              onCommit:
+                  navigation: stay
               readyWhen: >-
-                $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
-              substeps:
-                - id: mark
-                  roles: [line]
-                  readyWhen: >-
-                    $count($domain.pallet.*[$exists(weight) and $not(progress = 'done')]) >= 1
-                  dynamicProperties:
-                    progress:
-                        read: rows
-                  reads:
-                    rows:
-                        entity: pallet
-                        where: $exists(weight) and $not(progress = 'done')
-                        key: id
-                  schema:
-                    type: object
-                    title: Segna avanzamento
-                    properties:
-                        progress:
-                            type: object
-                            additionalProperties:
-                                enum: [partial, done]
-                  uiSchema:
-                    progress:
-                        ui:field: mapTable
-                        ui:options:
-                            expandable: false
-                            columns: {id: Bancale, value: Avanzamento}
-                        additionalProperties:
-                            ui:options:
-                                enumNames: [Parziale, Fatto]
-                                # U+2013 — empty / stock-clearable trigger; Go expands to shadcn4*
-                                placeholder: –
-                  onSubmit:
-                    transform:
-                        - op: patchEach
-                          entity: pallet
-                          set:
-                            progress: $value
-            - id: containerReg
-              kind: group
-              title: Registrazione contenitori
-              repeatable: true
-              startLabel: Nuova registrazione
-              closeLabel: Chiudi registrazione
-              instanceLabelEntity: load
-              closeRequiresChildSubmission: true
-              unlockFrom: openTurno
-              substeps:
-                - id: register
-                  roles: [logistic]
-                  enumReads:
-                    sourceLoadId: loads
-                  reads:
-                    loads:
-                        entity: load
-                        where: $not(fullyProcessed = true)
-                        key: id
-                  # Prefill still-open incompletes as continuation rows (hidden continuesContainerId).
-                  initialData: >-
-                    (
-                      $reduce($catalogs.materials, function($acc, $m){(
-                        $open := $sift($domain.container, function($v){$v.incomplete = true and $v.material = $m.label});
-                        $ids := $keys($open);
-                        $count($ids) = 0 ? $acc : $merge([$acc, {$m.key: $map($ids, function($id){{
-                          "continuesContainerId": $id,
-                          "incomplete": false,
-                          "weight": $lookup($open, $id).weight
-                        }})}])
-                      )}, {})
-                    )
-                  schema:
-                    type: object
-                    title: Registrazione contenitori
-                    required: [sourceLoadId]
-                    properties:
-                        sourceLoadId:
-                            type: string
-                            title: Carico sorgente
-                        polvereDiVetro:
-                            type: array
-                            title: Polvere di vetro
-                            items: &containerWeightRow
-                                type: object
-                                required: [weight]
-                                properties:
-                                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
-                                    incomplete:
-                                        type: boolean
-                                        title: Incompleto
-                                        default: false
-                                    continuesContainerId:
-                                        type: string
-                        granellaDiVetro:
-                            type: array
-                            title: Granella di vetro
-                            items: *containerWeightRow
-                        granellaDiVetro2:
-                            type: array
-                            title: Granella di vetro 2
-                            items: *containerWeightRow
-                        polvereDiSilicio:
-                            type: array
-                            title: Polvere di silicio
-                            items: *containerWeightRow
-                        plastica:
-                            type: array
-                            title: Plastica
-                            items: *containerWeightRow
-                        alluminio:
-                            type: array
-                            title: Alluminio
-                            items: *containerWeightRow
-                        sopravaglio:
-                            type: array
-                            title: Sopravaglio
-                            items: *containerWeightRow
-                        polvereDiAspirazione:
-                            type: array
-                            title: Polvere di aspirazione
-                            items: *containerWeightRow
-                  uiSchema:
+                (
+                  $lookup($domain.shift, $instance.id).status = "open"
+                  and $count($domain.lot.*[status = "open" or status = "parked"]) = 0
+                  and $count($domain.lot.*[$not(status = "fullyProcessed") and $not(status = "open") and $not(status = "parked")]) >= 1
+                )
+              enumReads:
+                lotId: lots
+              reads:
+                lots:
+                    entity: lot
+                    where: $not(status = "fullyProcessed") and $not(status = "open") and $not(status = "parked")
+                    key: id
+              schema:
+                type: object
+                title: Apri lotto
+                required: [lotId]
+                properties:
+                    lotId:
+                        type: string
+                        title: Lotto
+              uiSchema:
+                lotId:
+                    ui:components:
+                        stringField: enumField
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: lot
+                      id: $.lotId
+                      set:
+                        status: '"open"'
+            - id: weigh
+              roles: [logistic]
+              submit: many
+              title: Pesa bancale
+              onCommit:
+                  navigation: stay
+              readyWhen: >-
+                (
+                  $lookup($domain.shift, $instance.id).status = "open"
+                  and $count($domain.lot.*[status = "open"]) = 1
+                  and $count($domain.pallet.*[
+                    lotId = $keys($sift($domain.lot, function($v){$v.status = "open"}))[0]
+                    and $not($exists(weight))
+                  ]) >= 1
+                )
+              reads:
+                pallets:
+                    entity: pallet
+                    where: >-
+                      lotId = $keys($sift($domain.lot, function($v){$v.status = "open"}))[0]
+                      and $not($exists(weight))
+                    key: id
+              enumReads:
+                palletId: pallets
+              derived:
+                panelCount:
+                    overridable: true
+                    expr: |
+                        (
+                          $avg := $data.averagePanelWeight;
+                          $kind := $data.tareKind;
+                          $tare := $kind = 'custom'
+                            ? $data.customTareWeight
+                            : $lookup($catalogs.tareKinds, $kind);
+                          $w := $data.weight;
+                          $avg > 0 and $type($tare) = "number" and $type($w) = "number"
+                            ? $floor(($w - $tare) / $avg)
+                            : undefined
+                        )
+              schema:
+                type: object
+                title: Pesa bancale
+                required: [palletId, averagePanelWeight, tareKind, weight, idoneita]
+                properties:
+                    palletId: {type: string, title: Bancale}
+                    averagePanelWeight:
+                        type: number
+                        exclusiveMinimum: 0
+                        title: Peso medio pannello (kg)
+                        default: 20
+                    tareKind:
+                        type: string
+                        title: Tara
+                        enum: [industrial, euro, custom]
+                        default: industrial
+                    customTareWeight:
+                        type: number
+                        exclusiveMinimum: 0
+                        title: Tara personalizzata (kg)
+                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                    idoneita:
+                        type: string
+                        title: IR / NIR
+                        enum: [NIR, IR]
+                        default: NIR
+                    panelCount: {type: number, title: Pannelli}
+              uiSchema:
+                ui:options:
+                    order:
+                        [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
+                tareKind:
                     ui:options:
-                        order: [sourceLoadId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
-                    sourceLoadId:
-                        ui:components:
-                            stringField: enumField
-                    polvereDiVetro: &containerRegMaterialArrayUi
-                        ui:components:
-                            arrayItemField: compactArrayItemField
+                        enumNames: ['industriale (25 kg)', 'euro (20 kg)', 'personalizzato']
+                idoneita:
+                    ui:options:
+                        enumNames: [NIR, IR]
+                panelCount:
+                    ui:field: derivedLeaf
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: pallet
+                      id: $.palletId
+                      set:
+                        weight: $.weight
+                        tareKind: $.tareKind
+                        idoneita: $.idoneita
+                        panelCount: $.panelCount
+            - id: markProgress
+              roles: [line]
+              submit: many
+              title: Segna avanzamento
+              onCommit:
+                  navigation: stay
+              readyWhen: >-
+                (
+                  $lookup($domain.shift, $instance.id).status = "open"
+                  and $count($domain.lot.*[status = "open"]) = 1
+                  and $count($domain.pallet.*[
+                    lotId = $keys($sift($domain.lot, function($v){$v.status = "open"}))[0]
+                    and $exists(weight)
+                    and $not(progress = 'done')
+                  ]) >= 1
+                )
+              dynamicProperties:
+                progress:
+                    read: rows
+              reads:
+                rows:
+                    entity: pallet
+                    where: >-
+                      lotId = $keys($sift($domain.lot, function($v){$v.status = "open"}))[0]
+                      and $exists(weight)
+                      and $not(progress = 'done')
+                    key: id
+              schema:
+                type: object
+                title: Segna avanzamento
+                properties:
+                    progress:
+                        type: object
+                        additionalProperties:
+                            enum: [partial, done]
+              uiSchema:
+                progress:
+                    ui:field: mapTable
+                    ui:options:
+                        expandable: false
+                        columns: {id: Bancale, value: Avanzamento}
+                    additionalProperties:
                         ui:options:
-                            orderable: false
-                            copyable: false
+                            enumNames: [Parziale, Fatto]
+                            # U+2013 — empty / stock-clearable trigger; Go expands to shadcn4*
+                            placeholder: –
+              onSubmit:
+                transform:
+                    - op: patchEach
+                      entity: pallet
+                      set:
+                        progress: $value
+            - id: containerReg
+              roles: [logistic]
+              submit: many
+              title: Registrazione contenitori
+              onCommit:
+                  navigation: stay
+              readyWhen: >-
+                (
+                  $lookup($domain.shift, $instance.id).status = "open"
+                  and $count($domain.lot.*[status = "open"]) = 1
+                )
+              enumReads:
+                sourceLotId: lots
+              reads:
+                lots:
+                    entity: lot
+                    where: status = "open"
+                    key: id
+              # Prefill still-open incompletes as continuation rows (hidden continuesContainerId).
+              initialData: >-
+                (
+                  $reduce($catalogs.materials, function($acc, $m){(
+                    $open := $sift($domain.container, function($v){$v.incomplete = true and $v.material = $m.label});
+                    $ids := $keys($open);
+                    $count($ids) = 0 ? $acc : $merge([$acc, {$m.key: $map($ids, function($id){{
+                      "continuesContainerId": $id,
+                      "incomplete": false,
+                      "weight": $lookup($open, $id).weight
+                    }})}])
+                  )}, {})
+                )
+              schema:
+                type: object
+                title: Registrazione contenitori
+                required: [sourceLotId]
+                properties:
+                    sourceLotId:
+                        type: string
+                        title: Carico sorgente
+                    polvereDiVetro:
+                        type: array
+                        title: Polvere di vetro
+                        items: &containerWeightRow
+                            type: object
+                            required: [weight]
+                            properties:
+                                weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                                incomplete:
+                                    type: boolean
+                                    title: Incompleto
+                                    default: false
+                                continuesContainerId:
+                                    type: string
+                    granellaDiVetro:
+                        type: array
+                        title: Granella di vetro
+                        items: *containerWeightRow
+                    granellaDiVetro2:
+                        type: array
+                        title: Granella di vetro 2
+                        items: *containerWeightRow
+                    polvereDiSilicio:
+                        type: array
+                        title: Polvere di silicio
+                        items: *containerWeightRow
+                    plastica:
+                        type: array
+                        title: Plastica
+                        items: *containerWeightRow
+                    alluminio:
+                        type: array
+                        title: Alluminio
+                        items: *containerWeightRow
+                    sopravaglio:
+                        type: array
+                        title: Sopravaglio
+                        items: *containerWeightRow
+                    polvereDiAspirazione:
+                        type: array
+                        title: Polvere di aspirazione
+                        items: *containerWeightRow
+              uiSchema:
+                ui:options:
+                    order: [sourceLotId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
+                sourceLotId:
+                    ui:components:
+                        stringField: enumField
+                polvereDiVetro: &containerRegMaterialArrayUi
+                    ui:components:
+                        arrayItemField: compactArrayItemField
+                    ui:options:
+                        orderable: false
+                        copyable: false
+                        layouts:
+                            array-field:
+                                class: 'gap-0 has-[[data-layout=array-items]>*]:gap-2 [&>button]:w-auto [&>button]:self-start has-[[data-layout=array-items]>*]:[&_[data-layout=array-field-title-row]]:mb-3'
+                            array-items:
+                                class: gap-1
+                            array-field-title-row:
+                                variant: label
+                                class: mb-1
+                    items:
+                        ui:options:
+                            hideTitle: true
+                            order: [continuesContainerId, weight, incomplete]
                             layouts:
-                                array-field:
-                                    class: 'gap-0 has-[[data-layout=array-items]>*]:gap-2 [&>button]:w-auto [&>button]:self-start has-[[data-layout=array-items]>*]:[&_[data-layout=array-field-title-row]]:mb-3'
-                                array-items:
-                                    class: gap-1
-                                array-field-title-row:
-                                    variant: label
-                                    class: mb-1
-                        items:
+                                object-properties:
+                                    class: flex w-full flex-row flex-nowrap items-stretch gap-2
+                        weight:
                             ui:options:
                                 hideTitle: true
-                                order: [continuesContainerId, weight, incomplete]
-                                layouts:
-                                    object-properties:
-                                        class: flex w-full flex-row flex-nowrap items-stretch gap-2
-                            weight:
-                                ui:options:
-                                    hideTitle: true
-                            incomplete:
-                                ui:components:
-                                    booleanField: checkboxOnlyField
-                            continuesContainerId:
-                                ui:components:
-                                    stringField: hiddenField
-                                ui:options:
-                                    presenceMark: true
-                                    title: Continua
-                    granellaDiVetro: *containerRegMaterialArrayUi
-                    granellaDiVetro2: *containerRegMaterialArrayUi
-                    polvereDiSilicio: *containerRegMaterialArrayUi
-                    plastica: *containerRegMaterialArrayUi
-                    alluminio: *containerRegMaterialArrayUi
-                    sopravaglio: *containerRegMaterialArrayUi
-                    polvereDiAspirazione: *containerRegMaterialArrayUi
-                  onSubmit:
-                    transform:
-                        - op: bind
-                          expr: >-
-                            (
-                              $rows := $reduce($catalogs.materials, function($acc, $m){(
-                                $arr := $lookup($, $m.key) ? $lookup($, $m.key) : [];
-                                $type($arr) != "array" ? $acc : $append($acc, $map(
-                                  $arr[$type(weight)="number" and weight > 0],
-                                  function($r){(
-                                    $cid := $r.continuesContainerId;
-                                    $merge([
-                                      {
-                                        "weight": $cid ? $r.weight - $lookup($domain.container, $cid).weight : $r.weight,
-                                        "material": $m.label,
-                                        "incomplete": $r.incomplete = true,
-                                        "continuesContainerId": $cid
-                                      },
-                                      $cid ? {"secondarySourceLoadId": $lookup($domain.container, $cid).sourceLoadId} : {}
-                                    ])
-                                  )}
-                                ))
-                              )}, []);
-                              $cont := $append([], $rows[continuesContainerId].continuesContainerId);
-                              $supersede := $count($cont) = 0 ? {} : $reduce($cont, function($a, $id){$merge([$a, {$id: true}])}, {});
-                              {"sourceLoadId": sourceLoadId, "rows": $rows, "supersede": $supersede}
-                            )
-                        - op: mintMany
-                          entity: container
-                          count: $count($.rows)
-                          id: "'C-' & $string($count($domain.container.*) + 1)"
-                          set:
-                            weight: $.rows[$index].weight
-                            material: $.rows[$index].material
-                            incomplete: $.rows[$index].incomplete
-                            sourceLoadId: $.sourceLoadId
-                            secondarySourceLoadId: $.rows[$index].secondarySourceLoadId
-                        - op: patch
-                          entity: load
-                          id: $.sourceLoadId
-                          # Marks primary so next Spawn enums omit it; also touches for instanceLabelEntity.
-                          set:
-                            fullyProcessed: true
-                        - op: bind
-                          expr: $.supersede
-                        - op: patchEach
-                          entity: container
-                          set:
-                            incomplete: false
+                        incomplete:
+                            ui:components:
+                                booleanField: checkboxOnlyField
+                        continuesContainerId:
+                            ui:components:
+                                stringField: hiddenField
+                            ui:options:
+                                presenceMark: true
+                                title: Continua
+                granellaDiVetro: *containerRegMaterialArrayUi
+                granellaDiVetro2: *containerRegMaterialArrayUi
+                polvereDiSilicio: *containerRegMaterialArrayUi
+                plastica: *containerRegMaterialArrayUi
+                alluminio: *containerRegMaterialArrayUi
+                sopravaglio: *containerRegMaterialArrayUi
+                polvereDiAspirazione: *containerRegMaterialArrayUi
+              onSubmit:
+                transform:
+                    - op: bind
+                      expr: >-
+                        (
+                          $rows := $reduce($catalogs.materials, function($acc, $m){(
+                            $arr := $lookup($, $m.key) ? $lookup($, $m.key) : [];
+                            $type($arr) != "array" ? $acc : $append($acc, $map(
+                              $arr[$type(weight)="number" and weight > 0],
+                              function($r){(
+                                $cid := $r.continuesContainerId;
+                                $merge([
+                                  {
+                                    "weight": $cid ? $r.weight - $lookup($domain.container, $cid).weight : $r.weight,
+                                    "material": $m.label,
+                                    "incomplete": $r.incomplete = true,
+                                    "continuesContainerId": $cid
+                                  },
+                                  $cid ? {"secondarySourceLotId": $lookup($domain.container, $cid).sourceLotId} : {}
+                                ])
+                              )}
+                            ))
+                          )}, []);
+                          $cont := $append([], $rows[continuesContainerId].continuesContainerId);
+                          $supersede := $count($cont) = 0 ? {} : $reduce($cont, function($a, $id){$merge([$a, {$id: true}])}, {});
+                          {"sourceLotId": sourceLotId, "rows": $rows, "supersede": $supersede}
+                        )
+                    - op: mintMany
+                      entity: container
+                      count: $count($.rows)
+                      id: "'C-' & $string($count($domain.container.*) + 1)"
+                      set:
+                        weight: $.rows[$index].weight
+                        material: $.rows[$index].material
+                        incomplete: $.rows[$index].incomplete
+                        sourceLotId: $.sourceLotId
+                        secondarySourceLotId: $.rows[$index].secondarySourceLotId
+                    - op: bind
+                      expr: $.supersede
+                    - op: patchEach
+                      entity: container
+                      set:
+                        incomplete: false
+            - id: closeLot
+              roles: [line]
+              submit: many
+              title: Chiudi lotto
+              onCommit:
+                  navigation: stay
+              readyWhen: >-
+                (
+                  $lookup($domain.shift, $instance.id).status = "open"
+                  and $count($domain.lot.*[status = "open"]) = 1
+                  and (
+                    $lotId := $keys($sift($domain.lot, function($v){$v.status = "open"}))[0];
+                    $pallets := $domain.pallet.*[lotId = $lotId];
+                    $count($pallets) > 0
+                    and $count($pallets[$exists(weight) and progress = "done"]) = $count($pallets)
+                  )
+                )
+              schema:
+                type: object
+                title: Chiudi lotto
+                properties: {}
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: lot
+                      id: $keys($sift($domain.lot, function($v){$v.status = "open"}))[0]
+                      set:
+                        status: '"fullyProcessed"'
             - id: closeTurno
               roles: [line]
-              unlockFrom: openTurno
               onCommit:
                   advanceTarget: false
               readyWhen: >-
@@ -856,43 +933,53 @@ steps:
                 properties: {}
               onSubmit:
                 transform:
+                    - op: bind
+                      expr: >-
+                        (
+                          $ids := $keys($sift($domain.lot, function($v){$v.status = "open"}));
+                          $count($ids) = 0 ? {} : $reduce($ids, function($a, $id){$merge([$a, {$id: true}])}, {})
+                        )
+                    - op: patchEach
+                      entity: lot
+                      set:
+                        status: '"parked"'
                     - op: patch
                       entity: shift
                       id: $instance.id
                       set:
                         status: '"closed"'
-    # Passport Lock: Job instance id = load id; select eligible load then approve freeze.
-    # Eligibility: fullyProcessed ∧ not locked (register closure ≠ passport closure).
+    # Passport Lock: Job instance id = lot id; select eligible lot then approve freeze.
+    # Eligibility: lot session status fullyProcessed ∧ not locked (closeLot is sole terminal writer).
     passport:
         repeatable: true
         title: Verifica dati e DPP
         startLabel: Emetti DPP
         color: '#0f766e'
-        instanceId: $.loadId
-        label: "'DPP: ' & $.loadId"
+        instanceId: $.lotId
+        label: "'DPP: ' & $.lotId"
         substeps:
             - id: select
               roles: [administration]
-              # Gate Worklist canStart until ≥1 eligible load (enum where alone does not).
+              # Gate Worklist canStart until ≥1 eligible lot (enum where alone does not).
               readyWhen: >-
-                $count($domain.load.*[fullyProcessed = true and $not(locked = true)]) >= 1
+                $count($domain.lot.*[status = "fullyProcessed" and $not(locked = true)]) >= 1
               enumReads:
-                loadId: loads
+                lotId: lots
               reads:
-                loads:
-                    entity: load
-                    where: fullyProcessed = true and $not(locked = true)
+                lots:
+                    entity: lot
+                    where: status = "fullyProcessed" and $not(locked = true)
                     key: id
               schema:
                 type: object
                 title: Seleziona carico
-                required: [loadId]
+                required: [lotId]
                 properties:
-                    loadId:
+                    lotId:
                         type: string
                         title: Carico
               uiSchema:
-                loadId:
+                lotId:
                     ui:components:
                         stringField: enumField
               onSubmit:
@@ -900,8 +987,8 @@ steps:
             - id: lock
               roles: [administration]
               readyWhen: >-
-                $lookup($domain.load, $instance.id).fullyProcessed = true
-                and $not($lookup($domain.load, $instance.id).locked = true)
+                $lookup($domain.lot, $instance.id).status = "fullyProcessed"
+                and $not($lookup($domain.lot, $instance.id).locked = true)
               schema:
                 type: object
                 title: Emetti DPP
@@ -918,7 +1005,7 @@ steps:
               onSubmit:
                 transform:
                     - op: patch
-                      entity: load
+                      entity: lot
                       id: $instance.id
                       set:
                         locked: true

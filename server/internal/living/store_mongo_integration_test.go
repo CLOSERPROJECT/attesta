@@ -22,7 +22,7 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 
 	org := "mongo-roundtrip-" + t.Name()
 	domain := domainFromKinds(map[string]EntityMap{
-		"load": {
+		"lot": {
 			"NIR-1": {"client": "NO", "a.b": 42},
 		},
 		"kind.x": {"id.1": {"k.v": true}},
@@ -40,13 +40,13 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Kind("load")["NIR-1"]["client"] != "NO" {
-		t.Fatalf("load = %#v", got.Kind("load"))
+	if got.Kind("lot")["NIR-1"]["client"] != "NO" {
+		t.Fatalf("load = %#v", got.Kind("lot"))
 	}
-	switch got.Kind("load")["NIR-1"]["a.b"].(type) {
+	switch got.Kind("lot")["NIR-1"]["a.b"].(type) {
 	case int, int32, int64, float64:
 	default:
-		t.Fatalf("dotted fact = %#v", got.Kind("load")["NIR-1"]["a.b"])
+		t.Fatalf("dotted fact = %#v", got.Kind("lot")["NIR-1"]["a.b"])
 	}
 	if got.Kind("kind.x")["id.1"]["k.v"] != true {
 		t.Fatalf("extra entity = %#v", got.Entities)
@@ -105,7 +105,7 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 
 	domains := NewMongoDomainStore(db)
 	configs := NewMongoConfigStore(db)
-	if err := domains.Put(ctx, org, domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})); err != nil {
+	if err := domains.Put(ctx, org, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadFeragameConfigFixture()
@@ -127,7 +127,7 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Kind("load")["L1"]["client"] != "NO" {
+	if got.Kind("lot")["L1"]["client"] != "NO" {
 		t.Fatalf("domain after reconnect = %#v", got)
 	}
 	active, err := configs2.ActiveVersion(ctx, org)
@@ -167,7 +167,7 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := domains.Put(ctx, cfg.Org, domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})); err != nil {
+	if err := domains.Put(ctx, cfg.Org, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
 		t.Fatal(err)
 	}
 	seeded, err := SeedDemo(ctx, domains, configs, SeedOptions{WipeDomain: true})
@@ -181,8 +181,8 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if _, ok := got.Kind("truck")[SeedTruckID]; !ok {
 		t.Fatalf("demo truck missing after wipe+seed: %#v", got.Kind("truck"))
 	}
-	if got.Kind("load")[SeedLoadCOID] == nil || got.Kind("load")[SeedLoadDAID] == nil {
-		t.Fatalf("demo loads missing after wipe+seed: %#v", got.Kind("load"))
+	if got.Kind("lot")[SeedLoadCOID] == nil || got.Kind("lot")[SeedLoadDAID] == nil {
+		t.Fatalf("demo loads missing after wipe+seed: %#v", got.Kind("lot"))
 	}
 	if len(got.Submissions) < 8 {
 		t.Fatalf("demo submissions = %#v", got.Submissions)

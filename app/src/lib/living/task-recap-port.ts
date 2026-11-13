@@ -24,8 +24,13 @@ export type TaskRecap = {
 	links: HttpLinkItem[];
 };
 
+/** List wire for once (0–1) and many (N); oldest timestamp first. */
+export type TaskRecapList = {
+	items: TaskRecap[];
+};
+
 export type TaskRecapPort = {
-	fetch(req: TaskRecapRequest): Promise<TaskRecap>;
+	fetch(req: TaskRecapRequest): Promise<TaskRecapList>;
 };
 
 export class TaskRecapError extends Error {

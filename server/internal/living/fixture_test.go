@@ -40,8 +40,8 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if entities["workingDay"] == nil || entities["shift"] == nil {
 		t.Fatalf("domain.entities missing workingDay/shift: %#v", entities)
 	}
-	if entities["truck"] == nil || entities["load"] == nil {
-		t.Fatalf("domain.entities missing truck/load: %#v", entities)
+	if entities["truck"] == nil || entities["lot"] == nil {
+		t.Fatalf("domain.entities missing truck/lot: %#v", entities)
 	}
 	truckFields, _ := entities["truck"].(map[string]any)
 	fields, _ := truckFields["fields"].([]any)
@@ -66,7 +66,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if got := cfg.Jobs.Keys; len(got) < 4 || got[0] != "workingDay" || got[1] != "intake" || got[2] != "line" || got[3] != "passport" {
 		t.Fatalf("job order = %v", got)
 	}
-	if cfg.Passport == nil || cfg.Passport.Subject.Entity != "load" {
+	if cfg.Passport == nil || cfg.Passport.Subject.Entity != "lot" {
 		t.Fatalf("passport.subject = %#v", cfg.Passport)
 	}
 	if strings.TrimSpace(cfg.Passport.Snapshot.Expr) == "" {
@@ -77,7 +77,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatal("missing passport Job")
 	}
 	pj := passportJob.(Job)
-	if !pj.Repeatable || pj.Title != "Verifica dati e DPP" || pj.StartLabel != "Emetti DPP" || pj.InstanceID != "$.loadId" {
+	if !pj.Repeatable || pj.Title != "Verifica dati e DPP" || pj.StartLabel != "Emetti DPP" || pj.InstanceID != "$.lotId" {
 		t.Fatalf("passport Job = %#v", pj)
 	}
 	wantPassportTasks := []string{"select", "lock"}
@@ -100,13 +100,29 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !intake.Repeatable || intake.Title != "Ingresso" || intake.StartLabel != "Nuovo camion" || intake.Color != "#ea580c" {
 		t.Fatalf("intake = %#v", intake)
 	}
-	wantIntakeTasks := []string{"truckArrive", "lots", "weightCheck"}
+	wantIntakeTasks := []string{"truckArrive", "register", "weightCheck"}
 	if got := OrderedTaskIDs(intake.Tasks); strings.Join(got, ",") != strings.Join(wantIntakeTasks, ",") {
 		t.Fatalf("intake tasks = %v", got)
 	}
-	lots, ok := TaskByID(intake.Tasks, "lots")
-	if !ok || !lots.IsGroup() {
-		t.Fatalf("lots group = %#v", lots)
+	if _, ok := TaskByID(intake.Tasks, "lots"); ok {
+		t.Fatal("intake must not author lots Task group")
+	}
+	register, ok := TaskByID(intake.Tasks, "register")
+	if !ok || register.IsGroup() || !taskSubmitMany(register) {
+		t.Fatalf("register leaf many = %#v", register)
+	}
+	if taskCommitNavigation(map[string]any(register)) != commitNavStay {
+		t.Fatalf("register onCommit.navigation = %#v, want stay", register["onCommit"])
+	}
+	weightCheck, ok := TaskByID(intake.Tasks, "weightCheck")
+	if !ok || weightCheck.IsGroup() {
+		t.Fatalf("weightCheck = %#v", weightCheck)
+	}
+	if rw, _ := weightCheck["readyWhen"].(string); !strings.Contains(rw, "lot") {
+		t.Fatalf("weightCheck.readyWhen = %#v, want ≥1 lot gate", weightCheck["readyWhen"])
+	}
+	if rw, _ := register["readyWhen"].(string); !strings.Contains(rw, "weightCheck") {
+		t.Fatalf("register.readyWhen = %#v, want weightCheck Submission gate", register["readyWhen"])
 	}
 
 	lineAny, _ := cfg.Jobs.Get("line")
@@ -120,12 +136,24 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if line.StartsWhen != nil {
 		t.Fatalf("line must not have startsWhen, got %#v", line.StartsWhen)
 	}
-	wantLineTasks := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "closeTurno"}
+	wantLineTasks := []string{"openTurno", "startLot", "weigh", "markProgress", "containerReg", "closeLot", "closeTurno"}
 	if got := OrderedTaskIDs(line.Tasks); strings.Join(got, ",") != strings.Join(wantLineTasks, ",") {
 		t.Fatalf("line tasks = %v", got)
 	}
-	if _, ok := TaskByID(line.Tasks, "closeTurno"); !ok {
-		t.Fatal("missing closeTurno")
+	for _, id := range wantLineTasks {
+		task, ok := TaskByID(line.Tasks, id)
+		if !ok || task.IsGroup() {
+			t.Fatalf("line.%s must be a leaf, got %#v", id, task)
+		}
+		if _, has := task["unlockFrom"]; has {
+			t.Fatalf("line.%s must omit unlockFrom, got %#v", id, task["unlockFrom"])
+		}
+	}
+	for _, id := range []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot"} {
+		task, _ := TaskByID(line.Tasks, id)
+		if !taskSubmitMany(task) {
+			t.Fatalf("line.%s submit = %#v, want many", id, task["submit"])
+		}
 	}
 	wdAny, ok := cfg.Jobs.Get("workingDay")
 	if !ok {
@@ -144,6 +172,9 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if taskAdvanceTarget(map[string]any(wdClose)) {
 		t.Fatalf("workingDay/close advanceTarget = true, want false")
 	}
+	if _, has := wdClose["unlockFrom"]; has {
+		t.Fatalf("workingDay/close must omit unlockFrom, got %#v", wdClose["unlockFrom"])
+	}
 	openTurno, _ := TaskByID(line.Tasks, "openTurno")
 	if taskCommitNavigation(map[string]any(openTurno)) != commitNavHome {
 		t.Fatalf("line/openTurno onCommit.navigation = %#v, want home", openTurno["onCommit"])
@@ -152,66 +183,43 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if taskAdvanceTarget(map[string]any(closeTurno)) {
 		t.Fatalf("line/closeTurno advanceTarget = true, want false")
 	}
-	register, _ := TaskByID(lots.ChildTasks(), "register")
-	if taskCommitNavigation(map[string]any(register)) != commitNavStay {
-		t.Fatalf("lots/register onCommit.navigation = %#v, want stay", register["onCommit"])
+	markProgress, _ := TaskByID(line.Tasks, "markProgress")
+	readyWhen, _ := markProgress["readyWhen"].(string)
+	if !strings.Contains(readyWhen, "$exists(weight)") {
+		t.Fatalf("markProgress.readyWhen must weigh-gate: %q", readyWhen)
 	}
-	pw, ok := TaskByID(line.Tasks, "palletWeight")
-	if !ok || !pw.IsGroup() {
-		t.Fatalf("palletWeight group = %#v", pw)
+	if !strings.Contains(readyWhen, `status = "open"`) {
+		t.Fatalf("markProgress.readyWhen = %q, want open-lot gate", readyWhen)
 	}
-	if pw["instanceLabelEntity"] != "pallet" {
-		t.Fatalf("palletWeight.instanceLabelEntity = %#v, want pallet", pw["instanceLabelEntity"])
+	containerReg, _ := TaskByID(line.Tasks, "containerReg")
+	reads, _ := containerReg["reads"].(map[string]any)
+	lotsRead, _ := reads["lots"].(map[string]any)
+	where, _ := lotsRead["where"].(string)
+	if where != `status = "open"` {
+		t.Fatalf("containerReg.reads.lots.where = %#v, want open lot", lotsRead["where"])
 	}
-	lineLoad, ok := TaskByID(line.Tasks, "lineLoad")
-	if !ok || !lineLoad.IsGroup() {
-		t.Fatalf("lineLoad group = %#v", lineLoad)
+	transform, _ := containerReg["onSubmit"].(map[string]any)
+	rawOps, _ := transform["transform"].([]any)
+	for _, raw := range rawOps {
+		op, _ := raw.(map[string]any)
+		set, _ := op["set"].(map[string]any)
+		if status, ok := set["status"].(string); ok && strings.Contains(status, "fullyProcessed") {
+			t.Fatal("containerReg must not write fullyProcessed")
+		}
 	}
-	if lineLoad["instanceLabelEntity"] != "pallet" {
-		t.Fatalf("lineLoad.instanceLabelEntity = %#v, want pallet", lineLoad["instanceLabelEntity"])
-	}
-	if got, _ := lineLoad["unlockFrom"].(string); got != "openTurno" {
-		t.Fatalf("lineLoad.unlockFrom = %#v, want openTurno", lineLoad["unlockFrom"])
-	}
-	readyWhen, _ := lineLoad["readyWhen"].(string)
-	if !strings.Contains(readyWhen, "$exists(weight)") || !strings.Contains(readyWhen, "progress = 'done'") {
-		t.Fatalf("lineLoad.readyWhen = %q, want locked Domain leftover expr", readyWhen)
-	}
-	mark, ok := TaskByID(lineLoad.ChildTasks(), "mark")
-	if !ok || mark.IsGroup() {
-		t.Fatalf("lineLoad.mark leaf = %#v", mark)
-	}
-	if _, has := pw["unlockFrom"]; has {
-		t.Fatalf("palletWeight must omit unlockFrom (linear), got %#v", pw["unlockFrom"])
-	}
-	containerReg, ok := TaskByID(line.Tasks, "containerReg")
-	if !ok || !containerReg.IsGroup() {
-		t.Fatalf("containerReg group = %#v", containerReg)
-	}
-	if got, _ := containerReg["unlockFrom"].(string); got != "openTurno" {
-		t.Fatalf("containerReg.unlockFrom = %#v, want openTurno", containerReg["unlockFrom"])
-	}
-	if _, has := containerReg["readyWhen"]; has {
-		t.Fatalf("containerReg must omit readyWhen, got %#v", containerReg["readyWhen"])
-	}
-	if containerReg["instanceLabelEntity"] != "load" {
-		t.Fatalf("containerReg.instanceLabelEntity = %#v, want load", containerReg["instanceLabelEntity"])
-	}
-	if containerReg["closeRequiresChildSubmission"] != true {
-		t.Fatalf("containerReg.closeRequiresChildSubmission = %#v", containerReg["closeRequiresChildSubmission"])
-	}
-	reg, ok := TaskByID(containerReg.ChildTasks(), "register")
-	if !ok || reg.IsGroup() {
-		t.Fatalf("containerReg.register leaf = %#v", reg)
-	}
-	reads, _ := reg["reads"].(map[string]any)
-	loadsRead, _ := reads["loads"].(map[string]any)
-	where, _ := loadsRead["where"].(string)
-	if !strings.Contains(where, "fullyProcessed") {
-		t.Fatalf("register.reads.loads.where = %#v, want fullyProcessed filter", loadsRead["where"])
+	closeLot, _ := TaskByID(line.Tasks, "closeLot")
+	closeRW, _ := closeLot["readyWhen"].(string)
+	if !strings.Contains(closeRW, "$exists(weight)") || !strings.Contains(closeRW, `progress = "done"`) {
+		t.Fatalf("closeLot.readyWhen = %q, want weighed+done gate", closeRW)
 	}
 	if _, has := TaskByID(line.Tasks, "loadedExtracted"); has {
 		t.Fatal("loadedExtracted must not be on the live line Task list")
+	}
+	if _, has := TaskByID(line.Tasks, "palletWeight"); has {
+		t.Fatal("palletWeight group must not remain on line")
+	}
+	if _, has := TaskByID(line.Tasks, "lineLoad"); has {
+		t.Fatal("lineLoad group must not remain on line")
 	}
 
 	raw, err := json.Marshal(cfg)
@@ -242,7 +250,7 @@ func TestEngineSourcesOmitPlantTaskIDBranches(t *testing.T) {
 			t.Fatal(err)
 		}
 		src := string(body)
-		for _, token := range []string{`"lineLoad"`, `"feragame"`, `"openTurno"`, `"palletWeight"`} {
+		for _, token := range []string{`"markProgress"`, `"feragame"`, `"openTurno"`, `"startLot"`, `"palletWeight"`} {
 			if strings.Contains(src, token) {
 				t.Fatalf("%s must not hard-code plant token %s", name, token)
 			}

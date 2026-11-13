@@ -13,22 +13,28 @@ const seedUsage = `Usage: attesta seed [flags]
 Demo fixture seed (identity + taxonomy + catalog + living by default).
 
 Flags:
-  --replace          Rewrite even when the empty-only marker org exists;
-                     living Domain (+ passports) is wiped and rebuilt.
-  --feragame-core    Hard-reset Feragame only: Appwrite org/users, Active
-                     Config, wipe Domain (+ passports) to empty. No staged
-                     demo plant. Skips Formata and orgs 1–3. Always runs.
-  --feragame-full    Same as --feragame-core, then restage the demo Domain
-                     plant. Always runs.
-  --file PATH        Taxonomy seed file (default: config/categories.yaml).
-  --help, -h         Show this help.
+  --replace              Rewrite even when the empty-only marker org exists;
+                         living Domain (+ passports) is wiped and rebuilt.
+  --feragame-config      Active Config + wipe Domain (+ passports) to empty.
+                         No Appwrite. Skips Formata. Always runs.
+  --feragame-domain      Active Config + wipe and stage demo Domain.
+                         No Appwrite. Skips Formata. Always runs.
+  --feragame-identity    Feragame Appwrite hard reset + Active Config + wipe
+                         Domain to empty. Skips Formata / orgs 1–3. Always runs.
+  --feragame-full        Feragame Appwrite hard reset + Active Config + wipe
+                         and stage demo Domain. Skips Formata / orgs 1–3.
+                         Always runs.
+  --file PATH            Taxonomy seed file (default: config/categories.yaml).
+  --help, -h             Show this help.
 
---feragame-core and --feragame-full are mutually exclusive.
+Feragame flags are mutually exclusive. Every Feragame path always wipes Domain.
 
 Examples:
   task seed
   task seed -- --replace
-  task seed:feragame-core
+  task seed:feragame-config
+  task seed:feragame-domain
+  task seed:feragame-identity
   task seed:feragame-full
 `
 
@@ -63,24 +69,24 @@ func seedHelpFromArgs(args []string) bool {
 }
 
 func seedLivingScopeFromArgs(args []string) (living.SeedScope, error) {
-	core := false
-	full := false
+	var found []living.SeedScope
 	for _, arg := range args {
 		switch strings.TrimSpace(arg) {
-		case "--feragame-core":
-			core = true
+		case "--feragame-config":
+			found = append(found, living.SeedScopeFeragameConfig)
+		case "--feragame-domain":
+			found = append(found, living.SeedScopeFeragameDomain)
+		case "--feragame-identity":
+			found = append(found, living.SeedScopeFeragameIdentity)
 		case "--feragame-full":
-			full = true
+			found = append(found, living.SeedScopeFeragameFull)
 		}
 	}
-	if core && full {
-		return living.SeedScopeBoth, fmt.Errorf("seed: --feragame-core and --feragame-full are mutually exclusive")
+	if len(found) > 1 {
+		return living.SeedScopeBoth, fmt.Errorf("seed: Feragame scope flags are mutually exclusive")
 	}
-	if core {
-		return living.SeedScopeFeragameCore, nil
-	}
-	if full {
-		return living.SeedScopeFeragameFull, nil
+	if len(found) == 1 {
+		return found[0], nil
 	}
 	return living.SeedScopeBoth, nil
 }
