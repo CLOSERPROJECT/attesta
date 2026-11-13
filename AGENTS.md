@@ -34,6 +34,9 @@
 - **Domain exploration:** before codebase exploration that depends on glossary
   or ADR vocabulary, read
   [`docs/agents/domain.md`](docs/agents/domain.md).
+- **Plant Org Config:** before editing
+  `server/internal/living/fixtures/feragame-config.yaml` (or its seed/test
+  followers), read [`docs/agents/plant-config.md`](docs/agents/plant-config.md).
 - **DPP/UNTP:** for Digital Link or credential behavior, read
   [`docs/untp.md`](docs/untp.md) and the implementation it names.
 - **Templates and CSS:** before changing `server/templates/` or
@@ -45,12 +48,8 @@
 - Living Go and the `/app` SPA are **dumb executors** of Org Config: plant
   business rules (entity shapes, transforms, `readyWhen`, open/close laws) live
   in Config, not as Feragame- or domain-named branches in executors. See
-  [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**).
-- When `server/internal/living/fixtures/feragame-config.yaml` (plant Org
-  Config) changes, update in the same change: seed (`seed.go` /
-  `demo_commits.go`), `server/internal/living` tests, `server/cmd/server`
-  Living HTTP tests, and SPA importers under `app/src/lib/living` that use
-  `$living-fixtures`. Plant law stays in Config `readyWhen`/transforms only.
+  [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**) and the plant checklist in
+  [`docs/agents/plant-config.md`](docs/agents/plant-config.md).
 - Progress keys containing dots are encoded for Mongo storage (`.` becomes
   `_`) and normalized on reads. Preserve that boundary when changing progress
   persistence.
