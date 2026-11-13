@@ -7,9 +7,9 @@ import (
 )
 
 // Demo instance ids for Oct-19 smoke / legacy Commit helpers (not SeedDemo stage matrix).
-// Truck: YYMMDD-turno-n from truckArrive. Load: client-YYMMDD-n from lots/register.
+// Truck: YYMMDD-n from open workingDay date. Load: client-YYMMDD-n from lots/register.
 const (
-	DemoTruckInstanceID = "261019-1st-1"
+	DemoTruckInstanceID = "261019-1"
 	DemoLoadInstanceID  = "CO-261019-1"
 	DemoLineShiftID     = "2026-10-19-1st"
 )
@@ -34,14 +34,39 @@ func demoSeedCommitter(domains DomainStore, configs ConfigStore) *Committer {
 	}
 }
 
+func commitOpenWorkingDayCtx(ctx context.Context, c *Committer, org, date, mode string) (string, error) {
+	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "logistic", "line"}}
+	if date == "" {
+		date = "2026-10-19"
+	}
+	if mode == "" {
+		mode = "multi"
+	}
+	if domain, err := c.Domains.Get(ctx, org); err == nil {
+		if day, ok := domain.Kind("workingDay")[date]; ok && day["status"] == "open" {
+			return date, nil
+		}
+	}
+	result, err := c.Commit(ctx, org, op, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": date, "mode": mode},
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		return "", err
+	}
+	return result.JobInstanceID, nil
+}
+
 func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *Committer, org string) (truckID, loadID string, err error) {
 	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "logistic", "line"}}
+	if _, err := commitOpenWorkingDayCtx(ctx, c, org, "2026-10-19", "multi"); err != nil {
+		return "", "", err
+	}
 	arrive, err := c.Commit(ctx, org, op, CommitRequest{
 		TaskPath: "intake/truckArrive",
-		Value: map[string]any{
-			"date": "2026-10-19", "turno": "1st", "truckWeight": 1000.0,
-		},
-		Mint: startingNewMint(),
+		Value:    map[string]any{"truckWeight": 1000.0},
+		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		return "", "", err
@@ -80,6 +105,9 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *Committer, org stri
 		return Domain{}, err
 	}
 	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "logistic", "line"}}
+	if _, err := commitOpenWorkingDayCtx(ctx, c, org, "2026-10-19", "multi"); err != nil {
+		return Domain{}, err
+	}
 	line, err := c.Commit(ctx, org, op, CommitRequest{
 		TaskPath: "line/openTurno",
 		Value:    map[string]any{"date": "2026-10-19", "turno": "1st"},
@@ -113,10 +141,13 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *Committer, org stri
 }
 
 func commitLineShiftNew(ctx context.Context, c *Committer, org, shift string) (Domain, error) {
-	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"line"}}
+	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "line"}}
 	turno := shift
 	if turno == "" {
 		turno = "1st"
+	}
+	if _, err := commitOpenWorkingDayCtx(ctx, c, org, "2026-10-19", "multi"); err != nil {
+		return Domain{}, err
 	}
 	result, err := c.Commit(ctx, org, op, CommitRequest{
 		TaskPath: "line/openTurno",
@@ -127,6 +158,16 @@ func commitLineShiftNew(ctx context.Context, c *Committer, org, shift string) (D
 		return Domain{}, err
 	}
 	return result.Domain, nil
+}
+
+func commitCloseTurnoCtx(ctx context.Context, c *Committer, org, lineID string) error {
+	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "line"}}
+	_, err := c.Commit(ctx, org, op, CommitRequest{
+		TaskPath:      "line/closeTurno",
+		JobInstanceID: lineID,
+		Value:         map[string]any{},
+	})
+	return err
 }
 
 // seedLineLoadReadyDomain wipes org Domain then Commits intake lots + line weigh

@@ -37,13 +37,33 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 		}
 	}
 	entities, _ := cfg.Domain["entities"].(map[string]any)
+	if entities["workingDay"] == nil || entities["shift"] == nil {
+		t.Fatalf("domain.entities missing workingDay/shift: %#v", entities)
+	}
 	if entities["truck"] == nil || entities["load"] == nil {
 		t.Fatalf("domain.entities missing truck/load: %#v", entities)
 	}
-	if cfg.Jobs.Len() != 3 {
+	truckFields, _ := entities["truck"].(map[string]any)
+	fields, _ := truckFields["fields"].([]any)
+	hasWD, hasDate, hasTurno := false, false, false
+	for _, f := range fields {
+		s, _ := f.(string)
+		switch s {
+		case "workingDayId":
+			hasWD = true
+		case "date":
+			hasDate = true
+		case "turno":
+			hasTurno = true
+		}
+	}
+	if !hasWD || hasDate || hasTurno {
+		t.Fatalf("truck.fields = %#v, want workingDayId without date/turno", fields)
+	}
+	if cfg.Jobs.Len() != 4 {
 		t.Fatalf("jobs len = %d, keys=%v", cfg.Jobs.Len(), cfg.Jobs.Keys)
 	}
-	if got := cfg.Jobs.Keys; len(got) < 3 || got[0] != "intake" || got[1] != "line" || got[2] != "passport" {
+	if got := cfg.Jobs.Keys; len(got) < 4 || got[0] != "workingDay" || got[1] != "intake" || got[2] != "line" || got[3] != "passport" {
 		t.Fatalf("job order = %v", got)
 	}
 	if cfg.Passport == nil || cfg.Passport.Subject.Entity != "load" {
@@ -100,9 +120,21 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if line.StartsWhen != nil {
 		t.Fatalf("line must not have startsWhen, got %#v", line.StartsWhen)
 	}
-	wantLineTasks := []string{"openTurno", "palletWeight", "lineLoad", "containerReg"}
+	wantLineTasks := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "closeTurno"}
 	if got := OrderedTaskIDs(line.Tasks); strings.Join(got, ",") != strings.Join(wantLineTasks, ",") {
 		t.Fatalf("line tasks = %v", got)
+	}
+	if _, ok := TaskByID(line.Tasks, "closeTurno"); !ok {
+		t.Fatal("missing closeTurno")
+	}
+	wdAny, ok := cfg.Jobs.Get("workingDay")
+	if !ok {
+		t.Fatal("missing workingDay")
+	}
+	wd := wdAny.(Job)
+	wantWDTasks := []string{"open", "close"}
+	if got := OrderedTaskIDs(wd.Tasks); strings.Join(got, ",") != strings.Join(wantWDTasks, ",") {
+		t.Fatalf("workingDay tasks = %v", got)
 	}
 	pw, ok := TaskByID(line.Tasks, "palletWeight")
 	if !ok || !pw.IsGroup() {

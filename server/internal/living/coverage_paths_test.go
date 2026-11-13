@@ -343,7 +343,7 @@ func TestFirstActionableTaskAndCompileDerivedEdges(t *testing.T) {
 	domain := EmptyDomain()
 	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
 	ref, ok := FirstActionableTask(cfg, wl)
-	if !ok || ref.JobID != "intake" || ref.TaskID != "truckArrive" || ref.JobInstanceID != "" {
+	if !ok || ref.JobID != "workingDay" || ref.TaskID != "open" || ref.JobInstanceID != "" {
 		t.Fatalf("first = %#v ok=%v", ref, ok)
 	}
 	ref, ok = FirstActionableTask(OrgConfig{}, Worklist{})
@@ -501,7 +501,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	deny := &Handler{Loader: loader, Committer: &Committer{Domains: domains, Configs: configs, Authorizer: DenyAllAuthorizer{}}, Gate: gateOK}
 	rec = httptest.NewRecorder()
 	deny.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(
-		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`,
+		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`,
 	)))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("unauthorized commit = %d body=%s", rec.Code, rec.Body.String())
@@ -1281,6 +1281,7 @@ func TestCommitErrorWrappingViaApply(t *testing.T) {
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("unknown task = %v", err)
 	}
+	ensureOpenWorkingDay(t, c)
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	}); err != nil {

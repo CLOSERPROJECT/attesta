@@ -6,8 +6,6 @@ import (
 
 func truckArriveValue() map[string]any {
 	return map[string]any{
-		"date":        "2026-10-19",
-		"turno":       "1st",
 		"truckWeight": 1000.0,
 	}
 }
@@ -34,8 +32,50 @@ func adminOp() OperatorIdentity {
 	return OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
 }
 
+// Idempotent when that day Job instance already exists.
+func commitOpenWorkingDay(t *testing.T, c *Committer, date, mode string) (string, error) {
+	t.Helper()
+	if date == "" {
+		date = "2026-10-19"
+	}
+	if mode == "" {
+		mode = "multi"
+	}
+	if domain, err := c.Domains.Get(t.Context(), "feragame"); err == nil {
+		if day, ok := domain.Kind("workingDay")[date]; ok {
+			if day["status"] == "open" {
+				return date, nil
+			}
+		}
+		for _, inst := range domain.JobInstances {
+			if inst.JobID == "workingDay" && inst.ID == date {
+				return date, nil
+			}
+		}
+	}
+	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": date, "mode": mode},
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		return "", err
+	}
+	return result.JobInstanceID, nil
+}
+
+func ensureOpenWorkingDay(t *testing.T, c *Committer) string {
+	t.Helper()
+	dayID, err := commitOpenWorkingDay(t, c, "2026-10-19", "multi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dayID
+}
+
 func commitTruckArrive(t *testing.T, c *Committer) string {
 	t.Helper()
+	ensureOpenWorkingDay(t, c)
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
@@ -99,6 +139,11 @@ func commitIntakeThroughLotsClosed(t *testing.T, c *Committer) (truckID, loadID 
 
 func commitOpenTurnoWith(t *testing.T, c *Committer, value map[string]any) string {
 	t.Helper()
+	date, _ := value["date"].(string)
+	if date == "" {
+		date = "2026-10-19"
+	}
+	ensureOpenWorkingDayForDate(t, c, date)
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
 		TaskPath: "line/openTurno",
 		Value:    value,
@@ -110,9 +155,27 @@ func commitOpenTurnoWith(t *testing.T, c *Committer, value map[string]any) strin
 	return result.JobInstanceID
 }
 
+func ensureOpenWorkingDayForDate(t *testing.T, c *Committer, date string) {
+	t.Helper()
+	if _, err := commitOpenWorkingDay(t, c, date, "multi"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func commitOpenTurno(t *testing.T, c *Committer) string {
 	t.Helper()
 	return commitOpenTurnoWith(t, c, openTurnoValue())
+}
+
+func commitCloseTurno(t *testing.T, c *Committer, lineID string) {
+	t.Helper()
+	if _, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		TaskPath:      "line/closeTurno",
+		JobInstanceID: lineID,
+		Value:         map[string]any{},
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func commitWeigh(t *testing.T, c *Committer, lineID, palletID string, weight float64) CommitResult {

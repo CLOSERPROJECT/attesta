@@ -26,11 +26,11 @@ type SeedOptions struct {
 }
 
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
-// Truck grammar: YYMMDD-turno-n from seedTruckArriveValue (date 2026-11-02).
+// Truck grammar: YYMMDD-n from open workingDay date (2026-11-02 → 261102-1).
 // Line grammar: date-turno from openTurno.
 // Load grammar: client-YYMMDD-n from lots/register.
 const (
-	SeedTruckID  = "261102-1st-1"
+	SeedTruckID  = "261102-1"
 	SeedLineID   = "2026-11-02-1st"
 	SeedLoadCOID = "CO-261102-1"
 	SeedLoadDAID = "DA-261102-1"
@@ -111,9 +111,17 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	logistic := OperatorIdentity{UserID: "seed-logistic", Org: org, Roles: []string{"logistic"}}
 	lineOp := OperatorIdentity{UserID: "seed-line", Org: org, Roles: []string{"line"}}
 
+	if _, err := seedCommit(ctx, c, org, admin, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-11-02", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		return err
+	}
+
 	arrive, err := seedCommit(ctx, c, org, admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
-		Value:    seedTruckArriveValue("1st", 1000),
+		Value:    seedTruckArriveValue(1000),
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
@@ -232,10 +240,8 @@ func seedCommit(ctx context.Context, c *Committer, org string, op OperatorIdenti
 	return res, nil
 }
 
-func seedTruckArriveValue(turno string, truckWeight float64) map[string]any {
+func seedTruckArriveValue(truckWeight float64) map[string]any {
 	return map[string]any{
-		"date":        "2026-11-02",
-		"turno":       turno,
 		"truckWeight": truckWeight,
 	}
 }

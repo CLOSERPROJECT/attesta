@@ -420,7 +420,8 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		}
 	}
 
-	arrive := post(`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`)
+	_ = post(`{"taskPath":"workingDay/open","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","mode":"multi"}}`)
+	arrive := post(`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`)
 	truckID, _ := arrive["jobInstanceId"].(string)
 	reg := post(`{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-E2E","palletCount":2,"truckWeightAfter":700,"notes":""}}`)
 	postClose("intake", truckID, "lots")

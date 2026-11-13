@@ -32,6 +32,7 @@ func testCommitter(t *testing.T, auth Authorizer) (*Committer, *MemoryDomainStor
 func TestCommitTruckArrivePersistsAndLoadReflects(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	ensureOpenWorkingDay(t, c)
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/truckArrive",
@@ -42,17 +43,17 @@ func TestCommitTruckArrivePersistsAndLoadReflects(t *testing.T) {
 		t.Fatal(err)
 	}
 	truckID := result.JobInstanceID
-	wantID := "261019-1st-1"
+	wantID := "261019-1"
 	if truckID != wantID {
 		t.Fatalf("jobInstanceId = %q, want %q", truckID, wantID)
 	}
 	if result.Domain.Kind("truck")[truckID]["truckWeight"] != 1000.0 {
 		t.Fatalf("truck = %#v", result.Domain.Kind("truck"))
 	}
-	if len(result.Domain.Submissions) != 1 {
+	if len(result.Domain.Submissions) != 2 {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
-	sub := result.Domain.Submissions[0]
+	sub := result.Domain.Submissions[len(result.Domain.Submissions)-1]
 	if sub.JobID != "intake" || sub.TaskID != "truckArrive" || sub.JobInstanceID != truckID {
 		t.Fatalf("submission path keys = %#v", sub)
 	}
@@ -64,7 +65,13 @@ func TestCommitTruckArrivePersistsAndLoadReflects(t *testing.T) {
 	if loaded.Domain.Kind("truck")[truckID]["lastScaleReading"] != 1000.0 {
 		t.Fatalf("loaded domain = %#v", loaded.Domain)
 	}
-	if len(loaded.Domain.JobInstances) != 1 || loaded.Domain.JobInstances[0].ID != truckID {
+	var sawTruck bool
+	for _, inst := range loaded.Domain.JobInstances {
+		if inst.JobID == "intake" && inst.ID == truckID {
+			sawTruck = true
+		}
+	}
+	if !sawTruck || len(loaded.Domain.JobInstances) != 2 {
 		t.Fatalf("jobInstances = %#v", loaded.Domain.JobInstances)
 	}
 }
@@ -116,7 +123,7 @@ func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
 		TaskPath:      "intake/notATask",
-		JobInstanceID: "261019-1st-1",
+		JobInstanceID: "261019-1",
 		Value:         map[string]any{},
 	})
 	var ce *CommitError
@@ -174,6 +181,7 @@ func TestCommitLotsUnlocksAfterArrive(t *testing.T) {
 
 func TestHandleCommitHappyPath(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
+	ensureOpenWorkingDay(t, c)
 	h := &Handler{
 		Loader:    loader,
 		Committer: c,
@@ -182,7 +190,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 		},
 	}
 
-	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
+	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
@@ -193,7 +201,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if wire["jobInstanceId"] != "261019-1st-1" {
+	if wire["jobInstanceId"] != "261019-1" {
 		t.Fatalf("jobInstanceId = %#v", wire["jobInstanceId"])
 	}
 	if _, has := wire["domain"]; has {
@@ -208,7 +216,8 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if domain.Kind("truck")["261019-1st-1"]["turno"] != "1st" {
+	truck := domain.Kind("truck")["261019-1"]
+	if truck["workingDayId"] != "2026-10-19" || truck["truckWeight"] != 1000.0 {
 		t.Fatalf("stored domain = %#v", domain)
 	}
 

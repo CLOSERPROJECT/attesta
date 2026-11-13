@@ -242,13 +242,13 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	logIntake, _ := worklistJobByID(logistic.Worklist, "intake")
 	lineJobWL, _ := worklistJobByID(line.Worklist, "line")
 	if !adminIntake.CanStart {
-		t.Fatal("administration canStart intake want true")
+		t.Fatal("administration canStart intake want true (open working day)")
 	}
 	if logIntake.CanStart {
 		t.Fatal("logistic canStart intake want false")
 	}
-	if !lineJobWL.CanStart {
-		t.Fatal("line canStart want true (no startsWhen gate on plant line)")
+	if lineJobWL.CanStart {
+		t.Fatal("line canStart want false while seed shift is still open")
 	}
 }
 
@@ -315,12 +315,15 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if len(got.Kind("pallet")) != 4 {
 		t.Fatalf("staged pallets = %#v, want 4", got.Kind("pallet"))
 	}
-	if len(got.JobInstances) != 2 {
-		t.Fatalf("jobInstances = %d, want 2 (1 intake + 1 line)", len(got.JobInstances))
+	if len(got.JobInstances) != 3 {
+		t.Fatalf("jobInstances = %d, want 3 (1 workingDay + 1 intake + 1 line)", len(got.JobInstances))
 	}
-	// truckArrive + 2× lots/register + openTurno + 4× weigh
-	if len(got.Submissions) < 8 {
-		t.Fatalf("submissions = %d, want >= 8", len(got.Submissions))
+	if _, ok := got.Kind("workingDay")["2026-11-02"]; !ok {
+		t.Fatalf("staged workingDay missing: %#v", got.Kind("workingDay"))
+	}
+	// workingDay/open + truckArrive + 2× lots/register + openTurno + 4× weigh + …
+	if len(got.Submissions) < 9 {
+		t.Fatalf("submissions = %d, want >= 9", len(got.Submissions))
 	}
 
 	cfg, err := LoadFeragameConfigFixture()

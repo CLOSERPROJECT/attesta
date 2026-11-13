@@ -1,16 +1,22 @@
 # Attesta Feragame demo fixture (steps / substeps).
 # Single source of truth: embedded by Go (LoadFeragameConfigFixture) and imported by SPA tests.
-# Plant tree: intake truckArrive → lots group → weightCheck; line openTurno → palletWeight group → …
+# Plant tree: workingDay open → close; intake truckArrive → lots → weightCheck;
+# line openTurno → palletWeight / lineLoad / containerReg → closeTurno; passport.
 #
 # Authored tasks are ordered lists with required unique id (not maps).
 # openTurno is a Job-start mint leaf (date+turno); engine cannot startingNew on a group-first Job.
+# whole-day is a workingDay.mode (and shift.turno id segment), not a turni catalog peer.
 
 id: feragame-config
 org: feragame
 domain:
     entities:
+        workingDay:
+            fields: [date, mode, status]
+        shift:
+            fields: [workingDayId, turno, status]
         truck:
-            fields: [date, turno, truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
+            fields: [workingDayId, truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
         load:
             # fullyProcessed = register closure only; locked/issued = Passport lock (v1 once).
             fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, fullyProcessed, locked, issued]
@@ -42,7 +48,6 @@ catalogs:
         1st: 1°
         2nd: 2°
         3rd: 3°
-        whole-day: giornata intera
     tareKinds:
         industrial: 25
         euro: 20
@@ -100,6 +105,11 @@ passport:
             (
               $load := $lookup($domain.load, $subjectId);
               $truck := $lookup($domain.truck, $load.truckId);
+              $day := $lookup($domain.workingDay, $truck.workingDayId);
+              $openShiftMap := $sift($domain.shift, function($v){$v.workingDayId = $truck.workingDayId and $v.status = "open"});
+              $openShiftIds := $keys($openShiftMap);
+              $openShift := $count($openShiftIds) = 1 ? $lookup($openShiftMap, $openShiftIds[0]) : null;
+              $turnoLabel := $openShift.turno = "whole-day" ? "giornata intera" : $lookup($catalogs.turni, $openShift.turno);
               $palletMap := $sift($domain.pallet, function($v){$v.loadId = $subjectId});
               $containerMap := $sift($domain.container, function($v){$v.sourceLoadId = $subjectId});
               $palletIds := $sort($keys($palletMap));
@@ -136,7 +146,7 @@ passport:
                     $row("CER", $str($load.wasteCode)),
                     $row("Netto lotto (kg)", $kg($load.netWeight)),
                     $row("Camion", $str($load.truckId)),
-                    $row("Data turno", $str($truck.date) & " / " & $lookup($catalogs.turni, $truck.turno)),
+                    $row("Giornata", $str($day.date) & ($openShift ? " / " & $turnoLabel : "")),
                     $row("Peso lordo camion (kg)", $kg($truck.truckWeight))
                   ],
                   $append($palletRows, $containerRows)
@@ -144,6 +154,73 @@ passport:
               }
             )
 steps:
+    workingDay:
+        repeatable: true
+        title: Giornata
+        startLabel: Nuova giornata
+        color: '#a16207'
+        instanceId: $.date
+        label: $.date
+        substeps:
+            - id: open
+              roles: [administration]
+              readyWhen: >-
+                $count($domain.workingDay.*[status = "open"]) = 0
+              schema:
+                type: object
+                title: Apri giornata
+                required: [date, mode]
+                properties:
+                    date:
+                        type: string
+                        format: date
+                        title: Data
+                        default: $today
+                    mode:
+                        type: string
+                        title: Modalità
+                        enum: [multi, whole-day]
+              uiSchema:
+                ui:options:
+                    order: [date, mode]
+                mode:
+                    ui:options:
+                        enumNames: ['multi-turno', 'giornata intera']
+              onSubmit:
+                transform:
+                    - op: mint
+                      entity: workingDay
+                      as: workingDay
+                      id: $.date
+                      set:
+                        date: $.date
+                        mode: $.mode
+                        status: '"open"'
+                    - op: mintMany
+                      entity: shift
+                      count: '$.mode = "whole-day" ? 1 : 0'
+                      id: $.date & "-whole-day"
+                      set:
+                        workingDayId: $.date
+                        turno: '"whole-day"'
+                        status: '"open"'
+            - id: close
+              roles: [administration]
+              unlockFrom: open
+              readyWhen: >-
+                $lookup($domain.workingDay, $instance.id).status = "open"
+                and $count($domain.shift.*[workingDayId = $instance.id and status = "open"]) = 0
+              schema:
+                type: object
+                title: Chiudi giornata
+                properties: {}
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: workingDay
+                      id: $instance.id
+                      set:
+                        status: '"closed"'
     intake:
         repeatable: true
         title: Ingresso
@@ -154,37 +231,30 @@ steps:
         substeps:
             - id: truckArrive
               roles: [administration]
+              readyWhen: >-
+                $count($domain.workingDay.*[status = "open"]) = 1
               schema:
                 type: object
                 title: Registrazione camion
-                required: [date, turno, truckWeight]
+                required: [truckWeight]
                 properties:
-                    date:
-                        type: string
-                        format: date
-                        title: Data
-                        default: $today
-                    turno:
-                        type: string
-                        title: Turno
-                        enum: [1st, 2nd, 3rd, whole-day]
                     truckWeight: {type: number, exclusiveMinimum: 0, title: Peso lordo camion}
               uiSchema:
                 ui:options:
-                    order: [date, turno, truckWeight]
-                turno:
-                    ui:options:
-                        enumNames: ['1°', '2°', '3°', 'giornata intera']
+                    order: [truckWeight]
               onSubmit:
                 transform:
                     - op: mint
                       entity: truck
                       as: truck
                       id: >-
-                        $substring($replace($.date, '-', ''), 2) & '-' & $.turno & '-' & $string($count($filter($domain.truck.*, function($v){$v.date = $.date and $v.turno = $.turno})) + 1)
+                        (
+                          $dayId := $keys($sift($domain.workingDay, function($v){$v.status = "open"}))[0];
+                          $substring($replace($dayId, "-", ""), 2) & "-" & $string($count($filter($domain.truck.*, function($v){$v.workingDayId = $dayId})) + 1)
+                        )
                       set:
-                        date: $.date
-                        turno: $.turno
+                        workingDayId: >-
+                          $keys($sift($domain.workingDay, function($v){$v.status = "open"}))[0]
                         truckWeight: $.truckWeight
                         lastScaleReading: $.truckWeight
             - id: lots
@@ -232,7 +302,7 @@ steps:
                         expr: >-
                             (
                               $truck := $lookup($domain.truck, $instance.id);
-                              $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).date = $truck.date})) + 1
+                              $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1
                             )
                     lotNetWeight:
                         kind: readonly
@@ -251,15 +321,16 @@ steps:
                           id: >-
                             (
                               $truck := $lookup($domain.truck, $instance.id);
-                              $n := $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).date = $truck.date})) + 1;
-                              $.client & '-' & $substring($replace($truck.date, '-', ''), 2) & '-' & $string($n)
+                              $day := $lookup($domain.workingDay, $truck.workingDayId);
+                              $n := $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1;
+                              $.client & '-' & $substring($replace($day.date, '-', ''), 2) & '-' & $string($n)
                             )
                           set:
                             client: $.client
                             clientProgressive: >-
                               (
                                 $truck := $lookup($domain.truck, $instance.id);
-                                $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).date = $truck.date})) + 1
+                                $count($filter($domain.load.*, function($v){$v.client = $.client and $lookup($domain.truck, $v.truckId).workingDayId = $truck.workingDayId})) + 1
                               )
                             numeroFir: $.numeroFir
                             wasteCode: $.wasteCode
@@ -288,7 +359,7 @@ steps:
                             {
 
                               "loadId": $load.id,
-                              "date": $substring($replace($lookup($domain.truck, $instance.id).date, '-', ''), 2),
+                              "date": $substring($replace($lookup($domain.workingDay, $lookup($domain.truck, $instance.id).workingDayId).date, '-', ''), 2),
                               "client": $.client,
                               "clientProgressive": $load.clientProgressive,
                               "numeroFir": $.numeroFir,
@@ -377,11 +448,40 @@ steps:
         startLabel: Nuovo turno
         color: '#0284c7'
         # Job-start leaf: engine cannot mint a Job instance from a group-first Commit.
-        instanceId: $.date & '-' & $.turno
-        label: "$.date & ' Turno: ' & $lookup($catalogs.turni, $.turno)"
+        # Force whole-day instance id from Domain so a wrong form turno cannot spawn a peer line instance.
+        instanceId: >-
+            (
+              $open := $domain.workingDay.*[status = "open"];
+              $open.mode = "whole-day" ? $open.date & "-whole-day" : $.date & "-" & $.turno
+            )
+        label: >-
+            (
+              $open := $domain.workingDay.*[status = "open"];
+              $open.mode = "whole-day"
+                ? $open.date & " Turno: giornata intera"
+                : $.date & " Turno: " & $lookup($catalogs.turni, $.turno)
+            )
         substeps:
             - id: openTurno
               roles: [line]
+              # Multi: mint when no open/whole-day shift. Whole-day: bind once (no openTurno Submission yet for that shift id).
+              readyWhen: >-
+                (
+                  $open := $domain.workingDay.*[status = "open"];
+                  $count($open) = 1
+                  and (
+                    (
+                      $open.mode != "whole-day"
+                      and $count($domain.shift.*[status = "open"]) = 0
+                      and $count($domain.shift.*[turno = "whole-day" and workingDayId = $open.date]) = 0
+                    )
+                    or (
+                      $open.mode = "whole-day"
+                      and $count($domain.shift.*[status = "open" and turno = "whole-day" and workingDayId = $open.date]) = 1
+                      and $count($domain.submissions[jobId = "line" and taskId = "openTurno" and jobInstanceId = $open.date & "-whole-day"]) = 0
+                    )
+                  )
+                )
               schema:
                 type: object
                 title: Apri turno
@@ -395,6 +495,7 @@ steps:
                     turno:
                         type: string
                         title: Turno
+                        # whole-day kept for bind-only path (instanceId = date-whole-day); not a turni catalog peer.
                         enum: [1st, 2nd, 3rd, whole-day]
               uiSchema:
                 ui:options:
@@ -403,7 +504,29 @@ steps:
                     ui:options:
                         enumNames: ['1°', '2°', '3°', 'giornata intera']
               onSubmit:
-                transform: []
+                transform:
+                    # whole-day: count 0 (bind). multi: mint one shift under the open day date.
+                    - op: mintMany
+                      entity: shift
+                      count: >-
+                        (
+                          $open := $domain.workingDay.*[status = "open"];
+                          $open.mode = "whole-day" ? 0 : (
+                            $count($domain.shift.*[status = "open"]) = 0
+                            and $count($sift($domain.shift, function($v, $k){$k = $open.date & "-" & $.turno})) = 0
+                            ? 1 : 0
+                          )
+                        )
+                      id: >-
+                        (
+                          $open := $domain.workingDay.*[status = "open"];
+                          $open.date & "-" & $.turno
+                        )
+                      set:
+                        workingDayId: >-
+                          $domain.workingDay.*[status = "open"].date
+                        turno: $.turno
+                        status: '"open"'
             - id: palletWeight
               kind: group
               title: Pesatura bancali
@@ -712,6 +835,22 @@ steps:
                           entity: container
                           set:
                             incomplete: false
+            - id: closeTurno
+              roles: [line]
+              unlockFrom: openTurno
+              readyWhen: >-
+                $lookup($domain.shift, $instance.id).status = "open"
+              schema:
+                type: object
+                title: Chiudi turno
+                properties: {}
+              onSubmit:
+                transform:
+                    - op: patch
+                      entity: shift
+                      id: $instance.id
+                      set:
+                        status: '"closed"'
     # Passport Lock: Job instance id = load id; select eligible load then approve freeze.
     # Eligibility: fullyProcessed ∧ not locked (register closure ≠ passport closure).
     passport:

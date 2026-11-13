@@ -8,6 +8,7 @@ import (
 // append a duplicate line JobInstance (JobPanel keyed-each would crash).
 func TestCommitOpenTurnoStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	ensureOpenWorkingDay(t, c)
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	first, err := c.Commit(t.Context(), "feragame", op, CommitRequest{

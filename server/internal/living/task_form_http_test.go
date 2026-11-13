@@ -11,6 +11,7 @@ import (
 func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	ensureOpenWorkingDay(t, c)
 
 	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "", "", "")
 	if err != nil {
@@ -90,6 +91,7 @@ func TestLoadTaskBundleDeniesRoleOutsideBoardScope(t *testing.T) {
 func TestHandleTaskFormHTTP(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	ensureOpenWorkingDay(t, c)
 	h := &Handler{
 		Loader: loader, Committer: c,
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -151,6 +153,7 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
+	ensureOpenWorkingDay(t, c)
 	arrive, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})

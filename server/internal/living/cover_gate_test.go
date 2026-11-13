@@ -26,6 +26,9 @@ func TestDemoCommitHelpersSeedLineLoadReady(t *testing.T) {
 		t.Fatal("expected load after demo seed")
 	}
 	c := demoSeedCommitter(domains, configs)
+	if err := commitCloseTurnoCtx(t.Context(), c, "feragame", DemoLineShiftID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := commitLineShiftNew(t.Context(), c, "feragame", "2nd"); err != nil {
 		t.Fatal(err)
 	}
@@ -255,6 +258,7 @@ func TestHandlerTaskFormRecapCloseQrErrorEdges(t *testing.T) {
 		t.Fatalf("task-form boom = %d", rec.Code)
 	}
 
+	ensureOpenWorkingDay(t, c)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/living/task-form?jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {

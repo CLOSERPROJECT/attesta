@@ -13,7 +13,7 @@ func TestFixtureLineHasNoStartsWhen(t *testing.T) {
 	if !line.Repeatable {
 		t.Fatal("line must stay repeatable")
 	}
-	want := []string{"openTurno", "palletWeight", "lineLoad", "containerReg"}
+	want := []string{"openTurno", "palletWeight", "lineLoad", "containerReg", "closeTurno"}
 	got := OrderedTaskIDs(line.Tasks)
 	if len(got) != len(want) {
 		t.Fatalf("line tasks = %v", got)
@@ -38,6 +38,14 @@ func TestCommitOpenTurnoViaCerbosOnEmptyDomain(t *testing.T) {
 	defer pdp.Close()
 
 	c, _, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	if _, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-10-19", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		t.Fatal(err)
+	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "line/openTurno",

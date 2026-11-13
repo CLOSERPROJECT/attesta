@@ -51,8 +51,8 @@ Open a new occurrence of a **Task group** under a **Job instance** by Committing
 _Avoid_: Empty-open without the first leaf Submission as the normal operator path; calling Job start “Spawn”; inventing a home Spawn peer of Can start; Task instance
 
 **Job instance**:
-One occurrence of a repeatable Job within the org Domain (e.g. one truck, one line). Often created on first Task submit; id/label from config and/or submitted data.
-_Avoid_: Step instance (legacy experiment name); whole-config execution instance; Stream instance; Node (domain docs)
+One occurrence of a repeatable Job within the org Domain (e.g. one truck, one line shift). Often created on first Task submit; id/label from config and/or submitted data. Distinct from Domain entities such as **working day** and **shift** (a line Job instance may share id with its shift entity).
+_Avoid_: Step instance (legacy experiment name); whole-config execution instance; Stream instance; Node (domain docs); treating the Job instance as a substitute for a Domain entity
 
 **Task path**:
 Stable address of a Task (or later a node) under a Job, e.g. `intake/palletWeight`. Commit and Submission keys use Task path plus Job instance id so deeper trees stay additive.
@@ -63,12 +63,12 @@ In-Job rule for which Tasks become completable after prior Submissions on the sa
 _Avoid_: Calling unlock “startsWhen”; Seal-gated unlock
 
 **startsWhen**:
-Job-level start gate: quantifier (`some` | `all`) over Submissions of a named Task. Distinct from Unlock order.
-_Avoid_: Locked (as the gate state word); Seal-gated start
+Job-level start gate: quantifier (`some` | `all`) over Submissions of a named Task. Distinct from Unlock order and from Domain readiness. Unused for plant working-day / shift exclusivity (those are Domain facts via **readyWhen**).
+_Avoid_: Locked (as the gate state word); Seal-gated start; encoding entity open/closed or “previous closed” law; availableWhen
 
 **readyWhen**:
-Task-level Domain readiness (boolean expression over Domain). Combined with the Task’s role gate. When false: visible but unavailable.
-_Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression
+Task-level Domain readiness (boolean expression over Domain). Combined with the Task’s role gate. When false: visible but unavailable. The gate for plant laws that depend on Domain entity state (e.g. open working day / open shift).
+_Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression; overloading startsWhen for Domain facts
 
 **Domain reads** (map/table Tasks):
 Authored `reads` + `dynamicProperties` that project current entity ids into a form map (row projection / `rowIds` on the Task form bundle). Projection **materializes** those ids into concrete `schema.properties`; authored `additionalProperties` is the per-id **template** only (`additionalProperties: false` after project). Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate subsystem; not spawn-many of full child registers. Two shapes share one authored `ui:field: mapTable`: a **cell map** (template scalar — one value column, sjsf field per cell schema) and an **object map** (template object — property columns, sjsf field per property). Cell enums are **real values only** (`partial`, `done`, …) — no `null` in enum. Stock sjsf clearable is for draft fix only: emptying a cell drops the key (`omit`/`undefined`); Commit treats omit as untouched (set-or-skip). Never unset Domain facts via Commit.
@@ -130,6 +130,18 @@ _Avoid_: boolean `processed` as Worklist status; using fullyProcessed as unlock 
 Plant Domain fact on a **container**: booked weight for the current load is frozen while the physical bin may continue on a later register. Distinct from Task-group Close.
 _Avoid_: Treating incomplete as Worklist/progress; engine special-case on the name (Config transform + form only)
 
+**working day** (entity):
+Plant Domain entity for one calendar date of plant operation. Id is that date. Mode is multi-shift or **whole-day**; status is open or closed; closed is terminal for that date. At most one working day is open; intake binds to the open working day, not to a shift.
+_Avoid_: Date form fields alone as the day; conflating with Job instance; giornata intera as a fourth turno peer of 1°/2°/3° without this entity; engine special-case on the name
+
+**shift** (entity):
+Plant Domain entity nested under a **working day**. Line work references the open shift; line Job instance id matches the shift id. Status is open or closed; Config allows at most one open shift at a time (catalog order 1°→2°→3° not required yet).
+_Avoid_: Equating shift with Job instance with no Domain row; binding intake to shift; engine special-case on the name
+
+**whole-day** (working day mode):
+Working day mode that mints exactly one shift on the same open Commit; further shift opens are gated off in Config. Multi-shift days mint only the day until a later shift open.
+_Avoid_: whole-day as only a turno enum beside 1st/2nd/3rd; auto-creating a line Job instance outside Org Config transforms
+
 **continuesContainerId** (Config form fact):
 Hidden row field on plant register: links a continuation row to a still-open incomplete Domain container. Load seeds it via Task `initialData`; Commit transform books delta weight and supersedes the prior incomplete. Not a Domain entity field. Operator visibility uses generic `ui:options.presenceMark` on `hiddenField` (Config title such as Continua)—not a second schema fact.
 _Avoid_: Engine special-case on the name; free-picked secondary load enum for continuity; storing continuesContainerId on minted containers; SPA branches on this field name beyond the generic hidden+presenceMark contract
@@ -149,6 +161,10 @@ Immutable projection of related Domain facts (and named Submissions) from the ro
 _Avoid_: Live Domain as the passport body; a second hand-authored recap expr that can drift from freeze; mutable “current view” credentials; “passport” as just another Feragame entity row
 
 ### Operator and seams
+
+**Dumb executor**:
+Go and the living SPA only evaluate Org Config and project Worklist/forms; plant business rules (entity shapes, open/close transforms, readyWhen) are authored in Config, not hard-coded in executors.
+_Avoid_: Feragame-named branches in Go or SPA; day/shift exclusivity outside Org Config; “the engine knows what a turno is”
 
 **OperatorIdentity**:
 Host-injected `{ userId, org, roles }` for role gates, chrome, and Submission actor. Not the Org Config document.

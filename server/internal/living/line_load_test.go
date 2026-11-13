@@ -125,6 +125,7 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		loadID + ".2": "partial",
 	})
 
+	commitCloseTurno(t, c, line1)
 	line2 := commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "2nd"})
 	// closeRequiresChildSubmission: need a weigh leaf on this Job instance before Close.
 	_ = commitWeigh(t, c, line2, loadID+".1", 11)

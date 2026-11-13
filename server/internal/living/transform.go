@@ -161,9 +161,10 @@ func domainBindings(domain Domain, jobInstanceID string, catalogs map[string]any
 	for kind, m := range entityMaps {
 		domainBag[kind] = entityMapToAny(m)
 	}
+	// JSON field names (jobId, taskId, …) so readyWhen can filter like form bindings.
 	subs := make([]any, len(domain.Submissions))
 	for i, s := range domain.Submissions {
-		subs[i] = s
+		subs[i] = deepCloneJSON(s)
 	}
 	domainBag["submissions"] = subs
 	bindings := ExprBindings{

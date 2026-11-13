@@ -56,6 +56,7 @@ func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 	}
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	ensureOpenWorkingDay(t, c)
 	committed, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
@@ -98,9 +99,13 @@ func TestLoadJSONOmitsBulkTaskFormBundlesWhenCanStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	wd, ok := worklistJobByID(result.Worklist, "workingDay")
+	if !ok || !wd.CanStart {
+		t.Fatalf("workingDay canStart = %#v", wd)
+	}
 	intake, ok := worklistJobByID(result.Worklist, "intake")
-	if !ok || !intake.CanStart {
-		t.Fatalf("intake canStart = %#v", intake)
+	if !ok || intake.CanStart {
+		t.Fatalf("intake canStart = %#v, want false without open day", intake)
 	}
 	if len(result.TaskFormBundles) != 0 {
 		t.Fatalf("home Load bundles = %#v, want empty (lazy task-form)", result.TaskFormBundles)
@@ -287,8 +292,9 @@ func TestLineLoadPartialMapAfterOnePalletWeighClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if closed.NextTaskFormBundle != nil {
-		t.Fatalf("after weigh Close next = %s, want overview (lineLoad is a Spawn group)", bundleAddress(closed.NextTaskFormBundle))
+	// lineLoad is Spawn (no auto-advance); closeTurno is unlocked from openTurno so may be next.
+	if b := closed.NextTaskFormBundle; b != nil && !(b.JobID == "line" && b.TaskID == "closeTurno" && b.JobInstanceID == lineID) {
+		t.Fatalf("after weigh Close next = %s, want overview or closeTurno", bundleAddress(b))
 	}
 	lineLoad, err := BuildTaskFormBundle(mustActiveConfig(t, c), closed.Domain, ActionableTaskRef{
 		JobID: "line", GroupID: "lineLoad", TaskID: "mark", JobInstanceID: lineID,
@@ -479,8 +485,8 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "truckArrive", "", "", ""); err == nil {
 		t.Fatal("line viewer must not mount intake provisional truckArrive")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "openTurno", "", "", ""); err != nil {
-		t.Fatalf("line canStart provisional openTurno after first mint: %v", err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "openTurno", "", "", ""); err == nil {
+		t.Fatal("line must not canStart openTurno while a shift is still open")
 	}
 
 	loaded, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{

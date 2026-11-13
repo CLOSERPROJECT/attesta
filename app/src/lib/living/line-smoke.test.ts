@@ -11,7 +11,7 @@ import {
 } from './types.js';
 
 /** Live line Task ids — plant fixture (no parked loadedExtracted). */
-const lineTaskIds = ['openTurno', 'palletWeight', 'lineLoad', 'containerReg'];
+const lineTaskIds = ['openTurno', 'palletWeight', 'lineLoad', 'containerReg', 'closeTurno'];
 
 function sub(
 	jobId: string,
@@ -63,7 +63,8 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 		openTurno: 'locked',
 		palletWeight: 'locked',
 		lineLoad: 'locked',
-		containerReg: 'locked'
+		containerReg: 'locked',
+		closeTurno: 'locked'
 	};
 	const lineSubs = domain.submissions.filter(
 		(s) => s.jobId === 'line' && s.jobInstanceId === lineInst.id
@@ -79,6 +80,8 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 		tasks.lineLoad = has('lineLoad') ? 'done' : 'actionable';
 		// unlockFrom openTurno — group stays available until Close
 		tasks.containerReg = 'available';
+		// unlockFrom openTurno; smoke leaves shift open (no closeTurno Commit).
+		tasks.closeTurno = has('closeTurno') ? 'done' : 'actionable';
 	}
 
 	return {
@@ -121,8 +124,8 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 				[`${loadId}.1`]: { loadId, weight: 400 },
 				[`${loadId}.2`]: { loadId, weight: 450 }
 			},
-			jobInstances: [{ jobId: 'intake', id: '261019-1st-1', label: '261019-1st-1' }],
-			submissions: [sub('intake', 'lots', '261019-1st-1')]
+			jobInstances: [{ jobId: 'intake', id: '261019-1', label: '261019-1' }],
+			submissions: [sub('intake', 'lots', '261019-1')]
 		};
 		let worklist = worklistFor(domain, true);
 

@@ -77,7 +77,7 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 		t.Fatalf("loaded = %#v", loaded)
 	}
 	intakeVal, ok := loaded.Jobs.Get("intake")
-	if !ok || loaded.Jobs.Keys[0] != "intake" {
+	if !ok || loaded.Jobs.Keys[0] != "workingDay" || loaded.Jobs.Keys[1] != "intake" {
 		t.Fatalf("jobs = %#v", loaded.Jobs)
 	}
 	if _, typed := intakeVal.(Job); !typed {

@@ -42,6 +42,10 @@
 
 ## Invariants
 
+- Living Go and the `/app` SPA are **dumb executors** of Org Config: plant
+  business rules (entity shapes, transforms, `readyWhen`, open/close laws) live
+  in Config, not as Feragame- or domain-named branches in executors. See
+  [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**).
 - Progress keys containing dots are encoded for Mongo storage (`.` becomes
   `_`) and normalized on reads. Preserve that boundary when changing progress
   persistence.

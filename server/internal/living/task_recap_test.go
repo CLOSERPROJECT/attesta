@@ -21,12 +21,16 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	if recap.UserID != "ada" || recap.Timestamp == "" {
 		t.Fatalf("actor/time = %#v", recap)
 	}
-	if recap.Facts["date"] != "2026-10-19" || recap.Facts["turno"] != "1st" {
+	if recap.Facts["truckWeight"] != 1000.0 {
 		t.Fatalf("facts = %#v", recap.Facts)
 	}
-	if recap.Titles["date"] != "Data" ||
-		recap.Titles["turno"] != "Turno" ||
-		recap.Titles["truckWeight"] != "Peso lordo camion" {
+	if _, has := recap.Facts["date"]; has {
+		t.Fatalf("truckArrive facts must omit date: %#v", recap.Facts)
+	}
+	if _, has := recap.Facts["turno"]; has {
+		t.Fatalf("truckArrive facts must omit turno: %#v", recap.Facts)
+	}
+	if recap.Titles["truckWeight"] != "Peso lordo camion" {
 		t.Fatalf("titles = %#v", recap.Titles)
 	}
 	if len(recap.Links) != 0 {

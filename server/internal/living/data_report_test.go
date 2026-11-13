@@ -34,7 +34,7 @@ func configWithParkedLoadedExtracted(t *testing.T) OrgConfig {
 func dataReportProbeDomain() Domain {
 	d := domainFromKinds(map[string]EntityMap{
 		"truck": {
-			"T1": {"date": "2026-10-19", "turno": "1st", "truckWeight": 1000.0, "lastScaleReading": 200.0},
+			"T1": {"workingDayId": "2026-10-19", "truckWeight": 1000.0, "lastScaleReading": 200.0},
 		},
 		"load": {
 			"L1": {"netWeight": 800.0, "truckId": "T1", "client": "NO"},

@@ -25,6 +25,13 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 
 	allowOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	if _, err := c.Commit(t.Context(), "feragame", allowOp, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-10-19", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		t.Fatalf("open working day: %v", err)
+	}
+	if _, err := c.Commit(t.Context(), "feragame", allowOp, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),

@@ -33,12 +33,20 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	wd, ok := worklistJobByID(result.Worklist, "workingDay")
+	if !ok {
+		t.Fatal("missing workingDay worklist job")
+	}
+	if !wd.CanStart {
+		t.Fatal("workingDay canStart want true on empty domain")
+	}
+
 	intake, ok := worklistJobByID(result.Worklist, "intake")
 	if !ok {
 		t.Fatal("missing intake worklist job")
 	}
-	if !intake.CanStart {
-		t.Fatal("intake canStart want true on empty domain")
+	if intake.CanStart {
+		t.Fatal("intake canStart want false on empty domain (truckArrive readyWhen)")
 	}
 	if len(intake.Instances) != 0 {
 		t.Fatalf("intake instances = %#v", intake.Instances)
@@ -48,8 +56,8 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 	if !ok {
 		t.Fatal("missing line worklist job")
 	}
-	if !line.CanStart {
-		t.Fatal("line canStart want true (plant line has no startsWhen)")
+	if line.CanStart {
+		t.Fatal("line canStart want false on empty domain (openTurno readyWhen)")
 	}
 
 	passport, ok := worklistJobByID(result.Worklist, "passport")
@@ -117,8 +125,8 @@ func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 	if !ok {
 		t.Fatal("missing line")
 	}
-	if !line.CanStart {
-		t.Fatal("line canStart want true")
+	if line.CanStart {
+		t.Fatal("line canStart want false while seeded shift is still open")
 	}
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
@@ -202,12 +210,12 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Worklist.Jobs) != 3 {
+	if len(got.Worklist.Jobs) != 4 {
 		t.Fatalf("worklist jobs = %#v", got.Worklist.Jobs)
 	}
 	intake, _ := worklistJobByID(got.Worklist, "intake")
-	if !intake.CanStart {
-		t.Fatal("intake canStart")
+	if intake.CanStart {
+		t.Fatal("intake canStart want false without open working day")
 	}
 	line, _ := worklistJobByID(got.Worklist, "line")
 	if line.CanStart {
@@ -229,7 +237,8 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 		},
 	}
 
-	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
+	ensureOpenWorkingDay(t, c)
+	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
@@ -300,8 +309,8 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if !ok {
 		t.Fatal("missing line worklist on Commit")
 	}
-	if !line.CanStart {
-		t.Fatal("line canStart want true")
+	if line.CanStart {
+		t.Fatal("line canStart want false while shift is still open")
 	}
 	inst, ok := worklistInstance(line, lineID)
 	if !ok {
@@ -345,11 +354,15 @@ func TestProjectWorklistViewerRoleSplitCanStartAndChrome(t *testing.T) {
 	if !ok {
 		t.Fatal("logistic missing intake")
 	}
-	if !adminIntake.CanStart {
-		t.Fatal("administration canStart intake want true (first Task truckArrive)")
+	if adminIntake.CanStart {
+		t.Fatal("administration canStart intake want false without open working day")
 	}
 	if logIntake.CanStart {
 		t.Fatal("logistic canStart intake want false (first Task truckArrive is administration-only)")
+	}
+	adminWD, ok := worklistJobByID(adminWL, "workingDay")
+	if !ok || !adminWD.CanStart {
+		t.Fatalf("administration canStart workingDay want true: %#v", adminWD)
 	}
 	if len(adminIntake.Tasks) == 0 || adminIntake.Tasks[0].ID != "truckArrive" {
 		t.Fatalf("task chrome = %#v", adminIntake.Tasks)

@@ -28,6 +28,34 @@ func seedLivingDemo(t *testing.T, server *Server) {
 	}
 }
 
+func livingCommit(t *testing.T, server *Server, sessionID, body string) living.CommitResult {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.livingHandler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("commit status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var result living.CommitResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func openWorkingDayThenArrive(t *testing.T, server *Server, sessionID string) string {
+	t.Helper()
+	livingCommit(t, server, sessionID,
+		`{"taskPath":"workingDay/open","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","mode":"multi"}}`)
+	arrived := livingCommit(t, server, sessionID,
+		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`)
+	if arrived.JobInstanceID != "261019-1" {
+		t.Fatalf("truck jobInstanceId = %q, want 261019-1", arrived.JobInstanceID)
+	}
+	return arrived.JobInstanceID
+}
+
 func TestEnsureLivingStoresUsesMemoryWithoutMongo(t *testing.T) {
 	server := &Server{store: NewMemoryStore()}
 	server.ensureLivingStores()
@@ -113,7 +141,7 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	}
 	wl, _ := wire["worklist"].(map[string]any)
 	jobs, _ := wl["jobs"].([]any)
-	if len(jobs) != 3 {
+	if len(jobs) != 4 {
 		t.Fatalf("worklist jobs = %#v", wl)
 	}
 	var passportJob map[string]any
@@ -222,23 +250,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		livingHttpPort: living.NewFakeHttpPort(),
 	}
 	seedLivingDemo(t, server)
-
-	arriveBody := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
-	arriveReq := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(arriveBody))
-	arriveReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-	arriveRec := httptest.NewRecorder()
-	server.livingHandler().ServeHTTP(arriveRec, arriveReq)
-	if arriveRec.Code != http.StatusOK {
-		t.Fatalf("arrive status = %d body=%s", arriveRec.Code, arriveRec.Body.String())
-	}
-	var arrived living.CommitResult
-	if err := json.Unmarshal(arriveRec.Body.Bytes(), &arrived); err != nil {
-		t.Fatal(err)
-	}
-	truckID := arrived.JobInstanceID
-	if truckID != "261019-1st-1" {
-		t.Fatalf("truck jobInstanceId = %q", truckID)
-	}
+	truckID := openWorkingDayThenArrive(t, server, sessionID)
 
 	body := `{"taskPath":"intake/lots/new/register","jobInstanceId":"` + truckID + `","mint":{"kind":"spawningNew"},"value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
@@ -439,7 +451,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 		livingAuthorizer: living.DenyAllAuthorizer{},
 	}
 	seedLivingDemo(t, server)
-	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
+	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
@@ -502,7 +514,15 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 	}
 	seedLivingDemo(t, server)
 	mux := server.newMux()
-	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","turno":"1st","truckWeight":1000}}`
+	openBody := `{"taskPath":"workingDay/open","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"date":"2026-10-19","mode":"multi"}}`
+	openReq := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(openBody))
+	openReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	openRec := httptest.NewRecorder()
+	mux.ServeHTTP(openRec, openReq)
+	if openRec.Code != http.StatusOK {
+		t.Fatalf("open status = %d body=%s", openRec.Code, openRec.Body.String())
+	}
+	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()

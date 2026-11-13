@@ -93,7 +93,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath:      "intake/weightCheck",
-		JobInstanceID: "261019-1st-1",
+		JobInstanceID: "261019-1",
 		Value:         map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
 	})
 	var ce *CommitError
@@ -116,7 +116,7 @@ func TestCommitLotRegisterAllowedViaCerbosInUnlockOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(before.Submissions) != 1 {
+	if len(before.Submissions) != 2 {
 		t.Fatalf("submissions before register = %#v", before.Submissions)
 	}
 
@@ -174,6 +174,13 @@ func TestCommitTruckArriveAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 
 	c, _, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-10-19", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		t.Fatal(err)
+	}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
@@ -182,7 +189,7 @@ func TestCommitTruckArriveAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("truck")[result.JobInstanceID]["turno"] != "1st" {
+	if result.Domain.Kind("truck")[result.JobInstanceID]["workingDayId"] != "2026-10-19" {
 		t.Fatalf("domain = %#v", result.Domain)
 	}
 }

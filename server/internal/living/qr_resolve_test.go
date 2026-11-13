@@ -130,7 +130,8 @@ func TestResolveQRZeroWhenNoWorklistCandidate(t *testing.T) {
 func TestResolveQRManyWhenMultipleLineShiftsSpawnable(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	_ = commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "1st"})
+	line1 := commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "1st"})
+	commitCloseTurno(t, c, line1)
 	_ = commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "2nd"})
 	cfg := mustActiveConfig(t, c)
 	domain, err := c.Domains.Get(t.Context(), "feragame")

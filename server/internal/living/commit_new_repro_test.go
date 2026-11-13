@@ -49,6 +49,13 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 		Now:        func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-10-19", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/truckArrive",
@@ -58,8 +65,8 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "261019-1st-1" {
-		t.Fatalf("jobInstanceId=%q want 261019-1st-1", result.JobInstanceID)
+	if result.JobInstanceID != "261019-1" {
+		t.Fatalf("jobInstanceId=%q want 261019-1", result.JobInstanceID)
 	}
 	for _, inst := range result.Domain.JobInstances {
 		if inst.ID == "_new" {
@@ -101,14 +108,21 @@ func TestCommitTruckArriveStartingNewAfterMongoJSONMintsTruckID(t *testing.T) {
 		Now: func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-10-19", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		t.Fatal(err)
+	}
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "261019-1st-1" {
-		t.Fatalf("jobInstanceId=%q want 261019-1st-1", result.JobInstanceID)
+	if result.JobInstanceID != "261019-1" {
+		t.Fatalf("jobInstanceId=%q want 261019-1", result.JobInstanceID)
 	}
 }
 

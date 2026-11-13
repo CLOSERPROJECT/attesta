@@ -20,7 +20,7 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 	transform := onSubmit["transform"].([]any)
 	op := transform[0].(map[string]any)
 	set := op["set"].(map[string]any)
-	set["plantNote"] = "$.turno"
+	set["plantNote"] = `"from-yaml"`
 
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
@@ -38,6 +38,13 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 		Now:        func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
 	opID := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	if _, err := c.Commit(t.Context(), "feragame", opID, CommitRequest{
+		TaskPath: "workingDay/open",
+		Value:    map[string]any{"date": "2026-10-19", "mode": "multi"},
+		Mint:     startingNewMint(),
+	}); err != nil {
+		t.Fatal(err)
+	}
 	result, err := c.Commit(t.Context(), "feragame", opID, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(),
 		Mint: startingNewMint(),
@@ -46,16 +53,17 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	truckID := result.JobInstanceID
-	if result.Domain.Kind("truck")[truckID]["turno"] != "1st" {
+	if result.Domain.Kind("truck")[truckID]["workingDayId"] != "2026-10-19" {
 		t.Fatalf("truck = %#v", result.Domain.Kind("truck")[truckID])
 	}
-	if result.Domain.Kind("truck")[truckID]["plantNote"] != "1st" {
+	if result.Domain.Kind("truck")[truckID]["plantNote"] != "from-yaml" {
 		t.Fatalf("transform YAML change should stamp plantNote without a new apply* — truck=%#v", result.Domain.Kind("truck")[truckID])
 	}
 }
 
 func TestCommitOpenTurnoLabelFromConfigExpr(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	ensureOpenWorkingDay(t, c)
 	result, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
 		UserID: "ada", Org: "feragame", Roles: []string{"line"},
 	}, CommitRequest{
