@@ -100,6 +100,13 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !intake.Repeatable || intake.Title != "Ingresso" || intake.StartLabel != "Nuovo camion" || intake.Color != "#ea580c" {
 		t.Fatalf("intake = %#v", intake)
 	}
+	truckArrive, okArrive := TaskByID(intake.Tasks, "truckArrive")
+	if !okArrive {
+		t.Fatal("truckArrive missing")
+	}
+	if rw, _ := truckArrive["readyWhen"].(string); !strings.Contains(rw, "checkedTruckWeight") {
+		t.Fatalf("truckArrive.readyWhen = %#v, want prior-truck weightCheck gate", truckArrive["readyWhen"])
+	}
 	wantIntakeTasks := []string{"truckArrive", "register", "weightCheck"}
 	if got := OrderedTaskIDs(intake.Tasks); strings.Join(got, ",") != strings.Join(wantIntakeTasks, ",") {
 		t.Fatalf("intake tasks = %v", got)
@@ -155,6 +162,11 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 			t.Fatalf("line.%s submit = %#v, want many", id, task["submit"])
 		}
 	}
+	startLot, _ := TaskByID(line.Tasks, "startLot")
+	startLotRoles, _ := startLot["roles"].([]any)
+	if len(startLotRoles) != 1 || startLotRoles[0] != "logistic" {
+		t.Fatalf("line/startLot roles = %#v, want [logistic]", startLot["roles"])
+	}
 	wdAny, ok := cfg.Jobs.Get("workingDay")
 	if !ok {
 		t.Fatal("missing workingDay")
@@ -179,9 +191,17 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if taskCommitNavigation(map[string]any(openTurno)) != commitNavHome {
 		t.Fatalf("line/openTurno onCommit.navigation = %#v, want home", openTurno["onCommit"])
 	}
+	openRoles, _ := openTurno["roles"].([]any)
+	if len(openRoles) != 2 || openRoles[0] != "line" || openRoles[1] != "logistic" {
+		t.Fatalf("line/openTurno roles = %#v, want [line, logistic]", openTurno["roles"])
+	}
 	closeTurno, _ := TaskByID(line.Tasks, "closeTurno")
 	if taskAdvanceTarget(map[string]any(closeTurno)) {
 		t.Fatalf("line/closeTurno advanceTarget = true, want false")
+	}
+	closeRoles, _ := closeTurno["roles"].([]any)
+	if len(closeRoles) != 2 || closeRoles[0] != "line" || closeRoles[1] != "logistic" {
+		t.Fatalf("line/closeTurno roles = %#v, want [line, logistic]", closeTurno["roles"])
 	}
 	markProgress, _ := TaskByID(line.Tasks, "markProgress")
 	readyWhen, _ := markProgress["readyWhen"].(string)

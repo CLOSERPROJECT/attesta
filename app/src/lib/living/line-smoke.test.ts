@@ -232,7 +232,7 @@ describe('line Commit smoke (session + Worklist + leaf many-submit)', () => {
 				worklist = worklistFor(domain, true);
 				const lineInst = worklistJobFor(worklist, 'line')?.instances[0];
 				let nextTaskFormBundle = null;
-				let navigation: 'task' | 'overview' | 'home' | 'stay' = 'home';
+				let navigation: 'task' | 'home' | 'stay' = 'home';
 				if (lineInst) {
 					for (const taskId of lineTaskIds) {
 						if (lineInst.tasks[taskId] !== 'actionable') continue;
@@ -252,12 +252,6 @@ describe('line Commit smoke (session + Worklist + leaf many-submit)', () => {
 						};
 						navigation = 'task';
 						break;
-					}
-					if (navigation !== 'task') {
-						const hasRemaining = lineTaskIds.some(
-							(tid) => lineInst.tasks[tid] !== 'done'
-						);
-						navigation = hasRemaining ? 'overview' : 'home';
 					}
 				}
 				return {

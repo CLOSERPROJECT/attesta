@@ -78,14 +78,18 @@ function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
 }
 
 function parseCommitNavigation(raw: unknown): CommitNavigation {
-	if (raw === 'stay' || raw === 'task' || raw === 'overview' || raw === 'home') {
+	if (raw === 'stay' || raw === 'task' || raw === 'home') {
 		return raw;
 	}
+	// Legacy wire overview → home (ADR-0006 hard cut).
+	if (raw === 'overview') return 'home';
 	return 'home';
 }
 
 function parseContinueNavigation(raw: unknown): ContinueNavigation | null {
-	if (raw === 'task' || raw === 'overview' || raw === 'home') return raw;
+	if (raw === 'task' || raw === 'home') return raw;
+	// Legacy wire overview → home.
+	if (raw === 'overview') return 'home';
 	return null;
 }
 

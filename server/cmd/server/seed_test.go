@@ -320,6 +320,71 @@ func TestSeedLivingScopeFromArgs(t *testing.T) {
 	}
 }
 
+func TestSeedKeepDomainFromArgs(t *testing.T) {
+	keep, err := seedKeepDomainFromArgs(nil, living.SeedScopeFeragameConfig)
+	if err != nil || keep {
+		t.Fatalf("default = %v %v", keep, err)
+	}
+	keep, err = seedKeepDomainFromArgs([]string{"--feragame-config", "--keep-domain"}, living.SeedScopeFeragameConfig)
+	if err != nil || !keep {
+		t.Fatalf("config keep = %v %v", keep, err)
+	}
+	keep, err = seedKeepDomainFromArgs([]string{"--feragame-identity", "--keep-domain"}, living.SeedScopeFeragameIdentity)
+	if err != nil || !keep {
+		t.Fatalf("identity keep = %v %v", keep, err)
+	}
+	if _, err := seedKeepDomainFromArgs([]string{"--feragame-domain", "--keep-domain"}, living.SeedScopeFeragameDomain); err == nil {
+		t.Fatal("expected keep-domain rejected with domain")
+	}
+	if _, err := seedKeepDomainFromArgs([]string{"--keep-domain"}, living.SeedScopeBoth); err == nil {
+		t.Fatal("expected keep-domain rejected with default scope")
+	}
+}
+
+func TestSeedFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"lot": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), living.PassportRecord{
+		Org: "feragame", SubjectID: living.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		LivingConfigs:   configs,
+		LivingDomains:   domains,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameConfig,
+		KeepDomain:      true,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("lot")["L1"] == nil || len(got.Submissions) != 1 {
+		t.Fatalf("Domain must be kept: %#v", got)
+	}
+	if _, err := passports.Get(t.Context(), "feragame", living.SeedLoadCOID); err != nil {
+		t.Fatalf("passport must be kept: %v", err)
+	}
+}
 
 func TestSeedFeragameConfigWipesDomainSkipsIdentityAndFormata(t *testing.T) {
 	store := NewMemoryStore()

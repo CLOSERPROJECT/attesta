@@ -109,7 +109,7 @@ func withSeedSession(
 // non-nil → prepare→seed by value (skip file apply; main is the Server restart adapter).
 // Feragame config/domain skip Appwrite open; identity/full open Appwrite. Mongo
 // still opens for living stores; Formata writes are skipped inside Seed.
-func runSeedSession(ctx context.Context, args []string, replace bool, livingScope living.SeedScope, creds *appwriteRuntimeCredentials) error {
+func runSeedSession(ctx context.Context, args []string, replace bool, livingScope living.SeedScope, keepDomain bool, creds *appwriteRuntimeCredentials) error {
 	needIdentity := !seedScopeFeragame(livingScope) || seedScopeFeragameNeedsIdentity(livingScope)
 	if needIdentity && creds == nil {
 		if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
@@ -134,6 +134,7 @@ func runSeedSession(ctx context.Context, args []string, replace bool, livingScop
 			CategoriesPath: sess.CategoriesPath,
 			Replace:        replace,
 			LivingScope:    livingScope,
+			KeepDomain:     keepDomain,
 		}
 		// Mongo CLI seed must rewrite Active Org Config (e.g. tasks array shape).
 		if ms, ok := sess.Store.(*MongoStore); ok && ms != nil && ms.db != nil {
@@ -146,11 +147,19 @@ func runSeedSession(ctx context.Context, args []string, replace bool, livingScop
 		}
 		switch livingScope {
 		case living.SeedScopeFeragameConfig:
-			log.Printf("seed: Feragame config ready (Active Config + empty Domain)")
+			if keepDomain {
+				log.Printf("seed: Feragame config ready (Active Config; Domain kept)")
+			} else {
+				log.Printf("seed: Feragame config ready (Active Config + empty Domain)")
+			}
 		case living.SeedScopeFeragameDomain:
 			log.Printf("seed: Feragame domain ready (Active Config + staged Domain)")
 		case living.SeedScopeFeragameIdentity:
-			log.Printf("seed: Feragame identity ready (Appwrite + Active Config + empty Domain)")
+			if keepDomain {
+				log.Printf("seed: Feragame identity ready (Appwrite + Active Config; Domain kept)")
+			} else {
+				log.Printf("seed: Feragame identity ready (Appwrite + Active Config + empty Domain)")
+			}
 		case living.SeedScopeFeragameFull:
 			log.Printf("seed: Feragame full ready (Appwrite + Active Config + staged Domain)")
 		default:

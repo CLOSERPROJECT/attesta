@@ -7,31 +7,25 @@
 	import { hrefLivingTarget } from '../router/navigate-target.js';
 	import { draftAddressForTask } from './drafts.js';
 	import { living } from './living-app.svelte.js';
+	import ManySubmitHistory from './ManySubmitHistory.svelte';
 	import WorklistJobLine from './WorklistJobLine.svelte';
 	import WorklistRow from './WorklistRow.svelte';
 	import {
-		availableRowKey,
-		availableRowsFromWorklist,
+		actNowRowKey,
+		actNowRowsFromWorklist,
 		availableRowTarget,
-		canStartRowsFromWorklist,
-		completedRowKey,
-		completedRowsFromWorklist,
-		inProgressRowKey,
-		inProgressRowsFromWorklist,
-		taskRouteInstanceSegment
+		taskRouteInstanceSegment,
+		type ActNowRow
 	} from './worklist-home.js';
 
 	onMount(() => {
 		void living.hydrate();
 	});
 
-	const available = $derived(availableRowsFromWorklist(living.result?.worklist));
-	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
-	const inProgress = $derived(inProgressRowsFromWorklist(living.result?.worklist));
-	const completed = $derived(completedRowsFromWorklist(living.result?.worklist));
+	const actNow = $derived(actNowRowsFromWorklist(living.result?.worklist));
 	const drafts = $derived(living.drafts);
 
-	function rowHasDirtyDraft(row: (typeof available)[number]): boolean {
+	function rowHasDirtyDraft(row: Extract<ActNowRow, { kind: 'task' }>): boolean {
 		void drafts;
 		const addr = draftAddressForTask({
 			jobId: row.jobId,
@@ -66,153 +60,77 @@
 	{/if}
 
 	{#if living.result}
-		<section class="space-y-3" data-testid="worklist-available">
-			<h2 class="text-lg font-semibold text-zinc-900">{m.available()}</h2>
+		<section class="space-y-3" data-testid="worklist-act-now">
 			<ul class="flex flex-col gap-1">
-				{#each available as row (availableRowKey(row))}
+				{#each actNow as row (actNowRowKey(row))}
 					<li>
-						<WorklistRow
-							data-testid="available-row"
-							data-job-id={row.jobId}
-							data-instance-id={row.jobInstanceId}
-							data-group-id={row.groupId}
-							data-group-instance-id={row.groupInstanceId}
-							data-task-id={row.taskId}
-							ready
-							showDraft={rowHasDirtyDraft(row)}
-							accentColor={row.jobColor}
-							href={hrefLivingTarget(availableRowTarget(row))}
-						>
-							<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
-							<WorklistJobLine
-								class="mt-1"
-								mode="progress"
-								size="xs"
-								jobId={row.jobId}
-								jobTitle={row.jobTitle}
-								label={row.instanceLabel}
-								done={row.tasksDone}
-								total={row.tasksTotal}
-								progressTestId="available-progress"
-							/>
-						</WorklistRow>
+						{#if row.kind === 'task'}
+							<div class="flex flex-col gap-1">
+								<WorklistRow
+									data-testid="available-row"
+									data-job-id={row.jobId}
+									data-instance-id={row.jobInstanceId}
+									data-group-id={row.groupId}
+									data-group-instance-id={row.groupInstanceId}
+									data-task-id={row.taskId}
+									ready
+									showDraft={rowHasDirtyDraft(row)}
+									accentColor={row.jobColor}
+									href={hrefLivingTarget(availableRowTarget(row))}
+								>
+									<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
+									<WorklistJobLine
+										class="mt-1"
+										mode="progress"
+										size="xs"
+										jobId={row.jobId}
+										jobTitle={row.jobTitle}
+										label={row.instanceLabel}
+										done={row.tasksDone}
+										total={row.tasksTotal}
+										progressTestId="available-progress"
+									/>
+								</WorklistRow>
+								<ManySubmitHistory
+									submit={row.submit}
+									submissionCount={row.submissionCount}
+									request={{
+										jobId: row.jobId,
+										jobInstanceId: row.jobInstanceId,
+										taskId: row.taskId,
+										groupId: row.groupId,
+										groupInstanceId: row.groupInstanceId
+									}}
+									data-testid="home-many-history"
+								/>
+							</div>
+						{:else}
+							<WorklistRow
+								data-testid="can-start-row"
+								data-job-id={row.jobId}
+								accentColor={row.jobColor}
+								href={p('/:jobId/:jobInstanceId/:taskId', {
+									params: {
+										jobId: row.jobId,
+										jobInstanceId: taskRouteInstanceSegment(''),
+										taskId: row.firstTaskId
+									}
+								})}
+							>
+								<WorklistJobLine
+									mode="start"
+									size="sm"
+									jobId={row.jobId}
+									jobTitle={row.jobTitle}
+									label={row.startLabel}
+								/>
+							</WorklistRow>
+						{/if}
 					</li>
 				{:else}
 					<li>
-						<WorklistRow data-testid="available-empty" class="text-sm text-zinc-500">
+						<WorklistRow data-testid="act-now-empty" class="text-sm text-zinc-500">
 							{m.no_available_tasks()}
-						</WorklistRow>
-					</li>
-				{/each}
-			</ul>
-		</section>
-
-		<section class="space-y-3" data-testid="worklist-can-start">
-			<h2 class="text-lg font-semibold text-zinc-900">{m.can_start()}</h2>
-			<ul class="flex flex-col gap-1">
-				{#each canStart as row (row.jobId)}
-					<li>
-						<WorklistRow
-							data-testid="can-start-row"
-							data-job-id={row.jobId}
-							accentColor={row.jobColor}
-							href={p('/:jobId/:jobInstanceId/:taskId', {
-								params: {
-									jobId: row.jobId,
-									jobInstanceId: taskRouteInstanceSegment(''),
-									taskId: row.firstTaskId
-								}
-							})}
-						>
-							<WorklistJobLine
-								mode="start"
-								size="sm"
-								jobId={row.jobId}
-								jobTitle={row.jobTitle}
-								label={row.startLabel}
-							/>
-						</WorklistRow>
-					</li>
-				{:else}
-					<li>
-						<WorklistRow data-testid="can-start-empty" class="text-sm text-zinc-500">
-							{m.no_jobs_to_start()}
-						</WorklistRow>
-					</li>
-				{/each}
-			</ul>
-		</section>
-
-		<section class="space-y-3" data-testid="worklist-in-progress">
-			<h2 class="text-lg font-semibold text-zinc-900">{m.in_progress()}</h2>
-			<ul class="flex flex-col gap-1">
-				{#each inProgress as row (inProgressRowKey(row))}
-					<li>
-						<WorklistRow
-							data-testid="in-progress-row"
-							data-job-id={row.jobId}
-							data-instance-id={row.jobInstanceId}
-							accentColor={row.jobColor}
-							href={hrefLivingTarget({
-								kind: 'overview',
-								jobId: row.jobId,
-								jobInstanceId: row.jobInstanceId
-							})}
-						>
-							<WorklistJobLine
-								mode="progress"
-								size="sm"
-								jobId={row.jobId}
-								jobTitle={row.jobTitle}
-								label={row.instanceLabel}
-								done={row.tasksDone}
-								total={row.tasksTotal}
-								progressTestId="in-progress-progress"
-							/>
-						</WorklistRow>
-					</li>
-				{:else}
-					<li>
-						<WorklistRow data-testid="in-progress-empty" class="text-sm text-zinc-500">
-							{m.no_jobs_in_progress()}
-						</WorklistRow>
-					</li>
-				{/each}
-			</ul>
-		</section>
-
-		<section class="space-y-3" data-testid="worklist-completed">
-			<h2 class="text-lg font-semibold text-zinc-900">{m.completed()}</h2>
-			<ul class="flex flex-col gap-1">
-				{#each completed as row (completedRowKey(row))}
-					<li>
-						<WorklistRow
-							data-testid="completed-row"
-							data-job-id={row.jobId}
-							data-instance-id={row.jobInstanceId}
-							accentColor={row.jobColor}
-							href={hrefLivingTarget({
-								kind: 'overview',
-								jobId: row.jobId,
-								jobInstanceId: row.jobInstanceId
-							})}
-						>
-							<WorklistJobLine
-								mode="progress"
-								size="sm"
-								jobId={row.jobId}
-								jobTitle={row.jobTitle}
-								label={row.instanceLabel}
-								done={row.tasksDone}
-								total={row.tasksTotal}
-								progressTestId="completed-progress"
-							/>
-						</WorklistRow>
-					</li>
-				{:else}
-					<li>
-						<WorklistRow data-testid="completed-empty" class="text-sm text-zinc-500">
-							{m.no_completed_jobs()}
 						</WorklistRow>
 					</li>
 				{/each}

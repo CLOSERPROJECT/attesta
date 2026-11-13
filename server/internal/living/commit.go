@@ -64,9 +64,10 @@ type CommitResult struct {
 	JobInstanceID string   `json:"jobInstanceId"`
 	Domain        Domain   `json:"-"`
 	Worklist      Worklist `json:"worklist"`
-	// Navigation is always set: task, overview, home, or stay.
+	// Navigation is always set: task, home, or stay (legacy overview → home).
 	Navigation CommitNext `json:"navigation"`
 	// ContinueNavigation is set only when Navigation is stay (deferred Continue).
+	// Never overview — remaining-work / nested defaults map to home.
 	ContinueNavigation CommitNext `json:"continueNavigation,omitempty"`
 	// NextTaskFormBundle when Navigation or ContinueNavigation is task.
 	NextTaskFormBundle *TaskFormBundle `json:"nextTaskFormBundle,omitempty"`
@@ -306,7 +307,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 }
 
 // resolveCommitDestination evaluates authored onCommit.navigation first, then
-// the default nested/advance/overview/home law (ADR-0006 + advanceTarget).
+// the default nested/advance/home law (ADR-0006 + advanceTarget). Authored
+// overview maps to home on the wire (route kept, unlinked).
 func resolveCommitDestination(
 	cfg OrgConfig,
 	domain Domain,
@@ -327,10 +329,8 @@ func resolveCommitDestination(
 		return "", "", nil, err
 	}
 	switch authored {
-	case commitNavHome:
+	case commitNavHome, commitNavOverview:
 		return CommitNextHome, "", nil, nil
-	case commitNavOverview:
-		return CommitNextOverview, "", nil, nil
 	case commitNavStay:
 		return CommitNextStay, defaultNav, defaultBundle, nil
 	default:
@@ -338,8 +338,9 @@ func resolveCommitDestination(
 	}
 }
 
-// resolveDefaultCommitDestination: nested child while group open → overview;
-// else auto-advance (skipping !advanceTarget) → overview → home.
+// resolveDefaultCommitDestination: nested child while group open → home;
+// else auto-advance (skipping !advanceTarget) → home when remaining work
+// or finished (ADR-0006 hard cut: overview is not a Commit destination).
 func resolveDefaultCommitDestination(
 	cfg OrgConfig,
 	domain Domain,
@@ -349,7 +350,7 @@ func resolveDefaultCommitDestination(
 ) (CommitNext, *TaskFormBundle, error) {
 	jobID := ref.JobID
 	if ref.Nested() && !IsGroupClosed(domain.ClosedGroups, jobID, jobInstanceID, ref.GroupID) {
-		return CommitNextOverview, nil, nil
+		return CommitNextHome, nil, nil
 	}
 	if advance, ok := NextAdvanceTaskRef(cfg, wl, jobID, jobInstanceID); ok {
 		b, err := BuildTaskFormBundle(cfg, domain, advance)
@@ -357,9 +358,6 @@ func resolveDefaultCommitDestination(
 			return "", nil, err
 		}
 		return CommitNextTask, b, nil
-	}
-	if worklistInstanceHasRemainingWork(cfg, wl, jobID, jobInstanceID) {
-		return CommitNextOverview, nil, nil
 	}
 	return CommitNextHome, nil, nil
 }

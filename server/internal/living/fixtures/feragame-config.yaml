@@ -84,7 +84,7 @@ qr:
             onMany: "Più destinazioni possibili: apri il turno giusto dalla lista lavori"
             onIneligible: Bancale non pesabile (assente, già pesato, o lotto non aperto)
 # Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
-# After YAML shape changes: task seed:feragame-config (empty Domain). Staged Domain: seed:feragame-domain. With Appwrite: seed:feragame-identity / seed:feragame-full. Full-stack: task seed -- --replace.
+# After YAML shape changes: task seed:feragame-config (empty Domain). Soft Config refresh: seed:feragame-config -- --keep-domain. Staged Domain: seed:feragame-domain. With Appwrite: seed:feragame-identity / seed:feragame-full. Full-stack: task seed -- --replace.
 passport:
     subject:
         entity: lot
@@ -234,8 +234,10 @@ steps:
         substeps:
             - id: truckArrive
               roles: [administration]
+              # One open intake at a time: every existing truck must have finished weightCheck.
               readyWhen: >-
                 $count($domain.workingDay.*[status = "open"]) = 1
+                and $count($sift($domain.truck, function($v){$not($exists($v.checkedTruckWeight))})) = 0
               schema:
                 type: object
                 title: Registrazione camion
@@ -468,7 +470,7 @@ steps:
             )
         substeps:
             - id: openTurno
-              roles: [line]
+              roles: [line, logistic]
               onCommit:
                   navigation: home
               # Multi: mint when no open/whole-day shift. Whole-day: bind once (no openTurno Submission yet for that shift id).
@@ -546,7 +548,7 @@ steps:
                       set:
                         status: '"open"'
             - id: startLot
-              roles: [line]
+              roles: [logistic]
               submit: many
               title: Apri lotto
               onCommit:
@@ -922,7 +924,7 @@ steps:
                       set:
                         status: '"fullyProcessed"'
             - id: closeTurno
-              roles: [line]
+              roles: [line, logistic]
               onCommit:
                   advanceTarget: false
               readyWhen: >-

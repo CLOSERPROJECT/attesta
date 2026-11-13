@@ -18,8 +18,10 @@ once). For `submit: many`, unlocked status stays `unavailable` | `available` |
 `actionable` from readyWhen + roles.
 
 **Amends [ADR-0006](0006-living-operator-worklist-home.md) plant path:** Feragame
-no longer relies on Task-group Spawn/Close home/overview chrome for intake or
-line multi-pass; overview stays leaf-Task accordion for that fixture.
+no longer relies on Task-group Spawn/Close chrome for intake or line multi-pass.
+Many-submit Submission history attaches under **Worklist** home act-now rows when
+counts allow; Job instance overview is unlinked from product navigation (route may
+remain).
 
 **Considered options:** keep repeatable Task groups for N submits; map/table
 “leftovers” as unlock grammar; Unlock pipeline weigh→load→register. Rejected:

@@ -24,15 +24,20 @@ Flags:
   --feragame-full        Feragame Appwrite hard reset + Active Config + wipe
                          and stage demo Domain. Skips Formata / orgs 1–3.
                          Always runs.
+  --keep-domain          With --feragame-config or --feragame-identity only:
+                         put Active Config and leave Domain (+ passports)
+                         untouched. Rejected with domain/full.
   --file PATH            Taxonomy seed file (default: config/categories.yaml).
   --help, -h             Show this help.
 
-Feragame flags are mutually exclusive. Every Feragame path always wipes Domain.
+Feragame scope flags are mutually exclusive. Domain wipe is the default for
+Feragame paths unless --keep-domain is set on config/identity.
 
 Examples:
   task seed
   task seed -- --replace
   task seed:feragame-config
+  task seed:feragame-config -- --keep-domain
   task seed:feragame-domain
   task seed:feragame-identity
   task seed:feragame-full
@@ -47,7 +52,11 @@ func runSeedCommand(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return runSeedSession(ctx, args, seedReplaceFromArgs(args), scope, nil)
+	keepDomain, err := seedKeepDomainFromArgs(args, scope)
+	if err != nil {
+		return err
+	}
+	return runSeedSession(ctx, args, seedReplaceFromArgs(args), scope, keepDomain, nil)
 }
 
 func seedReplaceFromArgs(args []string) bool {
@@ -66,6 +75,25 @@ func seedHelpFromArgs(args []string) bool {
 		}
 	}
 	return false
+}
+
+func seedKeepDomainFromArgs(args []string, scope living.SeedScope) (bool, error) {
+	keep := false
+	for _, arg := range args {
+		if strings.TrimSpace(arg) == "--keep-domain" {
+			keep = true
+			break
+		}
+	}
+	if !keep {
+		return false, nil
+	}
+	switch scope {
+	case living.SeedScopeFeragameConfig, living.SeedScopeFeragameIdentity:
+		return true, nil
+	default:
+		return false, fmt.Errorf("seed: --keep-domain is only valid with --feragame-config or --feragame-identity")
+	}
 }
 
 func seedLivingScopeFromArgs(args []string) (living.SeedScope, error) {

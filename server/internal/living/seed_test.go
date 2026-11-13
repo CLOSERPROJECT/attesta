@@ -229,6 +229,51 @@ func TestSeedDemoFeragameConfigRequiresDomainStore(t *testing.T) {
 	}
 }
 
+func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	passports := NewMemoryPassportStore()
+	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
+	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "L1"}}
+	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), PassportRecord{
+		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
+		Scope:      SeedScopeFeragameConfig,
+		Passports:  passports,
+		KeepDomain: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("lot")["L1"] == nil || len(got.Submissions) != 1 {
+		t.Fatalf("Domain must be kept: %#v", got)
+	}
+	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); err != nil {
+		t.Fatalf("passport must be kept: %v", err)
+	}
+}
+
+func TestSeedDemoKeepDomainRejectedForDomainScope(t *testing.T) {
+	_, err := SeedDemo(t.Context(), NewMemoryDomainStore(), NewMemoryConfigStore(), SeedOptions{
+		Scope:      SeedScopeFeragameDomain,
+		KeepDomain: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "KeepDomain") {
+		t.Fatalf("err = %v, want KeepDomain rejection", err)
+	}
+}
+
 func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
@@ -335,6 +380,9 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	if !hasActionableRef(lineRefs, "line", "closeTurno", SeedLineID) {
 		t.Fatalf("line actionable missing closeTurno@%s: %#v", SeedLineID, lineRefs)
 	}
+	if !hasActionableRef(logRefs, "line", "closeTurno", SeedLineID) {
+		t.Fatalf("logistic actionable missing closeTurno@%s: %#v", SeedLineID, logRefs)
+	}
 	adminPassport, _ := worklistJobByID(admin.Worklist, "passport")
 	if !adminPassport.CanStart || adminPassport.StartLabel != "Emetti DPP" {
 		t.Fatalf("administration passport CanStart = %#v, want true + Emetti DPP", adminPassport)
@@ -343,14 +391,19 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	adminIntake, _ := worklistJobByID(admin.Worklist, "intake")
 	logIntake, _ := worklistJobByID(logistic.Worklist, "intake")
 	lineJobWL, _ := worklistJobByID(line.Worklist, "line")
-	if !adminIntake.CanStart {
-		t.Fatal("administration canStart intake want true (open working day)")
+	logLine, _ := worklistJobByID(logistic.Worklist, "line")
+	// Seed truck is mid-intake (weightCheck still open) — Nuovo camion stays off.
+	if adminIntake.CanStart {
+		t.Fatal("administration canStart intake want false while prior truck incomplete")
 	}
 	if logIntake.CanStart {
 		t.Fatal("logistic canStart intake want false")
 	}
 	if lineJobWL.CanStart {
 		t.Fatal("line canStart want false while seed shift is still open")
+	}
+	if logLine.CanStart {
+		t.Fatal("logistic canStart line want false while seed shift is still open")
 	}
 }
 

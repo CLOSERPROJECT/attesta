@@ -90,11 +90,9 @@ describe('post-Commit navigation adapter', () => {
 		});
 	});
 
-	test('overview next opens overview for the committed instance', () => {
+	test('legacy overview wire maps to home', () => {
 		expect(resolvePostCommitNavigation('overview', 'intake', 'NIR-1', null)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-1'
+			kind: 'home'
 		});
 	});
 
@@ -106,10 +104,10 @@ describe('post-Commit navigation adapter', () => {
 });
 
 describe('Task deep link + exit', () => {
-	test('unauthorized / locked Task URL → overview; unknown → Home', () => {
+	test('unauthorized / locked Task URL → home; unknown → home', () => {
 		expect(
 			resolveTaskDeepLink('intake', 'NIR-1', 'palletWeight', false, adminWorklist)
-		).toEqual({ kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-1' });
+		).toEqual({ kind: 'home' });
 
 		expect(
 			resolveTaskDeepLink('intake', 'NIR-advance', 'codiceFir', false, adminWorklist)
@@ -124,10 +122,10 @@ describe('Task deep link + exit', () => {
 		).toEqual({ kind: 'task' });
 	});
 
-	test('task-form deny shares unmountable redirect with deep-link', () => {
+	test('task-form deny shares unmountable redirect with deep-link → home', () => {
 		expect(
 			resolveUnmountableTaskTarget('intake', 'NIR-1', false, adminWorklist)
-		).toEqual({ kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-1' });
+		).toEqual({ kind: 'home' });
 		expect(resolveUnmountableTaskTarget('intake', '', true, adminWorklist)).toEqual({
 			kind: 'home'
 		});
@@ -136,13 +134,9 @@ describe('Task deep link + exit', () => {
 		).toEqual({ kind: 'home' });
 	});
 
-	test('Task exit: provisional Job Home; existing overview', () => {
+	test('Task exit: always home (minted and provisional)', () => {
 		expect(resolveTaskExit('intake', '', true)).toEqual({ kind: 'home' });
-		expect(resolveTaskExit('intake', 'NIR-1', false)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-1'
-		});
+		expect(resolveTaskExit('intake', 'NIR-1', false)).toEqual({ kind: 'home' });
 	});
 
 	test('nested provisional Spawn deep-link mounts; minted uses group actionable', () => {
@@ -192,7 +186,7 @@ describe('Task deep link + exit', () => {
 		).toEqual({ kind: 'task' });
 		expect(
 			resolveTaskDeepLink('intake', 'T1', 'labels', false, wl, 'lots', 'lots-1')
-		).toEqual({ kind: 'overview', jobId: 'intake', jobInstanceId: 'T1' });
+		).toEqual({ kind: 'home' });
 	});
 
 	test('task next with nested bundle includes group coordinates', () => {
@@ -220,9 +214,7 @@ describe('post-Commit stay from server navigation', () => {
 			kind: 'stay'
 		});
 		expect(resolveCommitFollowUp('overview', 'intake', 'T1', null)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'T1'
+			kind: 'home'
 		});
 		expect(
 			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle)
@@ -241,9 +233,7 @@ describe('post-Commit stay from server navigation', () => {
 		expect(
 			resolveContinueNavigation('overview', 'intake', 'T1', null)
 		).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'T1'
+			kind: 'home'
 		});
 		expect(
 			resolveContinueNavigation('task', 'intake', 'NIR-advance', nextBundle)

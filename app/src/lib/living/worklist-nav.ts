@@ -93,22 +93,15 @@ function viewerMayAct(inst: WorklistInstance, taskId: string): boolean {
 
 /**
  * When a Task cannot be mounted (deep-link gate miss, task-form 403/404):
- * overview if the instance is known on the Worklist, else Home.
+ * always Home (overview unlinked as a product entry).
  */
 export function resolveUnmountableTaskTarget(
-	jobId: string,
-	jobInstanceId: string,
-	provisionalJob: boolean,
-	worklist: Worklist | null | undefined
-): Extract<PostCommitTarget, { kind: 'overview' | 'home' }> {
-	if (provisionalJob || !jobId || !jobInstanceId || jobInstanceId === 'new') {
-		return { kind: 'home' };
-	}
-	const job = worklistJobFor(worklist, jobId);
-	if (!job || !instanceFor(job, jobInstanceId)) {
-		return { kind: 'home' };
-	}
-	return { kind: 'overview', jobId, jobInstanceId };
+	_jobId: string,
+	_jobInstanceId: string,
+	_provisionalJob: boolean,
+	_worklist: Worklist | null | undefined
+): Extract<PostCommitTarget, { kind: 'home' }> {
+	return { kind: 'home' };
 }
 
 /**
@@ -152,9 +145,7 @@ export function resolvePostCommitNavigation(
 		}
 		return { kind: 'home' };
 	}
-	if (navigation === 'overview' && jobId && jobInstanceId) {
-		return { kind: 'overview', jobId, jobInstanceId };
-	}
+	// Legacy wire/Config overview → home (ADR-0006 hard cut).
 	return { kind: 'home' };
 }
 
@@ -197,14 +188,11 @@ export function resolveTaskDeepLink(
 	return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
 }
 
-/** Exit from Task without Commit: provisional Job → Home; else overview. */
+/** Exit from Task without Commit: always Home (overview unlinked). */
 export function resolveTaskExit(
-	jobId: string,
-	jobInstanceId: string,
-	provisionalJob: boolean
-): PostCommitTarget {
-	if (provisionalJob || !jobInstanceId || jobInstanceId === 'new') {
-		return { kind: 'home' };
-	}
-	return { kind: 'overview', jobId, jobInstanceId };
+	_jobId: string,
+	_jobInstanceId: string,
+	_provisionalJob: boolean
+): Extract<PostCommitTarget, { kind: 'home' }> {
+	return { kind: 'home' };
 }

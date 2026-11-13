@@ -47,9 +47,12 @@ type SeedDeps struct {
 	LivingConfigs   living.ConfigStore
 	LivingPassports living.PassportStore
 	// LivingScope selects Feragame config/domain/identity/full or both (default).
-	// Feragame scopes always wipe Domain, skip Formata, bypass the empty-only
-	// marker. Identity/full also hard-reset Feragame Appwrite (not orgs 1–3).
+	// Feragame scopes skip Formata and bypass the empty-only marker; Domain wipe
+	// is default unless KeepDomain (config/identity only). Identity/full also
+	// hard-reset Feragame Appwrite (not orgs 1–3).
 	LivingScope living.SeedScope
+	// KeepDomain leaves Domain untouched with Feragame config/identity scopes.
+	KeepDomain bool
 	// Nil picks a time-based source in Seed.
 	RNG     catalogStreamRNG
 	Fixture *demoFixture
@@ -146,7 +149,7 @@ func seedFeragame(ctx context.Context, deps SeedDeps) error {
 	if deps.LivingConfigs == nil {
 		return fmt.Errorf("seed: living config store required for Feragame scopes")
 	}
-	if deps.LivingDomains == nil {
+	if !deps.KeepDomain && deps.LivingDomains == nil {
 		return fmt.Errorf("seed: living domain store required for Feragame scopes")
 	}
 	if seedScopeFeragameNeedsIdentity(deps.LivingScope) {
@@ -173,6 +176,7 @@ func applyLivingSeed(ctx context.Context, deps SeedDeps) error {
 		WipeDomain: deps.Replace,
 		Passports:  deps.LivingPassports,
 		Scope:      deps.LivingScope,
+		KeepDomain: deps.KeepDomain,
 	}
 	if _, err := living.SeedDemo(ctx, deps.LivingDomains, deps.LivingConfigs, opts); err != nil {
 		return fmt.Errorf("seed: living: %w", err)

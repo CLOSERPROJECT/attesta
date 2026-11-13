@@ -145,12 +145,9 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 	if err != nil || provisional == nil {
 		t.Fatalf("addressed register: %v %#v", err, provisional)
 	}
-	arrive, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", "")
-	if err != nil || arrive == nil {
-		t.Fatalf("provisional truckArrive: %v %#v", err, arrive)
-	}
-	if arrive.Surface != "live" || arrive.Schema == nil {
-		t.Fatalf("truckArrive incomplete: %#v", arrive)
+	// Prior truck still incomplete → Nuovo camion / provisional truckArrive off.
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", ""); err == nil {
+		t.Fatal("provisional truckArrive must deny while prior truck incomplete")
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", truckID, "", ""); err == nil {
 		t.Fatal("done truckArrive must be forbidden on addressed fetch")
@@ -439,7 +436,7 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if committed.Navigation != CommitNextOverview && committed.Navigation != CommitNextHome && committed.Navigation != CommitNextTask {
+	if committed.Navigation != CommitNextHome && committed.Navigation != CommitNextTask {
 		t.Fatalf("advance Navigation = %q", committed.Navigation)
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err == nil {

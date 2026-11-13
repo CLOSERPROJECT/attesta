@@ -102,8 +102,8 @@ func TestCommitNestedSpawnSubmitCloseNext(t *testing.T) {
 	if truckID != "T1" {
 		t.Fatalf("truck id = %q", truckID)
 	}
-	if arrive.Navigation != CommitNextOverview {
-		t.Fatalf("after arrive navigation = %q, want overview (open lots)", arrive.Navigation)
+	if arrive.Navigation != CommitNextHome {
+		t.Fatalf("after arrive navigation = %q, want home (open lots; overview unlinked)", arrive.Navigation)
 	}
 
 	intake, ok := worklistJobByID(arrive.Worklist, "intake")
@@ -139,8 +139,8 @@ func TestCommitNestedSpawnSubmitCloseNext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spawned.Navigation != CommitNextOverview {
-		t.Fatalf("spawn Commit navigation = %q, want overview while group open", spawned.Navigation)
+	if spawned.Navigation != CommitNextHome {
+		t.Fatalf("spawn Commit navigation = %q, want home while group open", spawned.Navigation)
 	}
 	if spawned.NextTaskFormBundle != nil {
 		t.Fatal("spawn Commit must omit nextTaskFormBundle")
@@ -217,8 +217,8 @@ func TestDomainSpawnGroupInstanceThenCommitLeaf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if committed.Navigation != CommitNextOverview {
-		t.Fatalf("nested leaf Commit navigation = %q, want overview", committed.Navigation)
+	if committed.Navigation != CommitNextHome {
+		t.Fatalf("nested leaf Commit navigation = %q, want home", committed.Navigation)
 	}
 	sub := committed.Domain.Submissions[len(committed.Domain.Submissions)-1]
 	if sub.GroupInstanceID != "lots-1" {

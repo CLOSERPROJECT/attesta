@@ -215,6 +215,48 @@ func TestIntakeUnavailableWithoutOpenDayThenSucceedsWithWorkingDayId(t *testing.
 	if _, has := truck["turno"]; has {
 		t.Fatalf("truck must not stamp turno: %#v", truck)
 	}
+
+	blocked, ok := worklistJobByID(ProjectWorklist(cfg, arrive.Domain, admin), "intake")
+	if !ok || blocked.CanStart {
+		t.Fatalf("intake canStart with open incomplete truck = %#v, want false", blocked)
+	}
+	_, err = c.Commit(t.Context(), "feragame", admin, CommitRequest{
+		TaskPath: "intake/truckArrive",
+		Value:    truckArriveValue(),
+		Mint:     startingNewMint(),
+	})
+	var deny *CommitError
+	if err == nil || !asCommitError(err, &deny) || deny.Kind != "unauthorized" {
+		t.Fatalf("second truckArrive while prior incomplete must deny: %v", err)
+	}
+}
+
+func TestLogisticCanStartLineOpenTurnoWhenNoOpenShift(t *testing.T) {
+	c, _, _ := testCommitter(t, readyWhenGateAuthorizer{})
+	if _, err := commitOpenWorkingDay(t, c, "2026-10-19", "multi"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := mustActiveConfig(t, c)
+	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	lineWL, ok := worklistJobByID(ProjectWorklist(cfg, domain, logistic), "line")
+	if !ok || !lineWL.CanStart {
+		t.Fatalf("logistic canStart line with open day and no shift = %#v, want true", lineWL)
+	}
+	opened, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+		TaskPath: "line/openTurno",
+		Value:    openTurnoValue(),
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.JobInstanceID != "2026-10-19-1st" {
+		t.Fatalf("jobInstanceId = %q", opened.JobInstanceID)
+	}
 }
 
 func TestCloseDayUnavailableWhileShiftOpen(t *testing.T) {

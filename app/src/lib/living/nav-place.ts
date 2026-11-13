@@ -113,14 +113,14 @@ export type NavPlaceInput = {
 	taskId: string;
 	/** Job-level Start only — nested Spawn keeps a real jobInstanceId. */
 	provisionalJob: boolean;
-	/** Nested provisional Spawn — same chrome as minted Task; Back still overview. */
+	/** Nested provisional Spawn — same chrome as minted Task; Back → home. */
 	provisionalSpawn?: boolean;
 	worklist: Worklist | null | undefined;
 };
 
 export type NavPlaceChrome = {
 	showBack: boolean;
-	backTarget: Extract<PostCommitTarget, { kind: 'home' | 'overview' }>;
+	backTarget: Extract<PostCommitTarget, { kind: 'home' }>;
 	primaryLabel: string;
 	/**
 	 * Muted top line: authored Job.title on overview; on Task pages
@@ -194,10 +194,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 	}
 
 	const taskTitle = taskTitleFromWorklist(worklist, jobId, taskId);
-	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisionalJob) as Extract<
-		PostCommitTarget,
-		{ kind: 'home' | 'overview' }
-	>;
+	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisionalJob);
 
 	if (provisionalJob) {
 		return {

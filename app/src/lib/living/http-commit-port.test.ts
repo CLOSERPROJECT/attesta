@@ -192,7 +192,7 @@ describe('HttpCommitDomainPort', () => {
 			mint: { kind: 'none' }
 		});
 		expect(got.navigation).toBe('stay');
-		expect(got.continueNavigation).toBe('overview');
+		expect(got.continueNavigation).toBe('home');
 	});
 
 	test('spawningNew mint posts nested taskPath with real jobInstanceId', async () => {
@@ -220,7 +220,7 @@ describe('HttpCommitDomainPort', () => {
 			value: { lotId: 'L1' },
 			mint: { kind: 'spawningNew' }
 		});
-		expect(got.navigation).toBe('overview');
+		expect(got.navigation).toBe('home');
 	});
 
 	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {

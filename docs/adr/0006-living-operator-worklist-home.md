@@ -1,19 +1,47 @@
-# Living `/app` operator home is a viewer-scoped Worklist with Task and overview routes
+# Living `/app` home is a single Worklist act-now list (Task + stay; overview unlinked)
 
-Living operators land on a **Worklist** home (Available Tasks + Can start Jobs + **In progress** open Job instances + **Completed** finished Job instances), not the prior flat JobPanel board and not legacy `/my`. Available rows are flat and keyed by `jobId` / `jobInstanceId` / `taskId`; Can start lists Jobs the viewer may open; **In progress** lists unfinished Job instances (Config `taskIds` progress incomplete) and deep-links to **Job instance overview**; **Completed** lists finished instances (progress complete) under In progress with the same overview deep-link—home still does not embed the full instance tree. Working a Task uses `/app/{jobId}/{jobInstanceId|new}/{taskId}`; handoff uses a **Job instance overview** at `/app/{jobId}/{jobInstanceId}`. After Commit, auto-advance applies when the same **OperatorIdentity** has another role-eligible actionable Task on that instance and Config allows it; otherwise overview (or home when the instance is finished). That product law is evaluated **server-side** on Commit: the response always includes **`navigation`** (`task` | `overview` | `home` | `stay`), and when `navigation` is `task`, `nextTaskFormBundle`. When `navigation` is **`stay`**, Commit also ships **`continueNavigation`** (deferred `home` | `overview` | `task`) plus `nextTaskFormBundle` when Continue targets a Task. The SPA navigates from **`navigation`** only — it does not re-walk Worklist for overview-vs-home and **must not** infer `stay` from HTTP links. Authored Task **`onCommit.navigation`** (`home` | `overview` | `advance` | `stay`; omit ⇒ `advance`) and **`onCommit.advanceTarget`** (bool; omit ⇒ true; close Tasks false) override default linear advance without plant branches in executors. When only `advanceTarget: false` applies, overview unless navigation authored `home` / `overview` / `stay`. Available / Can start / auto-advance use authored Config-role intersection for board chrome; **Cerbos** remains authoritative on Commit. Home Load ships a viewer-scoped Worklist (Task title + roles chrome). Decided end-state: home Load and Commit omit bulk **Task form bundle**s (bundles load on Task open via addressed `GET /api/living/task-form`; Commit returns updated Worklist + `navigation` + optional advance bundle). Addressed fetch + Commit navigation fields are in place; Task routes fetch on demand. **readyWhen** stays Commit-only (ADR-0005). This amends ADR-0005’s “ship every available bundle on Load” policy for the operator home path (end-state). Stream Operator home and the Stream timeline accordion stay out of scope.
+Living operators land on a **Worklist** home that is one **act-now** list: viewer
+**`actionable`** Tasks and **Can start** Jobs (peer row kinds, shared list layout)—not
+legacy `/my`, not peer **In progress** / **Completed** bands, and not an Archive
+surface yet. Rows are keyed by `jobId` / `jobInstanceId` / `taskId` (or Can start →
+first Task with provisional `new`). Working a Task uses
+`/app/{jobId}/{jobInstanceId|new}/{taskId}`. **Job instance overview** at
+`/app/{jobId}/{jobInstanceId}` may remain routed for later reuse but is **not** a
+Commit, Continue, home, or Task-back target. After Commit, auto-advance applies when
+the same **OperatorIdentity** has another role-eligible actionable Task on that
+instance and Config allows it; otherwise **home** (or **stay** when authored). Product
+law is evaluated **server-side**: response **`navigation`** is `task` | `home` |
+`stay` (legacy wire/Config `overview` maps to **home**); when `task`,
+`nextTaskFormBundle`; when **`stay`**, **`continueNavigation`** is deferred `home` |
+`task` (+ bundle when Continue targets a Task). SPA navigates from **`navigation`**
+only—no Worklist re-walk for destination, no inferring `stay` from HTTP links.
+Authored **`onCommit.navigation`** (`home` | `overview` | `advance` | `stay`; omit ⇒
+`advance`; `overview` ⇒ home) and **`onCommit.advanceTarget`** (bool; omit ⇒ true)
+override linear advance without plant branches. When only `advanceTarget: false`
+applies, destination is **home**. For **`submit: many`** act-now rows, Submission
+history chrome may sit under the row when `submissionCounts` N > 0 (closed count;
+open = lazy list recap + links)—not a full instance accordion on home. **`submit:
+once`** done recaps are not on home (gap until Archive). Home Load ships
+viewer-scoped Worklist (title + roles + counts chrome); Task form bundles load on
+Task open (`GET /api/living/task-form`) or Commit advance. **readyWhen** stays
+Commit-path law (ADR-0005). Amends ADR-0005’s bulk Available bundles-on-Load for the
+home path. Stream Operator home stays out of scope. Task-group Spawn/Close as a
+product hub is out of scope (groups pending full removal).
 
-**Considered options:** (1) Keep inline JobPanel forms on a single `/app` page — rejected: no deep links, weak handoff, heavy Load. (2) Role-blind Worklist with client filtering from Org Config — rejected: Config must stay off the wire; “mine” must be server-projected. (3) Cerbos round-trip per Worklist row — rejected: board chrome stays slug∩roles; Commit keeps Cerbos. (4) Always return to home after Commit — rejected: same-role auto-advance and explicit overview handoff match plant handoffs. (5) Keep overview-vs-home derived in the SPA from Worklist after Commit — rejected: splits ADR-0006 routing across Go (auto-advance) and TS; Commit now ships explicit `navigation`.
+**Considered options:** (1) Keep four home bands + overview handoff — rejected:
+home should be act-now only; finished/non-actionable rediscovery waits for Archive.
+(2) Delete overview route — rejected for now: keep path for later reuse; unlink from
+product flows. (3) Always stay on overview for role handoff — rejected: handoff is
+the next viewer’s act-now list. (4) Role-blind client filtering from Org Config —
+rejected (ADR-0005/0006). (5) SPA re-derives post-Commit destination from Worklist —
+rejected; Commit ships `navigation`.
 
-**Amended by [ADR-0008](0008-living-task-submit-cardinality.md) (Feragame path):** Feragame multi-pass uses leaf `submit: many` + stay navigation, not Task-group Spawn/Close. Group chrome below remains for configs that still author groups.
+**Amended by [ADR-0008](0008-living-task-submit-cardinality.md):** leaf `submit:
+once|many`; Feragame multi-pass uses `many` + stay, not Task groups. Many-submit
+Submission history on home reuses list-recap / timestamped LinkStore.
 
-**Task groups (amend):** Repeatable **Task group** Close (and overview Spawn) live on the **Job instance overview**, not as a home “Can start” peer or a separate home Spawn band. Home **Available** may still offer Spawn-via-first-leaf: when Worklist group chrome has `canSpawn`, the board includes a provisional first-child row with group instance `new` (same mint path as overview Spawn / Commit `spawningNew`), alongside minted nested Available for open group instances. After Commit of a child Task while that group is still open and Commit returns **no** download links, `navigation` is **overview** (Spawn / Close hub)—do not auto-advance into the next Job-level Task until Close. When Commit returns download links (e.g. lot labels), Config-authored **`navigation: stay`** (or equivalent server stay) parks on a **read-only** submitted form with those links plus **Start another** (Spawn) and **Close group** (confirm dialog); **Continue** follows `continueNavigation`. After Close, the usual auto-advance → overview → home law applies. Overview still exposes Spawn / Close for other entry paths. Overview may show a projected Worklist group-instance `label` (Config `instanceLabelEntity` kind ∩ nested Submission `idsTouched`; display `label || id`). Durable free-form labels under the lot remain deferred. Any Commit with download links uses stay + Continue (not only group children); without links, navigation follows the rules above / the general ADR law.
-
-**Consequences:** Living demo seed needs role-split users and multi-stage Domain so each home differs. Overview and Task routes replace “instance tree on home.” SPA must not re-derive Unlock / startsWhen / role eligibility from a full Org Config snapshot, must not re-derive post-Commit destination from Worklist, and must not invent stay from link presence alone. Group child Commit must not steal the lot-entry loop by advancing past an open group.
-
-**Amended (Job instance overview accordion chrome):** Overview restores experiment-style row chrome (boxed Config-order number on Job-level Tasks and **Task group** cards only — not on group occurrences or **child Tasks**; status tag; chevron) using **shadcn Accordion** (add the shadcn-svelte accordion primitive if missing). Home remains Available + Can start + **In progress** + **Completed** bands — not a Stream/experiment StepStack timeline and not the full instance tree. Interaction: `actionable` → Task form route (not expand); `locked` / `available` → display only; `done` → accordion body = Submission facts recap + stored post-Commit links (lazy fetch; collapsed by default; multi-open OK). **Task group** card is itself an accordion: expand shows occurrences + Spawn/Close; each occurrence accordion expands to **child Task** rows with the same status rules (no numbers inside the group). Recap does not re-run `onSubmit.http`. Commit pipeline stays Domain Put → HttpPort → **separate link side-record** keyed like the Submission (failure does not roll back Domain); recap returns facts + those links. UI tags: Bloccato / Disponibile / Per te / Fatto for `locked` / `available` / `actionable` / `done`.
-
-**Amended (In progress home band):** Home adds an **In progress** band of unfinished Job instances (Worklist Job → instance order; progress from Config `taskIds`). Rows navigate to **Job instance overview**. An instance may appear in both Available (actionable Tasks) and In progress; finished instances are omitted. Still no full instance tree on home.
-
-**Amended (Completed home band):** Home adds a **Completed** band **below In progress** of finished Job instances (Worklist Job → instance order; Config `taskIds` progress complete — inverse of In progress). Rows navigate to **Job instance overview**, where done-Task accordion already shows stored post-Commit links (e.g. DPP). No separate DPP-only home widget; rediscovery reuses overview link recap. Still no plant-/passport-named SPA branches and no full instance tree on home.
-
-**Amended (Commit navigation):** Default post-Commit routing remains auto-advance → overview → home, but Tasks may author **`onCommit.navigation`** and **`onCommit.advanceTarget`** so open/day-start Commits return **home** (not the next sibling close), close Commits set **`advanceTarget: false`**, and HTTP link leaves use **`navigation: stay`** with server-computed **`continueNavigation`**. Wire field **`navigation`** supersedes legacy **`next`**; stay is explicit on the wire, not a client heuristic. Locked product detail: [`.scratch/commit-navigation/LOCKED.md`](../../.scratch/commit-navigation/LOCKED.md).
+**Consequences:** Demo seed still needs role-split users so each home differs. SPA
+must not treat overview as the board, must not show In progress/Completed on home,
+must back from Task to home, and must not invent stay from links. Archive hierarchy
+(working day → shift → lot) is explicitly later. Prior home-band and
+overview-as-navigation amends of this ADR are superseded by the act-now hard cut.

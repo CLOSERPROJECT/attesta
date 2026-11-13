@@ -163,8 +163,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 		t.Fatal(err)
 	}
 	truckID := arrive.JobInstanceID
-	// Open group first leaf with downloads → stay/overview law; without FakeHttp links → overview.
-	if arrive.Navigation != CommitNextOverview && arrive.Navigation != CommitNextTask {
+	// Open group first leaf with downloads → stay/home law; without FakeHttp links → home.
+	if arrive.Navigation != CommitNextHome && arrive.Navigation != CommitNextTask {
 		t.Fatalf("after arrive Navigation = %q", arrive.Navigation)
 	}
 
@@ -194,8 +194,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if done.Navigation != CommitNextHome && done.Navigation != CommitNextOverview {
-		t.Fatalf("finished Navigation = %q", done.Navigation)
+	if done.Navigation != CommitNextHome {
+		t.Fatalf("finished Navigation = %q, want home", done.Navigation)
 	}
 
 	lineID := commitOpenTurno(t, c)
@@ -208,7 +208,7 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pw.Navigation != CommitNextStay && pw.Navigation != CommitNextOverview && pw.Navigation != CommitNextTask {
+	if pw.Navigation != CommitNextStay && pw.Navigation != CommitNextHome && pw.Navigation != CommitNextTask {
 		t.Fatalf("logistic Navigation = %q", pw.Navigation)
 	}
 }

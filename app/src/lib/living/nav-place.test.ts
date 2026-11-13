@@ -155,7 +155,7 @@ describe('resolveNavPlace', () => {
 		});
 	});
 
-	test('task provisional Spawn: job · instance muted, task primary, back overview', () => {
+	test('task provisional Spawn: job · instance muted, task primary, back home', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
@@ -168,13 +168,13 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
+			backTarget: { kind: 'home' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion · Camion B'
 		});
 	});
 
-	test('task minted: job · instance muted, task primary, back overview', () => {
+	test('task minted: job · instance muted, task primary, back home', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
@@ -186,7 +186,7 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
+			backTarget: { kind: 'home' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion · Camion B'
 		});

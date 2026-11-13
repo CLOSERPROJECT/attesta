@@ -7,16 +7,14 @@
 	import * as Dialog from '#lib/shadcn/ui/dialog/index.js';
 
 	import { draftAddressForTask } from '../living/drafts.js';
+	import ManySubmitHistory from '../living/ManySubmitHistory.svelte';
 	import OverviewRowChrome from '../living/OverviewRowChrome.svelte';
-	import TaskRecapList from '../living/TaskRecapList.svelte';
 	import TaskRecapPanel from '../living/TaskRecapPanel.svelte';
 	import { living } from '../living/living-app.svelte.js';
 	import type { TaskStatus, TaskSubmit } from '../living/types.js';
 	import {
 		formatHandoffCopy,
-		formatSubmissionCount,
 		jobInstanceOverview,
-		manySubmitHistoryVisible,
 		provisionalSpawnDraftRowVisible,
 		type OverviewTaskRow
 	} from '../living/worklist-overview.js';
@@ -33,7 +31,6 @@
 	let expandedTopOverride = $state.raw<string[] | null>(null);
 	let expandedOccurrencesOverride = $state.raw<string[] | null>(null);
 	let expandedChildDoneOverride = $state.raw<string[] | null>(null);
-	let expandedManyHistoryOverride = $state.raw<string[] | null>(null);
 	let accordionScopeId = $state.raw('');
 
 	onMount(() => {
@@ -126,17 +123,6 @@
 		return [];
 	});
 
-	const expandedManyHistory = $derived.by(() => {
-		if (!model) return [] as string[];
-		if (
-			accordionScopeId === model.jobInstanceId &&
-			expandedManyHistoryOverride !== null
-		) {
-			return expandedManyHistoryOverride;
-		}
-		return [];
-	});
-
 	$effect(() => {
 		const id = jobInstanceId;
 		if (id === PROVISIONAL_GROUP_INSTANCE_ID || id === '') {
@@ -166,21 +152,6 @@
 		if (!model) return;
 		accordionScopeId = model.jobInstanceId;
 		expandedChildDoneOverride = value;
-	}
-
-	function setExpandedManyHistory(value: string[]) {
-		if (!model) return;
-		accordionScopeId = model.jobInstanceId;
-		expandedManyHistoryOverride = value;
-	}
-
-	function onManyHistoryRowChange(historyValue: string, next: string[]) {
-		const opening = next.includes(historyValue);
-		setExpandedManyHistory(
-			opening
-				? [...expandedManyHistory.filter((v) => v !== historyValue), historyValue]
-				: expandedManyHistory.filter((v) => v !== historyValue)
-		);
 	}
 
 	function askClose(groupId: string) {
@@ -239,17 +210,6 @@
 
 	function childDoneValue(groupId: string, instanceId: string, taskId: string) {
 		return `child-done:${groupId}:${instanceId}:${taskId}`;
-	}
-
-	function manyHistoryValue(
-		taskId: string,
-		groupId?: string,
-		groupInstanceId?: string
-	) {
-		if (groupId && groupInstanceId) {
-			return `many:${groupId}:${groupInstanceId}:${taskId}`;
-		}
-		return `many:${taskId}`;
 	}
 
 	const rowShellBase =
@@ -318,39 +278,8 @@
 		doneContentClass: string;
 		submit?: TaskSubmit;
 		submissionCount?: number;
-		manyHistoryValue?: string;
 	};
 </script>
-
-{#snippet manySubmitHistory(opts: TaskRowOpts)}
-	{#if opts.manyHistoryValue && manySubmitHistoryVisible(opts.submit, opts.submissionCount)}
-		{@const historyValue = opts.manyHistoryValue}
-		{@const historyOpen = expandedManyHistory.includes(historyValue)}
-		<Accordion.Root
-			type="multiple"
-			value={historyOpen ? [historyValue] : []}
-			onValueChange={(next) => onManyHistoryRowChange(historyValue, next)}
-			class="flex flex-col"
-			data-testid="overview-many-history"
-			data-task-id={opts.taskId}
-		>
-			<Accordion.Item
-				value={historyValue}
-				class="overflow-hidden rounded border border-border bg-card"
-			>
-				<Accordion.Trigger
-					class="w-full px-3 py-2 text-sm text-muted-foreground hover:no-underline"
-					data-testid="overview-many-history-trigger"
-				>
-					{formatSubmissionCount(opts.submissionCount ?? 0)}
-				</Accordion.Trigger>
-				<Accordion.Content class={accordionContentClass()}>
-					<TaskRecapList active={historyOpen} request={opts.recap} />
-				</Accordion.Content>
-			</Accordion.Item>
-		</Accordion.Root>
-	{/if}
-{/snippet}
 
 {#snippet taskStatusRow(opts: TaskRowOpts)}
 	{#if opts.status === 'done'}
@@ -400,7 +329,12 @@
 					/>
 				</div>
 			{/if}
-			{@render manySubmitHistory(opts)}
+			<ManySubmitHistory
+				submit={opts.submit}
+				submissionCount={opts.submissionCount}
+				request={opts.recap}
+				data-testid="overview-many-history"
+			/>
 		</div>
 	{/if}
 {/snippet}
@@ -501,12 +435,7 @@
 														),
 														doneContentClass: accordionContentClass(),
 														submit: flatChild.submit,
-														submissionCount: flatChild.submissionCount,
-														manyHistoryValue: manyHistoryValue(
-															flatChild.taskId,
-															row.taskId,
-															gi.id
-														)
+														submissionCount: flatChild.submissionCount
 													})}
 												</div>
 											{:else}
@@ -566,12 +495,7 @@
 																	),
 																	doneContentClass: accordionContentClass(),
 																	submit: child.submit,
-																	submissionCount: child.submissionCount,
-																	manyHistoryValue: manyHistoryValue(
-																		child.taskId,
-																		row.taskId,
-																		gi.id
-																	)
+																	submissionCount: child.submissionCount
 																})}
 															{/each}
 														</Accordion.Root>
@@ -682,8 +606,7 @@
 							doneTriggerClass: accordionTriggerClass('px-3 py-3', row.status),
 							doneContentClass: accordionContentClass(),
 							submit: row.submit,
-							submissionCount: row.submissionCount,
-							manyHistoryValue: manyHistoryValue(row.taskId)
+							submissionCount: row.submissionCount
 						})}
 					{/if}
 				</div>

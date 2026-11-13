@@ -15,6 +15,8 @@ vi.mock('../router/index.js', () => ({
 import { hrefLivingTarget } from '../router/navigate-target.js';
 import type { Worklist } from './types.js';
 import {
+	actNowRowKey,
+	actNowRowsFromWorklist,
 	availableRowKey,
 	availableRowsFromWorklist,
 	availableRowTarget,
@@ -29,6 +31,7 @@ import {
 	progressFraction,
 	taskRouteInstanceSegment
 } from './worklist-home.js';
+import { manySubmitHistoryVisible } from './worklist-overview.js';
 
 const chrome = {
 	intake: [
@@ -318,12 +321,153 @@ describe('worklist-home bands', () => {
 		expect(taskRouteInstanceSegment('NIR-1')).toBe('NIR-1');
 	});
 
+	test('actNowRows: actionable first, Can start after; keys discriminate kinds', () => {
+		const rows = actNowRowsFromWorklist(adminWorklist);
+		expect(rows.map((r) => (r.kind === 'task' ? r.taskId : `start:${r.jobId}`))).toEqual([
+			'register',
+			'start:intake'
+		]);
+		expect(rows[0]).toMatchObject({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-2',
+			taskId: 'register',
+			title: 'Registrazione'
+		});
+		expect(rows[1]).toMatchObject({
+			kind: 'start',
+			jobId: 'intake',
+			startLabel: 'Nuovo camion',
+			firstTaskId: 'register'
+		});
+		expect(actNowRowKey(rows[0]!)).toBe('task:intake/NIR-2/register');
+		expect(actNowRowKey(rows[1]!)).toBe('start:intake');
+
+		const tasksOnly = actNowRowsFromWorklist(logisticWorklist);
+		expect(tasksOnly.every((r) => r.kind === 'task')).toBe(true);
+		expect(tasksOnly.map((r) => (r.kind === 'task' ? r.taskId : ''))).toEqual([
+			'palletWeight'
+		]);
+	});
+
+	test('available / act-now task rows enrich submit + submissionCount (flat + group)', () => {
+		const flat: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					title: 'Camion',
+					taskIds: ['register', 'palletWeight'],
+					tasks: [
+						{
+							id: 'register',
+							title: 'Registrazione',
+							roles: ['administration'],
+							submit: 'many'
+						},
+						{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
+					],
+					instances: [
+						{
+							id: 'NIR-1',
+							label: 'NIR-1',
+							tasks: { register: 'actionable', palletWeight: 'locked' },
+							submissionCounts: { register: 2 }
+						}
+					]
+				}
+			]
+		};
+		const flatRows = availableRowsFromWorklist(flat);
+		expect(flatRows).toHaveLength(1);
+		expect(flatRows[0]).toMatchObject({
+			taskId: 'register',
+			submit: 'many',
+			submissionCount: 2
+		});
+		const actNowFlat = actNowRowsFromWorklist(flat)[0];
+		expect(actNowFlat).toMatchObject({
+			kind: 'task',
+			submit: 'many',
+			submissionCount: 2
+		});
+		// Slice D: home many-history chrome gates on submit + count (same helper as overview).
+		expect(
+			actNowFlat?.kind === 'task' &&
+				manySubmitHistoryVisible(actNowFlat.submit, actNowFlat.submissionCount)
+		).toBe(true);
+
+		// once / omit: no submit/count fields → history hidden.
+		const onceRow = availableRowsFromWorklist(adminWorklist)[0];
+		expect(onceRow?.submit).toBeUndefined();
+		expect(onceRow?.submissionCount).toBeUndefined();
+		expect(manySubmitHistoryVisible(onceRow?.submit, onceRow?.submissionCount)).toBe(
+			false
+		);
+
+		const nested: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: false,
+					repeatable: true,
+					title: 'Camion',
+					taskIds: ['lots'],
+					tasks: [
+						{ id: 'lots', title: 'Lots', roles: [] },
+						{
+							id: 'register',
+							title: 'Register lot',
+							roles: ['administration'],
+							submit: 'many'
+						}
+					],
+					instances: [
+						{
+							id: 'T1',
+							label: 'Truck 1',
+							tasks: { lots: 'available' },
+							groups: {
+								lots: {
+									groupId: 'lots',
+									repeatable: true,
+									canSpawn: false,
+									canClose: false,
+									childTaskIds: ['register'],
+									instances: [
+										{
+											id: 'L1',
+											tasks: { register: 'actionable' },
+											submissionCounts: { register: 3 }
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		};
+		const nestedRows = availableRowsFromWorklist(nested);
+		expect(nestedRows).toHaveLength(1);
+		expect(nestedRows[0]).toMatchObject({
+			groupId: 'lots',
+			groupInstanceId: 'L1',
+			taskId: 'register',
+			submit: 'many',
+			submissionCount: 3
+		});
+	});
+
 	test('empty Worklist yields empty bands', () => {
 		expect(availableRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(canStartRowsFromWorklist({ jobs: [] })).toEqual([]);
+		expect(actNowRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(inProgressRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(completedRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(availableRowsFromWorklist(null)).toEqual([]);
+		expect(actNowRowsFromWorklist(null)).toEqual([]);
 		expect(inProgressRowsFromWorklist(null)).toEqual([]);
 		expect(completedRowsFromWorklist(null)).toEqual([]);
 	});

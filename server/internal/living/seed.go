@@ -14,12 +14,12 @@ const (
 	// SeedScopeBoth puts Active Config then stages Domain per WipeDomain /
 	// empty-Domain rules (prior SeedDemo behavior).
 	SeedScopeBoth SeedScope = iota
-	// SeedScopeFeragameConfig puts Active Config and always wipes Domain
-	// (+ passports) to empty; never stages.
+	// SeedScopeFeragameConfig puts Active Config and (unless KeepDomain) wipes
+	// Domain (+ passports) to empty; never stages.
 	SeedScopeFeragameConfig
 	// SeedScopeFeragameDomain puts Active Config and always wipes+stages Domain.
 	SeedScopeFeragameDomain
-	// SeedScopeFeragameIdentity is living-identical to Config (empty wipe);
+	// SeedScopeFeragameIdentity is living-identical to Config;
 	// cmd/server pairs it with Feragame Appwrite hard reset.
 	SeedScopeFeragameIdentity
 	// SeedScopeFeragameFull is living-identical to Domain (wipe+stage);
@@ -44,6 +44,9 @@ type SeedOptions struct {
 	// Passports is wiped for the org when Domain is rebuilt (seed --replace /
 	// Feragame scopes). Optional in tests that never lock; task seed must wire it.
 	Passports PassportStore
+	// KeepDomain is valid only with Feragame Config/Identity: put Active Config
+	// and leave Domain (+ passports) untouched. Rejected for Domain/Full.
+	KeepDomain bool
 	// Scope selects Feragame config/domain/identity/full or both (default).
 	Scope SeedScope
 }
@@ -62,9 +65,10 @@ const (
 // SeedDemo applies the demo Feragame fixture per opts.Scope:
 //   - SeedScopeBoth (default): Active Config, then Domain when WipeDomain is set
 //     or Domain is missing/empty (unless SkipEmptyDomainStaging).
-//   - SeedScopeFeragameConfig / Identity: Active Config + always wipe Domain
-//     (+ passports) to empty; never stages.
-//   - SeedScopeFeragameDomain / Full: Active Config + always wipe + stage.
+//   - SeedScopeFeragameConfig / Identity: Active Config; wipe Domain to empty
+//     unless KeepDomain; never stages.
+//   - SeedScopeFeragameDomain / Full: Active Config + always wipe + stage
+//     (KeepDomain is invalid).
 //
 // Demo/fixture only — product hosts must not require this demo seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
@@ -74,13 +78,22 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 	}
 	switch opts.Scope {
 	case SeedScopeFeragameConfig, SeedScopeFeragameIdentity:
+		if opts.KeepDomain {
+			return SeedFixtureConfigStore(configs)
+		}
 		return seedDemoFeragameEmptyDomain(ctx, domains, configs, opts.Passports)
 	case SeedScopeFeragameDomain, SeedScopeFeragameFull:
+		if opts.KeepDomain {
+			return OrgConfig{}, fmt.Errorf("living: KeepDomain is only valid with Feragame config/identity scopes")
+		}
 		return seedDemoBoth(ctx, domains, configs, SeedOptions{
 			WipeDomain: true,
 			Passports:  opts.Passports,
 		})
 	default:
+		if opts.KeepDomain {
+			return OrgConfig{}, fmt.Errorf("living: KeepDomain is only valid with Feragame config/identity scopes")
+		}
 		return seedDemoBoth(ctx, domains, configs, opts)
 	}
 }
@@ -239,7 +252,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 			weight float64
 		}{{SeedLoadDAID + ".1", 90.0}, {SeedLoadDAID + ".2", 85.0}}},
 	} {
-		if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
 			TaskPath:      "line/startLot",
 			JobInstanceID: SeedLineID,
 			Value:         map[string]any{"lotId": lot.id},

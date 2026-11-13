@@ -3,6 +3,7 @@ import * as m from '#lib/paraglide/messages.js';
 import type { PostCommitTarget } from './worklist-nav.js';
 import {
 	PROVISIONAL_GROUP_INSTANCE_ID,
+	type TaskSubmit,
 	type Worklist,
 	type WorklistInstance,
 	type WorklistJob,
@@ -26,6 +27,10 @@ export type AvailableRow = {
 	roles: string[];
 	tasksDone: number;
 	tasksTotal: number;
+	/** Config submit cardinality; many-history chrome reads this (Slice D). */
+	submit?: TaskSubmit;
+	/** Domain Submission N when `submit === 'many'` (from Worklist counts). */
+	submissionCount?: number;
 };
 
 export type CanStartRow = {
@@ -37,6 +42,11 @@ export type CanStartRow = {
 	startLabel: string;
 	firstTaskId: string;
 };
+
+/** Home act-now peer: actionable Task or Can start Job. */
+export type ActNowRow =
+	| ({ kind: 'task' } & AvailableRow)
+	| ({ kind: 'start' } & CanStartRow);
 
 export type InProgressRow = {
 	jobId: string;
@@ -95,16 +105,34 @@ function jobColorOf(job: WorklistJob): string | undefined {
 	return color || undefined;
 }
 
+/** Mirror overview: only when chrome is `many`; count from instance or group instance. */
+function manySubmitFields(
+	chromeSubmit: TaskSubmit | undefined,
+	counts: Record<string, number> | undefined,
+	taskId: string
+): Pick<AvailableRow, 'submit' | 'submissionCount'> {
+	if (chromeSubmit !== 'many') return {};
+	return {
+		submit: 'many',
+		submissionCount: counts?.[taskId] ?? 0
+	};
+}
+
 function pushAvailableRow(
 	out: AvailableRow[],
 	job: WorklistJob,
 	inst: WorklistInstance,
 	taskId: string,
 	progress: { done: number; total: number },
-	group?: { groupId: string; groupInstanceId: string }
+	group?: {
+		groupId: string;
+		groupInstanceId: string;
+		submissionCounts?: Record<string, number>;
+	}
 ): void {
 	const chrome = taskChrome(job, taskId);
 	const jobColor = jobColorOf(job);
+	const counts = group ? group.submissionCounts : inst.submissionCounts;
 	out.push({
 		jobId: job.jobId,
 		jobInstanceId: inst.id,
@@ -118,7 +146,8 @@ function pushAvailableRow(
 		title: chrome?.title || taskId,
 		roles: chrome?.roles ?? [],
 		tasksDone: progress.done,
-		tasksTotal: progress.total
+		tasksTotal: progress.total,
+		...manySubmitFields(chrome?.submit, counts, taskId)
 	});
 }
 
@@ -146,7 +175,8 @@ export function availableRowsFromWorklist(
 							if (gi.tasks[childId] !== 'actionable') continue;
 							pushAvailableRow(out, job, inst, childId, progress, {
 								groupId: taskId,
-								groupInstanceId: gi.id
+								groupInstanceId: gi.id,
+								submissionCounts: gi.submissionCounts
 							});
 						}
 					}
@@ -188,6 +218,29 @@ export function canStartRowsFromWorklist(
 		});
 	}
 	return out;
+}
+
+/**
+ * Home act-now: actionable Tasks first (availableRows order), then Can start
+ * Jobs. Peer kinds in one flat list — no In progress / Completed.
+ */
+export function actNowRowsFromWorklist(
+	worklist: Worklist | null | undefined
+): ActNowRow[] {
+	const tasks: ActNowRow[] = availableRowsFromWorklist(worklist).map((row) => ({
+		kind: 'task',
+		...row
+	}));
+	const starts: ActNowRow[] = canStartRowsFromWorklist(worklist).map((row) => ({
+		kind: 'start',
+		...row
+	}));
+	return [...tasks, ...starts];
+}
+
+export function actNowRowKey(row: ActNowRow): string {
+	if (row.kind === 'task') return `task:${availableRowKey(row)}`;
+	return `start:${row.jobId}`;
 }
 
 /**

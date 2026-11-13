@@ -46,9 +46,11 @@ Checklist when changing the Feragame plant fixture
    and `bun run test:unit -- --run src/lib/living` from `app/`.
 8. **Local stacks** — after fixture YAML shape changes, run
    `task seed:feragame-config` (Active Config + empty Domain; no Appwrite).
-   Staged demo Domain: `task seed:feragame-domain`. With Feragame Appwrite
-   operators: `task seed:feragame-identity` (empty Domain) or
-   `task seed:feragame-full` (staged). Full-stack rewrite remains
+   Soft Config refresh without Domain wipe:
+   `task seed:feragame-config -- --keep-domain`. Staged demo Domain:
+   `task seed:feragame-domain`. With Feragame Appwrite operators:
+   `task seed:feragame-identity` (empty Domain) or `task seed:feragame-full`
+   (staged); identity also accepts `--keep-domain`. Full-stack rewrite remains
    `task seed -- --replace` (orgs 1–3 + Formata + Feragame).
 
 ## Commit navigation (`onCommit`)
