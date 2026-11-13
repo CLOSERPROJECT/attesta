@@ -172,6 +172,53 @@ func hasLeafCommitFields(t TaskConfig) bool {
 	return false
 }
 
+const (
+	commitNavAdvance  = "advance"
+	commitNavHome     = "home"
+	commitNavOverview = "overview"
+	commitNavStay     = "stay"
+)
+
+func taskOnCommit(task map[string]any) map[string]any {
+	if task == nil {
+		return nil
+	}
+	on, _ := task["onCommit"].(map[string]any)
+	return on
+}
+
+// taskCommitNavigation reads onCommit.navigation; omit or unknown ⇒ advance.
+func taskCommitNavigation(task map[string]any) string {
+	on := taskOnCommit(task)
+	if on == nil {
+		return commitNavAdvance
+	}
+	nav, _ := on["navigation"].(string)
+	switch nav {
+	case commitNavHome, commitNavOverview, commitNavStay, commitNavAdvance:
+		return nav
+	default:
+		return commitNavAdvance
+	}
+}
+
+// taskAdvanceTarget reads onCommit.advanceTarget; omit ⇒ true.
+func taskAdvanceTarget(task map[string]any) bool {
+	on := taskOnCommit(task)
+	if on == nil {
+		return true
+	}
+	raw, ok := on["advanceTarget"]
+	if !ok {
+		return true
+	}
+	b, ok := raw.(bool)
+	if !ok {
+		return true
+	}
+	return b
+}
+
 func decodeTaskConfigList(raw any) []TaskConfig {
 	switch list := raw.(type) {
 	case []TaskConfig:

@@ -379,8 +379,8 @@ func TestContainerRegCloseRequiresChildSubmissionNoUnlockSuccessor(t *testing.T)
 	if wi.Tasks["containerReg"] != TaskStatusDone {
 		t.Fatalf("containerReg after Close = %q, want done (no Unlock successor)", wi.Tasks["containerReg"])
 	}
-	if closed.Next == CommitNextTask {
-		t.Fatalf("Close must not hand off to another Task; next bundle = %s", bundleAddress(closed.NextTaskFormBundle))
+	if closed.Navigation == CommitNextTask {
+		t.Fatalf("Close must not hand off to another Task; navigation bundle = %s", bundleAddress(closed.NextTaskFormBundle))
 	}
 }
 

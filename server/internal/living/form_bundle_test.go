@@ -292,9 +292,9 @@ func TestLineLoadPartialMapAfterOnePalletWeighClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// lineLoad is Spawn (no auto-advance); closeTurno is unlocked from openTurno so may be next.
-	if b := closed.NextTaskFormBundle; b != nil && !(b.JobID == "line" && b.TaskID == "closeTurno" && b.JobInstanceID == lineID) {
-		t.Fatalf("after weigh Close next = %s, want overview or closeTurno", bundleAddress(b))
+	// lineLoad is Spawn (no auto-advance); closeTurno has advanceTarget false so is not auto-advanced.
+	if closed.Navigation == CommitNextTask {
+		t.Fatalf("after weigh Close navigation = task (%s), want overview", bundleAddress(closed.NextTaskFormBundle))
 	}
 	lineLoad, err := BuildTaskFormBundle(mustActiveConfig(t, c), closed.Domain, ActionableTaskRef{
 		JobID: "line", GroupID: "lineLoad", TaskID: "mark", JobInstanceID: lineID,
@@ -450,8 +450,8 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if committed.Next != CommitNextOverview && committed.Next != CommitNextHome && committed.Next != CommitNextTask {
-		t.Fatalf("advance Next = %q", committed.Next)
+	if committed.Navigation != CommitNextOverview && committed.Navigation != CommitNextHome && committed.Navigation != CommitNextTask {
+		t.Fatalf("advance Navigation = %q", committed.Navigation)
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err == nil {
 		t.Fatal("addressed weightCheck must deny after it leaves available")
@@ -471,8 +471,11 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if _, has := wire["taskFormBundles"]; has {
 		t.Fatalf("Commit JSON must omit taskFormBundles: %s", string(raw))
 	}
-	if wire["next"] == nil || wire["next"] == "" {
-		t.Fatalf("Commit JSON next = %#v", wire["next"])
+	if wire["navigation"] == nil || wire["navigation"] == "" {
+		t.Fatalf("Commit JSON navigation = %#v", wire["navigation"])
+	}
+	if _, has := wire["next"]; has {
+		t.Fatalf("Commit JSON must not ship legacy next: %s", string(raw))
 	}
 }
 

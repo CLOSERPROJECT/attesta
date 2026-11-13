@@ -138,7 +138,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: nextWorklist,
-			next: 'overview' as const,
+			navigation: 'overview' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
@@ -155,7 +155,7 @@ describe('LivingSession', () => {
 			mint: { kind: 'none' }
 		});
 		expect(outcome?.jobInstanceId).toBe('NIR-1');
-		expect(outcome?.next).toBe('overview');
+		expect(outcome?.navigation).toBe('overview');
 		expect(outcome?.nextTaskFormBundle).toBeNull();
 		expect(session.result?.worklist).toEqual(nextWorklist);
 		expect(session.result?.taskFormBundles).toEqual([]);
@@ -168,7 +168,7 @@ describe('LivingSession', () => {
 			org: string;
 			jobInstanceId: string;
 			worklist: typeof sample.worklist;
-			next: 'overview';
+			navigation: 'overview';
 			nextTaskFormBundle: null;
 		}) => void;
 		const commit = vi.fn(
@@ -197,14 +197,14 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: sample.worklist,
-			next: 'overview',
+			navigation: 'overview',
 			nextTaskFormBundle: null
 		});
-		expect(await first).toMatchObject({ jobInstanceId: 'NIR-1', next: 'overview' });
+		expect(await first).toMatchObject({ jobInstanceId: 'NIR-1', navigation: 'overview' });
 		expect(commit).toHaveBeenCalledTimes(1);
 	});
 
-	test('spawningNew clears nested provisional draft and returns overview next', async () => {
+	test('spawningNew clears nested provisional draft and returns overview navigation', async () => {
 		const nextWorklist: Worklist = {
 			jobs: [
 				{
@@ -242,7 +242,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'T1',
 			worklist: nextWorklist,
-			next: 'overview' as const,
+			navigation: 'overview' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
@@ -260,7 +260,7 @@ describe('LivingSession', () => {
 			mint: { kind: 'spawningNew' },
 			draftBagInstanceKey: bagKey
 		});
-		expect(outcome?.next).toBe('overview');
+		expect(outcome?.navigation).toBe('overview');
 		expect(outcome?.jobInstanceId).toBe('T1');
 		expect(session.result?.worklist).toEqual(nextWorklist);
 		expect(session.getDraft('intake/lots/new/register', bagKey)).toBeNull();
@@ -277,7 +277,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
-			next: 'task' as const,
+			navigation: 'task' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
@@ -304,7 +304,7 @@ describe('LivingSession', () => {
 		expect(session.getDraft('intake/register', '_new')).toBeNull();
 	});
 
-	test('commit outcome surfaces next + nextTaskFormBundle for auto-advance', async () => {
+	test('commit outcome surfaces navigation + nextTaskFormBundle for auto-advance', async () => {
 		const next: TaskFormBundle = {
 			jobId: 'intake',
 			taskId: 'codiceFir',
@@ -323,7 +323,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
-			next: 'task' as const,
+			navigation: 'task' as const,
 			nextTaskFormBundle: next
 		}));
 		const session = new LivingSession({
@@ -338,17 +338,18 @@ describe('LivingSession', () => {
 			value: { client: 'NO' },
 			mint: { kind: 'none' }
 		});
-		expect(outcome?.next).toBe('task');
+		expect(outcome?.navigation).toBe('task');
 		expect(outcome?.nextTaskFormBundle).toEqual(next);
 		expect(session.linksStayActive).toBe(false);
 	});
 
-	test('commit with download links sets linksStayActive; clearLinksStay resets', async () => {
+	test('navigation stay sets linksStayActive; clearLinksStay resets', async () => {
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'T1',
 			worklist: emptyWorklist(),
-			next: 'overview' as const,
+			navigation: 'stay' as const,
+			continueNavigation: 'overview' as const,
 			nextTaskFormBundle: null,
 			links: [
 				{
@@ -365,12 +366,14 @@ describe('LivingSession', () => {
 			hydrate: false
 		});
 		session.result = structuredClone(sample);
-		await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/lots/lots-1/register',
 			jobInstanceId: 'T1',
 			value: { lotId: 'L1' },
 			mint: { kind: 'none' }
 		});
+		expect(outcome?.navigation).toBe('stay');
+		expect(outcome?.continueNavigation).toBe('overview');
 		expect(session.linksStayActive).toBe(true);
 		expect(session.lastHttpLinks).toHaveLength(1);
 		session.clearLinksStay();
@@ -378,12 +381,12 @@ describe('LivingSession', () => {
 		expect(session.lastHttpLinks).toEqual([]);
 	});
 
-	test('link-only commit sets linksStayActive; clearLinksStay drops strip state', async () => {
-		const commit = vi.fn(async () => ({
+	test('links alone do not invent stay; navigation stay + continueNavigation parks', async () => {
+		const withLinksOverview = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'L1',
 			worklist: emptyWorklist(),
-			next: 'overview' as const,
+			navigation: 'overview' as const,
 			nextTaskFormBundle: null,
 			links: [
 				{
@@ -396,7 +399,7 @@ describe('LivingSession', () => {
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
-			commit: { commit },
+			commit: { commit: withLinksOverview },
 			hydrate: false
 		});
 		session.result = structuredClone(sample);
@@ -406,13 +409,45 @@ describe('LivingSession', () => {
 			value: { ack: true },
 			mint: { kind: 'none' }
 		});
-		expect(session.linksStayActive).toBe(true);
+		expect(session.linksStayActive).toBe(false);
 		expect(session.lastHttpLinks).toHaveLength(1);
 		expect(session.lastHttpErrors).toEqual(['warn']);
-		session.clearLinksStay();
-		expect(session.lastHttpLinks).toEqual([]);
-		expect(session.lastHttpErrors).toEqual([]);
-		expect(session.linksStayActive).toBe(false);
+
+		const stayCommit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'L1',
+			worklist: emptyWorklist(),
+			navigation: 'stay' as const,
+			continueNavigation: 'overview' as const,
+			nextTaskFormBundle: null,
+			links: [
+				{
+					label: 'Digital Product Passport',
+					url: 'https://example.test/01/09506000134352',
+					action: 'link' as const
+				}
+			],
+			httpErrors: ['warn']
+		}));
+		const staySession = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit: stayCommit },
+			hydrate: false
+		});
+		staySession.result = structuredClone(sample);
+		const outcome = await staySession.commit({
+			taskPath: 'passport/lock',
+			jobInstanceId: 'L1',
+			value: { ack: true },
+			mint: { kind: 'none' }
+		});
+		expect(outcome?.navigation).toBe('stay');
+		expect(outcome?.continueNavigation).toBe('overview');
+		expect(staySession.linksStayActive).toBe(true);
+		staySession.clearLinksStay();
+		expect(staySession.lastHttpLinks).toEqual([]);
+		expect(staySession.lastHttpErrors).toEqual([]);
+		expect(staySession.linksStayActive).toBe(false);
 	});
 
 	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
@@ -444,7 +479,7 @@ describe('LivingSession', () => {
 		expect(session.result?.taskFormBundles).toBe(priorBundles);
 	});
 
-	test('closeGroup success replaces Worklist and returns next for advance', async () => {
+	test('closeGroup success replaces Worklist and returns navigation for advance', async () => {
 		const afterClose: Worklist = {
 			jobs: [
 				{
@@ -499,7 +534,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'T1',
 			worklist: afterClose,
-			next: 'task' as const,
+			navigation: 'task' as const,
 			nextTaskFormBundle: nextBundle
 		}));
 		const session = new LivingSession({
@@ -513,7 +548,7 @@ describe('LivingSession', () => {
 			jobInstanceId: 'T1',
 			groupId: 'lots'
 		});
-		expect(outcome?.next).toBe('task');
+		expect(outcome?.navigation).toBe('task');
 		expect(outcome?.nextTaskFormBundle?.taskId).toBe('weightCheck');
 		expect(session.result?.worklist).toEqual(afterClose);
 		expect(session.result?.worklist.jobs[0]?.instances[0]?.tasks.weightCheck).toBe(
@@ -656,7 +691,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: sample.worklist,
-			next: 'overview' as const,
+			navigation: 'overview' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
@@ -744,7 +779,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: sample.worklist,
-			next: 'overview' as const,
+			navigation: 'overview' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({

@@ -84,8 +84,7 @@ qr:
             onMany: "Più destinazioni possibili: apri il turno giusto dalla lista lavori"
             onIneligible: Bancale non pesabile (assente o già pesato)
 # Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
-# Active Config refresh after YAML edits: task seed:config (no Domain wipe).
-# Domain rebuild against Active Config: task seed:domain (or seed:data). Full rewrite: task seed -- --replace.
+# After YAML shape changes: task seed:feragame-core (empty Domain). Demo Jobs: task seed:feragame-full. Full rewrite: task seed -- --replace.
 passport:
     subject:
         entity: load
@@ -165,6 +164,8 @@ steps:
         substeps:
             - id: open
               roles: [administration]
+              onCommit:
+                  navigation: home
               readyWhen: >-
                 $count($domain.workingDay.*[status = "open"]) = 0
               schema:
@@ -208,6 +209,8 @@ steps:
             - id: close
               roles: [administration]
               unlockFrom: open
+              onCommit:
+                  advanceTarget: false
               readyWhen: >-
                 $lookup($domain.workingDay, $instance.id).status = "open"
                 and $count($domain.shift.*[workingDayId = $instance.id and status = "open"]) = 0
@@ -269,6 +272,8 @@ steps:
               substeps:
                 - id: register
                   roles: [administration]
+                  onCommit:
+                      navigation: stay
                   schema:
                     type: object
                     required: [client, numeroFir, palletCount, truckWeightAfter]
@@ -465,6 +470,8 @@ steps:
         substeps:
             - id: openTurno
               roles: [line]
+              onCommit:
+                  navigation: home
               # Multi: mint when no open/whole-day shift. Whole-day: bind once (no openTurno Submission yet for that shift id).
               readyWhen: >-
                 (
@@ -839,6 +846,8 @@ steps:
             - id: closeTurno
               roles: [line]
               unlockFrom: openTurno
+              onCommit:
+                  advanceTarget: false
               readyWhen: >-
                 $lookup($domain.shift, $instance.id).status = "open"
               schema:

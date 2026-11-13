@@ -556,9 +556,10 @@ func NormalizeGroupInstanceID(groupInstanceID string) string {
 }
 
 // NextAdvanceTaskRef picks the first projected flat actionable Task on
-// jobInstanceID (ADR-0006 auto-advance). Nested group leaves stay overview
-// while the group is open. Empty jobInstanceID never advances.
-func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string) (ActionableTaskRef, bool) {
+// jobInstanceID that allows advanceTarget (ADR-0006 auto-advance). Nested
+// group leaves stay overview while the group is open. Empty jobInstanceID
+// never advances.
+func NextAdvanceTaskRef(cfg OrgConfig, wl Worklist, jobID, jobInstanceID string) (ActionableTaskRef, bool) {
 	jobID = strings.TrimSpace(jobID)
 	jobInstanceID = strings.TrimSpace(jobInstanceID)
 	if jobID == "" || jobInstanceID == "" {
@@ -572,11 +573,20 @@ func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string) (ActionableTas
 	if !ok {
 		return ActionableTaskRef{}, false
 	}
+	var cfgTasks []TaskConfig
+	if jobVal, ok := cfg.Jobs.Get(jobID); ok {
+		if j, ok := AsJob(jobVal); ok {
+			cfgTasks = j.Tasks
+		}
+	}
 	for _, taskID := range job.TaskIDs {
 		if _, isGroup := inst.Groups[taskID]; isGroup {
 			continue
 		}
 		if inst.Tasks[taskID] != TaskStatusActionable {
+			continue
+		}
+		if leaf, ok := TaskByID(cfgTasks, taskID); ok && !taskAdvanceTarget(map[string]any(leaf)) {
 			continue
 		}
 		return ActionableTaskRef{

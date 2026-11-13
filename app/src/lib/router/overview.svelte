@@ -171,7 +171,7 @@
 		if (!outcome) return;
 		navigateLivingTarget(
 			resolvePostCommitNavigation(
-				outcome.next,
+				outcome.navigation === 'stay' ? 'home' : outcome.navigation,
 				jobId,
 				outcome.jobInstanceId,
 				outcome.nextTaskFormBundle

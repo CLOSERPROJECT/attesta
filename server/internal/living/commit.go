@@ -52,20 +52,23 @@ const (
 	CommitNextTask     CommitNext = "task"
 	CommitNextOverview CommitNext = "overview"
 	CommitNextHome     CommitNext = "home"
+	CommitNextStay     CommitNext = "stay"
 )
 
 // CommitResult is the SPA Commit response: viewer-scoped Worklist, explicit
-// next destination, and optional auto-advance Task form bundle when next is
-// task. Domain stays on the Go value for tests; omitted from JSON. Task mounts
-// use addressed GET /api/living/task-form.
+// navigation destination, and optional Task form bundle when advancing (or
+// Continue targeting) a Task. Domain stays on the Go value for tests; omitted
+// from JSON. Task mounts use addressed GET /api/living/task-form.
 type CommitResult struct {
 	Org           string   `json:"org"`
 	JobInstanceID string   `json:"jobInstanceId"`
 	Domain        Domain   `json:"-"`
 	Worklist      Worklist `json:"worklist"`
-	// Next is always set: task (auto-advance), overview (handoff), or home (finished).
-	Next CommitNext `json:"next"`
-	// NextTaskFormBundle is set only when Next is task; omitted otherwise.
+	// Navigation is always set: task, overview, home, or stay.
+	Navigation CommitNext `json:"navigation"`
+	// ContinueNavigation is set only when Navigation is stay (deferred Continue).
+	ContinueNavigation CommitNext `json:"continueNavigation,omitempty"`
+	// NextTaskFormBundle when Navigation or ContinueNavigation is task.
 	NextTaskFormBundle *TaskFormBundle `json:"nextTaskFormBundle,omitempty"`
 	Links              []HttpLinkItem  `json:"links,omitempty"`
 	HttpErrors         []string        `json:"httpErrors,omitempty"`
@@ -267,7 +270,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 
 	wl := ProjectWorklist(cfg, applied.Domain, op)
-	next, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
+	nav, continueNav, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
 	if err != nil {
 		return CommitResult{}, err
 	}
@@ -276,7 +279,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		JobInstanceID:      applied.JobInstanceID,
 		Domain:             applied.Domain,
 		Worklist:           wl,
-		Next:               next,
+		Navigation:         nav,
+		ContinueNavigation: continueNav,
 		NextTaskFormBundle: nextBundle,
 	}
 	if wantsPassport {
@@ -301,9 +305,42 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	return result, nil
 }
 
-// resolveCommitDestination evaluates ADR-0006: nested child while group open →
-// overview; else auto-advance → overview → home.
+// resolveCommitDestination evaluates authored onCommit.navigation first, then
+// the default nested/advance/overview/home law (ADR-0006 + advanceTarget).
 func resolveCommitDestination(
+	cfg OrgConfig,
+	domain Domain,
+	wl Worklist,
+	ref TaskPathRef,
+	jobInstanceID string,
+) (nav CommitNext, continueNav CommitNext, bundle *TaskFormBundle, err error) {
+	authored := commitNavAdvance
+	if jobVal, ok := cfg.Jobs.Get(ref.JobID); ok {
+		if job, ok := AsJob(jobVal); ok {
+			if leaf, ok := LeafTaskByPath(job.Tasks, ref); ok {
+				authored = taskCommitNavigation(map[string]any(leaf))
+			}
+		}
+	}
+	defaultNav, defaultBundle, err := resolveDefaultCommitDestination(cfg, domain, wl, ref, jobInstanceID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	switch authored {
+	case commitNavHome:
+		return CommitNextHome, "", nil, nil
+	case commitNavOverview:
+		return CommitNextOverview, "", nil, nil
+	case commitNavStay:
+		return CommitNextStay, defaultNav, defaultBundle, nil
+	default:
+		return defaultNav, "", defaultBundle, nil
+	}
+}
+
+// resolveDefaultCommitDestination: nested child while group open → overview;
+// else auto-advance (skipping !advanceTarget) → overview → home.
+func resolveDefaultCommitDestination(
 	cfg OrgConfig,
 	domain Domain,
 	wl Worklist,
@@ -314,7 +351,7 @@ func resolveCommitDestination(
 	if ref.Nested() && !IsGroupClosed(domain.ClosedGroups, jobID, jobInstanceID, ref.GroupID) {
 		return CommitNextOverview, nil, nil
 	}
-	if advance, ok := NextAdvanceTaskRef(wl, jobID, jobInstanceID); ok {
+	if advance, ok := NextAdvanceTaskRef(cfg, wl, jobID, jobInstanceID); ok {
 		b, err := BuildTaskFormBundle(cfg, domain, advance)
 		if err != nil {
 			return "", nil, err

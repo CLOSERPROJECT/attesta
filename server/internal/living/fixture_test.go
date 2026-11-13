@@ -136,6 +136,26 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if got := OrderedTaskIDs(wd.Tasks); strings.Join(got, ",") != strings.Join(wantWDTasks, ",") {
 		t.Fatalf("workingDay tasks = %v", got)
 	}
+	wdOpen, _ := TaskByID(wd.Tasks, "open")
+	if taskCommitNavigation(map[string]any(wdOpen)) != commitNavHome {
+		t.Fatalf("workingDay/open onCommit.navigation = %#v, want home", wdOpen["onCommit"])
+	}
+	wdClose, _ := TaskByID(wd.Tasks, "close")
+	if taskAdvanceTarget(map[string]any(wdClose)) {
+		t.Fatalf("workingDay/close advanceTarget = true, want false")
+	}
+	openTurno, _ := TaskByID(line.Tasks, "openTurno")
+	if taskCommitNavigation(map[string]any(openTurno)) != commitNavHome {
+		t.Fatalf("line/openTurno onCommit.navigation = %#v, want home", openTurno["onCommit"])
+	}
+	closeTurno, _ := TaskByID(line.Tasks, "closeTurno")
+	if taskAdvanceTarget(map[string]any(closeTurno)) {
+		t.Fatalf("line/closeTurno advanceTarget = true, want false")
+	}
+	register, _ := TaskByID(lots.ChildTasks(), "register")
+	if taskCommitNavigation(map[string]any(register)) != commitNavStay {
+		t.Fatalf("lots/register onCommit.navigation = %#v, want stay", register["onCommit"])
+	}
 	pw, ok := TaskByID(line.Tasks, "palletWeight")
 	if !ok || !pw.IsGroup() {
 		t.Fatalf("palletWeight group = %#v", pw)

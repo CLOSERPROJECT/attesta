@@ -162,8 +162,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	}
 	truckID := arrive.JobInstanceID
 	// Open group first leaf with downloads → stay/overview law; without FakeHttp links → overview.
-	if arrive.Next != CommitNextOverview && arrive.Next != CommitNextTask {
-		t.Fatalf("after arrive Next = %q", arrive.Next)
+	if arrive.Navigation != CommitNextOverview && arrive.Navigation != CommitNextTask {
+		t.Fatalf("after arrive Navigation = %q", arrive.Navigation)
 	}
 
 	lot, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
@@ -179,8 +179,11 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if loadID == "" {
 		t.Fatal("expected load")
 	}
-	if lot.Next != CommitNextOverview && lot.Next != CommitNextTask {
-		t.Fatalf("after lot Next = %q", lot.Next)
+	if lot.Navigation != CommitNextStay {
+		t.Fatalf("after lot Navigation = %q, want stay", lot.Navigation)
+	}
+	if lot.ContinueNavigation != CommitNextOverview {
+		t.Fatalf("after lot ContinueNavigation = %q, want overview", lot.ContinueNavigation)
 	}
 
 	closed, err := c.CloseGroup(t.Context(), "feragame", admin, CloseGroupRequest{
@@ -189,8 +192,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if closed.Next != CommitNextTask {
-		t.Fatalf("after close Next = %q, want task", closed.Next)
+	if closed.Navigation != CommitNextTask {
+		t.Fatalf("after close Navigation = %q, want task", closed.Navigation)
 	}
 	if closed.NextTaskFormBundle == nil || closed.NextTaskFormBundle.TaskID != "weightCheck" {
 		t.Fatalf("after close bundle = %s, want weightCheck", bundleAddress(closed.NextTaskFormBundle))
@@ -203,8 +206,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if done.Next != CommitNextHome && done.Next != CommitNextOverview {
-		t.Fatalf("finished Next = %q", done.Next)
+	if done.Navigation != CommitNextHome && done.Navigation != CommitNextOverview {
+		t.Fatalf("finished Navigation = %q", done.Navigation)
 	}
 
 	lineID := commitOpenTurno(t, c)
@@ -217,8 +220,8 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pw.Next != CommitNextOverview && pw.Next != CommitNextTask {
-		t.Fatalf("logistic Next = %q", pw.Next)
+	if pw.Navigation != CommitNextOverview && pw.Navigation != CommitNextTask {
+		t.Fatalf("logistic Navigation = %q", pw.Navigation)
 	}
 }
 

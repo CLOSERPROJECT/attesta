@@ -3,8 +3,9 @@ import * as m from '#lib/paraglide/messages.js';
 import {
 	CommitDomainError,
 	type CommitDomainPort,
-	type CommitNext,
+	type CommitNavigation,
 	type CommitResult,
+	type ContinueNavigation,
 	type HttpLinkItem
 } from './commit-port.js';
 import { parseHttpLinkItem } from './parse-http-link-item.js';
@@ -28,9 +29,16 @@ function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
 	return raw as TaskFormBundle;
 }
 
-function parseCommitNext(raw: unknown): CommitNext {
-	if (raw === 'task' || raw === 'overview' || raw === 'home') return raw;
+function parseCommitNavigation(raw: unknown): CommitNavigation {
+	if (raw === 'stay' || raw === 'task' || raw === 'overview' || raw === 'home') {
+		return raw;
+	}
 	return 'home';
+}
+
+function parseContinueNavigation(raw: unknown): ContinueNavigation | null {
+	if (raw === 'task' || raw === 'overview' || raw === 'home') return raw;
+	return null;
 }
 
 /** Normalize Commit JSON so SPA always sees arrays for links / httpErrors. */
@@ -51,10 +59,20 @@ export function parseCommitResult(raw: unknown): CommitResult {
 	const nextBundle = parseOptionalTaskFormBundle(
 		(raw as { nextTaskFormBundle?: unknown })?.nextTaskFormBundle
 	);
+	const navigation = parseCommitNavigation(
+		(raw as { navigation?: unknown })?.navigation
+	);
+	const continueNavigation =
+		navigation === 'stay'
+			? parseContinueNavigation(
+					(raw as { continueNavigation?: unknown })?.continueNavigation
+				)
+			: null;
 	return {
 		...body,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
-		next: parseCommitNext((raw as { next?: unknown })?.next),
+		navigation,
+		continueNavigation,
 		nextTaskFormBundle: nextBundle,
 		links,
 		httpErrors

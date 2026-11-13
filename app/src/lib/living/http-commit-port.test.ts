@@ -7,7 +7,7 @@ import { emptyWorklist } from './types.js';
 const sampleResult = {
 	org: 'feragame',
 	jobInstanceId: 'NIR-261019-NO-1',
-	next: 'task' as const,
+	navigation: 'task' as const,
 	worklist: {
 		jobs: [
 			{
@@ -87,7 +87,8 @@ describe('HttpCommitDomainPort', () => {
 		});
 		expect(got.org).toBe('feragame');
 		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
-		expect(got.next).toBe('task');
+		expect(got.navigation).toBe('task');
+		expect(got.continueNavigation).toBeNull();
 		expect(got.worklist).toEqual(sampleResult.worklist);
 		expect(got.nextTaskFormBundle).toEqual(sampleResult.nextTaskFormBundle);
 		expect(got.links).toEqual(sampleResult.links);
@@ -95,12 +96,12 @@ describe('HttpCommitDomainPort', () => {
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
 
-	test('normalizes missing links/httpErrors/worklist/next/bundle', async () => {
+	test('normalizes missing links/httpErrors/worklist/navigation/bundle', async () => {
 		const {
 			links: _l,
 			httpErrors: _e,
 			worklist: _w,
-			next: _next,
+			navigation: _nav,
 			nextTaskFormBundle: _n,
 			...withoutHttp
 		} = sampleResult;
@@ -121,8 +122,33 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.links).toEqual([]);
 		expect(got.httpErrors).toEqual([]);
 		expect(got.worklist).toEqual(emptyWorklist());
-		expect(got.next).toBe('home');
+		expect(got.navigation).toBe('home');
+		expect(got.continueNavigation).toBeNull();
 		expect(got.nextTaskFormBundle).toBeNull();
+	});
+
+	test('parses stay + continueNavigation from Commit wire', async () => {
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						...sampleResult,
+						navigation: 'stay',
+						continueNavigation: 'overview',
+						nextTaskFormBundle: null
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } }
+				)
+		);
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		const got = await port.commit({
+			taskPath: 'intake/lots/lots-1/register',
+			jobInstanceId: 'T1',
+			value: { lotId: 'L1' },
+			mint: { kind: 'none' }
+		});
+		expect(got.navigation).toBe('stay');
+		expect(got.continueNavigation).toBe('overview');
 	});
 
 	test('spawningNew mint posts nested taskPath with real jobInstanceId', async () => {
@@ -137,7 +163,7 @@ describe('HttpCommitDomainPort', () => {
 				JSON.stringify({
 					...sampleResult,
 					jobInstanceId: 'T1',
-					next: 'overview',
+					navigation: 'overview',
 					nextTaskFormBundle: null
 				}),
 				{ status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -150,7 +176,7 @@ describe('HttpCommitDomainPort', () => {
 			value: { lotId: 'L1' },
 			mint: { kind: 'spawningNew' }
 		});
-		expect(got.next).toBe('overview');
+		expect(got.navigation).toBe('overview');
 	});
 
 	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {

@@ -3,8 +3,8 @@ import { describe, expect, test } from 'vitest';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist } from './types.js';
 import {
-	commitHasLinks,
 	resolveCommitFollowUp,
+	resolveContinueNavigation,
 	resolveGroupStartAnotherTarget,
 	resolvePostCommitNavigation,
 	resolveTaskDeepLink,
@@ -214,50 +214,48 @@ describe('Task deep link + exit', () => {
 	});
 });
 
-describe('post-Commit stay-for-links', () => {
-	const downloadLinks = [
-		{
-			label: 'Labels',
-			url: 'https://example.test/labels.pdf',
-			action: 'download' as const,
-			filename: 'labels.pdf'
-		}
-	];
-
-	test('any non-empty links are detected', () => {
-		expect(commitHasLinks(downloadLinks)).toBe(true);
-		expect(
-			commitHasLinks([
-				{ label: 'Open', url: 'https://example.test/x', action: 'link' }
-			])
-		).toBe(true);
-		expect(commitHasLinks([])).toBe(false);
-		expect(commitHasLinks(null)).toBe(false);
-	});
-
-	test('with any links → stay; empty → existing next law', () => {
-		expect(
-			resolveCommitFollowUp('overview', 'intake', 'T1', null, downloadLinks)
-		).toEqual({ kind: 'stay' });
-		expect(resolveCommitFollowUp('overview', 'intake', 'T1', null, [])).toEqual({
+describe('post-Commit stay from server navigation', () => {
+	test('navigation stay parks; other destinations follow ADR law', () => {
+		expect(resolveCommitFollowUp('stay', 'intake', 'T1', null)).toEqual({
+			kind: 'stay'
+		});
+		expect(resolveCommitFollowUp('overview', 'intake', 'T1', null)).toEqual({
 			kind: 'overview',
 			jobId: 'intake',
 			jobInstanceId: 'T1'
 		});
 		expect(
-			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle, [
-				{ label: 'doc', url: 'https://example.test/d', action: 'link' }
-			])
-		).toEqual({ kind: 'stay' });
+			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle)
+		).toEqual({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-advance',
+			taskId: 'codiceFir'
+		});
+		expect(resolveCommitFollowUp('home', 'passport', 'L1', null)).toEqual({
+			kind: 'home'
+		});
+	});
+
+	test('Continue uses continueNavigation only', () => {
 		expect(
-			resolveCommitFollowUp('overview', 'passport', 'L1', null, [
-				{
-					label: 'Digital Product Passport',
-					url: 'https://example.test/dpp',
-					action: 'link'
-				}
-			])
-		).toEqual({ kind: 'stay' });
+			resolveContinueNavigation('overview', 'intake', 'T1', null)
+		).toEqual({
+			kind: 'overview',
+			jobId: 'intake',
+			jobInstanceId: 'T1'
+		});
+		expect(
+			resolveContinueNavigation('task', 'intake', 'NIR-advance', nextBundle)
+		).toEqual({
+			kind: 'task',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-advance',
+			taskId: 'codiceFir'
+		});
+		expect(resolveContinueNavigation(null, 'intake', 'T1', null)).toEqual({
+			kind: 'home'
+		});
 	});
 
 	test('Start another targets provisional first-leaf form', () => {

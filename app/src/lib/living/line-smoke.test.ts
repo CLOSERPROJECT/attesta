@@ -199,7 +199,7 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 				worklist = worklistFor(domain, true);
 				const lineInst = worklistJobFor(worklist, 'line')?.instances[0];
 				let nextTaskFormBundle = null;
-				let next: 'task' | 'overview' | 'home' = 'home';
+				let navigation: 'task' | 'overview' | 'home' = 'home';
 				if (lineInst) {
 					for (const taskId of lineTaskIds) {
 						if (lineInst.tasks[taskId] !== 'actionable') continue;
@@ -217,21 +217,21 @@ describe('line Commit smoke (session + Worklist + group register)', () => {
 							sealFieldIds: [],
 							bindings: { domain: {} }
 						};
-						next = 'task';
+						navigation = 'task';
 						break;
 					}
-					if (next !== 'task') {
+					if (navigation !== 'task') {
 						const hasRemaining = lineTaskIds.some(
 							(tid) => lineInst.tasks[tid] !== 'done'
 						);
-						next = hasRemaining ? 'overview' : 'home';
+						navigation = hasRemaining ? 'overview' : 'home';
 					}
 				}
 				return {
 					org: 'feragame',
 					jobInstanceId: req.jobInstanceId,
 					worklist,
-					next,
+					navigation,
 					nextTaskFormBundle
 				};
 			}

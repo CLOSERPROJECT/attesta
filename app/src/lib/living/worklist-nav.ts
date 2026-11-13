@@ -1,4 +1,4 @@
-import type { CommitNext, HttpLinkItem } from './commit-port.js';
+import type { CommitNavigation, ContinueNavigation } from './commit-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist, WorklistInstance, WorklistJob } from './types.js';
 import {
@@ -21,30 +21,37 @@ export type PostCommitTarget =
 	| { kind: 'overview'; jobId: string; jobInstanceId: string }
 	| { kind: 'home' };
 
-/** Commit follow-up: stay when links present, else ADR-0006 target. */
+/** Commit follow-up: stay only when server `navigation` is stay. */
 export type CommitFollowUp = { kind: 'stay' } | PostCommitTarget;
 
-/** True when Commit returned at least one HttpLink (link and/or download). */
-export function commitHasLinks(
-	links: readonly HttpLinkItem[] | null | undefined
-): boolean {
-	return (links ?? []).length > 0;
-}
-
 /**
- * Post-Commit SPA decision: stay on read-only form when any links are present;
- * otherwise thin-adapt server `next` (ADR-0006 Task groups amend).
+ * Post-Commit SPA decision from server `navigation` only (ADR-0006).
+ * Stay is never inferred from HTTP links.
  */
 export function resolveCommitFollowUp(
-	next: CommitNext,
+	navigation: CommitNavigation,
 	jobId: string,
 	jobInstanceId: string,
-	nextTaskFormBundle: TaskFormBundle | null | undefined,
-	links: readonly HttpLinkItem[] | null | undefined
+	nextTaskFormBundle: TaskFormBundle | null | undefined
 ): CommitFollowUp {
-	if (commitHasLinks(links)) return { kind: 'stay' };
+	if (navigation === 'stay') return { kind: 'stay' };
 	return resolvePostCommitNavigation(
-		next,
+		navigation,
+		jobId,
+		jobInstanceId,
+		nextTaskFormBundle
+	);
+}
+
+/** Continue after stay: server `continueNavigation` only (never re-derive). */
+export function resolveContinueNavigation(
+	continueNavigation: ContinueNavigation | null | undefined,
+	jobId: string,
+	jobInstanceId: string,
+	nextTaskFormBundle: TaskFormBundle | null | undefined
+): PostCommitTarget {
+	return resolvePostCommitNavigation(
+		continueNavigation ?? 'home',
 		jobId,
 		jobInstanceId,
 		nextTaskFormBundle
@@ -105,16 +112,17 @@ export function resolveUnmountableTaskTarget(
 }
 
 /**
- * Thin adapter over Commit `next` (ADR-0006). Does not re-walk Worklist —
- * destination is server-evaluated.
+ * Thin adapter over Commit `navigation` / Continue (ADR-0006). Does not
+ * re-walk Worklist — destination is server-evaluated. Callers must not pass
+ * `stay` (use resolveCommitFollowUp / resolveContinueNavigation).
  */
 export function resolvePostCommitNavigation(
-	next: CommitNext,
+	navigation: Exclude<CommitNavigation, 'stay'> | ContinueNavigation,
 	jobId: string,
 	jobInstanceId: string,
 	nextTaskFormBundle: TaskFormBundle | null | undefined
 ): PostCommitTarget {
-	if (next === 'task') {
+	if (navigation === 'task') {
 		const bundle = nextTaskFormBundle;
 		if (
 			bundle &&
@@ -144,7 +152,7 @@ export function resolvePostCommitNavigation(
 		}
 		return { kind: 'home' };
 	}
-	if (next === 'overview' && jobId && jobInstanceId) {
+	if (navigation === 'overview' && jobId && jobInstanceId) {
 		return { kind: 'overview', jobId, jobInstanceId };
 	}
 	return { kind: 'home' };

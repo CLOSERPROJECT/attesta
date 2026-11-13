@@ -102,8 +102,8 @@ func TestCommitNestedSpawnSubmitCloseNext(t *testing.T) {
 	if truckID != "T1" {
 		t.Fatalf("truck id = %q", truckID)
 	}
-	if arrive.Next != CommitNextOverview {
-		t.Fatalf("after arrive next = %q, want overview (open lots)", arrive.Next)
+	if arrive.Navigation != CommitNextOverview {
+		t.Fatalf("after arrive navigation = %q, want overview (open lots)", arrive.Navigation)
 	}
 
 	intake, ok := worklistJobByID(arrive.Worklist, "intake")
@@ -139,8 +139,8 @@ func TestCommitNestedSpawnSubmitCloseNext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spawned.Next != CommitNextOverview {
-		t.Fatalf("spawn Commit next = %q, want overview while group open", spawned.Next)
+	if spawned.Navigation != CommitNextOverview {
+		t.Fatalf("spawn Commit navigation = %q, want overview while group open", spawned.Navigation)
 	}
 	if spawned.NextTaskFormBundle != nil {
 		t.Fatal("spawn Commit must omit nextTaskFormBundle")
@@ -171,8 +171,8 @@ func TestCommitNestedSpawnSubmitCloseNext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if closed.Next != CommitNextTask {
-		t.Fatalf("after close next = %q, want task (weightCheck)", closed.Next)
+	if closed.Navigation != CommitNextTask {
+		t.Fatalf("after close navigation = %q, want task (weightCheck)", closed.Navigation)
 	}
 	if closed.NextTaskFormBundle == nil || closed.NextTaskFormBundle.TaskID != "weightCheck" {
 		t.Fatalf("after close nextTaskFormBundle = %#v", closed.NextTaskFormBundle)
@@ -217,8 +217,8 @@ func TestDomainSpawnGroupInstanceThenCommitLeaf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if committed.Next != CommitNextOverview {
-		t.Fatalf("nested leaf Commit next = %q, want overview", committed.Next)
+	if committed.Navigation != CommitNextOverview {
+		t.Fatalf("nested leaf Commit navigation = %q, want overview", committed.Navigation)
 	}
 	sub := committed.Domain.Submissions[len(committed.Domain.Submissions)-1]
 	if sub.GroupInstanceID != "lots-1" {
@@ -291,8 +291,8 @@ func TestCloseHTTPAndNestedTaskForm(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if wire["next"] != string(CommitNextTask) {
-		t.Fatalf("close JSON next = %#v", wire["next"])
+	if wire["navigation"] != string(CommitNextTask) {
+		t.Fatalf("close JSON navigation = %#v", wire["navigation"])
 	}
 	if _, ok := wire["nextTaskFormBundle"].(map[string]any); !ok {
 		t.Fatalf("close JSON missing nextTaskFormBundle: %s", rec.Body.String())

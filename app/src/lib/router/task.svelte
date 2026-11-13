@@ -11,6 +11,7 @@
 	import { openGroupLoopChrome } from '../living/worklist-overview.js';
 	import {
 		resolveCommitFollowUp,
+		resolveContinueNavigation,
 		resolveGroupStartAnotherTarget,
 		resolvePostCommitNavigation,
 		resolveTaskDeepLink,
@@ -43,7 +44,7 @@
 	let error = $state.raw<string | null>(null);
 	let loadGen = 0;
 	let redirected = $state(false);
-	/** Held while stay-for-links so Continue / Close can apply server `next`. */
+	/** Held while stay so Continue / Close can apply server continueNavigation / navigation. */
 	let stayedOutcome = $state.raw<CommitOutcome | null>(null);
 	/** Route key that owns the active stay; null during Commit→onCommitted race. */
 	let stayRouteKey = $state.raw<string | null>(null);
@@ -60,10 +61,10 @@
 			: null
 	);
 
-	function advanceFromOutcome(outcome: CommitOutcome) {
+	function advanceFromClose(outcome: CommitOutcome) {
 		navigateLivingTarget(
 			resolvePostCommitNavigation(
-				outcome.next,
+				outcome.navigation === 'stay' ? 'home' : outcome.navigation,
 				jobId,
 				outcome.jobInstanceId,
 				outcome.nextTaskFormBundle
@@ -80,11 +81,10 @@
 
 	function onCommitted(outcome: CommitOutcome) {
 		const followUp = resolveCommitFollowUp(
-			outcome.next,
+			outcome.navigation,
 			jobId,
 			outcome.jobInstanceId,
-			outcome.nextTaskFormBundle,
-			living.lastHttpLinks
+			outcome.nextTaskFormBundle
 		);
 		if (followUp.kind === 'stay') {
 			stayedOutcome = outcome;
@@ -103,7 +103,14 @@
 		const outcome = stayedOutcome;
 		if (!outcome) return;
 		endLinksStay();
-		advanceFromOutcome(outcome);
+		navigateLivingTarget(
+			resolveContinueNavigation(
+				outcome.continueNavigation,
+				jobId,
+				outcome.jobInstanceId,
+				outcome.nextTaskFormBundle
+			)
+		);
 	}
 
 	function onStartAnother() {
@@ -138,7 +145,7 @@
 		});
 		if (!outcome) return;
 		endLinksStay();
-		advanceFromOutcome(outcome);
+		advanceFromClose(outcome);
 	}
 
 	$effect(() => {

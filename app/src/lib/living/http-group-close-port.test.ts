@@ -7,7 +7,7 @@ import { emptyWorklist } from './types.js';
 const closedBoard = {
 	org: 'grouporg',
 	jobInstanceId: 'T1',
-	next: 'task' as const,
+	navigation: 'task' as const,
 	worklist: {
 		jobs: [
 			{
@@ -74,7 +74,7 @@ describe('HttpGroupClosePort', () => {
 			jobInstanceId: 'T1',
 			groupId: 'lots'
 		});
-		expect(got.next).toBe('task');
+		expect(got.navigation).toBe('task');
 		expect(got.nextTaskFormBundle?.taskId).toBe('weightCheck');
 		expect(got.worklist.jobs[0]?.instances[0]?.tasks.weightCheck).toBe('actionable');
 		expect(fetchFn).toHaveBeenCalledOnce();
@@ -88,7 +88,7 @@ describe('HttpGroupClosePort', () => {
 		).rejects.toBeInstanceOf(CommitDomainError);
 	});
 
-	test('normalizes missing worklist/next on close', async () => {
+	test('normalizes missing worklist/navigation on close', async () => {
 		const fetchFn = vi.fn(
 			async () =>
 				new Response(JSON.stringify({ org: 'grouporg', jobInstanceId: 'T1' }), {
@@ -104,7 +104,7 @@ describe('HttpGroupClosePort', () => {
 		});
 		expect(got.org).toBe('grouporg');
 		expect(got.jobInstanceId).toBe('T1');
-		expect(got.next).toBe('home');
+		expect(got.navigation).toBe('home');
 		expect(got.worklist).toEqual(emptyWorklist());
 		expect(got.nextTaskFormBundle).toBeNull();
 		expect(got.links).toEqual([]);
