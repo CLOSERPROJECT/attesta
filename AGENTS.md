@@ -46,6 +46,11 @@
   business rules (entity shapes, transforms, `readyWhen`, open/close laws) live
   in Config, not as Feragame- or domain-named branches in executors. See
   [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**).
+- When `server/internal/living/fixtures/feragame-config.yaml` (plant Org
+  Config) changes, update in the same change: seed (`seed.go` /
+  `demo_commits.go`), `server/internal/living` tests, `server/cmd/server`
+  Living HTTP tests, and SPA importers under `app/src/lib/living` that use
+  `$living-fixtures`. Plant law stays in Config `readyWhen`/transforms only.
 - Progress keys containing dots are encoded for Mongo storage (`.` becomes
   `_`) and normalized on reads. Preserve that boundary when changing progress
   persistence.
