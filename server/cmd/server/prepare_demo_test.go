@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
 
 func TestPrepareDemoStackPublicEntrySeedDisabled(t *testing.T) {
@@ -634,7 +636,7 @@ func TestRunSeedSessionStandaloneAppliesRuntimeEnvFile(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
-	_ = runSeedSession(ctx, nil, false, nil)
+	_ = runSeedSession(ctx, nil, false, living.SeedScopeBoth, nil)
 	if got := os.Getenv("APPWRITE_API_KEY"); got != "from-file" {
 		t.Fatalf("APPWRITE_API_KEY=%q after standalone seed, want from-file", got)
 	}
@@ -658,7 +660,7 @@ func TestRunSeedSessionWithCredsSkipsRuntimeEnvFile(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
-	_ = runSeedSession(ctx, nil, false, creds)
+	_ = runSeedSession(ctx, nil, false, living.SeedScopeBoth, creds)
 	if got := os.Getenv("APPWRITE_API_KEY"); got != "stale" {
 		t.Fatalf("APPWRITE_API_KEY=%q after prepare-path seed, want stale (file not applied)", got)
 	}

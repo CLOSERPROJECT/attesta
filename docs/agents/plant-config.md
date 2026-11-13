@@ -35,8 +35,10 @@ Checklist when changing the Feragame plant fixture
    `$living-fixtures` or hardcode plant task ids / schemas.
 7. **Verify** — `go test ./internal/living/`, `go test ./cmd/server/ -run Living`,
    and `bun run test:unit -- --run src/lib/living` from `app/`.
-8. **Local stacks** — Active Config + Domain need
-   `task seed -- --replace` (human-gated wipe) after fixture shape changes.
+8. **Local stacks** — after fixture shape changes, refresh Active Config with
+   `task seed:config` (no Domain wipe). Rebuild staged Domain with
+   `task seed:domain` (or `task seed:data`) against Active Config. Full rewrite
+   remains `task seed -- --replace` (identity + catalog + config + Domain).
 
 ## Done when
 

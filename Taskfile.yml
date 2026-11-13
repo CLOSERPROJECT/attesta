@@ -289,7 +289,7 @@ tasks:
           '
 
   seed:
-    desc: Apply integrated demo fixture (identity + taxonomy + catalog + instances). Empty-only by default; pass --replace to rewrite.
+    desc: Apply integrated demo fixture (identity + taxonomy + catalog + living). Empty-only by default; --replace rewrites. Living scopes - --config-only / --domain-only (--data-only). See seed --help.
     cmds:
       - |
           bash -c '
@@ -298,3 +298,24 @@ tasks:
           cd server
           go run ./cmd/server seed {{.CLI_ARGS}}
           '
+
+  seed:config:
+    desc: Seed Feragame Active Config only (no Domain wipe/stage).
+    cmds:
+      - task: seed
+        vars:
+          CLI_ARGS: "--config-only {{.CLI_ARGS}}"
+
+  seed:domain:
+    desc: Wipe and rebuild staged Domain against Active Config (+ passports). Fails if Active Config is missing. Alias task seed:data.
+    cmds:
+      - task: seed
+        vars:
+          CLI_ARGS: "--domain-only {{.CLI_ARGS}}"
+
+  seed:data:
+    desc: Alias for seed:domain.
+    cmds:
+      - task: seed:domain
+        vars:
+          CLI_ARGS: "{{.CLI_ARGS}}"

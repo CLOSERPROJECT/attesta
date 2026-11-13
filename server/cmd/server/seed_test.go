@@ -295,6 +295,116 @@ func TestSeedReplaceFromArgs(t *testing.T) {
 	}
 }
 
+func TestSeedLivingScopeFromArgs(t *testing.T) {
+	scope, err := seedLivingScopeFromArgs(nil)
+	if err != nil || scope != living.SeedScopeBoth {
+		t.Fatalf("default = %v %v, want Both", scope, err)
+	}
+	scope, err = seedLivingScopeFromArgs([]string{"--config-only"})
+	if err != nil || scope != living.SeedScopeConfig {
+		t.Fatalf("config-only = %v %v", scope, err)
+	}
+	scope, err = seedLivingScopeFromArgs([]string{"--domain-only"})
+	if err != nil || scope != living.SeedScopeDomain {
+		t.Fatalf("domain-only = %v %v", scope, err)
+	}
+	scope, err = seedLivingScopeFromArgs([]string{"--data-only"})
+	if err != nil || scope != living.SeedScopeDomain {
+		t.Fatalf("data-only = %v %v", scope, err)
+	}
+	if _, err := seedLivingScopeFromArgs([]string{"--config-only", "--domain-only"}); err == nil {
+		t.Fatal("expected mutual exclusion error")
+	}
+}
+
+func TestSeedConfigOnlySkipsIdentityAndLeavesDomain(t *testing.T) {
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"load": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		LivingDomains: domains,
+		LivingConfigs: configs,
+		LivingScope:   living.SeedScopeConfig,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("load")["L1"] == nil || len(got.Submissions) != 1 {
+		t.Fatalf("config-only wiped Domain: %#v", got)
+	}
+}
+
+func TestSeedDomainOnlyRequiresActiveConfig(t *testing.T) {
+	err := Seed(t.Context(), SeedDeps{
+		LivingDomains: living.NewMemoryDomainStore(),
+		LivingConfigs: living.NewMemoryConfigStore(),
+		LivingScope:   living.SeedScopeDomain,
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "Active Config required") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestSeedDomainOnlyRebuildsWithoutRewritingConfig(t *testing.T) {
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	if _, err := living.SeedFixtureConfigStore(configs); err != nil {
+		t.Fatal(err)
+	}
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"load": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeDomain,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.Kind("load")["L1"]; ok {
+		t.Fatal("pre-wipe L1 must not survive")
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; !ok {
+		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+}
+
 func TestAppwriteIdentityFromEnvRequiresEnv(t *testing.T) {
 	t.Setenv("APPWRITE_ENDPOINT", "")
 	t.Setenv("APPWRITE_PROJECT_ID", "")

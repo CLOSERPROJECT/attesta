@@ -84,7 +84,8 @@ qr:
             onMany: "Più destinazioni possibili: apri il turno giusto dalla lista lavori"
             onIneligible: Bancale non pesabile (assente o già pesato)
 # Living Passport scheme (one shape per Config version). Lock leaf opts in via onSubmit.passport.
-# Active Config refresh after YAML edits needs: task seed -- --replace (human-gated wipe).
+# Active Config refresh after YAML edits: task seed:config (no Domain wipe).
+# Domain rebuild against Active Config: task seed:domain (or seed:data). Full rewrite: task seed -- --replace.
 passport:
     subject:
         entity: load

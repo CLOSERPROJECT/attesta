@@ -107,25 +107,33 @@ func withSeedSession(
 
 // creds nil → ambient identity (standalone seed applies the runtime env file);
 // non-nil → prepare→seed by value (skip file apply; main is the Server restart adapter).
-func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
+// Living-only scopes (--config-only / --domain-only) still open Mongo for living
+// stores; identity open is skipped so Ambient Appwrite is not required.
+func runSeedSession(ctx context.Context, args []string, replace bool, livingScope living.SeedScope, creds *appwriteRuntimeCredentials) error {
 	if creds == nil {
 		if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
 			return err
 		}
 	}
-	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
-		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
-		if creds == nil {
-			return appwriteIdentityFromEnv(opts)
+	livingOnly := livingScope == living.SeedScopeConfig || livingScope == living.SeedScopeDomain
+	var openIdentity func() (IdentityStore, error)
+	if !livingOnly {
+		openIdentity = func() (IdentityStore, error) {
+			opts := appwriteIdentityFromEnvOptions{RequireAll: true}
+			if creds == nil {
+				return appwriteIdentityFromEnv(opts)
+			}
+			return appwriteIdentityFromCredentials(*creds, opts)
 		}
-		return appwriteIdentityFromCredentials(*creds, opts)
-	}, func(sess seedSession) error {
+	}
+	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, openIdentity, func(sess seedSession) error {
 		deps := SeedDeps{
 			Identity:       sess.Identity,
 			Store:          sess.Store,
 			ConfigDir:      sess.ConfigDir,
 			CategoriesPath: sess.CategoriesPath,
 			Replace:        replace,
+			LivingScope:    livingScope,
 		}
 		// Mongo CLI seed must rewrite Active Org Config (e.g. tasks array shape).
 		if ms, ok := sess.Store.(*MongoStore); ok && ms != nil && ms.db != nil {
@@ -136,10 +144,17 @@ func runSeedSession(ctx context.Context, args []string, replace bool, creds *app
 		if err := Seed(ctx, deps); err != nil {
 			return err
 		}
-		if replace {
-			log.Printf("seed: replaced demo fixture")
-		} else {
-			log.Printf("seed: demo fixture ready (empty-only)")
+		switch livingScope {
+		case living.SeedScopeConfig:
+			log.Printf("seed: living Active Config ready (config-only)")
+		case living.SeedScopeDomain:
+			log.Printf("seed: living Domain rebuilt (domain-only)")
+		default:
+			if replace {
+				log.Printf("seed: replaced demo fixture")
+			} else {
+				log.Printf("seed: demo fixture ready (empty-only)")
+			}
 		}
 		return nil
 	})

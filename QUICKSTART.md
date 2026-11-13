@@ -57,8 +57,9 @@ Only `task seed` / `attesta seed` seeds living Domain + Active Config (and ident
 
 - Identity: `attesta seed` creates org `feragame`, all-roles `living@attesta.com` / `living@attesta.com`, plus single-role `administration@attesta.com`, `logistic@attesta.com`, and `line@attesta.com` (password = email) so each login’s Worklist home differs. Existing stacks need `task seed -- --replace` once to pick this up.
 - Domain + Active Config fixture: the same seed puts the feragame-config Org Config as Active and, when Domain is missing or empty (no JobInstances / Submissions) or `--replace` is used, rebuilds a staged Domain (intake after register / after codiceFir / weightCheck-ready, plus line after shift). There is no harness `/api/runs` snapshot PUT.
-- If the seed marker org already exists and Feragame Domain is still empty (pre-staging seed), run `task seed -- --replace` (or any wipe re-seed) once to pick up the staged matrix and new users — empty-only seed is a no-op while the marker is set.
-- In-memory Domain clears on server restart; re-run `task seed` (or `task seed -- --replace`) after a Memory-backed restart if you need the demo fixture again.
+- Living scopes (skip identity/taxonomy/catalog): `task seed:config` / `attesta seed --config-only` refreshes Active Config without touching Domain; `task seed:domain` (alias `seed:data`) / `--domain-only` / `--data-only` wipes Domain (+ passports) and rebuilds against existing Active Config (fails clearly if Active Config is missing). Default seed still does both. See `attesta seed --help`.
+- If the seed marker org already exists and Feragame Domain is still empty (pre-staging seed), run `task seed -- --replace` (or `task seed:domain`) once to pick up the staged matrix and new users — empty-only seed is a no-op while the marker is set.
+- In-memory Domain clears on server restart; re-run `task seed` (or `task seed:domain` / `task seed -- --replace`) after a Memory-backed restart if you need the demo fixture again.
 
 ## Migration Notes
 - Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.

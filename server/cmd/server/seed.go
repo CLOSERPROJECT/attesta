@@ -46,6 +46,10 @@ type SeedDeps struct {
 	LivingDomains   living.DomainStore
 	LivingConfigs   living.ConfigStore
 	LivingPassports living.PassportStore
+	// LivingScope selects living config-only / domain-only / both (default).
+	// Config or Domain scope skips identity+taxonomy+catalog and always runs
+	// living SeedDemo (bypasses the empty-only marker).
+	LivingScope living.SeedScope
 	// Nil picks a time-based source in Seed.
 	RNG     catalogStreamRNG
 	Fixture *demoFixture
@@ -55,19 +59,24 @@ type SeedDeps struct {
 // Empty-only (default): if the marker org already exists, returns nil without writing.
 // Pass Replace to rewrite.
 //
-// Apply order is intentional: identity → taxonomy → catalog streams → instances.
+// Apply order is intentional: identity → taxonomy → catalog streams → instances → living.
+// LivingScope Config/Domain skips identity+catalog and only runs living SeedDemo.
 //
 // Seed does not create the Appwrite project or API key (use prepare for that) and
 // does not read ATTESTA_SEED (hosts gate via PrepareDemoStack / ADR-0004).
 func Seed(ctx context.Context, deps SeedDeps) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if deps.LivingScope == living.SeedScopeConfig || deps.LivingScope == living.SeedScopeDomain {
+		return seedLivingOnly(ctx, deps)
+	}
+
 	if deps.Identity == nil {
 		return fmt.Errorf("seed: identity is required")
 	}
 	if deps.Store == nil {
 		return fmt.Errorf("seed: store is required")
-	}
-	if err := ctx.Err(); err != nil {
-		return err
 	}
 
 	if !deps.Replace {
@@ -116,13 +125,36 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 		return fmt.Errorf("seed: instances: %w", err)
 	}
 
-	if deps.LivingConfigs != nil {
-		if _, err := living.SeedDemo(ctx, deps.LivingDomains, deps.LivingConfigs, living.SeedOptions{
-			WipeDomain: deps.Replace,
-			Passports:  deps.LivingPassports,
-		}); err != nil {
-			return fmt.Errorf("seed: living: %w", err)
-		}
+	return applyLivingSeed(ctx, deps)
+}
+
+func seedLivingOnly(ctx context.Context, deps SeedDeps) error {
+	if deps.LivingConfigs == nil {
+		return fmt.Errorf("seed: living config store required for --config-only/--domain-only")
+	}
+	if deps.LivingScope == living.SeedScopeDomain && deps.LivingDomains == nil {
+		return fmt.Errorf("seed: living domain store required for --domain-only")
+	}
+	return applyLivingSeed(ctx, deps)
+}
+
+func applyLivingSeed(ctx context.Context, deps SeedDeps) error {
+	if deps.LivingConfigs == nil {
+		return nil
+	}
+	opts := living.SeedOptions{
+		WipeDomain: deps.Replace,
+		Passports:  deps.LivingPassports,
+		Scope:      deps.LivingScope,
+	}
+	if deps.LivingScope == living.SeedScopeConfig {
+		opts.WipeDomain = false
+	}
+	if deps.LivingScope == living.SeedScopeDomain {
+		opts.WipeDomain = true
+	}
+	if _, err := living.SeedDemo(ctx, deps.LivingDomains, deps.LivingConfigs, opts); err != nil {
+		return fmt.Errorf("seed: living: %w", err)
 	}
 	return nil
 }
