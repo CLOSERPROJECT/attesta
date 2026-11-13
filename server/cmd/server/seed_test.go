@@ -300,39 +300,83 @@ func TestSeedLivingScopeFromArgs(t *testing.T) {
 	if err != nil || scope != living.SeedScopeBoth {
 		t.Fatalf("default = %v %v, want Both", scope, err)
 	}
-	scope, err = seedLivingScopeFromArgs([]string{"--config-only"})
-	if err != nil || scope != living.SeedScopeConfig {
-		t.Fatalf("config-only = %v %v", scope, err)
+	scope, err = seedLivingScopeFromArgs([]string{"--feragame-core"})
+	if err != nil || scope != living.SeedScopeFeragameCore {
+		t.Fatalf("feragame-core = %v %v", scope, err)
 	}
-	scope, err = seedLivingScopeFromArgs([]string{"--domain-only"})
-	if err != nil || scope != living.SeedScopeDomain {
-		t.Fatalf("domain-only = %v %v", scope, err)
+	scope, err = seedLivingScopeFromArgs([]string{"--feragame-full"})
+	if err != nil || scope != living.SeedScopeFeragameFull {
+		t.Fatalf("feragame-full = %v %v", scope, err)
 	}
-	scope, err = seedLivingScopeFromArgs([]string{"--data-only"})
-	if err != nil || scope != living.SeedScopeDomain {
-		t.Fatalf("data-only = %v %v", scope, err)
-	}
-	if _, err := seedLivingScopeFromArgs([]string{"--config-only", "--domain-only"}); err == nil {
+	if _, err := seedLivingScopeFromArgs([]string{"--feragame-core", "--feragame-full"}); err == nil {
 		t.Fatal("expected mutual exclusion error")
 	}
 }
 
-func TestSeedConfigOnlySkipsIdentityAndLeavesDomain(t *testing.T) {
+func TestSeedFeragameCoreHardResetsIdentityWipesDomainSkipsFormata(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
+
+	store := NewMemoryStore()
+	identity := newSeedFakeIdentity()
+	// Marker org present — full-stack empty-only would no-op; Feragame core must still run.
+	identity.orgs[demoFixtureMarkerOrgSlug] = IdentityOrg{
+		ID: demoFixtureMarkerOrgSlug, Slug: demoFixtureMarkerOrgSlug, Name: "Organization 1",
+	}
 	domains := living.NewMemoryDomainStore()
 	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
 	marker := living.EmptyDomain()
 	marker.Entities = map[string]living.EntityMap{"load": {"L1": {"client": "NO"}}}
 	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
 	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
 		t.Fatal(err)
 	}
+	if err := passports.Create(t.Context(), living.PassportRecord{
+		Org: "feragame", SubjectID: living.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted := false
+	identity.deleteOrgFn = func(_ context.Context, orgSlug string) error {
+		if orgSlug == demoLivingOrgSlug {
+			deleted = true
+		}
+		if orgSlug == demoFixtureMarkerOrgSlug {
+			t.Fatal("feragame-core must not delete organization-1")
+		}
+		delete(identity.orgs, orgSlug)
+		delete(identity.memberships, orgSlug)
+		return nil
+	}
 
 	if err := Seed(t.Context(), SeedDeps{
-		LivingDomains: domains,
-		LivingConfigs: configs,
-		LivingScope:   living.SeedScopeConfig,
+		Identity:        identity,
+		Store:           store,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameCore,
 	}); err != nil {
 		t.Fatalf("Seed: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected Feragame org hard delete")
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug); err != nil {
+		t.Fatalf("feragame org missing: %v", err)
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), "organization-2"); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("orgs 1–3 must not be created: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 0 {
+		t.Fatalf("Formata taxonomy must be skipped: %d categories", len(cats))
 	}
 	version, err := configs.ActiveVersion(t.Context(), "feragame")
 	if err != nil {
@@ -345,32 +389,36 @@ func TestSeedConfigOnlySkipsIdentityAndLeavesDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Kind("load")["L1"] == nil || len(got.Submissions) != 1 {
-		t.Fatalf("config-only wiped Domain: %#v", got)
+	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 || got.Kind("load")["L1"] != nil {
+		t.Fatalf("feragame-core Domain not empty: %#v", got)
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; ok {
+		t.Fatal("feragame-core must not stage Domain")
+	}
+	if _, err := passports.Get(t.Context(), "feragame", living.SeedLoadCOID); !errors.Is(err, living.ErrNotFound) {
+		t.Fatalf("passport after feragame-core = %v, want ErrNotFound", err)
+	}
+	for _, email := range []string{
+		demoLivingUserEmail, demoLivingAdminUserEmail, demoLivingLogisticUserEmail, demoLivingLineUserEmail,
+	} {
+		if _, err := identity.GetUserByEmail(t.Context(), email); err != nil {
+			t.Fatalf("living user %s: %v", email, err)
+		}
 	}
 }
 
-func TestSeedDomainOnlyRequiresActiveConfig(t *testing.T) {
-	err := Seed(t.Context(), SeedDeps{
-		LivingDomains: living.NewMemoryDomainStore(),
-		LivingConfigs: living.NewMemoryConfigStore(),
-		LivingScope:   living.SeedScopeDomain,
-	})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !strings.Contains(err.Error(), "Active Config required") {
-		t.Fatalf("err = %v", err)
-	}
-}
+func TestSeedFeragameFullHardResetsAndStages(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
 
-func TestSeedDomainOnlyRebuildsWithoutRewritingConfig(t *testing.T) {
+	store := NewMemoryStore()
+	identity := newSeedFakeIdentity()
+	identity.orgs[demoFixtureMarkerOrgSlug] = IdentityOrg{
+		ID: demoFixtureMarkerOrgSlug, Slug: demoFixtureMarkerOrgSlug, Name: "Organization 1",
+	}
 	domains := living.NewMemoryDomainStore()
 	configs := living.NewMemoryConfigStore()
 	passports := living.NewMemoryPassportStore()
-	if _, err := living.SeedFixtureConfigStore(configs); err != nil {
-		t.Fatal(err)
-	}
 	marker := living.EmptyDomain()
 	marker.Entities = map[string]living.EntityMap{"load": {"L1": {"client": "NO"}}}
 	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
@@ -378,13 +426,44 @@ func TestSeedDomainOnlyRebuildsWithoutRewritingConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	deleted := false
+	identity.deleteOrgFn = func(_ context.Context, orgSlug string) error {
+		if orgSlug == demoLivingOrgSlug {
+			deleted = true
+		}
+		if orgSlug == demoFixtureMarkerOrgSlug {
+			t.Fatal("feragame-full must not delete organization-1")
+		}
+		delete(identity.orgs, orgSlug)
+		delete(identity.memberships, orgSlug)
+		return nil
+	}
+
 	if err := Seed(t.Context(), SeedDeps{
+		Identity:        identity,
+		Store:           store,
 		LivingDomains:   domains,
 		LivingConfigs:   configs,
 		LivingPassports: passports,
-		LivingScope:     living.SeedScopeDomain,
+		LivingScope:     living.SeedScopeFeragameFull,
 	}); err != nil {
 		t.Fatalf("Seed: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected Feragame org hard delete")
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug); err != nil {
+		t.Fatalf("feragame org missing: %v", err)
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), "organization-2"); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("orgs 1–3 must not be created: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 0 {
+		t.Fatalf("Formata taxonomy must be skipped: %d categories", len(cats))
 	}
 	got, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
@@ -402,6 +481,33 @@ func TestSeedDomainOnlyRebuildsWithoutRewritingConfig(t *testing.T) {
 	}
 	if version != living.DefaultFixtureVersion {
 		t.Fatalf("active = %q", version)
+	}
+}
+
+func TestSeedFeragameCoreRequiresIdentityAndLivingStores(t *testing.T) {
+	err := Seed(t.Context(), SeedDeps{
+		LivingDomains: living.NewMemoryDomainStore(),
+		LivingConfigs: living.NewMemoryConfigStore(),
+		LivingScope:   living.SeedScopeFeragameCore,
+	})
+	if err == nil || !strings.Contains(err.Error(), "identity is required") {
+		t.Fatalf("err = %v, want identity required", err)
+	}
+	err = Seed(t.Context(), SeedDeps{
+		Identity:      newSeedFakeIdentity(),
+		LivingDomains: living.NewMemoryDomainStore(),
+		LivingScope:   living.SeedScopeFeragameCore,
+	})
+	if err == nil || !strings.Contains(err.Error(), "living config store required") {
+		t.Fatalf("err = %v, want living config required", err)
+	}
+	err = Seed(t.Context(), SeedDeps{
+		Identity:      newSeedFakeIdentity(),
+		LivingConfigs: living.NewMemoryConfigStore(),
+		LivingScope:   living.SeedScopeFeragameCore,
+	})
+	if err == nil || !strings.Contains(err.Error(), "living domain store required") {
+		t.Fatalf("err = %v, want living domain required", err)
 	}
 }
 

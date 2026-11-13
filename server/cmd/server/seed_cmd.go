@@ -15,22 +15,21 @@ Demo fixture seed (identity + taxonomy + catalog + living by default).
 Flags:
   --replace          Rewrite even when the empty-only marker org exists;
                      living Domain (+ passports) is wiped and rebuilt.
-  --config-only      Living Active Config only (Feragame fixture). Does not
-                     wipe or stage Domain. Skips identity/taxonomy/catalog.
-  --domain-only      Wipe and rebuild staged Domain against existing Active
-                     Config (+ passports). Fails if Active Config is missing.
-                     Skips identity/taxonomy/catalog. Alias: --data-only.
+  --feragame-core    Hard-reset Feragame only: Appwrite org/users, Active
+                     Config, wipe Domain (+ passports) to empty. No staged
+                     demo plant. Skips Formata and orgs 1–3. Always runs.
+  --feragame-full    Same as --feragame-core, then restage the demo Domain
+                     plant. Always runs.
   --file PATH        Taxonomy seed file (default: config/categories.yaml).
   --help, -h         Show this help.
 
-Living scope defaults to both (config + domain). --config-only and
---domain-only/--data-only are mutually exclusive.
+--feragame-core and --feragame-full are mutually exclusive.
 
 Examples:
   task seed
   task seed -- --replace
-  task seed -- --config-only
-  task seed -- --domain-only
+  task seed:feragame-core
+  task seed:feragame-full
 `
 
 func runSeedCommand(ctx context.Context, args []string) error {
@@ -64,24 +63,24 @@ func seedHelpFromArgs(args []string) bool {
 }
 
 func seedLivingScopeFromArgs(args []string) (living.SeedScope, error) {
-	configOnly := false
-	domainOnly := false
+	core := false
+	full := false
 	for _, arg := range args {
 		switch strings.TrimSpace(arg) {
-		case "--config-only":
-			configOnly = true
-		case "--domain-only", "--data-only":
-			domainOnly = true
+		case "--feragame-core":
+			core = true
+		case "--feragame-full":
+			full = true
 		}
 	}
-	if configOnly && domainOnly {
-		return living.SeedScopeBoth, fmt.Errorf("seed: --config-only and --domain-only/--data-only are mutually exclusive")
+	if core && full {
+		return living.SeedScopeBoth, fmt.Errorf("seed: --feragame-core and --feragame-full are mutually exclusive")
 	}
-	if configOnly {
-		return living.SeedScopeConfig, nil
+	if core {
+		return living.SeedScopeFeragameCore, nil
 	}
-	if domainOnly {
-		return living.SeedScopeDomain, nil
+	if full {
+		return living.SeedScopeFeragameFull, nil
 	}
 	return living.SeedScopeBoth, nil
 }

@@ -107,24 +107,20 @@ func withSeedSession(
 
 // creds nil → ambient identity (standalone seed applies the runtime env file);
 // non-nil → prepare→seed by value (skip file apply; main is the Server restart adapter).
-// Living-only scopes (--config-only / --domain-only) still open Mongo for living
-// stores; identity open is skipped so Ambient Appwrite is not required.
+// Feragame scopes still open Appwrite (Feragame-only hard reset) and Mongo for
+// living stores; Formata taxonomy/catalog writes are skipped inside Seed.
 func runSeedSession(ctx context.Context, args []string, replace bool, livingScope living.SeedScope, creds *appwriteRuntimeCredentials) error {
 	if creds == nil {
 		if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
 			return err
 		}
 	}
-	livingOnly := livingScope == living.SeedScopeConfig || livingScope == living.SeedScopeDomain
-	var openIdentity func() (IdentityStore, error)
-	if !livingOnly {
-		openIdentity = func() (IdentityStore, error) {
-			opts := appwriteIdentityFromEnvOptions{RequireAll: true}
-			if creds == nil {
-				return appwriteIdentityFromEnv(opts)
-			}
-			return appwriteIdentityFromCredentials(*creds, opts)
+	openIdentity := func() (IdentityStore, error) {
+		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
+		if creds == nil {
+			return appwriteIdentityFromEnv(opts)
 		}
+		return appwriteIdentityFromCredentials(*creds, opts)
 	}
 	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, openIdentity, func(sess seedSession) error {
 		deps := SeedDeps{
@@ -145,10 +141,10 @@ func runSeedSession(ctx context.Context, args []string, replace bool, livingScop
 			return err
 		}
 		switch livingScope {
-		case living.SeedScopeConfig:
-			log.Printf("seed: living Active Config ready (config-only)")
-		case living.SeedScopeDomain:
-			log.Printf("seed: living Domain rebuilt (domain-only)")
+		case living.SeedScopeFeragameCore:
+			log.Printf("seed: Feragame core ready (Active Config + empty Domain)")
+		case living.SeedScopeFeragameFull:
+			log.Printf("seed: Feragame full ready (Active Config + staged Domain)")
 		default:
 			if replace {
 				log.Printf("seed: replaced demo fixture")

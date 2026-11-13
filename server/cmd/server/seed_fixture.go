@@ -30,7 +30,112 @@ const (
 	demoLivingLineUserEmail     = "line@attesta.com"
 )
 
+func feragameOrgDef() demoFixtureOrg {
+	return demoFixtureOrg{
+		Name: "Feragame",
+		Roles: []IdentityRole{
+			{Slug: "administration", Name: "Administration", Palette: "blue"},
+			{Slug: "logistic", Name: "Logistic", Palette: "cyan"},
+			{Slug: "line", Name: "Line", Palette: "emerald"},
+		},
+	}
+}
+
+func feragameLivingUsers() []demoFixtureUser {
+	return []demoFixtureUser{
+		{
+			Email:         demoLivingUserEmail,
+			Password:      demoLivingUserEmail,
+			Name:          "Living All Roles",
+			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			MembershipRoles: map[string][]string{
+				demoLivingOrgSlug: {"administration", "logistic", "line"},
+			},
+		},
+		{
+			Email:         demoLivingAdminUserEmail,
+			Password:      demoLivingAdminUserEmail,
+			Name:          "Living Administration",
+			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			MembershipRoles: map[string][]string{
+				demoLivingOrgSlug: {"administration"},
+			},
+		},
+		{
+			Email:         demoLivingLogisticUserEmail,
+			Password:      demoLivingLogisticUserEmail,
+			Name:          "Living Logistic",
+			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			MembershipRoles: map[string][]string{
+				demoLivingOrgSlug: {"logistic"},
+			},
+		},
+		{
+			Email:         demoLivingLineUserEmail,
+			Password:      demoLivingLineUserEmail,
+			Name:          "Living Line",
+			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			MembershipRoles: map[string][]string{
+				demoLivingOrgSlug: {"line"},
+			},
+		},
+	}
+}
+
+// Scoped so Feragame hard-reset never touches orgs 1–3 / the Formata marker org.
+func feragameDemoFixture() demoFixture {
+	users := []demoFixtureUser{{
+		Email:         "admin@attesta.com",
+		Password:      "admin@attesta.com",
+		Name:          "Platform Admin",
+		PlatformAdmin: true,
+		OrgAdminSlugs: []string{demoLivingOrgSlug},
+	}}
+	users = append(users, feragameLivingUsers()...)
+	return demoFixture{
+		Orgs:  []demoFixtureOrg{feragameOrgDef()},
+		Users: users,
+	}
+}
+
 func defaultDemoFixture() demoFixture {
+	users := []demoFixtureUser{
+		{
+			Email:         "admin@attesta.com",
+			Password:      "admin@attesta.com",
+			Name:          "Platform Admin",
+			PlatformAdmin: true,
+			OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3", demoLivingOrgSlug},
+		},
+		{
+			Email:         "admin@org1.com",
+			Password:      "admin@org1.com",
+			Name:          "Org 1 Admin",
+			OrgAdminSlugs: []string{"organization-1"},
+			MembershipRoles: map[string][]string{
+				"organization-1": {"chemist", "mechanic", "supervisor"},
+			},
+		},
+		{
+			Email:         "admin@org2.com",
+			Password:      "admin@org2.com",
+			Name:          "Org 2 Admin",
+			OrgAdminSlugs: []string{"organization-2"},
+			MembershipRoles: map[string][]string{
+				"organization-2": {"analyst"},
+			},
+		},
+		{
+			Email:         "admin@org3.com",
+			Password:      "admin@org3.com",
+			Name:          "Org 3 Admin",
+			OrgAdminSlugs: []string{"organization-3"},
+			MembershipRoles: map[string][]string{
+				"organization-3": {"qainspector"},
+			},
+		},
+	}
+	users = append(users, feragameLivingUsers()...)
 	return demoFixture{
 		Orgs: []demoFixtureOrg{
 			{
@@ -53,87 +158,9 @@ func defaultDemoFixture() demoFixture {
 					{Slug: "qainspector", Name: "QA Inspector", Palette: "pink"},
 				},
 			},
-			{
-				Name: "Feragame",
-				Roles: []IdentityRole{
-					{Slug: "administration", Name: "Administration", Palette: "blue"},
-					{Slug: "logistic", Name: "Logistic", Palette: "cyan"},
-					{Slug: "line", Name: "Line", Palette: "emerald"},
-				},
-			},
+			feragameOrgDef(),
 		},
-		Users: []demoFixtureUser{
-			{
-				Email:         "admin@attesta.com",
-				Password:      "admin@attesta.com",
-				Name:          "Platform Admin",
-				PlatformAdmin: true,
-				OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3", demoLivingOrgSlug},
-			},
-			{
-				Email:         "admin@org1.com",
-				Password:      "admin@org1.com",
-				Name:          "Org 1 Admin",
-				OrgAdminSlugs: []string{"organization-1"},
-				MembershipRoles: map[string][]string{
-					"organization-1": {"chemist", "mechanic", "supervisor"},
-				},
-			},
-			{
-				Email:         "admin@org2.com",
-				Password:      "admin@org2.com",
-				Name:          "Org 2 Admin",
-				OrgAdminSlugs: []string{"organization-2"},
-				MembershipRoles: map[string][]string{
-					"organization-2": {"analyst"},
-				},
-			},
-			{
-				Email:         "admin@org3.com",
-				Password:      "admin@org3.com",
-				Name:          "Org 3 Admin",
-				OrgAdminSlugs: []string{"organization-3"},
-				MembershipRoles: map[string][]string{
-					"organization-3": {"qainspector"},
-				},
-			},
-			{
-				Email:         demoLivingUserEmail,
-				Password:      demoLivingUserEmail,
-				Name:          "Living All Roles",
-				OrgAdminSlugs: []string{demoLivingOrgSlug},
-				MembershipRoles: map[string][]string{
-					demoLivingOrgSlug: {"administration", "logistic", "line"},
-				},
-			},
-			{
-				Email:         demoLivingAdminUserEmail,
-				Password:      demoLivingAdminUserEmail,
-				Name:          "Living Administration",
-				OrgAdminSlugs: []string{demoLivingOrgSlug},
-				MembershipRoles: map[string][]string{
-					demoLivingOrgSlug: {"administration"},
-				},
-			},
-			{
-				Email:         demoLivingLogisticUserEmail,
-				Password:      demoLivingLogisticUserEmail,
-				Name:          "Living Logistic",
-				OrgAdminSlugs: []string{demoLivingOrgSlug},
-				MembershipRoles: map[string][]string{
-					demoLivingOrgSlug: {"logistic"},
-				},
-			},
-			{
-				Email:         demoLivingLineUserEmail,
-				Password:      demoLivingLineUserEmail,
-				Name:          "Living Line",
-				OrgAdminSlugs: []string{demoLivingOrgSlug},
-				MembershipRoles: map[string][]string{
-					demoLivingOrgSlug: {"line"},
-				},
-			},
-		},
+		Users: users,
 	}
 }
 

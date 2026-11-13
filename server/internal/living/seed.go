@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -15,11 +14,12 @@ const (
 	// SeedScopeBoth puts Active Config then stages Domain per WipeDomain /
 	// empty-Domain rules (prior SeedDemo behavior).
 	SeedScopeBoth SeedScope = iota
-	// SeedScopeConfig puts Active Config only; Domain is never wiped or staged.
-	SeedScopeConfig
-	// SeedScopeDomain wipes and rebuilds Domain (+ passports when set) against
-	// the org's existing Active Config. Fails if Active Config is missing.
-	SeedScopeDomain
+	// SeedScopeFeragameCore puts Active Config and wipes Domain (+ passports)
+	// to empty; never stages demo Jobs.
+	SeedScopeFeragameCore
+	// SeedScopeFeragameFull puts Active Config and wipes+stages Domain
+	// (+ passports) like a replace Domain rebuild.
+	SeedScopeFeragameFull
 )
 
 // SeedOptions controls Domain wipe and empty-Domain staging during SeedDemo.
@@ -37,9 +37,10 @@ type SeedOptions struct {
 	// set this — without it, EmptyDomain() would pick up the focused fixture.
 	SkipEmptyDomainStaging bool
 	// Passports is wiped for the org when Domain is rebuilt (seed --replace /
-	// --domain-only). Optional in tests that never lock; task seed must wire it.
+	// --feragame-core / --feragame-full). Optional in tests that never lock;
+	// task seed must wire it.
 	Passports PassportStore
-	// Scope selects config-only, domain-only, or both (default).
+	// Scope selects Feragame core/full or both (default full-stack living path).
 	Scope SeedScope
 }
 
@@ -57,9 +58,9 @@ const (
 // SeedDemo applies the demo Feragame fixture per opts.Scope:
 //   - SeedScopeBoth (default): Active Config, then Domain when WipeDomain is set
 //     or Domain is missing/empty (unless SkipEmptyDomainStaging).
-//   - SeedScopeConfig: Active Config only; Domain untouched.
-//   - SeedScopeDomain: wipe+rebuild Domain against existing Active Config;
-//     does not rewrite Config; fails if Active Config is missing.
+//   - SeedScopeFeragameCore: Active Config + wipe Domain/passports to empty;
+//     never stages.
+//   - SeedScopeFeragameFull: Active Config + wipe + stage demo Domain.
 //
 // Demo/fixture only — product hosts must not require this demo seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
@@ -68,10 +69,13 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 		return OrgConfig{}, fmt.Errorf("living: config store required")
 	}
 	switch opts.Scope {
-	case SeedScopeConfig:
-		return SeedFixtureConfigStore(configs)
-	case SeedScopeDomain:
-		return seedDemoDomainOnly(ctx, domains, configs, opts.Passports)
+	case SeedScopeFeragameCore:
+		return seedDemoFeragameCore(ctx, domains, configs, opts.Passports)
+	case SeedScopeFeragameFull:
+		return seedDemoBoth(ctx, domains, configs, SeedOptions{
+			WipeDomain: true,
+			Passports:  opts.Passports,
+		})
 	default:
 		return seedDemoBoth(ctx, domains, configs, opts)
 	}
@@ -112,49 +116,20 @@ func seedDemoBoth(ctx context.Context, domains DomainStore, configs ConfigStore,
 	return cfg, nil
 }
 
-func seedDemoDomainOnly(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore) (OrgConfig, error) {
-	org, err := fixtureOrgID()
-	if err != nil {
-		return OrgConfig{}, err
-	}
-	cfg, err := requireActiveConfig(ctx, configs, org)
+func seedDemoFeragameCore(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore) (OrgConfig, error) {
+	cfg, err := SeedFixtureConfigStore(configs)
 	if err != nil {
 		return OrgConfig{}, err
 	}
 	if domains == nil {
-		return OrgConfig{}, fmt.Errorf("living: domain store required to seed Domain")
+		return OrgConfig{}, fmt.Errorf("living: domain store required for Feragame core seed")
 	}
-	if err := seedStagedDemoDomain(ctx, domains, configs, passports, org); err != nil {
-		return OrgConfig{}, err
-	}
-	return cfg, nil
-}
-
-func fixtureOrgID() (string, error) {
-	cfg, err := LoadFeragameConfigFixture()
-	if err != nil {
-		return "", err
-	}
-	org := strings.TrimSpace(cfg.Org)
-	if org == "" {
-		return "", fmt.Errorf("feragame-config fixture missing org")
-	}
-	return org, nil
-}
-
-func requireActiveConfig(ctx context.Context, configs ConfigStore, org string) (OrgConfig, error) {
-	version, err := configs.ActiveVersion(ctx, org)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return OrgConfig{}, fmt.Errorf("living: Active Config required for Domain-only seed (org %q): %w", org, err)
+	if passports != nil {
+		if err := passports.DeleteByOrg(ctx, cfg.Org); err != nil {
+			return OrgConfig{}, err
 		}
-		return OrgConfig{}, err
 	}
-	cfg, err := configs.Get(ctx, org, version)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return OrgConfig{}, fmt.Errorf("living: Active Config required for Domain-only seed (org %q version %q): %w", org, version, err)
-		}
+	if err := domains.Put(ctx, cfg.Org, EmptyDomain()); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
@@ -171,7 +146,7 @@ func domainSeedEmpty(d Domain) bool {
 // lineLoad done, and both loads register-closed (fullyProcessed) for Passport.
 // Leaves weightCheck open; Passport Can start is ready for both loads.
 // When passports is set, org rows are deleted before Domain Put so deterministic
-// seed subject ids can Lock again after --replace / --domain-only.
+// seed subject ids can Lock again after --replace / --feragame-full.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports PassportStore, org string) error {
 	if passports != nil {
 		if err := passports.DeleteByOrg(ctx, org); err != nil {

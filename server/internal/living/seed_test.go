@@ -171,18 +171,25 @@ func TestSeedDemoSkipEmptyDomainStaging(t *testing.T) {
 	}
 }
 
-func TestSeedDemoConfigOnlyLeavesDomainUntouched(t *testing.T) {
+func TestSeedDemoFeragameCoreWipesToEmptyWithoutStaging(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
+	passports := NewMemoryPassportStore()
 	seeded := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "L1"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
+	if err := passports.Create(t.Context(), PassportRecord{
+		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
-		Scope:      SeedScopeConfig,
-		WipeDomain: true, // must still leave Domain alone
+		Scope:     SeedScopeFeragameCore,
+		Passports: passports,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -190,44 +197,42 @@ func TestSeedDemoConfigOnlyLeavesDomainUntouched(t *testing.T) {
 	if cfg.Org != "feragame" || cfg.Version != DefaultFixtureVersion {
 		t.Fatalf("cfg = %#v", cfg)
 	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
 	got, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind("load")) != 1 || got.Kind("load")["L1"] == nil || len(got.Submissions) != 1 {
-		t.Fatalf("config-only must not wipe Domain: %#v", got)
+	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 || len(got.Kind("load")) != 0 {
+		t.Fatalf("feragame-core Domain not empty: %#v", got)
 	}
 	if _, ok := got.Kind("truck")[SeedTruckID]; ok {
-		t.Fatal("config-only must not stage Domain")
+		t.Fatal("feragame-core must not stage Domain")
+	}
+	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("passport after feragame-core = %v, want ErrNotFound", err)
 	}
 }
 
-func TestSeedDemoConfigOnlyDoesNotStageEmptyDomain(t *testing.T) {
-	domains := NewMemoryDomainStore()
-	configs := NewMemoryConfigStore()
-	if err := domains.Put(t.Context(), "feragame", EmptyDomain()); err != nil {
-		t.Fatal(err)
+func TestSeedDemoFeragameCoreRequiresDomainStore(t *testing.T) {
+	_, err := SeedDemo(t.Context(), nil, NewMemoryConfigStore(), SeedOptions{Scope: SeedScopeFeragameCore})
+	if err == nil {
+		t.Fatal("expected error")
 	}
-
-	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{Scope: SeedScopeConfig}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 {
-		t.Fatalf("config-only staged empty Domain: %#v", got)
+	if !strings.Contains(err.Error(), "domain store required") {
+		t.Fatalf("err = %v, want domain store required", err)
 	}
 }
 
-func TestSeedDemoDomainOnlyRebuildsAgainstActiveConfig(t *testing.T) {
+func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryPassportStore()
-	if _, err := SeedFixtureConfigStore(configs); err != nil {
-		t.Fatal(err)
-	}
 	marker := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
 	marker.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
 	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
@@ -240,63 +245,26 @@ func TestSeedDemoDomainOnlyRebuildsAgainstActiveConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	beforeVersion, err := configs.ActiveVersion(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	beforeCfg, err := configs.Get(t.Context(), "feragame", beforeVersion)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
-		Scope:     SeedScopeDomain,
+		Scope:     SeedScopeFeragameFull,
 		Passports: passports,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Version != beforeVersion {
-		t.Fatalf("domain-only returned version %q, want existing %q", cfg.Version, beforeVersion)
+	if cfg.Org != "feragame" || cfg.Version != DefaultFixtureVersion {
+		t.Fatalf("cfg = %#v", cfg)
 	}
-	afterVersion, err := configs.ActiveVersion(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if afterVersion != beforeVersion {
-		t.Fatalf("domain-only must not change Active Config version: %q → %q", beforeVersion, afterVersion)
-	}
-	afterCfg, err := configs.Get(t.Context(), "feragame", afterVersion)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if afterCfg.ID != beforeCfg.ID {
-		t.Fatalf("domain-only rewrote Config id %q → %q", beforeCfg.ID, afterCfg.ID)
-	}
-
 	got, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := got.Kind("load")["L1"]; ok {
-		t.Fatal("pre-wipe L1 must not survive domain-only rebuild")
+		t.Fatal("pre-wipe L1 must not survive feragame-full rebuild")
 	}
 	assertStagedDemoDomain(t, got)
 	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("passport after domain-only = %v, want ErrNotFound", err)
-	}
-}
-
-func TestSeedDemoDomainOnlyRequiresActiveConfig(t *testing.T) {
-	_, err := SeedDemo(t.Context(), NewMemoryDomainStore(), NewMemoryConfigStore(), SeedOptions{Scope: SeedScopeDomain})
-	if err == nil {
-		t.Fatal("expected error when Active Config missing")
-	}
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("err = %v, want ErrNotFound wrapped", err)
-	}
-	if !strings.Contains(err.Error(), "Active Config required") {
-		t.Fatalf("err = %v, want Active Config required", err)
+		t.Fatalf("passport after feragame-full = %v, want ErrNotFound", err)
 	}
 }
 
