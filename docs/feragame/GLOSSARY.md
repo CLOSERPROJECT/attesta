@@ -1,7 +1,7 @@
 # Feragame
 
-First living **Org Config** use case: the demo plant fixture
-[`server/internal/living/fixtures/feragame-config.yaml`](../../server/internal/living/fixtures/feragame-config.yaml).
+First **Org Config** demo plant fixture:
+[`server/internal/org/fixtures/feragame-config.yaml`](../../server/internal/org/fixtures/feragame-config.yaml).
 These nouns are **payload** authored in Config (entities, transforms, `readyWhen`,
 Italian labels)—not Attesta platform product law. Platform vocabulary:
 [`GLOSSARY.md`](../../GLOSSARY.md). Which glossary applies:
@@ -98,7 +98,7 @@ Config role slugs in this fixture:
 
 Multi-pass leaves use platform **submit cardinality** `many` + Domain
 **readyWhen**—not Task groups / `unlockFrom`. See
-[`docs/adr/0008-living-task-submit-cardinality.md`](../adr/0008-living-task-submit-cardinality.md).
+[`docs/adr/0008-org-task-submit-cardinality.md`](../adr/0008-org-task-submit-cardinality.md).
 
 ### Authoring conventions
 

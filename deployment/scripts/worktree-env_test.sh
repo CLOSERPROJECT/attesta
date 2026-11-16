@@ -47,7 +47,7 @@ MAILPIT_UI_PORT=11007
 APPWRITE_HTTP_PORT=11008
 APPWRITE_HTTPS_PORT=11009
 DOCKER_APP_PORT=11010
-LIVING_HTTP_PORT=11011
+ORG_HTTP_PORT=11011
 COMPOSE_PROJECT_NAME=PROJECT_NAME
 EOF
 project_name="$(ATTESTA_ROOT_DIR="${tmpdir}" bash "${SCRIPT}" project-name)"
@@ -69,8 +69,8 @@ grep -q '^MONGODB_URI=mongodb://localhost:11003$' <<<"${resolved}" || fail "Mong
 grep -q '^APPWRITE_ENDPOINT=http://localhost:11008/v1$' <<<"${resolved}" || fail "Appwrite URL missing"
 grep -q '^MAILPIT_UI_URL=http://localhost:11007$' <<<"${resolved}" || fail "Mailpit URL missing"
 grep -q '^APP_DEV_SERVER=http://localhost:11002$' <<<"${resolved}" || fail "APP_DEV_SERVER missing"
-grep -q '^LIVING_HTTP_URL=http://localhost:11011$' <<<"${resolved}" || fail "LIVING_HTTP_URL missing"
-grep -q '^LIVING_HTTP_TOKEN=dev-living-http-token$' <<<"${resolved}" || fail "LIVING_HTTP_TOKEN missing"
+grep -q '^ORG_HTTP_URL=http://localhost:11011$' <<<"${resolved}" || fail "ORG_HTTP_URL missing"
+grep -q '^ORG_HTTP_TOKEN=dev-org-http-token$' <<<"${resolved}" || fail "ORG_HTTP_TOKEN missing"
 grep -q '^COMPOSE_PROJECT_NAME=' <<<"${resolved}" || fail "Compose project missing"
 grep -q '^ATTESTA_SEED=true$' <<<"${resolved}" || fail "ATTESTA_SEED flag missing"
 grep -qx "ATTESTA_ROOT_DIR=${tmpdir}" <<<"${resolved}" \

@@ -6,22 +6,22 @@
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Dialog from '#lib/shadcn/ui/dialog/index.js';
 
-	import { draftAddressForTask } from '../living/drafts.js';
-	import ManySubmitHistory from '../living/ManySubmitHistory.svelte';
-	import OverviewRowChrome from '../living/OverviewRowChrome.svelte';
-	import TaskRecapPanel from '../living/TaskRecapPanel.svelte';
-	import { living } from '../living/living-app.svelte.js';
-	import type { TaskStatus, TaskSubmit } from '../living/types.js';
+	import { draftAddressForTask } from '../org/drafts.js';
+	import ManySubmitHistory from '../org/ManySubmitHistory.svelte';
+	import OverviewRowChrome from '../org/OverviewRowChrome.svelte';
+	import TaskRecapPanel from '../org/TaskRecapPanel.svelte';
+	import { orgSession } from '../org/org-app.svelte.js';
+	import type { TaskStatus, TaskSubmit } from '../org/types.js';
 	import {
 		formatHandoffCopy,
 		jobInstanceOverview,
 		provisionalSpawnDraftRowVisible,
 		type OverviewTaskRow
-	} from '../living/worklist-overview.js';
-	import { resolvePostCommitNavigation } from '../living/worklist-nav.js';
-	import { PROVISIONAL_GROUP_INSTANCE_ID } from '../living/types.js';
+	} from '../org/worklist-overview.js';
+	import { resolvePostCommitNavigation } from '../org/worklist-nav.js';
+	import { PROVISIONAL_GROUP_INSTANCE_ID } from '../org/types.js';
 	import { navigate, p, route } from './index.js';
-	import { navigateLivingTarget } from './navigate-target.js';
+	import { navigateOrgTarget } from './navigate-target.js';
 
 	const jobId = $derived(String(route.params.jobId ?? ''));
 	const jobInstanceId = $derived(String(route.params.jobInstanceId ?? ''));
@@ -34,20 +34,20 @@
 	let accordionScopeId = $state.raw('');
 
 	onMount(() => {
-		if (!living.result && !living.loading) {
-			void living.hydrate();
+		if (!orgSession.result && !orgSession.loading) {
+			void orgSession.hydrate();
 		}
 	});
 
 	const model = $derived(
-		jobInstanceOverview(living.result?.worklist, jobId, jobInstanceId)
+		jobInstanceOverview(orgSession.result?.worklist, jobId, jobInstanceId)
 	);
-	const drafts = $derived(living.drafts);
+	const drafts = $derived(orgSession.drafts);
 
 	function leafShowDraft(taskId: string): boolean {
 		void drafts;
 		const addr = draftAddressForTask({ jobId, taskId, jobInstanceId });
-		return living.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
+		return orgSession.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
 	}
 
 	function childShowDraft(
@@ -63,7 +63,7 @@
 			groupId,
 			groupInstanceId
 		});
-		return living.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
+		return orgSession.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
 	}
 
 	/** Dirty provisional first-child Draft while Spawn is offered — overview row, not Spawn CTA. */
@@ -129,7 +129,7 @@
 			navigate('/');
 			return;
 		}
-		if (living.loading || !living.result) return;
+		if (orgSession.loading || !orgSession.result) return;
 		// Finished instances stay on overview (Archive rediscovery / deep-links).
 		if (!model) {
 			navigate('/');
@@ -163,14 +163,14 @@
 	}
 
 	async function confirmClose(groupId: string) {
-		const outcome = await living.closeGroup({
+		const outcome = await orgSession.closeGroup({
 			jobId,
 			jobInstanceId,
 			groupId
 		});
 		confirmCloseGroupId = null;
 		if (!outcome) return;
-		navigateLivingTarget(
+		navigateOrgTarget(
 			resolvePostCommitNavigation(
 				outcome.navigation === 'stay' ? 'home' : outcome.navigation,
 				jobId,
@@ -340,16 +340,16 @@
 {/snippet}
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="overview-route">
-	{#if living.loading && !living.result}
+	{#if orgSession.loading && !orgSession.result}
 		<p class="text-sm text-zinc-500" data-testid="overview-load-status">{m.loading()}</p>
-	{:else if living.error && !living.result}
+	{:else if orgSession.error && !orgSession.result}
 		<p class="text-sm text-red-700" data-testid="overview-load-error" role="alert">
-			{living.error}
+			{orgSession.error}
 		</p>
 	{:else if model}
-		{#if living.commitError}
-			<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
-				{m.close_denied()}: {living.commitError}
+		{#if orgSession.commitError}
+			<p class="text-sm text-red-700" data-testid="org-commit-error" role="alert">
+				{m.close_denied()}: {orgSession.commitError}
 			</p>
 		{/if}
 
@@ -575,7 +575,7 @@
 												class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
 												data-testid="overview-close"
 												data-group-id={row.taskId}
-												disabled={living.committing}
+												disabled={orgSession.committing}
 												onclick={() => askClose(row.taskId)}
 											>
 												{row.group.closeLabel}
@@ -635,7 +635,7 @@
 						type="button"
 						variant="outline"
 						data-testid="overview-close-cancel"
-						disabled={living.committing}
+						disabled={orgSession.committing}
 						onclick={cancelClose}
 					>
 						{m.cancel()}
@@ -643,7 +643,7 @@
 					<Button
 						type="button"
 						data-testid="overview-close-confirm-submit"
-						disabled={living.committing || !confirmCloseGroupId}
+						disabled={orgSession.committing || !confirmCloseGroupId}
 						onclick={() => {
 							if (confirmCloseGroupId) void confirmClose(confirmCloseGroupId);
 						}}

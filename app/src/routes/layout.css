@@ -4,10 +4,10 @@
 @plugin '@tailwindcss/typography';
 @import '@sjsf/shadcn4-theme/styles.css';
 @source '../../node_modules/@sjsf/shadcn4-theme/dist';
-@import '../lib/living/form/array-field.css';
+@import '../lib/org/form/array-field.css';
 @custom-variant dark (&:is(.dark *));
 
-/* Living FormPlan / sjsf light tokens */
+/* Org FormPlan / sjsf light tokens */
 :root {
 	--background: #fafcfb;
 	--foreground: #12210c;

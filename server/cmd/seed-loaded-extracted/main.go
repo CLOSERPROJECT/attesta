@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -28,31 +28,31 @@ func main() {
 	must(client.Ping(ctx, nil))
 
 	db := client.Database(dbName)
-	domains := living.NewMongoDomainStore(db)
-	configs := living.NewMongoConfigStore(db)
-	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{SkipEmptyDomainStaging: true}); err != nil {
+	domains := org.NewMongoDomainStore(db)
+	configs := org.NewMongoConfigStore(db)
+	if _, err := org.SeedDemo(ctx, domains, configs, org.SeedOptions{SkipEmptyDomainStaging: true}); err != nil {
 		must(err)
 	}
-	must(domains.Put(ctx, "feragame", living.EmptyDomain()))
+	must(domains.Put(ctx, "feragame", org.EmptyDomain()))
 
-	c := &living.Committer{
+	c := &org.TaskCommitter{
 		Domains:    domains,
 		Configs:    configs,
-		Authorizer: living.AllowAllAuthorizer{},
+		Authorizer: org.AllowAllAuthorizer{},
 		Now:        func() time.Time { return time.Date(2026, 10, 19, 16, 0, 0, 0, time.UTC) },
 	}
 
-	admin := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
-	lineOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"line"}}
-	logOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"logistic"}}
+	admin := org.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
+	lineOp := org.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"line"}}
+	logOp := org.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"logistic"}}
 
-	arrive := commit(c, admin, living.CommitRequest{
+	arrive := commit(c, admin, org.CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    map[string]any{"truckWeight": 1000.0},
 		Mint:     mintNew(),
 	})
 	truckID := arrive.JobInstanceID
-	reg := commit(c, admin, living.CommitRequest{
+	reg := commit(c, admin, org.CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value: map[string]any{
@@ -65,7 +65,7 @@ func main() {
 		must(fmt.Errorf("expected minted lot"))
 	}
 
-	commit(c, logOp, living.CommitRequest{
+	commit(c, logOp, org.CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": loadID},
 		Mint:     mintNew(),
@@ -77,7 +77,7 @@ func main() {
 		{loadID + ".1", 11},
 		{loadID + ".2", 22},
 	} {
-		commit(c, lineOp, living.CommitRequest{
+		commit(c, lineOp, org.CommitRequest{
 			TaskPath:      "lot_processing/weigh",
 			JobInstanceID: loadID,
 			Value: map[string]any{
@@ -90,7 +90,7 @@ func main() {
 			},
 		})
 	}
-	commit(c, lineOp, living.CommitRequest{
+	commit(c, lineOp, org.CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: loadID,
 		Value: map[string]any{
@@ -100,7 +100,7 @@ func main() {
 			},
 		},
 	})
-	res := commit(c, logOp, living.CommitRequest{
+	res := commit(c, logOp, org.CommitRequest{
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: loadID,
 		Value: map[string]any{
@@ -118,13 +118,13 @@ func main() {
 	})
 
 	// Second intake parked at weightCheck (flat dataReport smoke).
-	second := commit(c, admin, living.CommitRequest{
+	second := commit(c, admin, org.CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    map[string]any{"truckWeight": 800.0},
 		Mint:     mintNew(),
 	})
 	secondTruck := second.JobInstanceID
-	res = commit(c, admin, living.CommitRequest{
+	res = commit(c, admin, org.CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: secondTruck,
 		Value: map[string]any{
@@ -138,7 +138,7 @@ func main() {
 	cfg, err := configs.Get(ctx, "feragame", ver)
 	must(err)
 	domain := res.Domain
-	wl := living.ProjectWorklist(cfg, domain, living.FixtureAllRolesOp())
+	wl := org.ProjectWorklist(cfg, domain, org.FixtureAllRolesOp())
 	fmt.Printf("seeded feragame in %s\n", dbName)
 	fmt.Printf("containers=%d submissions=%d\n", len(domain.Kind("container")), len(domain.Submissions))
 	for _, j := range wl.Jobs {
@@ -149,10 +149,10 @@ func main() {
 			}
 		}
 	}
-	refs := living.CollectActionableTaskRefs(cfg, wl)
+	refs := org.CollectActionableTaskRefs(cfg, wl)
 	var haveWC bool
 	for _, ref := range refs {
-		b, err := living.BuildTaskFormBundle(cfg, domain, ref)
+		b, err := org.BuildTaskFormBundle(cfg, domain, ref)
 		must(err)
 		cd, _ := b.Bindings["chromeDisplay"].(map[string]any)
 		if b.TaskID == "weightCheck" {
@@ -168,7 +168,7 @@ func main() {
 	}
 }
 
-func commit(c *living.Committer, op living.OperatorIdentity, req living.CommitRequest) living.CommitResult {
+func commit(c *org.TaskCommitter, op org.OperatorIdentity, req org.CommitRequest) org.CommitResult {
 	res, err := c.Commit(context.Background(), "feragame", op, req)
 	if err != nil {
 		must(fmt.Errorf("%s: %w", req.TaskPath, err))
@@ -176,15 +176,15 @@ func commit(c *living.Committer, op living.OperatorIdentity, req living.CommitRe
 	return res
 }
 
-func firstLotID(d living.Domain) string {
+func firstLotID(d org.Domain) string {
 	for id := range d.Kind("lot") {
 		return id
 	}
 	return ""
 }
 
-func mintNew() *living.CommitMint {
-	return &living.CommitMint{Kind: living.MintKindStartingNew}
+func mintNew() *org.CommitMint {
+	return &org.CommitMint{Kind: org.MintKindStartingNew}
 }
 
 func must(err error) {

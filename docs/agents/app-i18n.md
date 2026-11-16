@@ -1,6 +1,6 @@
-# Living `/app` i18n (wiring)
+# `/app` i18n (wiring)
 
-How to implement locale on the Living SvelteKit app. **Tracks and v1 policy:** [ADR-0013](../adr/0013-living-app-locale-tracks.md) — do not restate that decision here.
+How to implement locale on the Org SvelteKit app. **Tracks and v1 policy:** [ADR-0013](../adr/0013-org-app-locale-tracks.md) — do not restate that decision here.
 
 ## Paraglide catalogs
 
@@ -12,7 +12,7 @@ How to implement locale on the Living SvelteKit app. **Tracks and v1 policy:** [
 
 **Strategy:** `cookie` → `globalVariable` → `baseLocale`. Cookie name **`PARAGLIDE_LOCALE`**. No Accept-Language in v1.
 
-- Shell chrome: `import * as m from '#lib/paraglide/messages.js'` in `app/src/lib/living/` and `app/src/lib/router/`.
+- Shell chrome: `import * as m from '#lib/paraglide/messages.js'` in `app/src/lib/org/` and `app/src/lib/router/`.
 - **Engineering English:** hidden control in root layout calls **`setLocale('en')`** (persists cookie; avoid `localizeHref` / URL-prefix locales per ADR-0013).
 
 ## Production static `/app`
@@ -27,13 +27,13 @@ Config `schema` / uiSchema titles remain pass-through (ADR track 2). Only `@sjsf
 
 1. **`getSjsfTranslation(locale)`** — map Paraglide `form_*` keys to a `Translation` (`fromRecord` / `overrideByRecord`).
 2. **`chain(itPack, en)`** with `@sjsf/form/translations/en` — no upstream `it` pack; chain fills gaps until every label id is in the catalog.
-3. Pass into **`createConfigForm`** ([`create-config-form.svelte.ts`](../../app/src/lib/living/form/create-config-form.svelte.ts)): `translation: getSjsfTranslation(getLocale())`. Remount when projection or locale changes.
+3. Pass into **`createConfigForm`** ([`create-config-form.svelte.ts`](../../app/src/lib/org/form/create-config-form.svelte.ts)): `translation: getSjsfTranslation(getLocale())`. Remount when projection or locale changes.
 
 Widget-only strings (combobox empty, date placeholders) use `extraUiOptions` / uiSchema, not the label table.
 
 ## Ajv
 
-[`ajv-form-validator.ts`](../../app/src/lib/living/form/ajv-form-validator.ts): add **`ajv-i18n`**, set **`messages: false`** on Ajv options, and wire `localize` with `ajv-i18n/localize/it` or `/en` matching `getLocale()`. Submit banners: Paraglide for framing; error bodies from localized Ajv.
+[`ajv-form-validator.ts`](../../app/src/lib/org/form/ajv-form-validator.ts): add **`ajv-i18n`**, set **`messages: false`** on Ajv options, and wire `localize` with `ajv-i18n/localize/it` or `/en` matching `getLocale()`. Submit banners: Paraglide for framing; error bodies from localized Ajv.
 
 ## Agent rules (from ADR consequences)
 
@@ -54,4 +54,4 @@ Widget-only strings (combobox empty, date placeholders) use `extraUiOptions` / u
 | shadcn dialog `Close` | Default/sr-only English in dialog chrome. |
 | SJSF upstream fallbacks | Untranslated label ids still chain to English pack. |
 | Icon / primitive a11y | bits-ui / lucide may still surface English aria strings. |
-| Slice 5 guardrail | Optional lint: no new hardcoded EN/IT under `living/` / `router/` outside catalogs. |
+| Slice 5 guardrail | Optional lint: no new hardcoded EN/IT under `org/` / `router/` outside catalogs. |

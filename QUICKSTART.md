@@ -51,11 +51,11 @@ After credentials exist, `task start` / `task start:docker` run the Go demo seed
 
 After `task reset` or `task purge`, the next start re-applies the Go demo seed when credentials exist.
 
-### Living Domain (`/app`) demo seed
+### Org Domain (`/app`) demo seed
 
-Only `task seed` / `attesta seed` seeds living Domain + Active Config (and identity). Product boot does not auto-load Feragame or wipe Domain.
+Only `task seed` / `attesta seed` seeds org Domain + Active Config (and identity). Product boot does not auto-load Feragame or wipe Domain.
 
-- Identity: `attesta seed` creates org `feragame`, all-roles `living@attesta.com` / `living@attesta.com`, plus single-role `administration@attesta.com`, `logistic@attesta.com`, and `line@attesta.com` (password = email) so each login’s Worklist home differs. Existing stacks need `task seed -- --replace` once to pick this up.
+- Identity: `attesta seed` creates org `feragame`, all-roles `admin@feragame.com`, plus single-role `administration@feragame.com`, `logistic@feragame.com`, and `line@feragame.com` (password = email) so each login’s Worklist home differs. Existing stacks need `task seed -- --replace` once to pick this up.
 - Domain + Active Config fixture: the same seed puts the feragame-config Org Config as Active and, when Domain is missing or empty (no JobInstances / Submissions) or `--replace` is used, rebuilds a staged Domain (intake after register / after codiceFir / weightCheck-ready, plus line after shift). There is no harness `/api/runs` snapshot PUT.
 - Feragame scopes (skip Formata; always run): `task seed:feragame-config` — Active Config + wipe Domain to empty (no Appwrite); `task seed:feragame-domain` — Config + staged Domain; `task seed:feragame-identity` — Feragame Appwrite + Config + empty Domain; `task seed:feragame-full` — Appwrite + Config + staged Domain. Add `--keep-domain` on config/identity only to refresh Active Config without touching Domain. Default `task seed` still does the full demo stack. See `attesta seed --help`.
 - If the seed marker org already exists and Feragame Domain is still empty (pre-staging seed), run `task seed -- --replace` (or `task seed:feragame-full`) once to pick up the staged matrix and new users — empty-only seed is a no-op while the marker is set.

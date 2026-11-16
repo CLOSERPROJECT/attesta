@@ -27,7 +27,7 @@
   [`README.md`](README.md), [`QUICKSTART.md`](QUICKSTART.md), and
   [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
   truth.
-- **Domain language:** which glossary applies — Living platform, Feragame
+- **Domain language:** which glossary applies — Org platform (`/app`), Feragame
   plant payload, or Legacy Stream — read
   [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
 - **Active work:** unresolved design and implementable work live as GitHub
@@ -37,7 +37,7 @@
   or ADR vocabulary, read
   [`docs/agents/domain.md`](docs/agents/domain.md).
 - **Plant Org Config:** before editing
-  `server/internal/living/fixtures/feragame-config.yaml` (or its seed/test
+  `server/internal/org/fixtures/feragame-config.yaml` (or its seed/test
   followers), read [`docs/agents/plant-config.md`](docs/agents/plant-config.md)
   and [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md).
 - **DPP/UNTP:** for Digital Link or credential behavior, read
@@ -48,7 +48,7 @@
 
 ## Invariants
 
-- Living Go and the `/app` SPA are **dumb executors** of Org Config: plant
+- Org Go (`server/internal/org`) and the `/app` SPA are **dumb executors** of Org Config: plant
   business rules (entity shapes, transforms, `readyWhen`, open/close laws) live
   in Config, not as Feragame- or domain-named branches in executors. See
   [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**) and the plant checklist in

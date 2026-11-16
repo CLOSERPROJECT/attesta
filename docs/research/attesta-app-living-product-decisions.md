@@ -83,30 +83,30 @@ Use these **temporary** engineering names in early slices so plans stay consiste
 
 | Placeholder | Use for |
 | --- | --- |
-| `server/internal/living` | Go package for living Domain / Org Config / Load / Commit HTTP |
+| `server/internal/org` | Go package for org Domain / Org Config / Load / Commit HTTP |
 | `DomainStore` | Persistence Interface for org Domain |
 | `ConfigStore` | Persistence Interface for versioned Org Config documents |
-| `GET /api/living/domain` | Load (org from session; Active Config version resolved server-side) |
-| `POST /api/living/commit` | Commit (body: Task path + Job instance id + sealed value / mint) |
-| `living` Cerbos resource kind (draft) | Commit allow/deny until real kind names land in rename |
+| `GET /api/org/domain` | Load (org from session; Active Config version resolved server-side) |
+| `POST /api/org/commit` | Commit (body: Task path + Job instance id + sealed value / mint) |
+| `task` Cerbos resource kind / `commit` action | Commit allow/deny (see `cerbos/policies/task_policy.yaml`) |
 
 Rejected as public shape even as placeholders: `/api/runs`, `RunStore`, `LoadRunPort`.
 
 ### Experiment → attesta port policy (locked 2026-10-29)
 
-Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/living` (placeholders). Rule of thumb: **same behaviour, new home, living nouns → copy + adapt**; **authority / persistence / product HTTP → rewrite in Go**; **if a copy would drag whole-config-execution or run-id identity → rewrite the seam**, keep only pure functions.
+Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/org` (placeholders). Rule of thumb: **same behaviour, new home, living nouns → copy + adapt**; **authority / persistence / product HTTP → rewrite in Go**; **if a copy would drag whole-config-execution or run-id identity → rewrite the seam**, keep only pure functions.
 
 **Copy (then adapt to living glossary)**
 
 - Pure TS Modules + Vitest that do not need Kit: Domain store helpers used only where still needed, Leftovers/submit prep while FormPlan remains client-side, ELT runner references, FormPlan / live chrome (until **Task form bundle**), wire DTOs, Local Commit/Load for unit tests only → into `app/` (or thin lib under `app/`).
-- **Superseded for Unlock / startsWhen chrome:** do **not** keep production TS copies of Unlock order or startsWhen for Job chrome. Go projects a **Worklist** on Load/Commit; see [`docs/adr/0005-living-worklist-server-projection.md`](../adr/0005-living-worklist-server-projection.md). Delete SPA gate plants once Worklist ships.
+- **Superseded for Unlock / startsWhen chrome:** do **not** keep production TS copies of Unlock order or startsWhen for Job chrome. Go projects a **Worklist** on Load/Commit; see [`docs/adr/0005-org-worklist-server-projection.md`](../adr/0005-org-worklist-server-projection.md). Delete SPA gate plants once Worklist ships.
 - Rename Step / Substep / Step instance → Job / Task / Job instance on the Commit path as files are ported (no big-bang rename for untouched files).
 - Flat truck-loop fixture: copy content; prefer **one** `steps`/`substeps` → Job/Task key rename when ConfigStore first loads Org Config so Load does not speak two languages.
-- Truck-loop / stack UI → `app/` + sv-router; HTTP Adapters → `/api/living/…`. Drop harness gear.
+- Truck-loop / stack UI → `app/` + sv-router; HTTP Adapters → `/api/org/…`. Drop harness gear.
 
 **Rewrite (do not copy as authority)**
 
-- Kit `+server`, SQLite RunStore, run-id routes — behaviour reference only; production = Go living package + DomainStore / ConfigStore.
+- Kit `+server`, SQLite RunStore, run-id routes — behaviour reference only; production = `server/internal/org` + DomainStore / ConfigStore.
 - Go Commit accept path — reimplement (resolve Org Config, re-gate, re-prep, ELT, Cerbos). TS Local Commit stays for Vitest only.
 - Go **Worklist** projection (Unlock / startsWhen / Leftovers openness → Task statuses + `canStart`) — server-only; SPA consumes JSON.
 - Harness AuthPort passthrough and snapshot-replace PUT — do not port; verified session + seed/wipe instead.
@@ -179,7 +179,7 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/l
 | **Living glossary lock** | **Done for flat-port core nouns** (Org Config, Config version, Active Config version, Domain, Job, Task, Job instance, Task path, Unlock order, Leftovers, startsWhen, readyWhen, Submission, Draft, Role catalog, Config role, Commit, Load, OperatorIdentity) — see root [`GLOSSARY.md`](../../GLOSSARY.md). **Still TBD:** final English for **Task group** (working label only). |
 | **Task group / nesting** | Implement Task groups under Job (repeatable, parent-scoped instances); Unlock order / `readyWhen` over child instances. Decision locked above; code after flat port works. |
 | **Feragame lot intake** | Reshape `intake` for truck lots (gross → per-lot register → final tare vs sum). Depends on Task group. Do not fake with Leftovers `completeness: some`. |
-| **Code seam rename (final slice)** | After flat port smokes: discussion + slice to replace placeholders (`internal/living`, `DomainStore` / `ConfigStore`, `/api/living/...`, draft Cerbos kind) with lasting names aligned to glossary. |
+| **Code seam rename (final slice)** | **Names locked 2026-11-16; hard cut (no `/api/living` / env / Cerbos / Mongo aliases).** Target: `internal/org` + `app/src/lib/org`, `/api/org/…`, Cerbos `task`/`commit`, `DomainLoader` / `TaskCommitter` / `API` / `DPPStore`, Mongo `org_domains` / `org_configs` / `org_dpps` / …, Feragame `*@feragame.com`. Table: [`.scratch/living-flat-port/issues/13-rename-placeholders-discussion.md`](../../.scratch/living-flat-port/issues/13-rename-placeholders-discussion.md). |
 | **Config version pin policy** | Whether in-flight Jobs pin to the Config version they started on vs always follow Active Config version. |
 | **Slice design** | Done: `.scratch/living-flat-port/issues/` (01–13 flat port + rename). |
 | **Wayfinder map** | Chart remaining **decisions + research** (not build tasks); destination ≈ “way clear to implement.” |
@@ -226,6 +226,6 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/l
 - 2026-10-29: Lock domain model — versioned Org Config, org-scoped living domain, repeat jobs not config-runs, dual role catalog + per-task roles / Cerbos; defer glossary wording rewrite.
 - 2026-10-29: Lock Job top-level only + Task tree (leaf vs Task group); reject jobs-all-the-way-down and lots-via-`completeness: some`; lock port-now (flat truck-loop + org Domain seams + path Commit) vs postpone nesting/lot intake.
 - 2026-10-29: Wording pass to locked root `GLOSSARY.md` (flat-port nouns); decisions unchanged; Task group final English still TBD; Config run retired as living noun in favor of “whole-config execution” / historical code names.
-- 2026-10-29: Lock code seam placeholders (`internal/living`, DomainStore/ConfigStore, `/api/living/domain` + `/commit`); defer real names to a final rename slice + discussion.
+- 2026-10-29: Lock code seam placeholders (`internal/living` → hard-cut `internal/org`, DomainStore/ConfigStore, `/api/org/domain` + `/commit`); final rename slice **13** (2026-11-16).
 - 2026-10-29: Flat-port tickets published under `.scratch/living-flat-port/issues/` (01–13).
 - 2026-10-29: Lock experiment→attesta copy/adapt vs rewrite vs do-not-copy policy for the flat port.

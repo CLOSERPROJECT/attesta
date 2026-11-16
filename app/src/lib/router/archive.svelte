@@ -3,39 +3,39 @@
 
 	import * as m from '#lib/paraglide/messages.js';
 
-	import { living } from '../living/living-app.svelte.js';
-	import WorklistJobLine from '../living/WorklistJobLine.svelte';
-	import WorklistRow from '../living/WorklistRow.svelte';
+	import { orgSession } from '../org/org-app.svelte.js';
+	import WorklistJobLine from '../org/WorklistJobLine.svelte';
+	import WorklistRow from '../org/WorklistRow.svelte';
 	import {
 		completedRowKey,
 		completedRowsFromWorklist,
 		completedRowTarget
-	} from '../living/worklist-home.js';
-	import { hrefLivingTarget } from './navigate-target.js';
+	} from '../org/worklist-home.js';
+	import { hrefOrgTarget } from './navigate-target.js';
 
 	onMount(() => {
-		if (!living.result && !living.loading) {
-			void living.hydrate();
+		if (!orgSession.result && !orgSession.loading) {
+			void orgSession.hydrate();
 		}
 	});
 
-	const completed = $derived(completedRowsFromWorklist(living.result?.worklist));
+	const completed = $derived(completedRowsFromWorklist(orgSession.result?.worklist));
 </script>
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="archive-route">
-	{#if !living.result && living.loading}
+	{#if !orgSession.result && orgSession.loading}
 		<p class="text-sm text-zinc-500" data-testid="archive-load-status">{m.loading()}</p>
-	{:else if !living.result && living.error}
+	{:else if !orgSession.result && orgSession.error}
 		<p class="text-sm text-red-700" data-testid="archive-load-error" role="alert">
-			{living.error}
+			{orgSession.error}
 		</p>
-	{:else if !living.result}
+	{:else if !orgSession.result}
 		<p class="text-sm text-zinc-500" data-testid="archive-load-status">
 			{m.not_loaded_yet()}
 		</p>
 	{/if}
 
-	{#if living.result}
+	{#if orgSession.result}
 		<section class="space-y-3" data-testid="archive-completed">
 			<ul class="flex flex-col gap-1">
 				{#each completed as row (completedRowKey(row))}
@@ -45,7 +45,7 @@
 							data-job-id={row.jobId}
 							data-instance-id={row.jobInstanceId}
 							accentColor={row.jobColor}
-							href={hrefLivingTarget(completedRowTarget(row))}
+							href={hrefOrgTarget(completedRowTarget(row))}
 						>
 							<WorklistJobLine
 								mode="progress"

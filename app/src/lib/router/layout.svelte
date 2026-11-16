@@ -8,27 +8,27 @@
 
 	import attestaMark from '#lib/assets/attesta-mark.svg';
 	import * as m from '#lib/paraglide/messages.js';
-	import { living } from '#lib/living/living-app.svelte.js';
-	import LivingToast from '#lib/living/LivingToast.svelte';
-	import ScanDialog from '#lib/living/ScanDialog.svelte';
-	import { createHttpQrResolvePort } from '#lib/living/http-qr-resolve-port.js';
+	import { orgSession } from '#lib/org/org-app.svelte.js';
+	import OrgToast from '#lib/org/OrgToast.svelte';
+	import ScanDialog from '#lib/org/ScanDialog.svelte';
+	import { createHttpQrResolvePort } from '#lib/org/http-qr-resolve-port.js';
 	import {
-		livingRouteCoordsFromPath,
+		orgRouteCoordsFromPath,
 		navPlaceKindFromRoute,
 		resolveNavPlace
-	} from '#lib/living/nav-place.js';
-	import { takeColdEntityIdRaw } from '#lib/living/qr-resolve-apply.js';
-	import { runQrScan } from '#lib/living/qr-scan-flow.js';
-	import { livingToast } from '#lib/living/toast.svelte.js';
+	} from '#lib/org/nav-place.js';
+	import { takeColdEntityIdRaw } from '#lib/org/qr-resolve-apply.js';
+	import { runQrScan } from '#lib/org/qr-scan-flow.js';
+	import { orgToast } from '#lib/org/toast.svelte.js';
 	import { Badge } from '#lib/shadcn/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
-	import { hrefLivingTarget, navigateLivingTarget } from '#lib/router/navigate-target.js';
+	import { hrefOrgTarget, navigateOrgTarget } from '#lib/router/navigate-target.js';
 	import { isActive, route } from '#lib/router/index.js';
 
 	let { children }: { children: Snippet } = $props();
 
 	// Pathname segments only — sv-router leaks group*/taskId across matches.
-	const coords = $derived(livingRouteCoordsFromPath({ pathname: route.pathname }));
+	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
 	const jobId = $derived(coords.jobId);
 	const routeInstance = $derived(coords.jobInstanceId);
 	const groupId = $derived(coords.groupId);
@@ -52,11 +52,11 @@
 			taskId,
 			provisionalJob: placeKind === 'task' ? provisionalJob : false,
 			provisionalSpawn: placeKind === 'task' ? provisionalSpawn : false,
-			worklist: living.result?.worklist
+			worklist: orgSession.result?.worklist
 		})
 	);
 
-	const roles = $derived(living.result?.roles ?? []);
+	const roles = $derived(orgSession.result?.roles ?? []);
 
 	const qrPort = createHttpQrResolvePort();
 	let scanOpen = $state(false);
@@ -69,9 +69,9 @@
 			await runQrScan(
 				{
 					resolve: qrPort.resolve,
-					drafts: living,
-					navigate: navigateLivingTarget,
-					toast: (message) => livingToast.show(message)
+					drafts: orgSession,
+					navigate: navigateOrgTarget,
+					toast: (message) => orgToast.show(message)
 				},
 				raw
 			);
@@ -90,7 +90,7 @@
 
 <nav
 	class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 text-sm"
-	data-testid="living-nav"
+	data-testid="org-nav"
 >
 	<div class="flex min-w-0 items-center gap-2">
 		{#if place.showBack}
@@ -100,7 +100,7 @@
 				size="icon"
 				aria-label={m.nav_back()}
 				data-testid="nav-back"
-				onclick={() => navigateLivingTarget(place.backTarget)}
+				onclick={() => navigateOrgTarget(place.backTarget)}
 			>
 				<ArrowLeft class="size-4" />
 			</Button>
@@ -139,7 +139,7 @@
 				aria-label={m.nav_archive()}
 				aria-current={isActive('/archive') ? 'page' : undefined}
 				data-testid="nav-archive"
-				href={hrefLivingTarget({ kind: 'archive' })}
+				href={hrefOrgTarget({ kind: 'archive' })}
 			>
 				<Archive class="size-4" />
 				{m.nav_archive()}
@@ -174,4 +174,4 @@
 	}}
 	onScan={handleRaw}
 />
-<LivingToast />
+<OrgToast />

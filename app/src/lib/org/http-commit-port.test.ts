@@ -1,0 +1,284 @@
+import { describe, expect, test, vi } from 'vitest';
+
+import { CommitDomainError } from './commit-port.js';
+import {
+	createHttpCommitDomainPort,
+	parseCommitResult,
+	parseSubmissionCounts
+} from './http-commit-port.js';
+import { emptyWorklist } from './types.js';
+
+const sampleResult = {
+	org: 'feragame',
+	jobInstanceId: 'NIR-261019-NO-1',
+	navigation: 'task' as const,
+	worklist: {
+		jobs: [
+			{
+				jobId: 'intake',
+				canStart: true,
+				repeatable: true,
+				taskIds: ['register', 'codiceFir'],
+				tasks: [],
+				instances: [
+					{
+						id: 'NIR-261019-NO-1',
+						label: 'NIR-261019-NO-1',
+						tasks: { register: 'done' as const, codiceFir: 'available' as const }
+					}
+				]
+			},
+			{
+				jobId: 'line',
+				canStart: false,
+				repeatable: true,
+				taskIds: ['shift'],
+				tasks: [],
+				instances: []
+			}
+		]
+	},
+	nextTaskFormBundle: {
+		jobId: 'intake',
+		taskId: 'codiceFir',
+		jobInstanceId: 'NIR-261019-NO-1',
+		title: 'Codice FIR',
+		surface: 'live' as const,
+		schema: { type: 'object' },
+		uiSchema: {},
+		initialData: {},
+		chrome: [],
+		chromeFieldIds: [],
+		sealFieldIds: ['codiceFir'],
+		bindings: { domain: {} }
+	},
+	links: [
+		{ label: 'Stampa etichette', url: 'blob:labels', action: 'link' as const },
+		{
+			label: 'Scarica CSV',
+			url: 'blob:csv',
+			action: 'download' as const,
+			filename: 'reg.csv'
+		}
+	],
+	httpErrors: [] as string[]
+};
+
+describe('parseSubmissionCounts', () => {
+	test('keeps finite taskId→N; drops empty / invalid', () => {
+		expect(parseSubmissionCounts(undefined)).toBeUndefined();
+		expect(parseSubmissionCounts({})).toBeUndefined();
+		expect(parseSubmissionCounts({ start: 1, repeat: 3 })).toEqual({
+			start: 1,
+			repeat: 3
+		});
+		expect(parseSubmissionCounts({ bad: 'x', ok: 2 })).toEqual({ ok: 2 });
+	});
+});
+
+describe('HttpCommitDomainPort', () => {
+	test('Commit worklist preserves instance submissionCounts', () => {
+		const got = parseCommitResult({
+			...sampleResult,
+			worklist: {
+				jobs: [
+					{
+						jobId: 'session',
+						canStart: false,
+						repeatable: true,
+						taskIds: ['repeat'],
+						tasks: [
+							{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }
+						],
+						instances: [
+							{
+								id: 'S1',
+								label: 'Session',
+								tasks: { repeat: 'actionable' },
+								submissionCounts: { repeat: 2 }
+							}
+						]
+					}
+				]
+			}
+		});
+		expect(got.worklist.jobs[0].instances[0].submissionCounts).toEqual({ repeat: 2 });
+	});
+
+	test('POST /api/org/commit with taskPath + jobInstanceId + value + mint', async () => {
+		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+			expect(String(input)).toBe('/api/org/commit');
+			expect(init?.method).toBe('POST');
+			expect(init?.credentials).toBe('include');
+			expect(JSON.parse(String(init?.body))).toEqual({
+				taskPath: 'intake/register',
+				jobInstanceId: 'NIR-261019-NO-1',
+				value: { client: 'NO', palletCount: 1 },
+				mint: { kind: 'none' }
+			});
+			return new Response(JSON.stringify(sampleResult), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		});
+
+		const port = createHttpCommitDomainPort({ fetch: fetchFn, baseUrl: '' });
+		const got = await port.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-261019-NO-1',
+			value: { client: 'NO', palletCount: 1 },
+			mint: { kind: 'none' }
+		});
+		expect(got.org).toBe('feragame');
+		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
+		expect(got.navigation).toBe('task');
+		expect(got.continueNavigation).toBeNull();
+		expect(got.worklist).toEqual(sampleResult.worklist);
+		expect(got.nextTaskFormBundle).toEqual(sampleResult.nextTaskFormBundle);
+		expect(got.links).toEqual(sampleResult.links);
+		expect(got.httpErrors).toEqual([]);
+		expect(fetchFn).toHaveBeenCalledOnce();
+	});
+
+	test('normalizes missing links/httpErrors/worklist/navigation/bundle', async () => {
+		const {
+			links: _l,
+			httpErrors: _e,
+			worklist: _w,
+			navigation: _nav,
+			nextTaskFormBundle: _n,
+			...withoutHttp
+		} = sampleResult;
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify(withoutHttp), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				})
+		);
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		const got = await port.commit({
+			taskPath: 'intake/codiceFir',
+			jobInstanceId: 'NIR-261019-NO-1',
+			value: { codiceFir: 'FIR-1' },
+			mint: { kind: 'none' }
+		});
+		expect(got.links).toEqual([]);
+		expect(got.httpErrors).toEqual([]);
+		expect(got.worklist).toEqual(emptyWorklist());
+		expect(got.navigation).toBe('home');
+		expect(got.continueNavigation).toBeNull();
+		expect(got.nextTaskFormBundle).toBeNull();
+	});
+
+	test('parses stay + continueNavigation from Commit wire', async () => {
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						...sampleResult,
+						navigation: 'stay',
+						continueNavigation: 'overview',
+						nextTaskFormBundle: null
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } }
+				)
+		);
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		const got = await port.commit({
+			taskPath: 'intake/lots/lots-1/register',
+			jobInstanceId: 'T1',
+			value: { lotId: 'L1' },
+			mint: { kind: 'none' }
+		});
+		expect(got.navigation).toBe('stay');
+		expect(got.continueNavigation).toBe('home');
+	});
+
+	test('spawningNew mint posts nested taskPath with real jobInstanceId', async () => {
+		const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+			expect(JSON.parse(String(init?.body))).toEqual({
+				taskPath: 'intake/lots/new/register',
+				jobInstanceId: 'T1',
+				value: { lotId: 'L1' },
+				mint: { kind: 'spawningNew' }
+			});
+			return new Response(
+				JSON.stringify({
+					...sampleResult,
+					jobInstanceId: 'T1',
+					navigation: 'overview',
+					nextTaskFormBundle: null
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } }
+			);
+		});
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		const got = await port.commit({
+			taskPath: 'intake/lots/new/register',
+			jobInstanceId: 'T1',
+			value: { lotId: 'L1' },
+			mint: { kind: 'spawningNew' }
+		});
+		expect(got.navigation).toBe('home');
+	});
+
+	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {
+		const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+			expect(JSON.parse(String(init?.body))).toEqual({
+				taskPath: 'intake/register',
+				jobInstanceId: '',
+				value: { client: 'NO' },
+				mint: { kind: 'startingNew' }
+			});
+			return new Response(JSON.stringify(sampleResult), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		});
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		await port.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: '',
+			value: { client: 'NO' },
+			mint: { kind: 'startingNew' }
+		});
+	});
+
+	test('rejects /api/runs-shaped URLs', async () => {
+		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			expect(url).not.toContain('/api/runs');
+			expect(url).toBe('https://host.example/api/org/commit');
+			return new Response(JSON.stringify(sampleResult), { status: 200 });
+		});
+		const port = createHttpCommitDomainPort({
+			fetch: fetchFn,
+			baseUrl: 'https://host.example'
+		});
+		await port.commit({
+			taskPath: 'intake/codiceFir',
+			jobInstanceId: 'NIR-261019-NO-1',
+			value: { codiceFir: 'FIR-1' }
+		});
+	});
+
+	test('403 becomes CommitDomainError without parsing a Domain body', async () => {
+		const fetchFn = vi.fn(async () => new Response('forbidden', { status: 403 }));
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		await expect(
+			port.commit({
+				taskPath: 'intake/register',
+				jobInstanceId: 'x',
+				value: {}
+			})
+		).rejects.toBeInstanceOf(CommitDomainError);
+		await expect(
+			port.commit({
+				taskPath: 'intake/register',
+				jobInstanceId: 'x',
+				value: {}
+			})
+		).rejects.toMatchObject({ status: 403, message: 'forbidden' });
+	});
+});

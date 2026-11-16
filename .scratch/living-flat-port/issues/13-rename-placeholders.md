@@ -1,12 +1,12 @@
 # 13: Rename placeholders (discussion + code)
 
-**What to build:** After the flat port smokes, run a short naming discussion, then rename code seam placeholders to lasting names aligned with the living glossary: Go package, DomainStore/ConfigStore, `/api/living/domain` + `/commit`, draft Cerbos kind `living`. Update docs; keep smoke green.
+**What to build:** Hard-cut rename to names locked in `13-rename-placeholders-discussion.md`: Go `internal/org`, SPA `lib/org`, `/api/org/…` only, Cerbos `task`/`commit`, types `DomainLoader` / `TaskCommitter` / `API` / `DPPStore`, Mongo `org_*` / `org_dpps`, Feragame `*@feragame.com` emails. No backwards compatibility. Preserve Stream `/my`.
 
-**Blocked by:** 11: /app — line Commit UI; 12: Demo seed — Domain wipe + all-roles user
+**Blocked by:** Quiet tree (no parallel agents editing living seams).
 
-**Status:** discussion paused — see `13-rename-placeholders-discussion.md` (open decisions). Do not implement until names agreed.
+**Status:** names locked + hard-cut amended 2026-11-16 — implement now on a quiet tree.
 
-- [ ] Agreed lasting names recorded (decisions dump and/or glossary-adjacent note)
-- [ ] Package, Interfaces, HTTP paths, and Cerbos kind renamed consistently
-- [ ] Client Adapters and seed paths updated
-- [ ] Flat-port smoke (Load + intake + line) still passes under new names
+- [x] Agreed lasting names recorded
+- [x] Package, Interfaces, HTTP paths, and Cerbos kind renamed consistently
+- [x] Client Adapters and seed/compose/env paths updated
+- [x] Flat-port smoke (Load + intake + line) still passes under new names

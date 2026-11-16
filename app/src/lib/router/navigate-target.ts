@@ -1,9 +1,9 @@
 import { navigate, p } from './index.js';
-import { PROVISIONAL_GROUP_INSTANCE_ID } from '../living/types.js';
-import type { PostCommitTarget } from '../living/worklist-nav.js';
+import { PROVISIONAL_GROUP_INSTANCE_ID } from '../org/types.js';
+import type { PostCommitTarget } from '../org/worklist-nav.js';
 
 /** Resolve ADR-0006 target to an href for `<a>` / Button `href` navigation. */
-export function hrefLivingTarget(target: PostCommitTarget): string {
+export function hrefOrgTarget(target: PostCommitTarget): string {
 	if (target.kind === 'home') {
 		return p('/');
 	}
@@ -39,7 +39,7 @@ export function hrefLivingTarget(target: PostCommitTarget): string {
 }
 
 /** Apply ADR-0006 post-Commit / exit / deep-link target. */
-export function navigateLivingTarget(target: PostCommitTarget): void {
+export function navigateOrgTarget(target: PostCommitTarget): void {
 	if (target.kind === 'home') {
 		void navigate('/');
 		return;

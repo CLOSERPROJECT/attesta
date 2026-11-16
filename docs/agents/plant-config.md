@@ -1,8 +1,8 @@
 # Plant Org Config
 
 Checklist when changing the Feragame plant fixture
-[`server/internal/living/fixtures/feragame-config.yaml`](../../server/internal/living/fixtures/feragame-config.yaml)
-(embedded Active Config + SPA `$living-fixtures`).
+[`server/internal/org/fixtures/feragame-config.yaml`](../../server/internal/org/fixtures/feragame-config.yaml)
+(embedded Active Config + SPA `$org-fixtures`).
 
 Plant nouns (lot session, Jobs, roles):
 [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md). Platform nouns:
@@ -24,13 +24,13 @@ Plant nouns (lot session, Jobs, roles):
   with `submit: many` (not repeatable Task groups). Lot entity + session status
   `open | fullyProcessed` only (no `parked`; no turn bookends; no working day /
   shift Domain). Platform law:
-  [`docs/adr/0008-living-task-submit-cardinality.md`](../adr/0008-living-task-submit-cardinality.md).
+  [`docs/adr/0008-org-task-submit-cardinality.md`](../adr/0008-org-task-submit-cardinality.md).
   Lot-session tables and plant entity renames:
   [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md)—not Attesta ADRs.
 - **JSONata exprs:** chrome / transform / QR / HttpPort bodies use jsonata-go —
   see [`jsonata-living.md`](jsonata-living.md) before blaming the executor.
 - **`/app` i18n:** SPA chrome vs Config copy vs English platform errors —
-  [`docs/adr/0013-living-app-locale-tracks.md`](../adr/0013-living-app-locale-tracks.md)
+  [`docs/adr/0013-org-app-locale-tracks.md`](../adr/0013-org-app-locale-tracks.md)
   and [`app-i18n.md`](app-i18n.md).
 - **Same change:** every follower below lands in the same commit/PR as the YAML.
 
@@ -43,20 +43,20 @@ Plant nouns (lot session, Jobs, roles):
    [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md) in the same change.
    Platform terms stay in root [`GLOSSARY.md`](../../GLOSSARY.md). (Working day
    / shift are not Domain entities on this plant path.)
-3. **Seed** — update [`seed.go`](../../server/internal/living/seed.go) and
-   [`demo_commits.go`](../../server/internal/living/demo_commits.go) Commit
+3. **Seed** — update [`seed.go`](../../server/internal/org/seed.go) and
+   [`demo_commits.go`](../../server/internal/org/demo_commits.go) Commit
    sequence and id constants (truck / lot grammars; no day/turno Commits).
-4. **Living package tests** — fix callers of the old sequence; add focused
+4. **Org package tests** — fix callers of the old sequence; add focused
    Commit / Worklist cases for new `readyWhen` laws (intake incompleteness and
    one-open-lot exclusivity).
-5. **Living HTTP tests** — update
-   [`server/cmd/server/living_test.go`](../../server/cmd/server/living_test.go)
-   (and any other `cmd/server` Living paths) for the new Commit payloads and
+5. **Org HTTP tests** — update
+   [`server/cmd/server/org_test.go`](../../server/cmd/server/org_test.go)
+   (and any other `cmd/server` org API paths) for the new Commit payloads and
    job counts (`intake` / `lot_processing` / `passport`).
-6. **SPA fixture importers** — update `app/src/lib/living` tests that parse
-   `$living-fixtures` or hardcode plant task ids / schemas.
-7. **Verify** — `go test ./internal/living/`, `go test ./cmd/server/ -run Living`,
-   and `bun run test:unit -- --run src/lib/living` from `app/`.
+6. **SPA fixture importers** — update `app/src/lib/org` tests that parse
+   `$org-fixtures` or hardcode plant task ids / schemas.
+7. **Verify** — `go test ./internal/org/`, `go test ./cmd/server/ -run Living`,
+   and `bun run test:unit -- --run src/lib/org` from `app/`.
 8. **Local stacks** — after fixture YAML shape changes, run
    `task seed:feragame-config` (Active Config + empty Domain; no Appwrite).
    Soft Config refresh without Domain wipe:
@@ -69,7 +69,7 @@ Plant nouns (lot session, Jobs, roles):
 ## Commit navigation (`onCommit`)
 
 Per Task, optional `onCommit` keys control **server-side** post-Commit routing
-([ADR-0006](../adr/0006-living-operator-worklist-home.md); glossary
+([ADR-0006](../adr/0006-org-operator-worklist-home.md); glossary
 **Commit navigation**).
 
 | Key | Values | Default |

@@ -1,9 +1,9 @@
-# 13 rename — discussion notes (paused)
+# 13 rename — discussion notes
 
-**Date:** 2026-10-30  
+**Date:** 2026-10-30 (names locked 2026-11-16; hard-cut amended same day)  
 **Ticket:** `.scratch/living-flat-port/issues/13-rename-placeholders.md`  
-**Status:** discussion paused — more pressing work first; **do not implement rename** until open decisions below are settled.  
-**Product smoke** on `feat/attesta-rework` may still be pending; rename was gated on smoke + agreed names.
+**Status:** **names agreed — hard cut.** No `/api/living` aliases, no `LIVING_HTTP_*` fallbacks, no dual Cerbos, no Mongo/draft migration.  
+**Product copy:** “operating picture” may stay in docs/glossary prose; **code seams use `org`**, not `operation` / `living`.
 
 ## Why rename
 
@@ -12,58 +12,92 @@ Flat-port placeholders from decisions dump (`docs/research/attesta-app-living-pr
 | Placeholder | Role |
 | --- | --- |
 | `server/internal/living` | Go package (Domain / Org Config / Load / Commit HTTP) |
-| `app/src/lib/living/` | Client living Modules / UI |
+| `app/src/lib/living/` | Client Modules / UI |
 | `DomainStore` / `ConfigStore` | Persistence Interfaces |
 | `GET /api/living/domain` | Load |
 | `POST /api/living/commit` | Commit |
 | Cerbos kind `living` | Commit allow/deny |
-| `ATTESTA_LIVING_SEED` | Domain wipe gate (ticket 12) |
+| `ATTESTA_LIVING_SEED` | Never shipped; demo gate is already `ATTESTA_SEED` |
 
-Rejected forever: `/api/runs`, `RunStore`, `LoadRunPort`, Stream/Process as living product names.
+Rejected forever: `/api/runs`, `RunStore`, `LoadRunPort`, Stream/Process as `/app` product names; bare package `domain` (clashes with Org Config authored `domain` section).
 
-## Settled in this discussion
+## Settled (2026-11-16)
 
-1. **`living` is out** — bad lasting product/engineering label; rename away from package, HTTP prefix, Cerbos kind, env, and client lib path.
-2. **Package must not be named `domain` alone** — clashes with Org Config’s authored **`domain`** section (entity shape). Org Config is more than Domain: **roles + jobs/tasks + domain**. Runtime **Domain** store is a different noun. A package called `domain` collapses authored config vs accumulating Domain and undersells Jobs/Commit.
+Scheme A (package-prefixed HTTP). Package is an **owner** noun so `org.DomainStore` reads naturally; vague role types get **glossary objects** so they stay clear under a short package. **Hard cut** — old seams deleted in the same change.
 
-## Open decisions (need human)
+| Seam | Lasting name |
+| --- | --- |
+| Go package | `server/internal/org` (`package org`) |
+| SPA lib | `app/src/lib/org/` |
+| Domain persistence | keep `DomainStore` → `org.DomainStore` |
+| Config persistence | keep `ConfigStore` → `org.ConfigStore` |
+| DPP persistence | `PassportStore` → `DPPStore`; Mongo `org_dpps` |
+| Load engine | `DomainLoader` → `org.DomainLoader` |
+| Commit engine | `TaskCommitter` → `org.TaskCommitter` |
+| HTTP facade | `API` → `org.API` |
+| HTTP prefix | `/api/org/…` only (no `/api/living`) |
+| Cerbos | kind `task`, action `commit` (delete `living_policy.yaml`) |
+| Sidecar | `org-http`; env `ORG_HTTP_*` only |
+| SPA session | `OrgSession`, export `orgSession` |
+| Demo seed gate | `ATTESTA_SEED` |
+| Feragame emails | `admin@feragame.com`, `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com` |
+| Legacy Stream `/my` | **untouched** |
 
-1. **Go package name** (and matching `app/src/lib/…` if we keep them aligned)  
-   Candidates floated: `orgops`, `ops`, `operation`, `work`, `runtime`, plant-flavoured names (too demo-specific), or a short product brand word.  
-   Constraint: means “org operating picture” (Config + Domain + Load/Commit), not Domain-the-noun and not `living`.
+### Target HTTP map
 
-2. **HTTP paths**  
-   Options:  
-   - Prefix matches package (`/api/<pkg>/domain` + `/api/<pkg>/commit`)  
-   - Glossary-short without package echo (`/api/domain` + `/api/commit`, org from session)  
-   Load response is still Domain + Active Config either way.
+```text
+GET  /api/org/domain
+GET  /api/org/task-form
+GET  /api/org/task-recap
+POST /api/org/commit
+POST /api/org/close
+POST /api/org/qr-resolve
+GET  /api/org/artifacts/{id}
+```
 
-3. **Cerbos resource kind**  
-   Lean from discussion: kind `task`, action `commit` (glossary: Cerbos targets leaf Tasks). Alternatives: keep a product-prefixed kind once package name exists.
+### Mongo collections
 
-4. **Store Interface names**  
-   - `DomainStore` — likely keep (glossary “Domain store”)  
-   - `ConfigStore` → `OrgConfigStore`? undecided
+```text
+org_domains
+org_configs
+org_active_config
+org_dpps
+org_submission_links
+```
 
-5. **Env wipe flag**  
-   Replace `ATTESTA_LIVING_SEED` with something that follows the new adjective (e.g. `ATTESTA_<PKG>_SEED` or `ATTESTA_DOMAIN_SEED` — latter risks the same Domain clash in ops docs).
+### How key Go names should read
 
-6. **When to rename vs ticket 14 (FormPlan)**  
-   Coordinate so FormPlan port doesn’t land on paths that immediately rename; order undecided.
+```text
+org.DomainStore
+org.ConfigStore
+org.DPPStore
+org.DomainLoader
+org.TaskCommitter
+org.API
+```
 
-## Soft lean (not agreed)
+## Hard cut (no compatibility)
 
-- Drop `living` everywhere.  
-- Cerbos → kind `task` / action `commit`.  
-- Keep `DomainStore`; consider `OrgConfigStore`.  
-- Package: waiting on a name that is not `living` / not bare `domain`.
+- No dual-mount of `/api/living/*`.
+- No dual Cerbos kinds; delete `living` policy when flipping to `task`.
+- No `LIVING_HTTP_*` env aliases.
+- Mongo new names only — reset/re-seed (or drop old `living_*` collections).
+- Draft prefix only `attesta:org-draft:` (abandon `attesta:living-draft:`).
+- Digital Link order unchanged: org DPP first, else Stream process DPP.
+
+## Explicitly not chosen
+
+- `orgops`, `ops`, `operation` as package
+- Glossary-flat HTTP only (`/api/domain`, `/api/commit`)
+- Plant-branded package names
+- `org_org_configs` (use `org_configs`)
 
 ## Resume checklist
 
-- [ ] Agree package (+ client lib) name  
-- [ ] Agree HTTP paths  
-- [ ] Agree Cerbos kind (+ action)  
-- [ ] Agree store Interface renames (if any)  
-- [ ] Agree env flag name  
-- [ ] Record lasting table in decisions dump (and/or glossary-adjacent note)  
-- [ ] Then implement ticket 13 (code + docs + smoke green)
+- [x] Agree package (+ client lib) name → `org`
+- [x] Agree HTTP paths → `/api/org/…` hard cut
+- [x] Agree Cerbos → `task` / `commit`
+- [x] Agree stores → `DomainStore` / `ConfigStore` / `DPPStore`
+- [x] Agree env / seed / emails / Mongo names
+- [x] Record lasting table in decisions dump (pointer row)
+- [x] Implement ticket 13 (code + docs + smoke green)

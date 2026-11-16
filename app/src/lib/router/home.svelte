@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LivingShell from '../living/LivingShell.svelte';
+	import OrgShell from '../org/OrgShell.svelte';
 </script>
 
-<LivingShell />
+<OrgShell />

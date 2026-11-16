@@ -1,12 +1,13 @@
-# Living Attesta
+# Org product (`/app`)
 
 Single-organization operating picture: a versioned **Org Config** (roles +
 jobs/tasks) and one accumulating **Domain** per org. Operators repeat **Jobs**
 inside the config; they do not run the whole config as an instance. Product UI
 for this context lives under `/app`.
 
-Which glossary applies: [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md) (Living platform,
-Feragame plant payload, Legacy Stream). Living ADRs: [`docs/adr/`](docs/adr/).
+Which glossary applies: [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md) (Org platform,
+Feragame plant payload, Legacy Stream). Org product ADRs: [`docs/adr/`](docs/adr/)
+(0005–0013).
 
 ## Language
 
@@ -27,7 +28,7 @@ The Config version the Organization uses for new work and for Load unless a pin
 policy says otherwise. Pin-in-flight policy is open.
 _Avoid_: Implied “latest file on disk” without an org pointer
 
-**Domain** (living):
+**Domain**:
 The Organization’s accumulating facts: entities with stable ids plus append-only
 submission history. One Domain per org.
 _Avoid_: One Domain per whole-config execution; Stream instance; Process
@@ -166,7 +167,7 @@ _Avoid_: Submission; Domain; multi-pass Task reopen while “row ids remain”
 
 ### Roles
 
-**Role catalog** (living):
+**Role catalog**:
 The set of **Config roles** declared on the Org Config.
 _Avoid_: Putting platform-only standing in the catalog; Stream role (legacy
 blueprint gate name)
@@ -222,17 +223,18 @@ maps under `mapTable`.
 _Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`;
 `ui:field: rowTable`
 
-### Passport (living)
+### Passport / DPP
 
-**Passport**:
+**Passport** (Config + operator prose):
 The issued Digital Product Passport for one Domain subject. Public credential
 and human page are projections of a **Passport snapshot**, not a live Domain
-walk. **Passport production** is a core living platform capability. Org Config
+walk. **Passport production** is a core Org platform capability. Org Config
 declares scheme in a root **`passport`** block (subject binding, identity,
 snapshot projection); a Lock leaf opts in with thin **`onSubmit.passport`** (not
 HttpPort). Which entity is the subject is Config payload (see Feragame glossary
-for the demo plant).
-_Avoid_: Stream Process DPP as the living issue path; SPA-assembled passport
+for the demo plant). **Code and storage** use **DPP** (`DPPStore`, `org_dpps`,
+`onSubmit.passport` still names the Config hook).
+_Avoid_: Stream Process DPP as the Org `/app` issue path; SPA-assembled passport
 payloads; treating one plant’s YAML as the feature itself; gather graph only on
 the Task with no root scheme; Job-level “produces DPP” with no Commit leaf
 
@@ -260,7 +262,7 @@ just another Domain entity row
 ### Operator and seams
 
 **Dumb executor**:
-Go and the living SPA only evaluate Org Config and project Worklist/forms; plant
+Go and the `/app` SPA only evaluate Org Config and project Worklist/forms; plant
 business rules (entity shapes, open/close transforms, readyWhen) are authored in
 Config, not hard-coded in executors.
 _Avoid_: Plant- or domain-named branches in Go or SPA; exclusivity law outside
@@ -314,7 +316,7 @@ Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**,
 viewer Config **roles** (for Available affordances), and Active Config version
 metadata for the home board; not a dump of full Domain + full Org Config.
 **Task form bundle**s load when opening a Task route via addressed fetch (`GET
-/api/living/task-form`; provisional `jobInstanceId` empty / `new`) and may
+/api/org/task-form`; provisional `jobInstanceId` empty / `new`) and may
 return on Commit when **Commit navigation** advances to a Task — home Load omits
 bulk bundles (ADR-0006). SPA post-Commit routing consumes Commit navigation (+
 bundle when advancing to a Task).
@@ -333,7 +335,7 @@ Job, authored `taskIds`, `startLabel`, `repeatable`, and Config-free Task title
 never uses Submission alone for `done`. Unlocked-not-done folds Task
 **readyWhen** (false ⇒ `unavailable`, skip role split); else unlocked splits by
 Config-role eligibility into `available` (not for this viewer) vs `actionable`
-(Per te). Living `/app` home is a **single act-now list**: viewer **`actionable`**
+(Per te). `/app` home is a **single act-now list**: viewer **`actionable`**
 Tasks and **Can start** rows (mount gates stay actionable-only). For
 **`submit: many`** act-now rows, Submission history chrome may sit under the row
 when count N > 0 (lazy facts/links). No home In progress / Completed bands;
@@ -364,7 +366,7 @@ target. The `/app/{jobId}/{jobInstanceId}` route may remain for that Archive
 link.
 _Avoid_: Commit or Continue navigation to overview; home deep-links into
 overview as the act-now path; day→shift→lot Archive tree; process page;
-treating overview as the living operator board; Task-group Spawn/Close as
+treating overview as the operator board; Task-group Spawn/Close as
 product law (groups are being removed)
 
 **Task form bundle**:
@@ -403,11 +405,11 @@ _Avoid_: Using these as names for Org Config, Domain, Job, or Task
 
 ### Rejected / historical code names
 
-Do not revive as living product nouns. Experiment/code may still say them until
-the port lands.
+Do not revive as Org product nouns. Experiment/code may still say them in
+archival notes until readers catch up.
 
 - **Whole-config execution** (historical name `Config run`): one “run of the
-  config” with its own Domain. Living Attesta uses one org Domain and repeated
+  config” with its own Domain. The Org product uses one org Domain and repeated
   Job instances instead.
 - **`LoadRunPort` / `/api/runs` / `RunStore`**: run-id shaped load/persist.
   Replace with org Domain Load/Commit.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 )
 
 const seedUsage = `Usage: attesta seed [flags]
@@ -48,7 +48,7 @@ func runSeedCommand(ctx context.Context, args []string) error {
 		fmt.Print(seedUsage)
 		return nil
 	}
-	scope, err := seedLivingScopeFromArgs(args)
+	scope, err := seedOrgScopeFromArgs(args)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func seedHelpFromArgs(args []string) bool {
 	return false
 }
 
-func seedKeepDomainFromArgs(args []string, scope living.SeedScope) (bool, error) {
+func seedKeepDomainFromArgs(args []string, scope org.SeedScope) (bool, error) {
 	keep := false
 	for _, arg := range args {
 		if strings.TrimSpace(arg) == "--keep-domain" {
@@ -89,32 +89,32 @@ func seedKeepDomainFromArgs(args []string, scope living.SeedScope) (bool, error)
 		return false, nil
 	}
 	switch scope {
-	case living.SeedScopeFeragameConfig, living.SeedScopeFeragameIdentity:
+	case org.SeedScopeFeragameConfig, org.SeedScopeFeragameIdentity:
 		return true, nil
 	default:
 		return false, fmt.Errorf("seed: --keep-domain is only valid with --feragame-config or --feragame-identity")
 	}
 }
 
-func seedLivingScopeFromArgs(args []string) (living.SeedScope, error) {
-	var found []living.SeedScope
+func seedOrgScopeFromArgs(args []string) (org.SeedScope, error) {
+	var found []org.SeedScope
 	for _, arg := range args {
 		switch strings.TrimSpace(arg) {
 		case "--feragame-config":
-			found = append(found, living.SeedScopeFeragameConfig)
+			found = append(found, org.SeedScopeFeragameConfig)
 		case "--feragame-domain":
-			found = append(found, living.SeedScopeFeragameDomain)
+			found = append(found, org.SeedScopeFeragameDomain)
 		case "--feragame-identity":
-			found = append(found, living.SeedScopeFeragameIdentity)
+			found = append(found, org.SeedScopeFeragameIdentity)
 		case "--feragame-full":
-			found = append(found, living.SeedScopeFeragameFull)
+			found = append(found, org.SeedScopeFeragameFull)
 		}
 	}
 	if len(found) > 1 {
-		return living.SeedScopeBoth, fmt.Errorf("seed: Feragame scope flags are mutually exclusive")
+		return org.SeedScopeBoth, fmt.Errorf("seed: Feragame scope flags are mutually exclusive")
 	}
 	if len(found) == 1 {
 		return found[0], nil
 	}
-	return living.SeedScopeBoth, nil
+	return org.SeedScopeBoth, nil
 }

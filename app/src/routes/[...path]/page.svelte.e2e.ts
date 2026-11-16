@@ -57,15 +57,15 @@ const registerBundle = {
 	bindings: { domain: { submissions: [], jobInstances: [] } }
 };
 
-async function stubLivingApis(page: Page) {
-	await page.route('**/api/living/domain', async (route) => {
+async function stubOrgApis(page: Page) {
+	await page.route('**/api/org/domain', async (route) => {
 		await route.fulfill({
 			status: 200,
 			contentType: 'application/json',
 			body: JSON.stringify(homeLoad)
 		});
 	});
-	await page.route('**/api/living/task-form**', async (route) => {
+	await page.route('**/api/org/task-form**', async (route) => {
 		const url = new URL(route.request().url());
 		const taskId = url.searchParams.get('taskId') ?? 'register';
 		const jobInstanceId = url.searchParams.get('jobInstanceId') ?? '';
@@ -91,10 +91,10 @@ async function stubLivingApis(page: Page) {
 }
 
 test('home route renders act-now Worklist (Italian default)', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app');
 	await expect(page.locator('html')).toHaveAttribute('lang', 'it');
-	await expect(page.getByTestId('living-shell')).toBeVisible();
+	await expect(page.getByTestId('org-shell')).toBeVisible();
 	// fallback_home is "Home" in both it and en catalogs
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 	await expect(page.getByTestId('nav-back')).toHaveCount(0);
@@ -110,7 +110,7 @@ test('home route renders act-now Worklist (Italian default)', async ({ page }) =
 });
 
 test('Home → Can start → nav-back → Home', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app');
 	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
 	await page.getByTestId('can-start-row').click();
@@ -118,13 +118,13 @@ test('Home → Can start → nav-back → Home', async ({ page }) => {
 	await expect(page.getByTestId('task-register')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
-	await expect(page.getByTestId('living-shell')).toBeVisible();
+	await expect(page.getByTestId('org-shell')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
 });
 
 test('Home → act-now task row → nav-back → Home', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app');
 	await expect(page.getByTestId('available-row')).toBeVisible();
 	await page.getByTestId('available-row').click();
@@ -132,13 +132,13 @@ test('Home → act-now task row → nav-back → Home', async ({ page }) => {
 	await expect(page.getByTestId('task-register')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
-	await expect(page.getByTestId('living-shell')).toBeVisible();
+	await expect(page.getByTestId('org-shell')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
 });
 
 test('overview shows handoff copy for other-role available Task', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app/intake/NIR-1');
 	await expect(page.getByTestId('overview-route')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('NIR-1');
@@ -148,21 +148,21 @@ test('overview shows handoff copy for other-role available Task', async ({ page 
 });
 
 test('unauthorized Task URL redirects Home', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app/intake/NIR-1/palletWeight');
-	await expect(page.getByTestId('living-shell')).toBeVisible();
+	await expect(page.getByTestId('org-shell')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 });
 
 test('unknown Task instance redirects Home', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app/intake/missing/register');
-	await expect(page.getByTestId('living-shell')).toBeVisible();
+	await expect(page.getByTestId('org-shell')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 });
 
 test('finished overview URL stays on overview', async ({ page }) => {
-	await stubLivingApis(page);
+	await stubOrgApis(page);
 	await page.goto('/app/intake/NIR-done');
 	await expect(page.getByTestId('overview-route')).toBeVisible();
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Finished');

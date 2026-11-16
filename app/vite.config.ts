@@ -7,9 +7,9 @@ import { playwright } from '@vitest/browser-playwright';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
-const livingFixturesDir = path.resolve(
+const orgFixturesDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
-	'../server/internal/living/fixtures'
+	'../server/internal/org/fixtures'
 );
 
 export default defineConfig({
@@ -41,7 +41,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			// Single Feragame plant fixture (Go //go:embed); SPA tests import via ?raw.
-			'$living-fixtures': livingFixturesDir
+			'$org-fixtures': orgFixturesDir
 		}
 	},
 	server: {
@@ -52,7 +52,7 @@ export default defineConfig({
 			host: process.env.VITE_HMR_HOST || 'localhost'
 		},
 		fs: {
-			allow: [livingFixturesDir]
+			allow: [orgFixturesDir]
 		}
 	},
 	preview: {

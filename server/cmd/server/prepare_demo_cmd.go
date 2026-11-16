@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 )
 
 func runPrepareCommand(ctx context.Context, args []string) error {
@@ -20,7 +20,7 @@ func runPrepareCommand(ctx context.Context, args []string) error {
 	deps := PrepareDeps{Policy: policy}
 
 	return PrepareDemoStack(ctx, deps.withSeedRunner(func(ctx context.Context, creds appwriteRuntimeCredentials) error {
-		return runSeedSession(ctx, nil, false, living.SeedScopeBoth, false, &creds)
+		return runSeedSession(ctx, nil, false, org.SeedScopeBoth, false, &creds)
 	}))
 }
 

@@ -23,11 +23,11 @@ type demoFixture struct {
 
 // Living Feragame demo org / operators (Cerbos Commit demos on /app).
 const (
-	demoLivingOrgSlug           = "feragame"
-	demoLivingUserEmail         = "living@attesta.com"
-	demoLivingAdminUserEmail    = "administration@attesta.com"
-	demoLivingLogisticUserEmail = "logistic@attesta.com"
-	demoLivingLineUserEmail     = "line@attesta.com"
+	demoFeragameOrgSlug           = "feragame"
+	demoOrgAdminUserEmail         = "admin@feragame.com"
+	demoAdministrationUserEmail    = "administration@feragame.com"
+	demoLogisticUserEmail = "logistic@feragame.com"
+	demoLineUserEmail     = "line@feragame.com"
 )
 
 func feragameOrgDef() demoFixtureOrg {
@@ -44,39 +44,39 @@ func feragameOrgDef() demoFixtureOrg {
 func feragameLivingUsers() []demoFixtureUser {
 	return []demoFixtureUser{
 		{
-			Email:         demoLivingUserEmail,
-			Password:      demoLivingUserEmail,
+			Email:         demoOrgAdminUserEmail,
+			Password:      demoOrgAdminUserEmail,
 			Name:          "Living All Roles",
-			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			OrgAdminSlugs: []string{demoFeragameOrgSlug},
 			MembershipRoles: map[string][]string{
-				demoLivingOrgSlug: {"administration", "logistic", "line"},
+				demoFeragameOrgSlug: {"administration", "logistic", "line"},
 			},
 		},
 		{
-			Email:         demoLivingAdminUserEmail,
-			Password:      demoLivingAdminUserEmail,
+			Email:         demoAdministrationUserEmail,
+			Password:      demoAdministrationUserEmail,
 			Name:          "Living Administration",
-			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			OrgAdminSlugs: []string{demoFeragameOrgSlug},
 			MembershipRoles: map[string][]string{
-				demoLivingOrgSlug: {"administration"},
+				demoFeragameOrgSlug: {"administration"},
 			},
 		},
 		{
-			Email:         demoLivingLogisticUserEmail,
-			Password:      demoLivingLogisticUserEmail,
+			Email:         demoLogisticUserEmail,
+			Password:      demoLogisticUserEmail,
 			Name:          "Living Logistic",
-			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			OrgAdminSlugs: []string{demoFeragameOrgSlug},
 			MembershipRoles: map[string][]string{
-				demoLivingOrgSlug: {"logistic"},
+				demoFeragameOrgSlug: {"logistic"},
 			},
 		},
 		{
-			Email:         demoLivingLineUserEmail,
-			Password:      demoLivingLineUserEmail,
+			Email:         demoLineUserEmail,
+			Password:      demoLineUserEmail,
 			Name:          "Living Line",
-			OrgAdminSlugs: []string{demoLivingOrgSlug},
+			OrgAdminSlugs: []string{demoFeragameOrgSlug},
 			MembershipRoles: map[string][]string{
-				demoLivingOrgSlug: {"line"},
+				demoFeragameOrgSlug: {"line"},
 			},
 		},
 	}
@@ -89,7 +89,7 @@ func feragameDemoFixture() demoFixture {
 		Password:      "admin@attesta.com",
 		Name:          "Platform Admin",
 		PlatformAdmin: true,
-		OrgAdminSlugs: []string{demoLivingOrgSlug},
+		OrgAdminSlugs: []string{demoFeragameOrgSlug},
 	}}
 	users = append(users, feragameLivingUsers()...)
 	return demoFixture{
@@ -105,7 +105,7 @@ func defaultDemoFixture() demoFixture {
 			Password:      "admin@attesta.com",
 			Name:          "Platform Admin",
 			PlatformAdmin: true,
-			OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3", demoLivingOrgSlug},
+			OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3", demoFeragameOrgSlug},
 		},
 		{
 			Email:         "admin@org1.com",

@@ -34,8 +34,8 @@ tasks:
       - task: worktree:bootstrap
       - bash scripts/worktree-compose.sh up --build
 
-  living-http:rebuild:
-    desc: Rebuild and recreate only living-http (use after services/living-http changes).
+  org-http:rebuild:
+    desc: Rebuild and recreate only org-http (use after services/org-http changes).
     cmds:
       - task: worktree:bootstrap
       - |
@@ -51,7 +51,7 @@ tasks:
           export ATTESTA_ROOT_DIR ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
           docker compose --project-name "${COMPOSE_PROJECT_NAME}" \
             -f "${ROOT_DIR}/deployment/docker-compose.local.yaml" \
-            up -d --build --force-recreate --no-deps living-http
+            up -d --build --force-recreate --no-deps org-http
           '
 
   start:docker:

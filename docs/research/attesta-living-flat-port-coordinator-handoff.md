@@ -41,15 +41,15 @@ Ship a **demoable flat** living product: org Domain + versioned Org Config fixtu
 
 Work **one ticket at a time** when implementing; as coordinator, keep the queue and blockers honest (mark done in the ticket file Status / checkboxes).
 
-## Code seam placeholders (until 13)
+## Code seams (ticket 13 hard cut)
 
-| Placeholder | Role |
+| Seam | Role |
 | --- | --- |
-| `server/internal/living` | Go package |
-| `DomainStore` / `ConfigStore` | Persistence Interfaces |
-| `GET /api/living/domain` | Load |
-| `POST /api/living/commit` | Commit (Task path + Job instance id + sealed value) |
-| Cerbos kind `living` | Draft Commit resource |
+| `server/internal/org` | Go package (`DomainLoader`, `TaskCommitter`, `API`, stores) |
+| `DomainStore` / `ConfigStore` / `DPPStore` | Persistence interfaces |
+| `GET /api/org/domain` | Load |
+| `POST /api/org/commit` | Commit (Task path + Job instance id + sealed value) |
+| Cerbos kind `task` / `commit` | Commit resource policy |
 
 Rejected even as placeholders: `/api/runs`, `RunStore`, `LoadRunPort`.
 
@@ -63,7 +63,7 @@ Rejected even as placeholders: `/api/runs`, `RunStore`, `LoadRunPort`.
 ## Port policy (summary)
 
 - **Copy + adapt:** pure TS Modules/tests, fixture, UI → `app/`; rename Step→Job etc. on the Commit path.  
-- **Rewrite:** Kit `+server` / SQLite / run-id HTTP → Go living + stores; Go Commit accept path; no harness PUT.  
+- **Rewrite:** Kit `+server` / SQLite / run-id HTTP → `server/internal/org` + stores; Go Commit accept path; no harness PUT.  
 - **Don’t copy:** spikes, Task group/lot work, harness product UI.
 
 Full text in the decisions dump.
@@ -87,7 +87,7 @@ Full text in the decisions dump.
 Per ticket acceptance checkboxes, plus as the stack grows:
 
 ```bash
-cd server && go test ./internal/living/... ./cmd/server -count=1
+cd server && go test ./internal/org/... ./cmd/server -count=1
 # after app UI tickets:
 cd app && bun run check && bun run build
 # smoke: task:dev → login → /app → Load; later Commit intake/line

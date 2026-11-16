@@ -6,23 +6,23 @@ vi.mock('./index.js', () => ({
 }));
 
 import { p } from './index.js';
-import { hrefLivingTarget } from './navigate-target.js';
+import { hrefOrgTarget } from './navigate-target.js';
 
-describe('hrefLivingTarget', () => {
+describe('hrefOrgTarget', () => {
 	test('home target matches p("/")', () => {
-		const href = hrefLivingTarget({ kind: 'home' });
+		const href = hrefOrgTarget({ kind: 'home' });
 		expect(href).toBe(p('/'));
 		expect(href).toContain('/app');
 	});
 
 	test('archive target matches p("/archive")', () => {
-		const href = hrefLivingTarget({ kind: 'archive' });
+		const href = hrefOrgTarget({ kind: 'archive' });
 		expect(href).toBe(p('/archive'));
 		expect(href).toContain('/app/archive');
 	});
 
 	test('nested task target includes group coordinates', () => {
-		const href = hrefLivingTarget({
+		const href = hrefOrgTarget({
 			kind: 'task',
 			jobId: 'intake',
 			jobInstanceId: 'T1',

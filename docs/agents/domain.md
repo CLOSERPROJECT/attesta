@@ -4,10 +4,10 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (Living
+- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (Org
   platform, Feragame plant, Legacy Stream). Then read that glossary.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
-  Living ADRs lock **platform** Decisions only—not plant YAML.
+  Org product ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
 - Plant fixture edits: also
   [`plant-config.md`](plant-config.md) and
   [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md).
@@ -21,7 +21,7 @@ creates them lazily when terms or decisions actually get resolved.
 ```
 /
 ├── GLOSSARY-MAP.md              ← which glossary
-├── GLOSSARY.md                  ← Living Attesta (platform)
+├── GLOSSARY.md                  ← Org product (platform)
 ├── CONTEXT.md                   ← Legacy Stream
 ├── docs/
 │   ├── feragame/GLOSSARY.md     ← first plant / Org Config payload
@@ -33,7 +33,7 @@ creates them lazily when terms or decisions actually get resolved.
 When your output names a domain concept (in an issue title, a refactor proposal,
 a hypothesis, a test name), use the term as defined in the glossary
 `GLOSSARY-MAP.md` selected for that work. Don't drift to synonyms the glossary
-explicitly avoids. Don't promote Feragame plant nouns into Living platform
+explicitly avoids. Don't promote Feragame plant nouns into Org platform
 docs or Attesta ADRs.
 
 If the concept you need isn't in the right glossary yet, that's a signal:

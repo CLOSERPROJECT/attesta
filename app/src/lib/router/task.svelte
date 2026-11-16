@@ -2,13 +2,13 @@
 	import * as m from '#lib/paraglide/messages.js';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 
-	import type { CommitOutcome } from '../living/commit-port.js';
-	import TaskForm from '../living/TaskForm.svelte';
-	import type { TaskFormBundle } from '../living/form/task-form-bundle.js';
-	import { living } from '../living/living-app.svelte.js';
-	import { livingRouteCoordsFromPath } from '../living/nav-place.js';
-	import { TaskFormError } from '../living/task-form-port.js';
-	import { openGroupLoopChrome } from '../living/worklist-overview.js';
+	import type { CommitOutcome } from '../org/commit-port.js';
+	import TaskForm from '../org/TaskForm.svelte';
+	import type { TaskFormBundle } from '../org/form/task-form-bundle.js';
+	import { orgSession } from '../org/org-app.svelte.js';
+	import { orgRouteCoordsFromPath } from '../org/nav-place.js';
+	import { TaskFormError } from '../org/task-form-port.js';
+	import { openGroupLoopChrome } from '../org/worklist-overview.js';
 	import {
 		resolveCommitFollowUp,
 		resolveContinueNavigation,
@@ -16,12 +16,12 @@
 		resolvePostCommitNavigation,
 		resolveTaskDeepLink,
 		resolveUnmountableTaskTarget
-	} from '../living/worklist-nav.js';
+	} from '../org/worklist-nav.js';
 	import { route } from './index.js';
-	import { navigateLivingTarget } from './navigate-target.js';
+	import { navigateOrgTarget } from './navigate-target.js';
 
 	// Pathname segments only — sv-router leaks group* from failed 5-seg match.
-	const coords = $derived(livingRouteCoordsFromPath({ pathname: route.pathname }));
+	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
 	const jobId = $derived(coords.jobId);
 	const taskId = $derived(coords.taskId);
 	const routeInstance = $derived(coords.jobInstanceId);
@@ -53,7 +53,7 @@
 	const groupLoop = $derived(
 		stayedOutcome && groupId
 			? openGroupLoopChrome(
-					living.result?.worklist,
+					orgSession.result?.worklist,
 					jobId,
 					stayedOutcome.jobInstanceId || jobInstanceId,
 					groupId
@@ -62,7 +62,7 @@
 	);
 
 	function advanceFromClose(outcome: CommitOutcome) {
-		navigateLivingTarget(
+		navigateOrgTarget(
 			resolvePostCommitNavigation(
 				outcome.navigation === 'stay' ? 'home' : outcome.navigation,
 				jobId,
@@ -73,7 +73,7 @@
 	}
 
 	function endLinksStay() {
-		living.clearLinksStay();
+		orgSession.clearLinksStay();
 		stayedOutcome = null;
 		stayRouteKey = null;
 		confirmClose = false;
@@ -93,17 +93,17 @@
 			return;
 		}
 		// Drop Commit links before navigate so the next TaskForm does not inherit them.
-		living.clearLinksStay();
+		orgSession.clearLinksStay();
 		stayedOutcome = null;
 		stayRouteKey = null;
-		navigateLivingTarget(followUp);
+		navigateOrgTarget(followUp);
 	}
 
 	function onContinue() {
 		const outcome = stayedOutcome;
 		if (!outcome) return;
 		endLinksStay();
-		navigateLivingTarget(
+		navigateOrgTarget(
 			resolveContinueNavigation(
 				outcome.continueNavigation,
 				jobId,
@@ -118,7 +118,7 @@
 		const firstChild = groupLoop?.firstChildTaskId;
 		if (!outcome || !groupId || !firstChild) return;
 		endLinksStay();
-		navigateLivingTarget(
+		navigateOrgTarget(
 			resolveGroupStartAnotherTarget(
 				jobId,
 				outcome.jobInstanceId,
@@ -138,7 +138,7 @@
 
 	async function confirmCloseGroup() {
 		if (!groupId || !stayedOutcome) return;
-		const outcome = await living.closeGroup({
+		const outcome = await orgSession.closeGroup({
 			jobId,
 			jobInstanceId: stayedOutcome.jobInstanceId,
 			groupId
@@ -157,18 +157,18 @@
 		const isProvSpawn = provisionalSpawn;
 		const instanceId = jobInstanceId;
 		const key = routeKey;
-		void living.result;
-		void living.loading;
-		void living.linksStayActive;
+		void orgSession.result;
+		void orgSession.loading;
+		void orgSession.linksStayActive;
 
-		if (living.linksStayActive) {
+		if (orgSession.linksStayActive) {
 			if (stayRouteKey === null || stayRouteKey === key) {
 				redirected = false;
 				loading = false;
 				error = null;
 				return;
 			}
-			living.clearLinksStay();
+			orgSession.clearLinksStay();
 		}
 
 		const gen = ++loadGen;
@@ -184,12 +184,12 @@
 			return;
 		}
 
-		if (!living.result) {
+		if (!orgSession.result) {
 			bundle = null;
 			error = null;
 			loading = true;
-			if (!living.loading) {
-				void living.hydrate();
+			if (!orgSession.loading) {
+				void orgSession.hydrate();
 			}
 			return;
 		}
@@ -199,7 +199,7 @@
 			instanceId,
 			tid,
 			isProvJob,
-			living.result.worklist,
+			orgSession.result.worklist,
 			gid,
 			giRoute
 		);
@@ -208,7 +208,7 @@
 			loading = false;
 			bundle = null;
 			error = null;
-			navigateLivingTarget(gate);
+			navigateOrgTarget(gate);
 			return;
 		}
 
@@ -228,7 +228,7 @@
 				: {})
 		};
 
-		void living
+		void orgSession
 			.fetchTaskForm(fetchReq)
 			.then((next) => {
 				if (gen !== loadGen) return;
@@ -240,12 +240,12 @@
 				bundle = null;
 				if (err instanceof TaskFormError && (err.status === 403 || err.status === 404)) {
 					redirected = true;
-					navigateLivingTarget(
+					navigateOrgTarget(
 						resolveUnmountableTaskTarget(
 							jid,
 							instanceId,
 							isProvJob,
-							living.result?.worklist
+							orgSession.result?.worklist
 						)
 					);
 					return;
@@ -264,9 +264,9 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="task-route">
-	{#if living.commitError}
-		<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
-			{stayedOutcome && confirmClose ? m.close_denied() : m.commit_denied()}: {living.commitError}
+	{#if orgSession.commitError}
+		<p class="text-sm text-red-700" data-testid="org-commit-error" role="alert">
+			{stayedOutcome && confirmClose ? m.close_denied() : m.commit_denied()}: {orgSession.commitError}
 		</p>
 	{/if}
 
@@ -311,7 +311,7 @@
 									type="button"
 									class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
 									data-testid="task-close-cancel"
-									disabled={living.committing}
+									disabled={orgSession.committing}
 									onclick={cancelClose}
 								>
 									{m.cancel()}
@@ -320,7 +320,7 @@
 									type="button"
 									class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
 									data-testid="task-close-confirm-submit"
-									disabled={living.committing}
+									disabled={orgSession.committing}
 									onclick={() => void confirmCloseGroup()}
 								>
 									{groupLoop.closeLabel}
@@ -334,7 +334,7 @@
 									type="button"
 									class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
 									data-testid="task-start-another"
-									disabled={living.committing}
+									disabled={orgSession.committing}
 									onclick={onStartAnother}
 								>
 									{m.start_another()}
@@ -345,7 +345,7 @@
 									type="button"
 									class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
 									data-testid="task-close"
-									disabled={living.committing}
+									disabled={orgSession.committing}
 									onclick={askClose}
 								>
 									{groupLoop.closeLabel}
@@ -360,7 +360,7 @@
 						size="sm"
 						class="bg-[var(--input)]"
 						data-testid="task-links-continue"
-						disabled={living.committing}
+						disabled={orgSession.committing}
 						onclick={onContinue}
 					>
 						{m.continue()}

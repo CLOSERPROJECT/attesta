@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 	"github.com/CLOSERPROJECT/attesta/server/internal/untp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -168,12 +168,12 @@ type Server struct {
 	turnstileSecretKey string
 	turnstileClient    *http.Client
 	turnstileVerifyURL string
-	livingDomains      living.DomainStore
-	livingConfigs      living.ConfigStore
-	livingLinks        living.LinkStore
-	livingPassports    living.PassportStore
-	livingAuthorizer   living.Authorizer
-	livingHttpPort     living.HttpPort
+	orgDomains      org.DomainStore
+	orgConfigs      org.ConfigStore
+	orgLinks        org.LinkStore
+	orgDPPs    org.DPPStore
+	orgAuthorizer   org.Authorizer
+	orgHttpPort     org.HttpPort
 }
 
 type SSEHub struct {
@@ -2536,14 +2536,14 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/docs/", s.handleDocs)
 	mux.HandleFunc("/about", s.handleAbout)
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
-	livingAPI := s.livingHandler()
-	mux.Handle("/api/living/domain", livingAPI)
-	mux.Handle("/api/living/task-form", livingAPI)
-	mux.Handle("/api/living/task-recap", livingAPI)
-	mux.Handle("/api/living/commit", livingAPI)
-	mux.Handle("/api/living/close", livingAPI)
-	mux.Handle("/api/living/qr-resolve", livingAPI)
-	mux.Handle("/api/living/artifacts/", livingAPI)
+	orgHTTP := s.orgAPI()
+	mux.Handle("/api/org/domain", orgHTTP)
+	mux.Handle("/api/org/task-form", orgHTTP)
+	mux.Handle("/api/org/task-recap", orgHTTP)
+	mux.Handle("/api/org/commit", orgHTTP)
+	mux.Handle("/api/org/close", orgHTTP)
+	mux.Handle("/api/org/qr-resolve", orgHTTP)
+	mux.Handle("/api/org/artifacts/", orgHTTP)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
@@ -5969,8 +5969,8 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		if _, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
-			// Living Passports do not expose Stream attachment downloads.
+		if _, found := s.loadOrgDPPByIdentity(r.Context(), gtin, lot, serial); found {
+			// Living DPPs do not expose Stream attachment downloads.
 			http.NotFound(w, r)
 			return
 		}
@@ -5982,8 +5982,8 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		if _, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
-			s.serveLivingPassportEventsGone(w)
+		if _, found := s.loadOrgDPPByIdentity(r.Context(), gtin, lot, serial); found {
+			s.serveOrgDPPEventsGone(w)
 			return
 		}
 		s.handleDigitalLinkEvents(w, r, gtin, lot, serial)
@@ -5994,8 +5994,8 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if rec, found := s.loadLivingPassportByIdentity(r.Context(), gtin, lot, serial); found {
-		s.serveLivingPassport(w, r, rec)
+	if rec, found := s.loadOrgDPPByIdentity(r.Context(), gtin, lot, serial); found {
+		s.serveOrgDPP(w, r, rec)
 		return
 	}
 	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)
@@ -8337,7 +8337,7 @@ func (s *Server) affiliationService() *Affiliation {
 	}
 	affStore, ok := s.store.(affiliationStore)
 	if !ok {
-		// Handler tests often omit a full Store; use an empty memory port so
+		// API tests often omit a full Store; use an empty memory port so
 		// invite/compatibility checks and chrome helpers do not panic.
 		affStore = NewMemoryStore()
 	}
