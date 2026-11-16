@@ -7,10 +7,11 @@
 	import * as Dialog from '#lib/shadcn/ui/dialog/index.js';
 
 	import { draftAddressForTask } from '../living/drafts.js';
+	import ManySubmitHistory from '../living/ManySubmitHistory.svelte';
 	import OverviewRowChrome from '../living/OverviewRowChrome.svelte';
 	import TaskRecapPanel from '../living/TaskRecapPanel.svelte';
 	import { living } from '../living/living-app.svelte.js';
-	import type { TaskStatus } from '../living/types.js';
+	import type { TaskStatus, TaskSubmit } from '../living/types.js';
 	import {
 		formatHandoffCopy,
 		jobInstanceOverview,
@@ -129,7 +130,7 @@
 			return;
 		}
 		if (living.loading || !living.result) return;
-		// Finished instances stay on overview (Completed band / post-Commit deep-links).
+		// Finished instances stay on overview (Archive rediscovery / deep-links).
 		if (!model) {
 			navigate('/');
 		}
@@ -171,7 +172,7 @@
 		if (!outcome) return;
 		navigateLivingTarget(
 			resolvePostCommitNavigation(
-				outcome.next,
+				outcome.navigation === 'stay' ? 'home' : outcome.navigation,
 				jobId,
 				outcome.jobInstanceId,
 				outcome.nextTaskFormBundle
@@ -275,6 +276,8 @@
 		doneItemClass: string;
 		doneTriggerClass: string;
 		doneContentClass: string;
+		submit?: TaskSubmit;
+		submissionCount?: number;
 	};
 </script>
 
@@ -296,31 +299,41 @@
 				<TaskRecapPanel active={opts.doneExpanded} request={opts.recap} />
 			</Accordion.Content>
 		</Accordion.Item>
-	{:else if opts.linkable}
-		<a
-			class={linkShellClass(opts.status)}
-			data-testid="overview-task-link"
-			data-task-id={opts.taskId}
-			href={opts.href}
-		>
-			<OverviewRowChrome
-				orderNumber={opts.orderNumber}
-				title={opts.title}
-				status={opts.status}
-				showDraft={opts.showDraft}
-			/>
-		</a>
 	{:else}
-		<div
-			class={rowShellClass(opts.status)}
-			data-testid="overview-task-status"
-			data-task-id={opts.taskId}
-		>
-			<OverviewRowChrome
-				orderNumber={opts.orderNumber}
-				title={opts.title}
-				status={opts.status}
-				showDraft={opts.showDraft}
+		<div class="flex flex-col gap-2">
+			{#if opts.linkable}
+				<a
+					class={linkShellClass(opts.status)}
+					data-testid="overview-task-link"
+					data-task-id={opts.taskId}
+					href={opts.href}
+				>
+					<OverviewRowChrome
+						orderNumber={opts.orderNumber}
+						title={opts.title}
+						status={opts.status}
+						showDraft={opts.showDraft}
+					/>
+				</a>
+			{:else}
+				<div
+					class={rowShellClass(opts.status)}
+					data-testid="overview-task-status"
+					data-task-id={opts.taskId}
+				>
+					<OverviewRowChrome
+						orderNumber={opts.orderNumber}
+						title={opts.title}
+						status={opts.status}
+						showDraft={opts.showDraft}
+					/>
+				</div>
+			{/if}
+			<ManySubmitHistory
+				submit={opts.submit}
+				submissionCount={opts.submissionCount}
+				request={opts.recap}
+				data-testid="overview-many-history"
 			/>
 		</div>
 	{/if}
@@ -420,7 +433,9 @@
 															'px-3 py-2.5',
 															flatChild.status
 														),
-														doneContentClass: accordionContentClass()
+														doneContentClass: accordionContentClass(),
+														submit: flatChild.submit,
+														submissionCount: flatChild.submissionCount
 													})}
 												</div>
 											{:else}
@@ -478,7 +493,9 @@
 																		'px-3 py-2.5',
 																		child.status
 																	),
-																	doneContentClass: accordionContentClass()
+																	doneContentClass: accordionContentClass(),
+																	submit: child.submit,
+																	submissionCount: child.submissionCount
 																})}
 															{/each}
 														</Accordion.Root>
@@ -587,7 +604,9 @@
 							showDraft: leafShowDraft(row.taskId),
 							doneItemClass: accordionItemClass(row.status),
 							doneTriggerClass: accordionTriggerClass('px-3 py-3', row.status),
-							doneContentClass: accordionContentClass()
+							doneContentClass: accordionContentClass(),
+							submit: row.submit,
+							submissionCount: row.submissionCount
 						})}
 					{/if}
 				</div>

@@ -6,8 +6,6 @@ import (
 
 func truckArriveValue() map[string]any {
 	return map[string]any{
-		"date":        "2026-10-19",
-		"turno":       "1st",
 		"truckWeight": 1000.0,
 	}
 }
@@ -23,73 +21,36 @@ func registerLotValue() map[string]any {
 	}
 }
 
-func openTurnoValue() map[string]any {
-	return map[string]any{
-		"date":  "2026-10-19",
-		"turno": "1st",
-	}
-}
-
 func adminOp() OperatorIdentity {
 	return OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
 }
 
 func commitTruckArrive(t *testing.T, c *Committer) string {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath: "intake/truckArrive",
-		Value:    truckArriveValue(),
-		Mint:     startingNewMint(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.JobInstanceID == "" {
-		t.Fatal("empty truck jobInstanceId")
-	}
-	return result.JobInstanceID
+	return plantCommitArrive(t, c)
 }
 
 func commitLotRegister(t *testing.T, c *Committer, truckID string, value map[string]any) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
-		JobInstanceID: truckID,
-		Value:         value,
-		Mint:          spawningNewMint(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result
-}
-
-func closeLots(t *testing.T, c *Committer, truckID string) {
-	t.Helper()
-	if _, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	return plantCommitRegister(t, c, truckID, value)
 }
 
 func firstLoadID(domain Domain) string {
-	for id := range domain.Kind("load") {
+	for id := range domain.Kind("lot") {
 		return id
 	}
 	return ""
 }
 
-// commitIntakeThroughLotsClosed: arrive → one lot register → close lots.
+// commitIntakeThroughLotsClosed: arrive → one lot register (weightCheck unlocked; no group Close).
 func commitIntakeThroughLotsClosed(t *testing.T, c *Committer) (truckID, loadID string, domain Domain) {
 	t.Helper()
 	truckID = commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	loadID = firstLoadID(result.Domain)
 	if loadID == "" {
-		t.Fatal("expected minted load")
+		t.Fatal("expected minted lot")
 	}
-	closeLots(t, c, truckID)
 	stored, err := c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
@@ -97,82 +58,37 @@ func commitIntakeThroughLotsClosed(t *testing.T, c *Committer) (truckID, loadID 
 	return truckID, loadID, stored
 }
 
-func commitOpenTurnoWith(t *testing.T, c *Committer, value map[string]any) string {
+func commitStartLot(t *testing.T, c *Committer, lotID string) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath: "line/openTurno",
-		Value:    value,
-		Mint:     startingNewMint(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result.JobInstanceID
+	return plantCommitStartLot(t, c, lotID)
 }
 
-func commitOpenTurno(t *testing.T, c *Committer) string {
+func commitWeigh(t *testing.T, c *Committer, lotID, palletID string, weight float64) CommitResult {
 	t.Helper()
-	return commitOpenTurnoWith(t, c, openTurnoValue())
+	return plantCommitWeigh(t, c, lotID, palletID, weight)
 }
 
-func commitWeigh(t *testing.T, c *Committer, lineID, palletID string, weight float64) CommitResult {
+func commitMarkProgress(t *testing.T, c *Committer, lotID string, progress map[string]any) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath:      GroupTaskPath("line", "palletWeight", ProvisionalGroupInstanceID, "weigh"),
-		JobInstanceID: lineID,
-		Value:         weighValue(palletID, weight),
-		Mint:          spawningNewMint(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result
+	return plantCommitMarkProgress(t, c, lotID, progress)
 }
 
-func closePalletWeight(t *testing.T, c *Committer, lineID string) {
+func commitCloseLot(t *testing.T, c *Committer, lotID string) CommitResult {
 	t.Helper()
-	if _, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
-		JobID: "line", JobInstanceID: lineID, GroupID: "palletWeight",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	return plantCommitCloseLot(t, c, lotID)
 }
 
-func seedLineReadyForLineLoad(t *testing.T, c *Committer) (loadID, lineID string) {
+// seedLotReadyAfterWeigh opens one lot and weighs both pallets.
+// Both return values are the lot id (Job instance id = lot id).
+func seedLotReadyAfterWeigh(t *testing.T, c *Committer) (loadID, lotInstanceID string) {
 	t.Helper()
-	_, loadID, _ = commitIntakeThroughLotsClosed(t, c)
-	lineID = commitOpenTurno(t, c)
-	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
-	_ = commitWeigh(t, c, lineID, loadID+".2", 22)
-	closePalletWeight(t, c, lineID)
-	return loadID, lineID
+	loadID = plantSeedOpenLotReadyForContainer(t, c)
+	return loadID, loadID
 }
 
 func completeIntakeThroughPalletWeight(t *testing.T, c *Committer, _ string) Domain {
 	t.Helper()
-	_, _ = seedLineReadyForLineLoad(t, c)
-	stored, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return stored
-}
-
-func commitLineShift(t *testing.T, c *Committer, shift string) Domain {
-	t.Helper()
-	val := openTurnoValue()
-	if shift != "" && shift != "1st" {
-		val["turno"] = shift
-	}
-	wantID := val["date"].(string) + "-" + val["turno"].(string)
-	if domain, err := c.Domains.Get(t.Context(), "feragame"); err == nil {
-		for _, inst := range domain.JobInstances {
-			if inst.JobID == "line" && inst.ID == wantID {
-				return domain
-			}
-		}
-	}
-	_ = commitOpenTurnoWith(t, c, val)
+	_, _ = seedLotReadyAfterWeigh(t, c)
 	stored, err := c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
@@ -189,24 +105,23 @@ func intakeTasks(t *testing.T) Job {
 	return cfg.Jobs.Values["intake"].(Job)
 }
 
-func lineJob(t *testing.T) Job {
+func lotProcessingJob(t *testing.T) Job {
 	t.Helper()
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return cfg.Jobs.Values["line"].(Job)
+	job, ok := cfg.Jobs.Values["lot_processing"].(Job)
+	if !ok {
+		t.Fatal("missing lot_processing Job")
+	}
+	return job
 }
 
-func palletWeightTask(line Job) TaskConfig {
-	v, _ := TaskByID(line.Tasks, "palletWeight")
-	return v
-}
-
-// TestPlantPathLotsAndLineWeigh locks the feragame plant fixture: several intake
-// lots (FakeHttp labels), Close → weightCheck, then line openTurno → weigh (readyWhen)
-// unlocks lineLoad without requiring palletWeight Close.
-func TestPlantPathLotsAndLineWeigh(t *testing.T) {
+// TestPlantPathLotsAndLotProcessingWeigh locks the feragame plant fixture: many-submit
+// register (FakeHttp labels) → weightCheck once, then lot_processing startLot →
+// peer weigh/markProgress (Domain weigh-before-progress gate) → closeLot terminal status.
+func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	c.HttpPort = NewFakeHttpPort()
 	op := adminOp()
@@ -221,11 +136,11 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 		t.Fatal("missing intake")
 	}
 	inst, ok := worklistInstance(intake, truckID)
-	if !ok || inst.Tasks["lots"] != TaskStatusAvailable {
-		t.Fatalf("lots after arrive = %#v", inst)
+	if !ok || inst.Tasks["register"] != TaskStatusActionable {
+		t.Fatalf("register after arrive = %#v", inst)
 	}
-	if g := inst.Groups["lots"]; !g.CanSpawn || g.CanClose {
-		t.Fatalf("open empty lots chrome = %#v", g)
+	if _, has := inst.Groups["lots"]; has {
+		t.Fatalf("intake must not project lots group chrome: %#v", inst.Groups)
 	}
 
 	lot1 := registerLotValue()
@@ -237,6 +152,14 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if load1 == "" {
 		t.Fatal("expected first load")
 	}
+	intakeAfter, ok := worklistJobByID(first.Worklist, "intake")
+	if !ok {
+		t.Fatal("missing intake on Commit worklist")
+	}
+	instAfter, ok := worklistInstance(intakeAfter, truckID)
+	if !ok || instAfter.Tasks["register"] != TaskStatusActionable {
+		t.Fatalf("register after first Commit = %#v", instAfter)
+	}
 
 	lot2 := registerLotValue()
 	lot2["client"] = "DA"
@@ -246,8 +169,8 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if len(second.Links) == 0 {
 		t.Fatal("second lot must also return links")
 	}
-	if len(second.Domain.GroupInstances) != 2 {
-		t.Fatalf("group instances = %#v", second.Domain.GroupInstances)
+	if len(second.Domain.Kind("lot")) != 2 {
+		t.Fatalf("lots = %#v", second.Domain.Kind("lot"))
 	}
 
 	mid, err := loader.Load(t.Context(), "feragame", op)
@@ -256,28 +179,11 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	}
 	intake, _ = worklistJobByID(mid.Worklist, "intake")
 	inst, _ = worklistInstance(intake, truckID)
-	if inst.Tasks["weightCheck"] != TaskStatusLocked {
-		t.Fatalf("weightCheck before close = %q", inst.Tasks["weightCheck"])
-	}
-	if g := inst.Groups["lots"]; !g.CanSpawn || !g.CanClose {
-		t.Fatalf("lots with children = %#v", g)
-	}
-
-	closeLots(t, c, truckID)
-	afterClose, err := loader.Load(t.Context(), "feragame", op)
-	if err != nil {
-		t.Fatal(err)
-	}
-	intake, _ = worklistJobByID(afterClose.Worklist, "intake")
-	inst, _ = worklistInstance(intake, truckID)
-	if inst.Tasks["lots"] != TaskStatusDone {
-		t.Fatalf("lots after close = %q", inst.Tasks["lots"])
+	if inst.Tasks["register"] != TaskStatusActionable {
+		t.Fatalf("register still many = %q", inst.Tasks["register"])
 	}
 	if inst.Tasks["weightCheck"] != TaskStatusActionable {
-		t.Fatalf("weightCheck after close = %q, want actionable", inst.Tasks["weightCheck"])
-	}
-	if g := inst.Groups["lots"]; g.CanSpawn || g.CanClose {
-		t.Fatalf("closed lots chrome = %#v", g)
+		t.Fatalf("weightCheck after ≥1 lot = %q, want actionable", inst.Tasks["weightCheck"])
 	}
 
 	wc, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
@@ -290,77 +196,96 @@ func TestPlantPathLotsAndLineWeigh(t *testing.T) {
 	if wc.Domain.Kind("truck")[truckID]["checkedLotSum"] != 600.0 {
 		t.Fatalf("weightCheck patch = %#v", wc.Domain.Kind("truck")[truckID])
 	}
-
-	lineID := commitOpenTurno(t, c)
-	lineWL, err := loader.Load(t.Context(), "feragame", op)
+	afterWC, err := loader.Load(t.Context(), "feragame", op)
 	if err != nil {
 		t.Fatal(err)
 	}
-	line, ok := worklistJobByID(lineWL.Worklist, "line")
-	if !ok {
-		t.Fatal("missing line")
+	intake, _ = worklistJobByID(afterWC.Worklist, "intake")
+	inst, _ = worklistInstance(intake, truckID)
+	if inst.Tasks["weightCheck"] != TaskStatusDone {
+		t.Fatalf("weightCheck after Commit = %q", inst.Tasks["weightCheck"])
 	}
-	lineInst, ok := worklistInstance(line, lineID)
-	if !ok || lineInst.Tasks["palletWeight"] != TaskStatusAvailable {
-		t.Fatalf("palletWeight after openTurno = %#v", lineInst)
-	}
-	if lineInst.Tasks["lineLoad"] != TaskStatusUnavailable {
-		t.Fatalf("lineLoad after openTurno (no weighed pallets) = %q, want unavailable", lineInst.Tasks["lineLoad"])
-	}
-	if g := lineInst.Groups["lineLoad"]; g.CanSpawn {
-		t.Fatalf("lineLoad CanSpawn after openTurno = %#v, want false", g)
-	}
-	if g := lineInst.Groups["palletWeight"]; !g.CanSpawn {
-		t.Fatalf("weigh group chrome = %#v", g)
+	if inst.Tasks["register"] != TaskStatusUnavailable {
+		t.Fatalf("register after weightCheck = %q, want unavailable", inst.Tasks["register"])
 	}
 
-	loads := make([]string, 0, 2)
-	for id := range wc.Domain.Kind("load") {
-		loads = append(loads, id)
+	lpWL, err := loader.Load(t.Context(), "feragame", op)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(loads) != 2 {
-		t.Fatalf("loads = %#v", loads)
+	lp, ok := worklistJobByID(lpWL.Worklist, "lot_processing")
+	if !ok || !lp.CanStart {
+		t.Fatalf("lot_processing canStart after intake = %#v", lp)
 	}
-	var weighed CommitResult
-	for _, loadID := range loads {
-		_ = commitWeigh(t, c, lineID, loadID+".1", 11)
-		weighed = commitWeigh(t, c, lineID, loadID+".2", 22)
+
+	_ = commitStartLot(t, c, load1)
+	afterStart, err := loader.Load(t.Context(), "feragame", op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lp, _ = worklistJobByID(afterStart.Worklist, "lot_processing")
+	lotInst, ok := worklistInstance(lp, load1)
+	if !ok {
+		t.Fatal("missing lot_processing instance")
+	}
+	if lotInst.Tasks["startLot"] != TaskStatusDone {
+		t.Fatalf("startLot after Commit = %q, want done", lotInst.Tasks["startLot"])
+	}
+	if lotInst.Tasks["weigh"] != TaskStatusActionable {
+		t.Fatalf("weigh after startLot = %q, want actionable", lotInst.Tasks["weigh"])
+	}
+	if lotInst.Tasks["markProgress"] != TaskStatusUnavailable {
+		t.Fatalf("markProgress after startLot (before weigh) = %q, want unavailable", lotInst.Tasks["markProgress"])
+	}
+	if lotInst.Tasks["containerReg"] != TaskStatusActionable {
+		t.Fatalf("containerReg after startLot = %q, want actionable", lotInst.Tasks["containerReg"])
+	}
+	if lotInst.Tasks["closeLot"] != TaskStatusUnavailable {
+		t.Fatalf("closeLot before weigh+progress = %q, want unavailable", lotInst.Tasks["closeLot"])
+	}
+	if _, has := lotInst.Tasks["openTurno"]; has {
+		t.Fatalf("openTurno must not project: %#v", lotInst.Tasks)
+	}
+	if _, has := lotInst.Tasks["closeTurno"]; has {
+		t.Fatalf("closeTurno must not project: %#v", lotInst.Tasks)
+	}
+	if len(lotInst.Groups) != 0 {
+		t.Fatalf("lot_processing must not project group chrome: %#v", lotInst.Groups)
+	}
+
+	_ = commitWeigh(t, c, load1, load1+".1", 11)
+	weighed := commitWeigh(t, c, load1, load1+".2", 22)
+	afterWeigh, err := loader.Load(t.Context(), "feragame", op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lp, _ = worklistJobByID(afterWeigh.Worklist, "lot_processing")
+	lotInst, _ = worklistInstance(lp, load1)
+	if lotInst.Tasks["markProgress"] != TaskStatusActionable {
+		t.Fatalf("markProgress after weigh = %q, want actionable", lotInst.Tasks["markProgress"])
 	}
 	last := weighed.Domain.Submissions[len(weighed.Domain.Submissions)-1]
-	if last.TaskID != "weigh" || last.GroupID != "palletWeight" {
+	if last.TaskID != "weigh" || last.GroupID != "" {
 		t.Fatalf("weigh submission = %#v", last)
 	}
+	if weighed.Domain.Kind("lot")[load1]["status"] != "open" {
+		t.Fatalf("lot status after weigh = %#v, want open", weighed.Domain.Kind("lot")[load1])
+	}
 
-	midLine, err := loader.Load(t.Context(), "feragame", op)
+	_ = commitMarkProgress(t, c, load1, map[string]any{
+		load1 + ".1": "done",
+		load1 + ".2": "done",
+	})
+	closed := commitCloseLot(t, c, load1)
+	if closed.Domain.Kind("lot")[load1]["status"] != "fullyProcessed" {
+		t.Fatalf("closeLot status = %#v", closed.Domain.Kind("lot")[load1])
+	}
+	afterClose, err := loader.Load(t.Context(), "feragame", op)
 	if err != nil {
 		t.Fatal(err)
 	}
-	line, _ = worklistJobByID(midLine.Worklist, "line")
-	lineInst, _ = worklistInstance(line, lineID)
-	if lineInst.Tasks["palletWeight"] != TaskStatusAvailable {
-		t.Fatalf("palletWeight still open after weigh = %q", lineInst.Tasks["palletWeight"])
-	}
-	if lineInst.Tasks["lineLoad"] != TaskStatusAvailable {
-		t.Fatalf("lineLoad after weigh (group open) = %q, want available (group chrome)", lineInst.Tasks["lineLoad"])
-	}
-	if g := lineInst.Groups["lineLoad"]; !g.CanSpawn {
-		t.Fatalf("lineLoad CanSpawn after weigh = %#v, want true", g)
-	}
-
-	closePalletWeight(t, c, lineID)
-	ready, err := loader.Load(t.Context(), "feragame", op)
-	if err != nil {
-		t.Fatal(err)
-	}
-	line, _ = worklistJobByID(ready.Worklist, "line")
-	lineInst, _ = worklistInstance(line, lineID)
-	if lineInst.Tasks["palletWeight"] != TaskStatusDone {
-		t.Fatalf("palletWeight after close = %q", lineInst.Tasks["palletWeight"])
-	}
-	if lineInst.Tasks["lineLoad"] != TaskStatusAvailable {
-		t.Fatalf("lineLoad after weigh close = %q, want available (Close not the gate)", lineInst.Tasks["lineLoad"])
-	}
-	if g := lineInst.Groups["lineLoad"]; !g.CanSpawn {
-		t.Fatalf("lineLoad CanSpawn after weigh close = %#v, want true", g)
+	lp, _ = worklistJobByID(afterClose.Worklist, "lot_processing")
+	if !lp.CanStart {
+		t.Fatal("lot_processing canStart after closeLot (second lot remains) want true")
 	}
 }

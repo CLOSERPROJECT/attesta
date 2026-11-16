@@ -25,7 +25,6 @@ import {
 	operatorFromLoad,
 	type OperatorIdentity
 } from './form/operator-identity.js';
-import { commitHasLinks } from './worklist-nav.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 /** Debounce for dirty Draft localStorage writes. */
@@ -79,8 +78,8 @@ export class LivingSession {
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
 	/**
-	 * Set synchronously with Commit downloads so Task deep-link $effect
-	 * does not redirect before the route can enter stay-for-links.
+	 * Set when Commit `navigation` is stay so Task deep-link $effect
+	 * does not redirect before the route can enter stay UI.
 	 */
 	linksStayActive = $state(false);
 	drafts = $state.raw<Record<string, DraftEntry>>({});
@@ -270,12 +269,13 @@ export class LivingSession {
 			}
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
-			this.linksStayActive = commitHasLinks(this.lastHttpLinks);
+			this.linksStayActive = committed.navigation === 'stay';
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
 				worklist: committed.worklist,
-				next: committed.next,
+				navigation: committed.navigation,
+				continueNavigation: committed.continueNavigation ?? null,
 				nextTaskFormBundle: committed.nextTaskFormBundle ?? null
 			};
 		} catch (err) {
@@ -329,7 +329,8 @@ export class LivingSession {
 			return {
 				jobInstanceId: closed.jobInstanceId,
 				worklist: closed.worklist,
-				next: closed.next,
+				navigation: closed.navigation,
+				continueNavigation: closed.continueNavigation ?? null,
 				nextTaskFormBundle: closed.nextTaskFormBundle ?? null
 			};
 		} catch (err) {

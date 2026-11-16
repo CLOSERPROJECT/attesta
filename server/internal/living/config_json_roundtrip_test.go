@@ -63,7 +63,7 @@ func TestAsJobRejectsNil(t *testing.T) {
 }
 
 func TestAsJobRejectsUnorderedMap(t *testing.T) {
-	if _, ok := AsJob(map[string]any{"instanceId": "$load.id", "tasks": map[string]any{}}); ok {
+	if _, ok := AsJob(map[string]any{"instanceId": "$lot.id", "tasks": map[string]any{}}); ok {
 		t.Fatal("AsJob(map) must not remarshal nested tasks")
 	}
 }

@@ -93,7 +93,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath:      "intake/weightCheck",
-		JobInstanceID: "261019-1st-1",
+		JobInstanceID: "261029-1",
 		Value:         map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
 	})
 	var ce *CommitError
@@ -121,20 +121,19 @@ func TestCommitLotRegisterAllowedViaCerbosInUnlockOrder(t *testing.T) {
 	}
 
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["numeroFir"] != "FIR-1" {
-		t.Fatalf("domain = %#v", result.Domain.Kind("load")[loadID])
+	if result.Domain.Kind("lot")[loadID]["numeroFir"] != "FIR-1" {
+		t.Fatalf("domain = %#v", result.Domain.Kind("lot")[loadID])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || last.GroupID != "lots" {
+	if last.TaskID != "register" || last.GroupID != "" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }
@@ -157,7 +156,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
-		t.Fatalf("weightCheck before lots close should deny via Unlock: %v", err)
+		t.Fatalf("weightCheck before register should deny via Unlock: %v", err)
 	}
 	after, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
@@ -182,8 +181,12 @@ func TestCommitTruckArriveAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("truck")[result.JobInstanceID]["turno"] != "1st" {
+	truck := result.Domain.Kind("truck")[result.JobInstanceID]
+	if truck["truckWeight"] != 1000.0 {
 		t.Fatalf("domain = %#v", result.Domain)
+	}
+	if _, has := truck["workingDayId"]; has {
+		t.Fatalf("truck must not stamp workingDayId: %#v", truck)
 	}
 }
 

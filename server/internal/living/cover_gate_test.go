@@ -9,28 +9,34 @@ import (
 	"testing"
 )
 
-func TestDemoCommitHelpersSeedLineLoadReady(t *testing.T) {
+func TestDemoCommitHelpersSeedLotProcessingReady(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
-	if err := seedLineLoadReadyDomain(t.Context(), domains, configs, "feragame"); err != nil {
+	if err := seedLotProcessingReadyDomain(t.Context(), domains, configs, "feragame"); err != nil {
 		t.Fatal(err)
 	}
 	domain, err := domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstLoadID(domain) == "" {
-		t.Fatal("expected load after demo seed")
+	loadID := firstLoadID(domain)
+	if loadID == "" {
+		t.Fatal("expected lot after demo seed")
 	}
-	c := demoSeedCommitter(domains, configs)
-	if _, err := commitLineShiftNew(t.Context(), c, "feragame", "2nd"); err != nil {
-		t.Fatal(err)
+	var sawLotProc bool
+	for _, inst := range domain.JobInstances {
+		if inst.JobID == "lot_processing" && inst.ID == loadID {
+			sawLotProc = true
+		}
+		if inst.JobID == "workingDay" || inst.JobID == "line" {
+			t.Fatalf("obsolete Job instance present: %#v", inst)
+		}
 	}
-	if _, err := commitLineShiftNew(t.Context(), c, "feragame", ""); err == nil {
-		t.Fatal("duplicate 1st openTurno should fail")
+	if !sawLotProc {
+		t.Fatalf("lot_processing instance missing: %#v", domain.JobInstances)
 	}
 }
 
@@ -73,9 +79,9 @@ func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("unknown job = %v", err)
 	}
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "ghost", GroupID: "lots"})
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("unknown instance = %v", err)
+	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "lot_processing", JobInstanceID: "ghost", GroupID: "weigh"})
+	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
+		t.Fatalf("line leaf CloseGroup = %v, want unknown-target", err)
 	}
 	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "T", GroupID: "truckArrive"})
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
@@ -103,48 +109,40 @@ func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
 		t.Fatalf("missing active = %v", err)
 	}
 
-	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
-	boomPut := &Committer{
-		Domains: &getOKPutErrDomainStore{
-			get: func(ctx context.Context, org string) (Domain, error) { return domains.Get(ctx, org) },
-			err: errors.New("put fail"),
-		},
-		Configs:    c.Configs,
-		Authorizer: AllowAllAuthorizer{},
-	}
-	_, err = boomPut.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
+	_, lotID := seedLotReadyAfterWeigh(t, c)
+	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
+		JobID: "lot_processing", JobInstanceID: lotID, GroupID: "weigh",
 	})
-	// lots already closed → CanClose false before Put
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("already closed = %v", err)
+	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
+		t.Fatalf("feragame lot_processing has no groups: CloseGroup = %v", err)
 	}
 
-	c2, domains2, _ := testCommitter(t, AllowAllAuthorizer{})
-	truckID2 := commitTruckArrive(t, c2)
-	_ = commitLotRegister(t, c2, truckID2, registerLotValue())
-	boomPut2 := &Committer{
-		Domains: &getOKPutErrDomainStore{
-			get: func(ctx context.Context, org string) (Domain, error) { return domains2.Get(ctx, org) },
-			err: errors.New("put fail"),
+	// Feragame has no groups; probe config so Domain Get runs after group lookup.
+	probeConfigs := NewMemoryConfigStore()
+	if err := probeConfigs.Put(t.Context(), "probe", "v1", OrgConfig{
+		ID: "probe", Org: "probe", Version: "v1",
+		Jobs: OrderedObject{
+			Keys: []string{"j"},
+			Values: map[string]any{
+				"j": Job{Tasks: []TaskConfig{{
+					"id": "g", "kind": "group",
+					"tasks": []any{map[string]any{"id": "child"}},
+				}}},
+			},
 		},
-		Configs:    c2.Configs,
-		Authorizer: AllowAllAuthorizer{},
+	}); err != nil {
+		t.Fatal(err)
 	}
-	_, err = boomPut2.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID2, GroupID: "lots",
-	})
-	if err == nil || !strings.Contains(err.Error(), "put fail") {
-		t.Fatalf("put fail = %v", err)
+	if err := probeConfigs.SetActiveVersion(t.Context(), "probe", "v1"); err != nil {
+		t.Fatal(err)
 	}
-
 	boomGet := &Committer{
 		Domains:    &errDomainStore{err: errors.New("get boom")},
-		Configs:    c.Configs,
+		Configs:    probeConfigs,
 		Authorizer: AllowAllAuthorizer{},
 	}
-	_, err = boomGet.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: truckID, GroupID: "lots",
+	_, err = boomGet.CloseGroup(t.Context(), "probe", op, CloseGroupRequest{
+		JobID: "j", JobInstanceID: "T", GroupID: "g",
 	})
 	if err == nil || !strings.Contains(err.Error(), "get boom") {
 		t.Fatalf("get boom = %v", err)
@@ -156,11 +154,12 @@ func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
 		Authorizer: AllowAllAuthorizer{},
 	}
 	_, err = emptyDomain.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "intake", JobInstanceID: "ghost", GroupID: "lots",
+		JobID: "lot_processing", JobInstanceID: "ghost", GroupID: "weigh",
 	})
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("empty domain unknown instance = %v", err)
+	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
+		t.Fatalf("empty domain CloseGroup leaf = %v", err)
 	}
+	_ = domains
 }
 
 type getOKPutErrDomainStore struct {

@@ -282,7 +282,7 @@ func labelSheetFromBody(body map[string]any) labelSheet {
 		NetWeight:         firstString(body, "netWeight", "totalWeight", "pesoTotale", "firWeight"),
 		Labels:            labelEntries(body),
 	}
-	if id, ok := body["loadId"].(string); ok && id != "" {
+	if id, ok := body["lotId"].(string); ok && id != "" {
 		sheet.LoadID = id
 	}
 	if sheet.Date == "" {
@@ -398,7 +398,7 @@ func labelEntryFromAny(item any) (labelEntry, bool) {
 func registerCSV(body map[string]any) ([]byte, string) {
 	headers := []string{
 		"client", "date", "wasteCode", "truckWeight", "truckTare",
-		"palletCount", "notes", "loadId", "palletIds",
+		"palletCount", "notes", "lotId", "palletIds",
 	}
 	palletIds := ""
 	if raw, ok := body["palletIds"]; ok {
@@ -425,7 +425,7 @@ func registerCSV(body map[string]any) ([]byte, string) {
 	}
 	text := strings.Join(headers, ",") + "\n" + strings.Join(row, ",") + "\n"
 	loadID := "register"
-	if s, ok := body["loadId"].(string); ok && s != "" {
+	if s, ok := body["lotId"].(string); ok && s != "" {
 		loadID = s
 	}
 	return []byte(text), loadID + ".csv"

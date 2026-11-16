@@ -8,26 +8,6 @@ import (
 	"testing"
 )
 
-func TestDecodeScanEntityIDQueryOrBare(t *testing.T) {
-	cases := []struct {
-		raw  string
-		want string
-	}{
-		{"https://plant.example/app?entityId=NO-261019-1.1", "NO-261019-1.1"},
-		{"https://plant.example/app?foo=1&entityId=P2&bar=3", "P2"},
-		{"?entityId=bare-query", "bare-query"},
-		{"https://plant.example/app", ""},
-		{"  NO-261019-1.2  ", "NO-261019-1.2"},
-		{"", ""},
-	}
-	for _, tc := range cases {
-		got := DecodeScanEntityID(tc.raw)
-		if got != tc.want {
-			t.Fatalf("DecodeScanEntityID(%q) = %q, want %q", tc.raw, got, tc.want)
-		}
-	}
-}
-
 func TestFixtureIncludesLockedQrRules(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
@@ -37,11 +17,11 @@ func TestFixtureIncludesLockedQrRules(t *testing.T) {
 		t.Fatalf("qr.rules = %#v", cfg.QR)
 	}
 	rule := cfg.QR.Rules[0]
-	if rule.ID != "line-pallet-weigh" {
+	if rule.ID != "lot-pallet-weigh" {
 		t.Fatalf("rule id = %q", rule.ID)
 	}
-	if rule.Match.JobID != "line" || rule.Match.GroupID != "palletWeight" ||
-		rule.Match.TaskID != "weigh" || !rule.Match.AllowSpawn {
+	if rule.Match.JobID != "lot_processing" || rule.Match.GroupID != "" ||
+		rule.Match.TaskID != "weigh" || rule.Match.AllowSpawn {
 		t.Fatalf("match = %#v", rule.Match)
 	}
 	if rule.Seed["palletId"] == "" {
@@ -52,16 +32,13 @@ func TestFixtureIncludesLockedQrRules(t *testing.T) {
 	}
 }
 
-func TestResolveQROneSpawnCandidateSeedsPalletID(t *testing.T) {
+func TestResolveQROneCandidateSeedsPalletID(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	domain := mustDomain(t, c)
+	op := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
 	palletID := loadID + ".1"
 
 	got := ResolveQR(cfg, domain, op, "https://plant.example/app?entityId="+palletID)
@@ -71,9 +48,8 @@ func TestResolveQROneSpawnCandidateSeedsPalletID(t *testing.T) {
 	if got.Navigate == nil {
 		t.Fatal("expected navigate")
 	}
-	if got.Navigate.JobID != "line" || got.Navigate.JobInstanceID != lineID ||
-		got.Navigate.GroupID != "palletWeight" || got.Navigate.GroupInstanceID != ProvisionalGroupInstanceID ||
-		got.Navigate.TaskID != "weigh" {
+	if got.Navigate.JobID != "lot_processing" || got.Navigate.JobInstanceID != loadID ||
+		got.Navigate.GroupID != "" || got.Navigate.TaskID != "weigh" {
 		t.Fatalf("navigate = %#v", got.Navigate)
 	}
 	if got.Seed["palletId"] != palletID {
@@ -84,14 +60,11 @@ func TestResolveQROneSpawnCandidateSeedsPalletID(t *testing.T) {
 func TestResolveQRIneligibleWhenPalletMissingOrWeighed(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
-	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
+	_ = commitStartLot(t, c, loadID)
+	_ = commitWeigh(t, c, loadID, loadID+".1", 11)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	domain := mustDomain(t, c)
+	op := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
 
 	missing := ResolveQR(cfg, domain, op, "missing-pallet")
 	if missing.Error == nil || missing.Error.Code != "ineligible" {
@@ -107,16 +80,14 @@ func TestResolveQRIneligibleWhenPalletMissingOrWeighed(t *testing.T) {
 	}
 }
 
-func TestResolveQRZeroWhenNoWorklistCandidate(t *testing.T) {
+func TestResolveQRZeroWhenViewerCannotActOnWeigh(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	// No openTurno → palletWeight not on any line instance.
+	_ = commitStartLot(t, c, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	domain := mustDomain(t, c)
+	// administration is eligible on Domain but cannot Commit weigh (line role).
+	op := OperatorIdentity{UserID: "admin", Org: "feragame", Roles: []string{"administration"}}
 
 	got := ResolveQR(cfg, domain, op, loadID+".1")
 	if got.Error == nil || got.Error.Code != "zero" {
@@ -127,37 +98,34 @@ func TestResolveQRZeroWhenNoWorklistCandidate(t *testing.T) {
 	}
 }
 
-func TestResolveQRManyWhenMultipleLineShiftsSpawnable(t *testing.T) {
+func TestResolveQROpenLotIsSoleCandidate(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	_ = commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "1st"})
-	_ = commitOpenTurnoWith(t, c, map[string]any{"date": "2026-10-19", "turno": "2nd"})
+	_, load1, load2 := plantIntakeTwoLots(t, c)
+	_ = commitStartLot(t, c, load1)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	domain := mustDomain(t, c)
+	op := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
 
-	got := ResolveQR(cfg, domain, op, loadID+".1")
-	if got.Error == nil || got.Error.Code != "many" {
+	got := ResolveQR(cfg, domain, op, load1+".1")
+	if got.Error != nil || got.Navigate == nil {
 		t.Fatalf("got = %#v", got)
 	}
-	if got.Error.Message != cfg.QR.Rules[0].Messages.OnMany {
-		t.Fatalf("message = %q", got.Error.Message)
+	if got.Navigate.JobInstanceID != load1 {
+		t.Fatalf("navigate = %#v, want open lot %s", got.Navigate, load1)
+	}
+	closedPallet := ResolveQR(cfg, domain, op, load2+".1")
+	if closedPallet.Error == nil || closedPallet.Error.Code != "ineligible" {
+		t.Fatalf("unopened lot pallet must be ineligible: %#v", closedPallet)
 	}
 }
 
 func TestResolveQRWhenSkipsEmptyEntityID(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	_, _, _ = commitIntakeThroughLotsClosed(t, c)
-	_ = commitOpenTurno(t, c)
+	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	_ = commitStartLot(t, c, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
+	domain := mustDomain(t, c)
+	op := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
 
 	got := ResolveQR(cfg, domain, op, "https://plant.example/app")
 	if got.Error == nil || got.Error.Code != "no-rule" {
@@ -168,12 +136,12 @@ func TestResolveQRWhenSkipsEmptyEntityID(t *testing.T) {
 func TestHandleQrResolveHTTPOneAndErrors(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
+	_ = commitStartLot(t, c, loadID)
 	h := &Handler{
 		Loader:    loader,
 		Committer: c,
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
-			return OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}, true
+			return OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}, true
 		},
 	}
 	palletID := loadID + ".1"
@@ -189,7 +157,7 @@ func TestHandleQrResolveHTTPOneAndErrors(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &okWire); err != nil {
 		t.Fatal(err)
 	}
-	if okWire.Error != nil || okWire.Navigate == nil || okWire.Navigate.JobInstanceID != lineID {
+	if okWire.Error != nil || okWire.Navigate == nil || okWire.Navigate.JobInstanceID != loadID {
 		t.Fatalf("ok wire = %#v", okWire)
 	}
 	if okWire.Seed["palletId"] != palletID {

@@ -24,37 +24,37 @@ func configWithParkedLoadedExtracted(t *testing.T) OrgConfig {
 	if task["id"] != "loadedExtracted" {
 		t.Fatalf("parked task id = %#v", task["id"])
 	}
-	lineVal, _ := cfg.Jobs.Get("line")
-	line, _ := AsJob(lineVal)
-	line.Tasks = append(append([]TaskConfig{}, line.Tasks...), TaskConfig(task))
-	cfg.Jobs.Set("line", line)
+	lpVal, _ := cfg.Jobs.Get("lot_processing")
+	lp, _ := AsJob(lpVal)
+	lp.Tasks = append(append([]TaskConfig{}, lp.Tasks...), TaskConfig(task))
+	cfg.Jobs.Set("lot_processing", lp)
 	return cfg
 }
 
 func dataReportProbeDomain() Domain {
 	d := domainFromKinds(map[string]EntityMap{
 		"truck": {
-			"T1": {"date": "2026-10-19", "turno": "1st", "truckWeight": 1000.0, "lastScaleReading": 200.0},
+			"T1": {"workingDayId": "2026-10-19", "truckWeight": 1000.0, "lastScaleReading": 200.0},
 		},
-		"load": {
+		"lot": {
 			"L1": {"netWeight": 800.0, "truckId": "T1", "client": "NO"},
 		},
 		"pallet": {
-			"P1": {"loadId": "L1", "weight": 125.0, "progress": "done"},
-			"P2": {"loadId": "L1", "weight": 100.0, "progress": "partial"},
+			"P1": {"lotId": "L1", "weight": 125.0, "progress": "done"},
+			"P2": {"lotId": "L1", "weight": 100.0, "progress": "partial"},
 		},
 		"container": {
 			"C1": {
-				"sourceLoadId": "L1", "material": "plastica", "weight": 50.0,
-				"secondarySourceLoadId": "L2",
+				"sourceLotId": "L1", "material": "plastica", "weight": 50.0,
+				"secondarySourceLotId": "L2",
 			},
-			"C2": {"sourceLoadId": "L1", "material": "plastica", "weight": 20.0},
-			"C3": {"sourceLoadId": "L1", "material": "alluminio", "weight": 30.0},
-			"C4": {"sourceLoadId": "L1", "material": "mystery", "weight": 5.0},
+			"C2": {"sourceLotId": "L1", "material": "plastica", "weight": 20.0},
+			"C3": {"sourceLotId": "L1", "material": "alluminio", "weight": 30.0},
+			"C4": {"sourceLotId": "L1", "material": "mystery", "weight": 5.0},
 		},
 	})
 	d.Submissions = []Submission{{
-		JobID: "line", TaskID: "weigh", JobInstanceID: "2026-10-19-1st",
+		JobID: "lot_processing", TaskID: "weigh", JobInstanceID: "2026-10-19-1st",
 		GroupID: "palletWeight", GroupInstanceID: "pw-1",
 		Facts: map[string]any{
 			"tareKind": "euro",
@@ -67,7 +67,7 @@ func dataReportProbeDomain() Domain {
 func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 	cfg := configWithParkedLoadedExtracted(t)
 	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), ActionableTaskRef{
-		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
+		JobID: "lot_processing", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {
 	cfg := configWithParkedLoadedExtracted(t)
 	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
-		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
+		JobID: "lot_processing", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -295,9 +295,9 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
 	cfg := configWithParkedLoadedExtracted(t)
-	lineVal, _ := cfg.Jobs.Get("line")
-	line, _ := AsJob(lineVal)
-	task, ok := TaskByID(line.Tasks, "loadedExtracted")
+	lpVal, _ := cfg.Jobs.Get("lot_processing")
+	lp, _ := AsJob(lpVal)
+	task, ok := TaskByID(lp.Tasks, "loadedExtracted")
 	if !ok {
 		t.Fatal("missing parked loadedExtracted")
 	}
@@ -307,7 +307,7 @@ func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
 	report["expr"] = "$this is not (( valid"
 
 	bundle, err := BuildTaskFormBundle(cfg, EmptyDomain(), ActionableTaskRef{
-		JobID: "line", TaskID: "loadedExtracted", JobInstanceID: "1st",
+		JobID: "lot_processing", TaskID: "loadedExtracted", JobInstanceID: "1st",
 	})
 	if err == nil {
 		t.Fatalf("expected error, got bundle chromeDisplay=%#v", bundle.Bindings["chromeDisplay"])

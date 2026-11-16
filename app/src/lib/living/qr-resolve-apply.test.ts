@@ -7,13 +7,11 @@ import {
 } from './qr-resolve-apply.js';
 
 describe('interpretQrResolve', () => {
-	test('one candidate → nested weigh target + provisional draft key + seed', () => {
+	test('one candidate → flat weigh target + draft key + seed', () => {
 		const got = interpretQrResolve({
 			navigate: {
 				jobId: 'line',
 				jobInstanceId: 'L1',
-				groupId: 'palletWeight',
-				groupInstanceId: 'new',
 				taskId: 'weigh'
 			},
 			seed: { palletId: 'load.1' }
@@ -24,17 +22,15 @@ describe('interpretQrResolve', () => {
 				kind: 'task',
 				jobId: 'line',
 				jobInstanceId: 'L1',
-				groupId: 'palletWeight',
-				groupInstanceId: 'new',
 				taskId: 'weigh'
 			},
-			taskPath: 'line/palletWeight/new/weigh',
-			draftInstanceKey: 'L1::palletWeight::',
+			taskPath: 'line/weigh',
+			draftInstanceKey: 'L1',
 			seed: { palletId: 'load.1' }
 		});
 	});
 
-	test('open group instance uses real groupInstanceId in draft key', () => {
+	test('nested navigate still builds group draft key when groupId present', () => {
 		const coords = qrDraftCoords({
 			jobId: 'line',
 			jobInstanceId: 'L1',

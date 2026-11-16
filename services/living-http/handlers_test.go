@@ -47,13 +47,13 @@ func TestAuthRejectsMissingAndWrongToken(t *testing.T) {
 	h := srv.routes()
 
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "", map[string]any{"loadId": "x"}))
+	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "", map[string]any{"lotId": "x"}))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("missing token status = %d", rr.Code)
 	}
 
 	rr = httptest.NewRecorder()
-	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "wrong", map[string]any{"loadId": "x"}))
+	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "wrong", map[string]any{"lotId": "x"}))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong token status = %d", rr.Code)
 	}
@@ -65,7 +65,7 @@ func TestLabelsAndRegisterCSVRoundTrip(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	req := authReq(t, http.MethodPost, "/fake/labels", "test-token", map[string]any{
-		"loadId": "NIR-1",
+		"lotId": "NIR-1",
 		"labels": []any{map[string]any{"id": "NIR-1.1"}},
 	})
 	req.Header.Set(orgHeader, "org-feragame")
@@ -81,7 +81,7 @@ func TestLabelsAndRegisterCSVRoundTrip(t *testing.T) {
 	rr = httptest.NewRecorder()
 	req = authReq(t, http.MethodPost, "/fake/register-csv", "test-token", map[string]any{
 		"client":    "NO",
-		"loadId":    "NIR-1",
+		"lotId":    "NIR-1",
 		"palletIds": []any{"NIR-1.1", "NIR-1.2"},
 	})
 	req.Header.Set(orgHeader, "org-feragame")
@@ -136,7 +136,7 @@ func TestLabelsAndRegisterCSVRoundTrip(t *testing.T) {
 		t.Fatalf("pdf missing structure (len=%d)", len(pdfBody))
 	}
 	if !bytes.Contains(pdfBody, []byte("NIR-1")) || !bytes.Contains(pdfBody, []byte("NIR-1.1")) {
-		t.Fatalf("pdf missing load/label text (len=%d)", len(pdfBody))
+		t.Fatalf("pdf missing lot/label text (len=%d)", len(pdfBody))
 	}
 
 	id := strings.TrimPrefix(labelsURL, "/artifacts/")
@@ -158,7 +158,7 @@ func TestGetArtifactRequiresToken(t *testing.T) {
 	h := srv.routes()
 
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "test-token", map[string]any{"loadId": "x"}))
+	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "test-token", map[string]any{"lotId": "x"}))
 	url := strings.TrimSpace(rr.Body.String())
 
 	rr = httptest.NewRecorder()

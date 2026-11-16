@@ -74,7 +74,7 @@ export function probeSyncDeepLocalWholeAssign(
 		});
 		// Mimic createConfigForm setter: local = next only (effect writes Draft)
 		assign = () => {
-			local = { sourceLoadId: 'x', polvereDiVetro: [{ weight: 1 }] };
+			local = { sourceLotId: 'x', polvereDiVetro: [{ weight: 1 }] };
 		};
 	});
 	flushSync();

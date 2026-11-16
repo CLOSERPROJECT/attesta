@@ -26,7 +26,7 @@ func TestLoaderEmptyDomainAndActiveConfig(t *testing.T) {
 	if result.ActiveConfigVersion != DefaultFixtureVersion {
 		t.Fatalf("active = %q", result.ActiveConfigVersion)
 	}
-	if len(result.Domain.Kind("load")) != 0 || len(result.Domain.Submissions) != 0 || len(result.Domain.JobInstances) != 0 {
+	if len(result.Domain.Kind("lot")) != 0 || len(result.Domain.Submissions) != 0 || len(result.Domain.JobInstances) != 0 {
 		t.Fatalf("domain not empty: %#v", result.Domain)
 	}
 	if result.Config.ID != "feragame-config" {
@@ -114,7 +114,7 @@ func TestHandleLoadRejectsWhenGateDenies(t *testing.T) {
 func TestMemoryStoresRoundTrip(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	domain := EmptyDomain()
-	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, "lot", EntityMap{"L1": {"client": "NO"}})
 	if err := domains.Put(t.Context(), "feragame", domain); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestMemoryStoresRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Kind("load")["L1"]["client"] != "NO" {
+	if got.Kind("lot")["L1"]["client"] != "NO" {
 		t.Fatalf("got = %#v", got)
 	}
 

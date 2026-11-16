@@ -16,11 +16,12 @@ type UnlockQuery struct {
 }
 
 // IsTaskUnlocked: Task unlocks when its Unlock predecessor is satisfied on this
-// Job instance. Default predecessor is the previous ordered sibling; optional
-// unlockFrom names an earlier sibling instead. Leaf predecessor → one
-// Submission. Group predecessor → group closed (not one child Submission).
-// First Task is always unlocked. Distinct from startsWhen / readyWhen.
-// Predecessor primitive inside EvaluatePathUnlock.
+// Job instance. Default predecessor is the nearest earlier once/group sibling
+// (submit: many leaves are skipped so peer many Tasks share one once bookend;
+// ADR-0008). Optional unlockFrom names an earlier sibling instead. Leaf
+// predecessor → one Submission. Group predecessor → group closed (not one child
+// Submission). First Task is always unlocked. Distinct from startsWhen /
+// readyWhen. Predecessor primitive inside EvaluatePathUnlock.
 func IsTaskUnlocked(q UnlockQuery) bool {
 	index := -1
 	for i, id := range q.OrderedIDs {
@@ -41,7 +42,8 @@ func IsTaskUnlocked(q UnlockQuery) bool {
 
 	previousID, ok := unlockPredecessorID(q, index)
 	if !ok {
-		return false
+		// Only submit:many siblings precede this Task — unlock with the instance.
+		return true
 	}
 	prev, ok := TaskByID(q.Tasks, previousID)
 	if !ok {
@@ -62,7 +64,8 @@ func IsTaskUnlocked(q UnlockQuery) bool {
 }
 
 // unlockPredecessorID resolves the Unlock predecessor for OrderedIDs[index].
-// unlockFrom (when present) must be a non-empty string Task id; omit ⇒ previous sibling.
+// unlockFrom (when present) must be a non-empty string Task id; omit ⇒ walk
+// backward skipping submit:many leaves until an once leaf or group.
 func unlockPredecessorID(q UnlockQuery, index int) (string, bool) {
 	current, ok := TaskByID(q.Tasks, q.TaskID)
 	if !ok {
@@ -78,7 +81,17 @@ func unlockPredecessorID(q UnlockQuery, index int) (string, bool) {
 	if index < 1 || index > len(q.OrderedIDs) {
 		return "", false
 	}
-	return q.OrderedIDs[index-1], true
+	for i := index - 1; i >= 0; i-- {
+		id := q.OrderedIDs[i]
+		prev, ok := TaskByID(q.Tasks, id)
+		if !ok {
+			continue
+		}
+		if prev.IsGroup() || !taskSubmitMany(prev) {
+			return id, true
+		}
+	}
+	return "", false
 }
 
 func hasFlatSubmissionOnInstance(subs []Submission, jobID, taskID, jobInstanceID string) bool {
@@ -101,8 +114,8 @@ func hasGroupChildSubmission(subs []Submission, jobID, groupID, groupInstanceID,
 }
 
 // PathUnlock is Unlock-path availability for one TaskPathRef on a Job instance:
-// nested scaffolding + predecessor Unlock → Unlocked; Submission / group-closed → Done.
-// startsWhen / readyWhen stay outside.
+// nested scaffolding + predecessor Unlock → Unlocked; submit: once Submission /
+// group-closed → Done (submit: many never Done). startsWhen / readyWhen stay outside.
 type PathUnlock struct {
 	Unlocked bool
 	Done     bool
@@ -149,9 +162,12 @@ func evaluateFlatPathUnlock(job Job, domain Domain, ref TaskPathRef, jobInstance
 			Done:     IsGroupClosed(domain.ClosedGroups, ref.JobID, jobInstanceID, ref.TaskID),
 		}
 	}
+	// submit: many never becomes done from Submission (ADR-0008); once (default) does.
+	done := !taskSubmitMany(tc) &&
+		hasFlatSubmissionOnInstance(domain.Submissions, ref.JobID, ref.TaskID, jobInstanceID)
 	return PathUnlock{
 		Unlocked: true,
-		Done:     hasFlatSubmissionOnInstance(domain.Submissions, ref.JobID, ref.TaskID, jobInstanceID),
+		Done:     done,
 	}
 }
 
@@ -174,9 +190,11 @@ func evaluateNestedPathUnlock(job Job, domain Domain, ref TaskPathRef, jobInstan
 	children := group.ChildTasks()
 	childDone := false
 	if ref.GroupInstanceID != "" && ref.GroupInstanceID != ProvisionalGroupInstanceID {
-		childDone = hasGroupChildSubmission(
-			domain.Submissions, ref.JobID, ref.GroupID, ref.GroupInstanceID, ref.TaskID, jobInstanceID,
-		)
+		if leaf, ok := TaskByID(children, ref.TaskID); ok && !taskSubmitMany(leaf) {
+			childDone = hasGroupChildSubmission(
+				domain.Submissions, ref.JobID, ref.GroupID, ref.GroupInstanceID, ref.TaskID, jobInstanceID,
+			)
+		}
 	}
 	if IsGroupClosed(domain.ClosedGroups, ref.JobID, jobInstanceID, ref.GroupID) {
 		return PathUnlock{Unlocked: false, Done: childDone}
@@ -223,7 +241,9 @@ func sequenceOkForPath(cfg OrgConfig, domain Domain, ref TaskPathRef, jobInstanc
 	if !ok {
 		return false
 	}
-	return EvaluatePathUnlock(cfg, domain, ref, jobInstanceID).Unlocked && startsWhenOk(cfg, job, domain)
+	// Done (submit: once after Submission) blocks Commit; many never Done ⇒ repeats OK.
+	ev := EvaluatePathUnlock(cfg, domain, ref, jobInstanceID)
+	return ev.Unlocked && !ev.Done && startsWhenOk(cfg, job, domain)
 }
 
 func startsWhenOk(cfg OrgConfig, job Job, domain Domain) bool {

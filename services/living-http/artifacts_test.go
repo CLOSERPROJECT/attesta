@@ -16,7 +16,7 @@ func sampleLabelBody(withQR bool) map[string]any {
 		labels[1].(map[string]any)["qr"] = "https://plant.example/app?entityId=NO-261012-1.2"
 	}
 	return map[string]any{
-		"loadId":            "NO-261012-1",
+		"lotId":            "NO-261012-1",
 		"date":              "261012",
 		"client":            "NO",
 		"clientProgressive": 1.0,
@@ -51,7 +51,7 @@ func TestLabelsPDFIncludesPlantFields(t *testing.T) {
 func TestLabelsPDFEncodesQrAsPNGNotJPEG(t *testing.T) {
 	payload := "https://plant.example/app?entityId=NO-261012-1.1"
 	pdf, err := labelsPDF(map[string]any{
-		"loadId": "NO-261012-1",
+		"lotId": "NO-261012-1",
 		"date":   "261012",
 		"client": "NO",
 		"clientProgressive": "1",
@@ -74,7 +74,7 @@ func TestLabelsPDFEncodesQrAsPNGNotJPEG(t *testing.T) {
 		t.Fatalf("expected template+QR images, got %d", bytes.Count(pdf, []byte("/Subtype /Image")))
 	}
 	plain, err := labelsPDF(map[string]any{
-		"loadId": "NO-261012-1",
+		"lotId": "NO-261012-1",
 		"labels": []any{map[string]any{"id": "NO-261012-1.1"}},
 	})
 	if err != nil {
@@ -147,7 +147,7 @@ func TestLabelEntriesAcceptsJsonataSingletonObject(t *testing.T) {
 	}
 
 	pdf, err := labelsPDF(map[string]any{
-		"loadId": "NO-261103-2",
+		"lotId": "NO-261103-2",
 		"labels": map[string]any{
 			"id": "NO-261103-2.1", "client": "NO",
 			"qr": "https://plant.example/app?entityId=NO-261103-2.1",
@@ -188,7 +188,7 @@ func TestFormatPalletHeadlineAndCER(t *testing.T) {
 
 func TestLabelSheetProgressiveFallback(t *testing.T) {
 	sheet := labelSheetFromBody(map[string]any{
-		"loadId": "FE-261012-1",
+		"lotId": "FE-261012-1",
 		"client": "FE",
 		"labels": []any{map[string]any{"id": "FE-261012-1.2"}},
 	})

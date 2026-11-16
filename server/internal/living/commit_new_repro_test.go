@@ -58,8 +58,8 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "261019-1st-1" {
-		t.Fatalf("jobInstanceId=%q want 261019-1st-1", result.JobInstanceID)
+	if result.JobInstanceID != "261029-1" {
+		t.Fatalf("jobInstanceId=%q want 261029-1", result.JobInstanceID)
 	}
 	for _, inst := range result.Domain.JobInstances {
 		if inst.ID == "_new" {
@@ -107,8 +107,8 @@ func TestCommitTruckArriveStartingNewAfterMongoJSONMintsTruckID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.JobInstanceID != "261019-1st-1" {
-		t.Fatalf("jobInstanceId=%q want 261019-1st-1", result.JobInstanceID)
+	if result.JobInstanceID != "261029-1" {
+		t.Fatalf("jobInstanceId=%q want 261029-1", result.JobInstanceID)
 	}
 }
 

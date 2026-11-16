@@ -20,7 +20,7 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 	transform := onSubmit["transform"].([]any)
 	op := transform[0].(map[string]any)
 	set := op["set"].(map[string]any)
-	set["plantNote"] = "$.turno"
+	set["plantNote"] = `"from-yaml"`
 
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
@@ -46,34 +46,35 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	truckID := result.JobInstanceID
-	if result.Domain.Kind("truck")[truckID]["turno"] != "1st" {
-		t.Fatalf("truck = %#v", result.Domain.Kind("truck")[truckID])
+	if _, has := result.Domain.Kind("truck")[truckID]["workingDayId"]; has {
+		t.Fatalf("truck must not stamp workingDayId: %#v", result.Domain.Kind("truck")[truckID])
 	}
-	if result.Domain.Kind("truck")[truckID]["plantNote"] != "1st" {
+	if result.Domain.Kind("truck")[truckID]["plantNote"] != "from-yaml" {
 		t.Fatalf("transform YAML change should stamp plantNote without a new apply* — truck=%#v", result.Domain.Kind("truck")[truckID])
 	}
 }
 
-func TestCommitOpenTurnoLabelFromConfigExpr(t *testing.T) {
+func TestCommitStartLotLabelFromConfigExpr(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	_, loadID := plantIntakeOneLot(t, c)
 	result, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
-		UserID: "ada", Org: "feragame", Roles: []string{"line"},
+		UserID: "ada", Org: "feragame", Roles: []string{"logistic"},
 	}, CommitRequest{
-		TaskPath: "line/openTurno",
-		Value:    openTurnoValue(),
+		TaskPath: "lot_processing/startLot",
+		Value:    map[string]any{"lotId": loadID},
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantID := "2026-10-19-1st"
+	wantLabel := "Lotto: " + loadID
 	var label string
 	for _, inst := range result.Domain.JobInstances {
-		if inst.JobID == "line" && inst.ID == wantID {
+		if inst.JobID == "lot_processing" && inst.ID == loadID {
 			label = inst.Label
 		}
 	}
-	if label != "2026-10-19 Turno: 1°" {
-		t.Fatalf("label from config expr = %q", label)
+	if label != wantLabel {
+		t.Fatalf("label from config expr = %q, want %q", label, wantLabel)
 	}
 }

@@ -122,7 +122,7 @@ func (c *Committer) CloseGroup(ctx context.Context, org string, op OperatorIdent
 func projectLifecycleResult(org, jobID, jobInstanceID string, cfg OrgConfig, domain Domain, op OperatorIdentity) (CommitResult, error) {
 	wl := ProjectWorklist(cfg, domain, op)
 	// Flat ref: Close is not a nested child Commit; use usual auto-advance law.
-	next, nextBundle, err := resolveCommitDestination(cfg, domain, wl, TaskPathRef{JobID: jobID}, jobInstanceID)
+	nav, continueNav, nextBundle, err := resolveCommitDestination(cfg, domain, wl, TaskPathRef{JobID: jobID}, jobInstanceID)
 	if err != nil {
 		return CommitResult{}, err
 	}
@@ -131,7 +131,8 @@ func projectLifecycleResult(org, jobID, jobInstanceID string, cfg OrgConfig, dom
 		JobInstanceID:      jobInstanceID,
 		Domain:             domain,
 		Worklist:           wl,
-		Next:               next,
+		Navigation:         nav,
+		ContinueNavigation: continueNav,
 		NextTaskFormBundle: nextBundle,
 	}, nil
 }

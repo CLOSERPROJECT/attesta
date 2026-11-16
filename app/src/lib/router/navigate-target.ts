@@ -7,6 +7,9 @@ export function hrefLivingTarget(target: PostCommitTarget): string {
 	if (target.kind === 'home') {
 		return p('/');
 	}
+	if (target.kind === 'archive') {
+		return p('/archive');
+	}
 	if (target.kind === 'overview') {
 		return p('/:jobId/:jobInstanceId', {
 			params: {
@@ -39,6 +42,10 @@ export function hrefLivingTarget(target: PostCommitTarget): string {
 export function navigateLivingTarget(target: PostCommitTarget): void {
 	if (target.kind === 'home') {
 		void navigate('/');
+		return;
+	}
+	if (target.kind === 'archive') {
+		void navigate('/archive');
 		return;
 	}
 	if (target.kind === 'overview') {

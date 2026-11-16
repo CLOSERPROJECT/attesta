@@ -13,6 +13,14 @@ export function localCalendarDateISO(now: Date = new Date()): string {
 	return `${y}-${m}-${d}`;
 }
 
+/** UTC calendar date as `YYYY-MM-DD` — matches Go Commit/transform `$today`. */
+export function utcCalendarDateISO(now: Date = new Date()): string {
+	const y = now.getUTCFullYear();
+	const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+	const d = String(now.getUTCDate()).padStart(2, '0');
+	return `${y}-${m}-${d}`;
+}
+
 /**
  * Replace authored `default: $today` on `format: date` schemas with a real
  * ISO date. Config stays authority — other date fields are untouched.

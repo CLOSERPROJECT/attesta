@@ -11,6 +11,7 @@ import type {
 import { isChromeTone } from './chrome-tone.js';
 import { evaluateSafe, formatJsonataError } from './jsonata-safe.js';
 import type { OperatorIdentity } from './operator-identity.js';
+import { utcCalendarDateISO } from './schema-defaults.js';
 import type { ChromeDataReport, TaskFormPlan } from './task-form-plan.js';
 
 export type LiveTaskFormPorts = {
@@ -42,9 +43,10 @@ function chromeBindings(
 	domain: unknown,
 	catalogs: unknown | undefined,
 	instance: unknown | undefined,
-	operator: OperatorIdentity | undefined
+	operator: OperatorIdentity | undefined,
+	today: string = utcCalendarDateISO()
 ): Record<string, unknown> {
-	const bindings: Record<string, unknown> = { domain };
+	const bindings: Record<string, unknown> = { domain, today };
 	if (catalogs !== undefined) {
 		bindings.catalogs = catalogs;
 	}

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
-// TaskRecap is the thin overview expand payload for a done Task: Submission
-// facts + actor/time, plus any post-Commit links side record. No schema,
-// uiSchema, or Domain — only optional property titles from Active Org Config.
+// TaskRecap is one Submission row for overview expand: facts + actor/time,
+// plus any post-Commit links side record. No schema, uiSchema, or Domain —
+// only optional property titles from Active Org Config.
 type TaskRecap struct {
 	JobID           string            `json:"jobId"`
 	JobInstanceID   string            `json:"jobInstanceId"`
@@ -25,61 +26,75 @@ type TaskRecap struct {
 	Links  []HttpLinkItem    `json:"links,omitempty"`
 }
 
-// LoadTaskRecap returns Submission facts (+ timestamp, userId) and stored links
-// for a done Task address. Auth is Caller's concern (Load-level Gate + org);
-// this method does not Cerbos-authorize. Unknown address or not-done → ErrNotFound.
+// TaskRecapList is the task-recap wire: always an items array (once → 0–1,
+// many → N), oldest timestamp first.
+type TaskRecapList struct {
+	Items []TaskRecap `json:"items"`
+}
+
+// LoadTaskRecap returns all Domain Submissions at addr (oldest first), each
+// with facts + LinkStore links keyed by that row's timestamp. Auth is Caller's
+// concern (Load-level Gate + org); this method does not Cerbos-authorize.
+// Unknown address or no matching Submissions → ErrNotFound.
 func (l *Loader) LoadTaskRecap(
 	ctx context.Context,
 	org string,
 	addr SubmissionAddress,
-) (TaskRecap, error) {
+) (TaskRecapList, error) {
 	org = strings.TrimSpace(org)
 	addr = addr.normalized()
 	if org == "" {
-		return TaskRecap{}, fmt.Errorf("living: org required")
+		return TaskRecapList{}, fmt.Errorf("living: org required")
 	}
 	if !addr.valid() {
-		return TaskRecap{}, fmt.Errorf("living: submission address required")
+		return TaskRecapList{}, fmt.Errorf("living: submission address required")
 	}
 	if l.Domains == nil {
-		return TaskRecap{}, fmt.Errorf("living: stores required")
+		return TaskRecapList{}, fmt.Errorf("living: stores required")
 	}
 
 	domain, err := l.Domains.Get(ctx, org)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return TaskRecap{}, ErrNotFound
+			return TaskRecapList{}, ErrNotFound
 		}
-		return TaskRecap{}, err
+		return TaskRecapList{}, err
 	}
 
-	sub, ok := findSubmission(domain.Submissions, addr)
-	if !ok {
-		return TaskRecap{}, ErrNotFound
+	matched := submissionsMatching(domain.Submissions, addr)
+	if len(matched) == 0 {
+		return TaskRecapList{}, ErrNotFound
 	}
+	sort.Slice(matched, func(i, j int) bool {
+		return matched[i].Timestamp < matched[j].Timestamp
+	})
 
-	recap := TaskRecap{
-		JobID:           sub.JobID,
-		JobInstanceID:   sub.JobInstanceID,
-		TaskID:          sub.TaskID,
-		GroupID:         sub.GroupID,
-		GroupInstanceID: sub.GroupInstanceID,
-		Timestamp:       sub.Timestamp,
-		UserID:          sub.UserID,
-		Facts:           cloneFacts(sub.Facts),
-		Titles:          l.factTitlesFromConfig(ctx, org, addr),
-	}
-
-	if l.LinkStore != nil {
-		links, err := l.LinkStore.Get(ctx, org, addr)
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			return TaskRecap{}, err
+	titles := l.factTitlesFromConfig(ctx, org, addr)
+	items := make([]TaskRecap, 0, len(matched))
+	for _, sub := range matched {
+		recap := TaskRecap{
+			JobID:           sub.JobID,
+			JobInstanceID:   sub.JobInstanceID,
+			TaskID:          sub.TaskID,
+			GroupID:         sub.GroupID,
+			GroupInstanceID: sub.GroupInstanceID,
+			Timestamp:       sub.Timestamp,
+			UserID:          sub.UserID,
+			Facts:           cloneFacts(sub.Facts),
+			Titles:          titles,
 		}
-		if err == nil {
-			recap.Links = links
+		if l.LinkStore != nil {
+			links, err := l.LinkStore.Get(ctx, org, addr, sub.Timestamp)
+			if err != nil && !errors.Is(err, ErrNotFound) {
+				return TaskRecapList{}, err
+			}
+			if err == nil {
+				recap.Links = links
+			}
 		}
+		items = append(items, recap)
 	}
-	return recap, nil
+	return TaskRecapList{Items: items}, nil
 }
 
 // factTitlesFromConfig reads property titles from the Active Org Config leaf
@@ -144,16 +159,17 @@ func schemaPropertyTitles(schema map[string]any) map[string]string {
 	return out
 }
 
-func findSubmission(subs []Submission, addr SubmissionAddress) (Submission, bool) {
+func submissionsMatching(subs []Submission, addr SubmissionAddress) []Submission {
 	addr = addr.normalized()
+	var out []Submission
 	for _, s := range subs {
 		if s.JobID == addr.JobID &&
 			s.TaskID == addr.TaskID &&
 			s.JobInstanceID == addr.JobInstanceID &&
 			s.GroupID == addr.GroupID &&
 			s.GroupInstanceID == addr.GroupInstanceID {
-			return s, true
+			out = append(out, s)
 		}
 	}
-	return Submission{}, false
+	return out
 }

@@ -22,8 +22,8 @@ const cellSchema = {
 	enum: ['partial', 'done']
 };
 
-/** Fixture: lineLoad mapTable after Go concrete-property projection. */
-function lineLoadProjectedSchema(rowIds: string[]): Schema {
+/** Fixture: markProgress mapTable after Go concrete-property projection. */
+function markProgressProjectedSchema(rowIds: string[]): Schema {
 	const properties: Record<string, typeof cellSchema> = {};
 	for (const id of rowIds) properties[id] = cellSchema;
 	return {
@@ -41,12 +41,12 @@ function lineLoadProjectedSchema(rowIds: string[]): Schema {
 function sealPlan() {
 	const rowIds = ['NIR-1.1', 'NIR-1.2', 'NIR-1.3'];
 	const bundle: TaskFormBundle = {
-		jobId: 'line',
-		taskId: 'lineLoad',
-		jobInstanceId: '1st',
-		title: 'lineLoad',
+		jobId: 'lot_processing',
+		taskId: 'markProgress',
+		jobInstanceId: 'CO-1',
+		title: 'Segna avanzamento',
 		surface: 'live',
-		schema: lineLoadProjectedSchema(rowIds),
+		schema: markProgressProjectedSchema(rowIds),
 		uiSchema: {} as UiSchemaRoot,
 		initialData: {},
 		rowIds,
@@ -60,7 +60,7 @@ function sealPlan() {
 
 describe('cascade #6 no SPA cell-map normalize', () => {
 	const rowIds = ['NIR-1.1', 'NIR-1.2'];
-	const schema = lineLoadProjectedSchema(rowIds);
+	const schema = markProgressProjectedSchema(rowIds);
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
 	test('form-cell-map normalize helpers are gone', () => {
@@ -114,7 +114,7 @@ describe('cascade #6 no SPA cell-map normalize', () => {
 	test('mapTable row keys === projected ids when Draft omits the map', () => {
 		const projectedIds = ['NIR-1.1', 'NIR-1.2', 'NIR-1.3'];
 		const progressSchema = (
-			lineLoadProjectedSchema(projectedIds) as {
+			markProgressProjectedSchema(projectedIds) as {
 				properties?: { progress?: { properties?: Record<string, unknown> } };
 			}
 		).properties?.progress;

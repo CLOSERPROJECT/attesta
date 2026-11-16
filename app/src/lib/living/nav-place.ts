@@ -5,7 +5,7 @@ import { worklistJobFor } from './types.js';
 import { resolveTaskExit, type PostCommitTarget } from './worklist-nav.js';
 import { jobInstanceOverview } from './worklist-overview.js';
 
-export type NavPlaceRouteKind = 'home' | 'overview' | 'task';
+export type NavPlaceRouteKind = 'home' | 'archive' | 'overview' | 'task';
 
 /** Living path segments after base strip (trailing slash normalized). */
 export function livingPathSegments(pathname: string): string[] {
@@ -18,6 +18,8 @@ export function livingPathSegments(pathname: string): string[] {
 	}
 	return path.replace(/^\//, '').split('/').filter(Boolean);
 }
+
+const ARCHIVE_SEGMENT = 'archive';
 
 /**
  * Task/overview coords from pathname only.
@@ -89,6 +91,7 @@ export function livingRouteCoordsFromPath(input: {
  * make Back navigate to the same overview (no-op).
  * Trailing slash → still home at `/`.
  * Nested Task: job / jobInstance / group / groupInstance / task (5 segments).
+ * Static `/archive` is Archive (not a Job id).
  */
 export function navPlaceKindFromRoute(input: {
 	pathname: string;
@@ -96,6 +99,9 @@ export function navPlaceKindFromRoute(input: {
 	const segments = livingPathSegments(input.pathname);
 	if (segments.length === 0) {
 		return 'home';
+	}
+	if (segments.length === 1 && segments[0] === ARCHIVE_SEGMENT) {
+		return 'archive';
 	}
 	if (segments.length >= 3) {
 		return 'task';
@@ -113,14 +119,15 @@ export type NavPlaceInput = {
 	taskId: string;
 	/** Job-level Start only — nested Spawn keeps a real jobInstanceId. */
 	provisionalJob: boolean;
-	/** Nested provisional Spawn — same chrome as minted Task; Back still overview. */
+	/** Nested provisional Spawn — same chrome as minted Task; Back → home. */
 	provisionalSpawn?: boolean;
 	worklist: Worklist | null | undefined;
 };
 
 export type NavPlaceChrome = {
 	showBack: boolean;
-	backTarget: Extract<PostCommitTarget, { kind: 'home' | 'overview' }>;
+	/** Home from Archive/Task/overview (arrival tracking skipped — always home). */
+	backTarget: Extract<PostCommitTarget, { kind: 'home' | 'archive' }>;
 	primaryLabel: string;
 	/**
 	 * Muted top line: authored Job.title on overview; on Task pages
@@ -181,6 +188,15 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 		};
 	}
 
+	if (kind === 'archive') {
+		return {
+			showBack: true,
+			backTarget: { kind: 'home' },
+			primaryLabel: m.archive(),
+			jobTitleLine: null
+		};
+	}
+
 	const jobTitleLine = authoredJobTitle(worklist, jobId);
 
 	if (kind === 'overview') {
@@ -194,10 +210,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 	}
 
 	const taskTitle = taskTitleFromWorklist(worklist, jobId, taskId);
-	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisionalJob) as Extract<
-		PostCommitTarget,
-		{ kind: 'home' | 'overview' }
-	>;
+	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisionalJob);
 
 	if (provisionalJob) {
 		return {

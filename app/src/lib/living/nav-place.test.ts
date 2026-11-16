@@ -61,6 +61,11 @@ describe('navPlaceKindFromRoute', () => {
 		expect(navPlaceKindFromRoute({ pathname: '' })).toBe('home');
 	});
 
+	test('pathname /archive → archive (not a Job id)', () => {
+		expect(navPlaceKindFromRoute({ pathname: '/archive' })).toBe('archive');
+		expect(navPlaceKindFromRoute({ pathname: '/archive/' })).toBe('archive');
+	});
+
 	test('3 path segments → task', () => {
 		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2/register' })).toBe('task');
 	});
@@ -102,6 +107,24 @@ describe('resolveNavPlace', () => {
 			showBack: false,
 			backTarget: { kind: 'home' },
 			primaryLabel: m.fallback_home(),
+			jobTitleLine: null
+		});
+	});
+
+	test('archive: Archive label, back home, no job title line', () => {
+		expect(
+			resolveNavPlace({
+				kind: 'archive',
+				jobId: '',
+				jobInstanceId: '',
+				taskId: '',
+				provisionalJob: false,
+				worklist
+			})
+		).toEqual({
+			showBack: true,
+			backTarget: { kind: 'home' },
+			primaryLabel: m.archive(),
 			jobTitleLine: null
 		});
 	});
@@ -155,7 +178,7 @@ describe('resolveNavPlace', () => {
 		});
 	});
 
-	test('task provisional Spawn: job · instance muted, task primary, back overview', () => {
+	test('task provisional Spawn: job · instance muted, task primary, back home', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
@@ -168,13 +191,13 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
+			backTarget: { kind: 'home' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion · Camion B'
 		});
 	});
 
-	test('task minted: job · instance muted, task primary, back overview', () => {
+	test('task minted: job · instance muted, task primary, back home', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
@@ -186,7 +209,7 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-2' },
+			backTarget: { kind: 'home' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion · Camion B'
 		});

@@ -33,26 +33,28 @@ describe('worklist helpers', () => {
 					instances: []
 				},
 				{
-					jobId: 'line',
+					jobId: 'lot_processing',
 					canStart: false,
 					repeatable: true,
-					taskIds: ['shift', 'lineLoad'],
+					taskIds: ['startLot', 'markProgress'],
 					tasks: [
-						{ id: 'shift', title: 'Turno', roles: ['line'] },
-						{ id: 'lineLoad', title: 'Carico', roles: ['line'] }
+						{ id: 'startLot', title: 'Apri lotto', roles: ['logistic'] },
+						{ id: 'markProgress', title: 'Segna avanzamento', roles: ['line'] }
 					],
 					instances: [
 						{
-							id: '1st',
-							label: 'Turno: 1st',
-							tasks: { shift: 'done', lineLoad: 'available' }
+							id: 'CO-1',
+							label: 'Lotto: CO-1',
+							tasks: { startLot: 'done', markProgress: 'available' }
 						}
 					]
 				}
 			]
 		};
-		expect(worklistJobFor(worklist, 'line')?.canStart).toBe(false);
-		expect(worklistJobFor(worklist, 'line')?.instances[0]?.tasks.lineLoad).toBe('available');
+		expect(worklistJobFor(worklist, 'lot_processing')?.canStart).toBe(false);
+		expect(worklistJobFor(worklist, 'lot_processing')?.instances[0]?.tasks.markProgress).toBe(
+			'available'
+		);
 		expect(worklistJobFor(worklist, 'missing')).toBeNull();
 		expect(worklistJobFor(null, 'intake')).toBeNull();
 	});
@@ -82,5 +84,66 @@ describe('worklist helpers', () => {
 		});
 		expect(intake?.tasks[1]?.title).toBeTruthy();
 		expect(intake?.tasks[1]?.roles).toEqual(['logistic']);
+	});
+
+	test('WorklistInstance submissionCounts mirrors Go wire (0 omit / 1 / N)', () => {
+		const emptyCounts: Worklist = {
+			jobs: [
+				{
+					jobId: 'session',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['repeat'],
+					tasks: [{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }],
+					instances: [{ id: 'S1', label: 'Session', tasks: { repeat: 'actionable' } }]
+				}
+			]
+		};
+		expect(emptyCounts.jobs[0].instances[0].submissionCounts).toBeUndefined();
+
+		const one: Worklist = {
+			jobs: [
+				{
+					jobId: 'session',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['start', 'repeat'],
+					tasks: [
+						{ id: 'start', title: 'Start', roles: ['operator'] },
+						{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }
+					],
+					instances: [
+						{
+							id: 'S1',
+							label: 'Session',
+							tasks: { start: 'done', repeat: 'actionable' },
+							submissionCounts: { start: 1 }
+						}
+					]
+				}
+			]
+		};
+		expect(one.jobs[0].instances[0].submissionCounts).toEqual({ start: 1 });
+
+		const many: Worklist = {
+			jobs: [
+				{
+					jobId: 'session',
+					canStart: false,
+					repeatable: true,
+					taskIds: ['repeat'],
+					tasks: [{ id: 'repeat', title: 'Repeat', roles: ['operator'], submit: 'many' }],
+					instances: [
+						{
+							id: 'S1',
+							label: 'Session',
+							tasks: { repeat: 'actionable' },
+							submissionCounts: { repeat: 3 }
+						}
+					]
+				}
+			]
+		};
+		expect(many.jobs[0].instances[0].submissionCounts?.repeat).toBe(3);
 	});
 });

@@ -21,9 +21,9 @@ func feragameWeighRowSchema() map[string]any {
 func TestPalletWeightRowIDsSkipsWeighted(t *testing.T) {
 	domain := EmptyDomain()
 	putKind(&domain, "pallet", EntityMap{
-		"load-1.1": map[string]any{"loadId": "load-1"},
-		"load-1.2": map[string]any{"loadId": "load-1", "weight": 11.0},
-		"load-2.1": map[string]any{"loadId": "load-2"},
+		"load-1.1": map[string]any{"lotId": "load-1"},
+		"load-1.2": map[string]any{"lotId": "load-1", "weight": 11.0},
+		"load-2.1": map[string]any{"lotId": "load-2"},
 	})
 	got := palletWeightRowIDs(domain, "load-1")
 	if len(got) != 1 || got[0] != "load-1.1" {
@@ -64,15 +64,15 @@ func TestFilterFilledObjectRowsUsesSchema(t *testing.T) {
 	}
 }
 
-func TestLineLoadRowIDsSkipsDone(t *testing.T) {
+func TestMarkProgressRowIDsSkipsDone(t *testing.T) {
 	domain := EmptyDomain()
 	putKind(&domain, "pallet", EntityMap{
-		"a": map[string]any{"loadId": "load-1", "weight": 11.0},
-		"b": map[string]any{"loadId": "load-1", "weight": 22.0, "progress": "partial"},
-		"c": map[string]any{"loadId": "load-1", "weight": 33.0, "progress": "done"},
-		"d": map[string]any{"loadId": "load-1"},
+		"a": map[string]any{"lotId": "load-1", "weight": 11.0},
+		"b": map[string]any{"lotId": "load-1", "weight": 22.0, "progress": "partial"},
+		"c": map[string]any{"lotId": "load-1", "weight": 33.0, "progress": "done"},
+		"d": map[string]any{"lotId": "load-1"},
 	})
-	got := lineLoadRowIDs(domain)
+	got := markProgressRowIDs(domain, "load-1")
 	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
 		t.Fatalf("got = %#v", got)
 	}
@@ -211,7 +211,7 @@ func TestFilterFilledCellsKeepsPartialDoneAndNullClear(t *testing.T) {
 func palletWeightRowIDs(domain Domain, jobInstanceID string) []string {
 	ids, err := ResolveRead(domain, ReadDef{
 		Entity: EntityType("pallet"),
-		Where:  "loadId = $instance.id and $not($exists(weight))",
+		Where:  "lotId = $instance.id and $not($exists(weight))",
 		Key:    "id",
 	}, jobInstanceID, "", nil)
 	if err != nil {
@@ -220,14 +220,3 @@ func palletWeightRowIDs(domain Domain, jobInstanceID string) []string {
 	return ids
 }
 
-func lineLoadRowIDs(domain Domain) []string {
-	ids, err := ResolveRead(domain, ReadDef{
-		Entity: EntityType("pallet"),
-		Where:  "$exists(weight) and $not(progress = 'done')",
-		Key:    "id",
-	}, "", "", nil)
-	if err != nil {
-		return nil
-	}
-	return ids
-}

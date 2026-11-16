@@ -124,7 +124,7 @@ func TestWithDefaultPlaceholdersEnumSelect(t *testing.T) {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"sourceLoadId": map[string]any{
+			"sourceLotId": map[string]any{
 				"type":  "string",
 				"title": "Carico sorgente",
 				"enum":  []any{"L1", "L2"},
@@ -138,7 +138,7 @@ func TestWithDefaultPlaceholdersEnumSelect(t *testing.T) {
 
 	ui := withDefaultPlaceholders(map[string]any{}, schema, nil)
 
-	source, _ := ui["sourceLoadId"].(map[string]any)
+	source, _ := ui["sourceLotId"].(map[string]any)
 	if got := placeholderFromFieldUI(source); got != "Seleziona Carico sorgente…" {
 		t.Fatalf("enum placeholder = %q, want Seleziona…", got)
 	}

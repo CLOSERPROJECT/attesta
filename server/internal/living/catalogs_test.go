@@ -52,21 +52,21 @@ func TestDomainBindingsEmptyCatalogsWhenNil(t *testing.T) {
 
 func TestRunTransformBindingsIncludeCatalogs(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, "load", EntityMap{})
+	putKind(&domain, "lot", EntityMap{})
 	got, err := RunTransform(domain, RunTransformInput{
 		JobInstanceID: "L1",
 		Facts:         map[string]any{},
 		Transform: []any{
 			map[string]any{
 				"op":     "mint",
-				"entity": "load",
+				"entity": "lot",
 				"id":     "'L1'",
 				"set": map[string]any{
 					"note": "$lookup($catalogs.tareKinds, 'euro')",
 				},
 			},
 		},
-		Allowed:  map[string]struct{}{"load": {}},
+		Allowed:  map[string]struct{}{"lot": {}},
 		Catalogs: map[string]any{"tareKinds": map[string]any{"euro": 25}},
 	})
 	if err != nil {
@@ -89,7 +89,7 @@ func TestRunTransformBindingsIncludeCatalogs(t *testing.T) {
 
 func TestBuildFormBindingsNoTareKindsInjection(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, "lot", EntityMap{"L1": {"client": "NO"}})
 	bindings := buildFormBindings(domain, ActionableTaskRef{
 		JobID: "intake", TaskID: "palletWeight", JobInstanceID: "L1",
 	}, map[string]any{
@@ -108,13 +108,13 @@ func TestBuildFormBindingsNoTareKindsInjection(t *testing.T) {
 
 func TestResolveReadWhereUsesCatalogs(t *testing.T) {
 	domain := domainFromKinds(map[string]EntityMap{
-		"load": {
+		"lot": {
 			"L1": {"client": "NO"},
 			"L2": {"client": "SU"},
 		},
 	})
 	ids, err := ResolveRead(domain, ReadDef{
-		Entity: EntityType("load"),
+		Entity: EntityType("lot"),
 		Where:  "client = $lookup($catalogs.clients, 'nord')",
 		Key:    "id",
 	}, "", "", map[string]any{"clients": map[string]any{"nord": "NO"}})

@@ -52,20 +52,24 @@ const (
 	CommitNextTask     CommitNext = "task"
 	CommitNextOverview CommitNext = "overview"
 	CommitNextHome     CommitNext = "home"
+	CommitNextStay     CommitNext = "stay"
 )
 
 // CommitResult is the SPA Commit response: viewer-scoped Worklist, explicit
-// next destination, and optional auto-advance Task form bundle when next is
-// task. Domain stays on the Go value for tests; omitted from JSON. Task mounts
-// use addressed GET /api/living/task-form.
+// navigation destination, and optional Task form bundle when advancing (or
+// Continue targeting) a Task. Domain stays on the Go value for tests; omitted
+// from JSON. Task mounts use addressed GET /api/living/task-form.
 type CommitResult struct {
 	Org           string   `json:"org"`
 	JobInstanceID string   `json:"jobInstanceId"`
 	Domain        Domain   `json:"-"`
 	Worklist      Worklist `json:"worklist"`
-	// Next is always set: task (auto-advance), overview (handoff), or home (finished).
-	Next CommitNext `json:"next"`
-	// NextTaskFormBundle is set only when Next is task; omitted otherwise.
+	// Navigation is always set: task, home, or stay (legacy overview → home).
+	Navigation CommitNext `json:"navigation"`
+	// ContinueNavigation is set only when Navigation is stay (deferred Continue).
+	// Never overview — remaining-work / nested defaults map to home.
+	ContinueNavigation CommitNext `json:"continueNavigation,omitempty"`
+	// NextTaskFormBundle when Navigation or ContinueNavigation is task.
 	NextTaskFormBundle *TaskFormBundle `json:"nextTaskFormBundle,omitempty"`
 	Links              []HttpLinkItem  `json:"links,omitempty"`
 	HttpErrors         []string        `json:"httpErrors,omitempty"`
@@ -223,9 +227,11 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	if now == nil {
 		now = time.Now
 	}
-	ts := now().UTC().Format(time.RFC3339Nano)
+	clock := now().UTC()
+	ts := clock.Format(time.RFC3339Nano)
+	today := clock.Format("2006-01-02")
 
-	applied, err := applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, mintKind)
+	applied, err := applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, today, mintKind)
 	if err != nil {
 		var ce *CommitError
 		if errors.As(err, &ce) {
@@ -267,7 +273,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 
 	wl := ProjectWorklist(cfg, applied.Domain, op)
-	next, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
+	nav, continueNav, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
 	if err != nil {
 		return CommitResult{}, err
 	}
@@ -276,7 +282,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		JobInstanceID:      applied.JobInstanceID,
 		Domain:             applied.Domain,
 		Worklist:           wl,
-		Next:               next,
+		Navigation:         nav,
+		ContinueNavigation: continueNav,
 		NextTaskFormBundle: nextBundle,
 	}
 	if wantsPassport {
@@ -296,14 +303,47 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	if c.LinkStore != nil && len(result.Links) > 0 {
 		// Side record only — never roll back Domain or fail Commit on store error.
-		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), result.Links)
+		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), ts, result.Links)
 	}
 	return result, nil
 }
 
-// resolveCommitDestination evaluates ADR-0006: nested child while group open →
-// overview; else auto-advance → overview → home.
+// resolveCommitDestination evaluates authored onCommit.navigation first, then
+// the default nested/advance/home law (ADR-0006 + advanceTarget). Authored
+// overview maps to home on the wire (route kept, unlinked).
 func resolveCommitDestination(
+	cfg OrgConfig,
+	domain Domain,
+	wl Worklist,
+	ref TaskPathRef,
+	jobInstanceID string,
+) (nav CommitNext, continueNav CommitNext, bundle *TaskFormBundle, err error) {
+	authored := commitNavAdvance
+	if jobVal, ok := cfg.Jobs.Get(ref.JobID); ok {
+		if job, ok := AsJob(jobVal); ok {
+			if leaf, ok := LeafTaskByPath(job.Tasks, ref); ok {
+				authored = taskCommitNavigation(map[string]any(leaf))
+			}
+		}
+	}
+	defaultNav, defaultBundle, err := resolveDefaultCommitDestination(cfg, domain, wl, ref, jobInstanceID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	switch authored {
+	case commitNavHome, commitNavOverview:
+		return CommitNextHome, "", nil, nil
+	case commitNavStay:
+		return CommitNextStay, defaultNav, defaultBundle, nil
+	default:
+		return defaultNav, "", defaultBundle, nil
+	}
+}
+
+// resolveDefaultCommitDestination: nested child while group open → home;
+// else auto-advance (skipping !advanceTarget) → home when remaining work
+// or finished (ADR-0006 hard cut: overview is not a Commit destination).
+func resolveDefaultCommitDestination(
 	cfg OrgConfig,
 	domain Domain,
 	wl Worklist,
@@ -312,17 +352,14 @@ func resolveCommitDestination(
 ) (CommitNext, *TaskFormBundle, error) {
 	jobID := ref.JobID
 	if ref.Nested() && !IsGroupClosed(domain.ClosedGroups, jobID, jobInstanceID, ref.GroupID) {
-		return CommitNextOverview, nil, nil
+		return CommitNextHome, nil, nil
 	}
-	if advance, ok := NextAdvanceTaskRef(wl, jobID, jobInstanceID); ok {
+	if advance, ok := NextAdvanceTaskRef(cfg, wl, jobID, jobInstanceID); ok {
 		b, err := BuildTaskFormBundle(cfg, domain, advance)
 		if err != nil {
 			return "", nil, err
 		}
 		return CommitNextTask, b, nil
-	}
-	if worklistInstanceHasRemainingWork(wl, jobID, jobInstanceID) {
-		return CommitNextOverview, nil, nil
 	}
 	return CommitNextHome, nil, nil
 }
@@ -357,7 +394,7 @@ func applyConfigCommit(
 	jobInstanceID, userID string,
 	value map[string]any,
 	transform any,
-	ts string,
+	ts, today string,
 	mintKind MintKind,
 ) (appliedCommit, error) {
 	jobID := ref.JobID
@@ -388,6 +425,7 @@ func applyConfigCommit(
 		Transform:     transform,
 		Allowed:       EntityKindsFromConfig(cfg),
 		Catalogs:      cfg.Catalogs,
+		Today:         today,
 	})
 	if err != nil {
 		return appliedCommit{}, err

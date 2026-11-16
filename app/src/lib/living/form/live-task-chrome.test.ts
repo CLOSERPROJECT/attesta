@@ -7,6 +7,7 @@ import {
 	formatChromeEvalValue
 } from './live-task-chrome.svelte.js';
 import { operatorFromLoad } from './operator-identity.js';
+import { utcCalendarDateISO } from './schema-defaults.js';
 
 describe('formatChromeEvalValue', () => {
 	test('undefined → chrome-failed', () => {
@@ -42,6 +43,26 @@ describe('evaluateChromeEntry $operator', () => {
 	test('without operator → chrome-failed', async () => {
 		const got = await evaluateChromeEntry('$operator.displayName', {}, {}, undefined);
 		expect(got).toEqual({ value: null, error: m.chrome_failed() });
+	});
+});
+
+describe('evaluateChromeEntry $today', () => {
+	test('binds UTC YYYY-MM-DD matching Commit/transform semantics', async () => {
+		const today = utcCalendarDateISO();
+		const got = await evaluateChromeEntry('$today', {}, {}, undefined);
+		expect(got).toEqual({ value: today, error: null });
+	});
+
+	test('progressive-style dateStamp uses $today', async () => {
+		const today = utcCalendarDateISO();
+		const dateStamp = today.replaceAll('-', '').slice(2);
+		const got = await evaluateChromeEntry(
+			"$substring($replace($today, '-', ''), 2)",
+			{},
+			{},
+			undefined
+		);
+		expect(got).toEqual({ value: dateStamp, error: null });
 	});
 });
 

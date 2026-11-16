@@ -20,8 +20,8 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["client"] != "CO" {
-		t.Fatalf("domain rolled back? %#v", result.Domain.Kind("load"))
+	if result.Domain.Kind("lot")[loadID]["client"] != "CO" {
+		t.Fatalf("domain rolled back? %#v", result.Domain.Kind("lot"))
 	}
 	if len(port.calls) != 2 {
 		t.Fatalf("http calls = %#v", port.calls)
@@ -72,7 +72,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[loadID]["client"] != "CO" {
+	if stored.Kind("lot")[loadID]["client"] != "CO" {
 		t.Fatalf("persisted domain = %#v", stored)
 	}
 }
@@ -132,17 +132,16 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 
 	truckID := commitTruckArrive(t, c)
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
-		TaskPath:      GroupTaskPath("intake", "lots", ProvisionalGroupInstanceID, "register"),
+		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
-		Mint:          spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatalf("Commit must succeed when HttpPort fails: %v", err)
 	}
 	loadID := firstLoadID(result.Domain)
-	if result.Domain.Kind("load")[loadID]["client"] != "CO" {
-		t.Fatalf("domain missing after http failure: %#v", result.Domain.Kind("load"))
+	if result.Domain.Kind("lot")[loadID]["client"] != "CO" {
+		t.Fatalf("domain missing after http failure: %#v", result.Domain.Kind("lot"))
 	}
 	if len(result.Domain.Kind("pallet")) != 2 {
 		t.Fatalf("pallets = %#v", result.Domain.Kind("pallet"))
@@ -161,7 +160,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Kind("load")[loadID]["client"] != "CO" {
+	if stored.Kind("lot")[loadID]["client"] != "CO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }
@@ -178,7 +177,6 @@ func TestCommitWithoutHTTPSkipsPort(t *testing.T) {
 		t.Fatalf("register should call http twice — calls=%d", len(port.calls))
 	}
 
-	closeLots(t, c, truckID)
 	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},

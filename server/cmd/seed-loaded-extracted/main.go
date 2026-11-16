@@ -2,9 +2,9 @@
 
 // One-shot smoke helper (not product seed): wipe feragame Domain and Commit jobs
 // for /app dataReport. Run from this directory: go run main.go
-// loadedExtracted is parked off the live line (ticket 02); this seed stops at
-// containerReg/register and still prints weightCheck chrome when available.
-// Focused SeedDemo(--replace) leaves one truck × two loads + one line turn through palletWeight.
+// Stops after containerReg (lot stays open) and leaves a second intake at weightCheck
+// so chromeDisplay can be printed. Focused SeedDemo(--replace) leaves one truck ×
+// one lot through weigh + markProgress + containerReg.
 package main
 
 import (
@@ -30,7 +30,6 @@ func main() {
 	db := client.Database(dbName)
 	domains := living.NewMongoDomainStore(db)
 	configs := living.NewMongoConfigStore(db)
-	// Active Config only — smoke builds Domain from empty; staged matrix would collide on line "1st".
 	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{SkipEmptyDomainStaging: true}); err != nil {
 		must(err)
 	}
@@ -40,23 +39,60 @@ func main() {
 		Domains:    domains,
 		Configs:    configs,
 		Authorizer: living.AllowAllAuthorizer{},
-		Now:        func() time.Time { return time.Date(2026, 10, 30, 16, 0, 0, 0, time.UTC) },
+		Now:        func() time.Time { return time.Date(2026, 10, 19, 16, 0, 0, 0, time.UTC) },
 	}
 
-	truckID := living.DemoTruckInstanceID
-	loadID := living.DemoLoadInstanceID
 	admin := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
 	lineOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"line"}}
 	logOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"logistic"}}
 
-	commit(c, admin, living.CommitRequest{
-		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 33.0},
+	arrive := commit(c, admin, living.CommitRequest{
+		TaskPath: "intake/truckArrive",
+		Value:    map[string]any{"truckWeight": 1000.0},
+		Mint:     mintNew(),
 	})
+	truckID := arrive.JobInstanceID
+	reg := commit(c, admin, living.CommitRequest{
+		TaskPath:      "intake/register",
+		JobInstanceID: truckID,
+		Value: map[string]any{
+			"client": "CO", "wasteCode": "160214", "numeroFir": "FIR-SMOKE-1",
+			"palletCount": 2.0, "truckWeightAfter": 700.0, "notes": "",
+		},
+	})
+	loadID := firstLotID(reg.Domain)
+	if loadID == "" {
+		must(fmt.Errorf("expected minted lot"))
+	}
+
+	commit(c, logOp, living.CommitRequest{
+		TaskPath: "lot_processing/startLot",
+		Value:    map[string]any{"lotId": loadID},
+		Mint:     mintNew(),
+	})
+	for _, row := range []struct {
+		id     string
+		weight float64
+	}{
+		{loadID + ".1", 11},
+		{loadID + ".2", 22},
+	} {
+		commit(c, lineOp, living.CommitRequest{
+			TaskPath:      "lot_processing/weigh",
+			JobInstanceID: loadID,
+			Value: map[string]any{
+				"palletId":           row.id,
+				"averagePanelWeight": 10.0,
+				"tareKind":           "euro",
+				"weight":             row.weight,
+				"idoneita":           "NIR",
+				"panelCount":         1.0,
+			},
+		})
+	}
 	commit(c, lineOp, living.CommitRequest{
-		TaskPath: living.GroupTaskPath("line", "lineLoad", living.ProvisionalGroupInstanceID, "mark"),
-		JobInstanceID: living.DemoLineShiftID,
-		Mint: &living.CommitMint{Kind: living.MintKindSpawningNew},
+		TaskPath:      "lot_processing/markProgress",
+		JobInstanceID: loadID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
@@ -64,18 +100,11 @@ func main() {
 			},
 		},
 	})
-	must(func() error {
-		_, err := c.CloseGroup(ctx, "feragame", lineOp, living.CloseGroupRequest{
-			JobID: "line", JobInstanceID: living.DemoLineShiftID, GroupID: "lineLoad",
-		})
-		return err
-	}())
 	res := commit(c, logOp, living.CommitRequest{
-		TaskPath: living.GroupTaskPath("line", "containerReg", living.ProvisionalGroupInstanceID, "register"),
-		JobInstanceID: living.DemoLineShiftID,
-		Mint: &living.CommitMint{Kind: living.MintKindSpawningNew},
+		TaskPath:      "lot_processing/containerReg",
+		JobInstanceID: loadID,
 		Value: map[string]any{
-			"sourceLoadId": loadID,
+			"sourceLotId": loadID,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 80.0},
 			},
@@ -89,29 +118,18 @@ func main() {
 	})
 
 	// Second intake parked at weightCheck (flat dataReport smoke).
-	weightCheckID := "NIR-261019-SU-1"
-	commit(c, admin, living.CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: weightCheckID,
-		Value: map[string]any{
-			"client": "DA", "date": "2026-10-19", "wasteCode": "160214",
-			"idoneitaRiutilizzo": "NIR", "truckWeight": 800.0, "truckTare": 180.0,
-			"palletCount": 2.0, "notes": "",
-		},
-		Mint: mintNew(),
+	second := commit(c, admin, living.CommitRequest{
+		TaskPath: "intake/truckArrive",
+		Value:    map[string]any{"truckWeight": 800.0},
+		Mint:     mintNew(),
 	})
-	commit(c, admin, living.CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: weightCheckID,
-		Value: map[string]any{"codiceFir": "FIR-SMOKE-WC"},
-	})
-	res = commit(c, logOp, living.CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: weightCheckID,
+	secondTruck := second.JobInstanceID
+	res = commit(c, admin, living.CommitRequest{
+		TaskPath:      "intake/register",
+		JobInstanceID: secondTruck,
 		Value: map[string]any{
-			"averagePanelWeight": 10.0,
-			"tareKind":           "euro",
-			"weights": map[string]any{
-				weightCheckID + ".1": map[string]any{"weight": 110.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 8.0},
-				weightCheckID + ".2": map[string]any{"weight": 95.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 7.0},
-			},
+			"client": "DA", "wasteCode": "160214", "numeroFir": "FIR-SMOKE-WC",
+			"palletCount": 2.0, "truckWeightAfter": 500.0, "notes": "",
 		},
 	})
 
@@ -119,9 +137,10 @@ func main() {
 	must(err)
 	cfg, err := configs.Get(ctx, "feragame", ver)
 	must(err)
-	wl := living.ProjectWorklist(cfg, res.Domain, living.FixtureAllRolesOp())
+	domain := res.Domain
+	wl := living.ProjectWorklist(cfg, domain, living.FixtureAllRolesOp())
 	fmt.Printf("seeded feragame in %s\n", dbName)
-	fmt.Printf("containers=%d submissions=%d\n", len(res.Domain.Kind("container")), len(res.Domain.Submissions))
+	fmt.Printf("containers=%d submissions=%d\n", len(domain.Kind("container")), len(domain.Submissions))
 	for _, j := range wl.Jobs {
 		for _, inst := range j.Instances {
 			fmt.Printf("%s@%s:\n", j.JobID, inst.ID)
@@ -133,7 +152,7 @@ func main() {
 	refs := living.CollectActionableTaskRefs(cfg, wl)
 	var haveWC bool
 	for _, ref := range refs {
-		b, err := living.BuildTaskFormBundle(cfg, res.Domain, ref)
+		b, err := living.BuildTaskFormBundle(cfg, domain, ref)
 		must(err)
 		cd, _ := b.Bindings["chromeDisplay"].(map[string]any)
 		if b.TaskID == "weightCheck" {
@@ -143,7 +162,7 @@ func main() {
 			haveWC = true
 		}
 	}
-	fmt.Println("loadedExtracted parked off live line (fixtures/parked-loaded-extracted.yaml)")
+	fmt.Println("lot_processing stopped after containerReg (lot open); second intake at weightCheck")
 	if !haveWC {
 		must(fmt.Errorf("weightCheck bundle missing"))
 	}
@@ -155,6 +174,13 @@ func commit(c *living.Committer, op living.OperatorIdentity, req living.CommitRe
 		must(fmt.Errorf("%s: %w", req.TaskPath, err))
 	}
 	return res
+}
+
+func firstLotID(d living.Domain) string {
+	for id := range d.Kind("lot") {
+		return id
+	}
+	return ""
 }
 
 func mintNew() *living.CommitMint {

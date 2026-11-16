@@ -6,8 +6,8 @@
  * Fix: resolve `$today` once, pass resolved schema into merge + createForm
  * so sjsf re-merge/reset cannot inject the sentinel literal.
  *
- * Authored schema comes from feragame-config YAML (Go ships the same shape in the bundle).
- * Plant path: truckArrive carries `$today` on date (lot register no longer owns that field).
+ * Plant Config no longer authors a date `$today` schema default (day Job gone);
+ * this probe keeps an inline authored shape so the sentinel path stays covered.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -15,9 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import type { Schema } from '@sjsf/form';
 import { createFormMerger } from '@sjsf/form/mergers/modern';
-import feragameConfigYaml from '$living-fixtures/feragame-config.yaml?raw';
 import { createAjvFormValidator } from './ajv-form-validator.js';
-import { loadFeragameConfig, taskConfig } from './load-feragame-config.js';
 import {
 	localCalendarDateISO,
 	mergeSchemaDefaultsIntoFormData,
@@ -27,10 +25,21 @@ import {
 
 const libDir = dirname(fileURLToPath(import.meta.url));
 
-describe('cascade #8 schema defaults on truckArrive open', () => {
-	const config = loadFeragameConfig(feragameConfigYaml);
-	const authored = taskConfig(config.jobs.intake, 'truckArrive')!;
-	const schema = authored.schema as Schema;
+/** Inline stand-in for an authored `format: date` + `default: $today` field. */
+const authoredDateSchema = {
+	type: 'object',
+	properties: {
+		date: {
+			type: 'string',
+			format: 'date',
+			default: TODAY_DEFAULT_SENTINEL
+		},
+		mode: { type: 'string' }
+	}
+} as Schema;
+
+describe('cascade #8 schema defaults on authored date $today', () => {
+	const schema = authoredDateSchema;
 	const props = (schema.properties ?? {}) as Record<string, Schema>;
 
 	test('authored date $today survives bundle schema', () => {
@@ -38,7 +47,7 @@ describe('cascade #8 schema defaults on truckArrive open', () => {
 		expect(props.date?.format).toBe('date');
 	});
 
-	test('empty-draft truckArrive open value includes today’s ISO date', () => {
+	test('empty-draft authored date value includes today’s ISO date', () => {
 		const today = localCalendarDateISO();
 		const merged = mergeSchemaDefaultsIntoFormData(schema, {}, today);
 		expect(merged).toMatchObject({
@@ -63,7 +72,7 @@ describe('cascade #8 schema defaults on truckArrive open', () => {
 		const merger = createFormMerger({ validator, schema: resolved });
 		const remerged = merger.mergeFormDataAndSchemaDefaults({
 			schema: resolved,
-			formData: { turno: '1st' },
+			formData: { mode: 'multi' },
 			initialDefaultsGenerated: true
 		}) as Record<string, unknown>;
 		expect(remerged.date).toBe(today);
@@ -74,12 +83,12 @@ describe('cascade #8 schema defaults on truckArrive open', () => {
 		const today = localCalendarDateISO();
 		const merged = mergeSchemaDefaultsIntoFormData(
 			schema,
-			{ date: '2020-01-15', turno: '2nd' },
+			{ date: '2020-01-15', mode: 'whole-day' },
 			today
 		);
 		expect(merged).toMatchObject({
 			date: '2020-01-15',
-			turno: '2nd'
+			mode: 'whole-day'
 		});
 	});
 
@@ -89,11 +98,11 @@ describe('cascade #8 schema defaults on truckArrive open', () => {
 		const today = localCalendarDateISO();
 		const merged = mergeSchemaDefaultsIntoFormData(
 			schema,
-			{ date: TODAY_DEFAULT_SENTINEL, turno: '1st' },
+			{ date: TODAY_DEFAULT_SENTINEL, mode: 'multi' },
 			today
 		);
 		expect(merged.date).toBe(today);
 		expect(merged.date).not.toBe(TODAY_DEFAULT_SENTINEL);
-		expect(merged).toMatchObject({ turno: '1st' });
+		expect(merged).toMatchObject({ mode: 'multi' });
 	});
 });

@@ -3,8 +3,9 @@ import * as m from '#lib/paraglide/messages.js';
 import {
 	CommitDomainError,
 	type CommitDomainPort,
-	type CommitNext,
+	type CommitNavigation,
 	type CommitResult,
+	type ContinueNavigation,
 	type HttpLinkItem
 } from './commit-port.js';
 import { parseHttpLinkItem } from './parse-http-link-item.js';
@@ -16,11 +17,59 @@ export type HttpCommitDomainPortOptions = {
 	baseUrl?: string;
 };
 
+/** Keep finite taskId→N maps; drop empty / non-object (mirrors Go omitempty). */
+export function parseSubmissionCounts(
+	raw: unknown
+): Record<string, number> | undefined {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+	const out: Record<string, number> = {};
+	for (const [taskId, n] of Object.entries(raw as Record<string, unknown>)) {
+		if (typeof n === 'number' && Number.isFinite(n)) out[taskId] = n;
+	}
+	return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function withSubmissionCounts<T extends { submissionCounts?: Record<string, number> }>(
+	row: T,
+	rawCounts: unknown
+): T {
+	const counts = parseSubmissionCounts(rawCounts);
+	if (!counts) {
+		if ('submissionCounts' in row) {
+			const { submissionCounts: _drop, ...rest } = row;
+			return rest as T;
+		}
+		return row;
+	}
+	return { ...row, submissionCounts: counts };
+}
+
 function parseWorklist(raw: unknown): Worklist {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return emptyWorklist();
 	const jobs = (raw as { jobs?: unknown }).jobs;
 	if (!Array.isArray(jobs)) return emptyWorklist();
-	return { jobs: jobs as Worklist['jobs'] };
+	return {
+		jobs: (jobs as Worklist['jobs']).map((job) => ({
+			...job,
+			instances: (job.instances ?? []).map((inst) => {
+				const groups = inst.groups
+					? Object.fromEntries(
+							Object.entries(inst.groups).map(([gid, g]) => [
+								gid,
+								{
+									...g,
+									instances: (g.instances ?? []).map((gi) =>
+										withSubmissionCounts(gi, gi.submissionCounts)
+									)
+								}
+							])
+						)
+					: undefined;
+				const next = withSubmissionCounts(inst, inst.submissionCounts);
+				return groups ? { ...next, groups } : next;
+			})
+		}))
+	};
 }
 
 function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
@@ -28,9 +77,20 @@ function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
 	return raw as TaskFormBundle;
 }
 
-function parseCommitNext(raw: unknown): CommitNext {
-	if (raw === 'task' || raw === 'overview' || raw === 'home') return raw;
+function parseCommitNavigation(raw: unknown): CommitNavigation {
+	if (raw === 'stay' || raw === 'task' || raw === 'home') {
+		return raw;
+	}
+	// Legacy wire overview → home (ADR-0006 hard cut).
+	if (raw === 'overview') return 'home';
 	return 'home';
+}
+
+function parseContinueNavigation(raw: unknown): ContinueNavigation | null {
+	if (raw === 'task' || raw === 'home') return raw;
+	// Legacy wire overview → home.
+	if (raw === 'overview') return 'home';
+	return null;
 }
 
 /** Normalize Commit JSON so SPA always sees arrays for links / httpErrors. */
@@ -51,10 +111,20 @@ export function parseCommitResult(raw: unknown): CommitResult {
 	const nextBundle = parseOptionalTaskFormBundle(
 		(raw as { nextTaskFormBundle?: unknown })?.nextTaskFormBundle
 	);
+	const navigation = parseCommitNavigation(
+		(raw as { navigation?: unknown })?.navigation
+	);
+	const continueNavigation =
+		navigation === 'stay'
+			? parseContinueNavigation(
+					(raw as { continueNavigation?: unknown })?.continueNavigation
+				)
+			: null;
 	return {
 		...body,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
-		next: parseCommitNext((raw as { next?: unknown })?.next),
+		navigation,
+		continueNavigation,
 		nextTaskFormBundle: nextBundle,
 		links,
 		httpErrors

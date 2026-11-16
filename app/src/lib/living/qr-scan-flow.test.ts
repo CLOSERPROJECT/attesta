@@ -4,7 +4,7 @@ import { runQrScan } from './qr-scan-flow.js';
 import { QrResolveHttpError } from './qr-resolve-port.js';
 
 describe('runQrScan', () => {
-	test('seeds draft then navigates on one candidate', async () => {
+	test('seeds draft then navigates on one candidate (flat weigh)', async () => {
 		const drafts = new Map<string, Record<string, unknown>>();
 		const navigate = vi.fn();
 		const toast = vi.fn();
@@ -14,8 +14,6 @@ describe('runQrScan', () => {
 					navigate: {
 						jobId: 'line',
 						jobInstanceId: 'L1',
-						groupId: 'palletWeight',
-						groupInstanceId: 'new',
 						taskId: 'weigh'
 					},
 					seed: { palletId: 'P1' }
@@ -32,15 +30,13 @@ describe('runQrScan', () => {
 			'https://plant.example/app?entityId=P1'
 		);
 		expect(result).toBe('navigated');
-		expect(drafts.get('line/palletWeight/new/weigh::L1::palletWeight::')).toEqual({
+		expect(drafts.get('line/weigh::L1')).toEqual({
 			palletId: 'P1'
 		});
 		expect(navigate).toHaveBeenCalledWith({
 			kind: 'task',
 			jobId: 'line',
 			jobInstanceId: 'L1',
-			groupId: 'palletWeight',
-			groupInstanceId: 'new',
 			taskId: 'weigh'
 		});
 		expect(toast).not.toHaveBeenCalled();

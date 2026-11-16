@@ -128,7 +128,7 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	configs := living.NewMemoryConfigStore()
 	passports := living.NewMemoryPassportStore()
 	seeded := living.EmptyDomain()
-	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
+	seeded.Entities["lot"] = living.EntityMap{"L1": {"client": "NO"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
@@ -157,14 +157,14 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := got.Kind("load")["L1"]; ok {
+	if _, ok := got.Kind("lot")["L1"]; ok {
 		t.Fatal("pre-replace L1 must not survive staged rebuild")
 	}
 	if _, ok := got.Kind("truck")[living.SeedTruckID]; !ok {
 		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
 	}
-	if got.Kind("load")[living.SeedLoadCOID] == nil || got.Kind("load")[living.SeedLoadDAID] == nil {
-		t.Fatalf("staged Domain missing loads: %#v", got.Kind("load"))
+	if got.Kind("lot")[living.SeedLoadCOID] == nil || got.Kind("lot")[living.SeedLoadDAID] == nil {
+		t.Fatalf("staged Domain missing lots: %#v", got.Kind("lot"))
 	}
 	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
 		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))
@@ -292,6 +292,391 @@ func TestSeedReplaceFromArgs(t *testing.T) {
 	}
 	if seedReplaceFromArgs(nil) {
 		t.Fatal("expected no replace")
+	}
+}
+
+func TestSeedLivingScopeFromArgs(t *testing.T) {
+	scope, err := seedLivingScopeFromArgs(nil)
+	if err != nil || scope != living.SeedScopeBoth {
+		t.Fatalf("default = %v %v, want Both", scope, err)
+	}
+	cases := []struct {
+		flag string
+		want living.SeedScope
+	}{
+		{"--feragame-config", living.SeedScopeFeragameConfig},
+		{"--feragame-domain", living.SeedScopeFeragameDomain},
+		{"--feragame-identity", living.SeedScopeFeragameIdentity},
+		{"--feragame-full", living.SeedScopeFeragameFull},
+	}
+	for _, tc := range cases {
+		scope, err = seedLivingScopeFromArgs([]string{tc.flag})
+		if err != nil || scope != tc.want {
+			t.Fatalf("%s = %v %v, want %v", tc.flag, scope, err, tc.want)
+		}
+	}
+	if _, err := seedLivingScopeFromArgs([]string{"--feragame-config", "--feragame-full"}); err == nil {
+		t.Fatal("expected mutual exclusion error")
+	}
+}
+
+func TestSeedKeepDomainFromArgs(t *testing.T) {
+	keep, err := seedKeepDomainFromArgs(nil, living.SeedScopeFeragameConfig)
+	if err != nil || keep {
+		t.Fatalf("default = %v %v", keep, err)
+	}
+	keep, err = seedKeepDomainFromArgs([]string{"--feragame-config", "--keep-domain"}, living.SeedScopeFeragameConfig)
+	if err != nil || !keep {
+		t.Fatalf("config keep = %v %v", keep, err)
+	}
+	keep, err = seedKeepDomainFromArgs([]string{"--feragame-identity", "--keep-domain"}, living.SeedScopeFeragameIdentity)
+	if err != nil || !keep {
+		t.Fatalf("identity keep = %v %v", keep, err)
+	}
+	if _, err := seedKeepDomainFromArgs([]string{"--feragame-domain", "--keep-domain"}, living.SeedScopeFeragameDomain); err == nil {
+		t.Fatal("expected keep-domain rejected with domain")
+	}
+	if _, err := seedKeepDomainFromArgs([]string{"--keep-domain"}, living.SeedScopeBoth); err == nil {
+		t.Fatal("expected keep-domain rejected with default scope")
+	}
+}
+
+func TestSeedFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"lot": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), living.PassportRecord{
+		Org: "feragame", SubjectID: living.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		LivingConfigs:   configs,
+		LivingDomains:   domains,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameConfig,
+		KeepDomain:      true,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("lot")["L1"] == nil || len(got.Submissions) != 1 {
+		t.Fatalf("Domain must be kept: %#v", got)
+	}
+	if _, err := passports.Get(t.Context(), "feragame", living.SeedLoadCOID); err != nil {
+		t.Fatalf("passport must be kept: %v", err)
+	}
+}
+
+func TestSeedFeragameConfigWipesDomainSkipsIdentityAndFormata(t *testing.T) {
+	store := NewMemoryStore()
+	identity := newSeedFakeIdentity()
+	identity.orgs[demoFixtureMarkerOrgSlug] = IdentityOrg{
+		ID: demoFixtureMarkerOrgSlug, Slug: demoFixtureMarkerOrgSlug, Name: "Organization 1",
+	}
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"lot": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+
+	identity.deleteOrgFn = func(_ context.Context, orgSlug string) error {
+		t.Fatalf("feragame-config must not touch Appwrite (delete %s)", orgSlug)
+		return nil
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:        identity,
+		Store:           store,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameConfig,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("feragame Appwrite org must not be created: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 0 {
+		t.Fatalf("Formata taxonomy must be skipped: %d categories", len(cats))
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 || got.Kind("lot")["L1"] != nil {
+		t.Fatalf("feragame-config Domain not empty: %#v", got)
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; ok {
+		t.Fatal("feragame-config must not stage Domain")
+	}
+}
+
+func TestSeedFeragameDomainWipesAndStagesWithoutIdentity(t *testing.T) {
+	store := NewMemoryStore()
+	identity := newSeedFakeIdentity()
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"lot": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+
+	identity.deleteOrgFn = func(_ context.Context, orgSlug string) error {
+		t.Fatalf("feragame-domain must not touch Appwrite (delete %s)", orgSlug)
+		return nil
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:        identity,
+		Store:           store,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameDomain,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("feragame Appwrite org must not be created: %v", err)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.Kind("lot")["L1"]; ok {
+		t.Fatal("pre-wipe L1 must not survive")
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; !ok {
+		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+	}
+}
+
+func TestSeedFeragameIdentityHardResetsIdentityWipesDomainSkipsFormata(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
+
+	store := NewMemoryStore()
+	identity := newSeedFakeIdentity()
+	// Marker org present — full-stack empty-only would no-op; Feragame identity must still run.
+	identity.orgs[demoFixtureMarkerOrgSlug] = IdentityOrg{
+		ID: demoFixtureMarkerOrgSlug, Slug: demoFixtureMarkerOrgSlug, Name: "Organization 1",
+	}
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"lot": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(t.Context(), living.PassportRecord{
+		Org: "feragame", SubjectID: living.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted := false
+	identity.deleteOrgFn = func(_ context.Context, orgSlug string) error {
+		if orgSlug == demoLivingOrgSlug {
+			deleted = true
+		}
+		if orgSlug == demoFixtureMarkerOrgSlug {
+			t.Fatal("feragame-identity must not delete organization-1")
+		}
+		delete(identity.orgs, orgSlug)
+		delete(identity.memberships, orgSlug)
+		return nil
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:        identity,
+		Store:           store,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameIdentity,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected Feragame org hard delete")
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug); err != nil {
+		t.Fatalf("feragame org missing: %v", err)
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), "organization-2"); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("orgs 1–3 must not be created: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 0 {
+		t.Fatalf("Formata taxonomy must be skipped: %d categories", len(cats))
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 || got.Kind("lot")["L1"] != nil {
+		t.Fatalf("feragame-identity Domain not empty: %#v", got)
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; ok {
+		t.Fatal("feragame-identity must not stage Domain")
+	}
+	if _, err := passports.Get(t.Context(), "feragame", living.SeedLoadCOID); !errors.Is(err, living.ErrNotFound) {
+		t.Fatalf("passport after feragame-identity = %v, want ErrNotFound", err)
+	}
+	for _, email := range []string{
+		demoLivingUserEmail, demoLivingAdminUserEmail, demoLivingLogisticUserEmail, demoLivingLineUserEmail,
+	} {
+		if _, err := identity.GetUserByEmail(t.Context(), email); err != nil {
+			t.Fatalf("living user %s: %v", email, err)
+		}
+	}
+}
+
+func TestSeedFeragameFullHardResetsAndStages(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
+
+	store := NewMemoryStore()
+	identity := newSeedFakeIdentity()
+	identity.orgs[demoFixtureMarkerOrgSlug] = IdentityOrg{
+		ID: demoFixtureMarkerOrgSlug, Slug: demoFixtureMarkerOrgSlug, Name: "Organization 1",
+	}
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	passports := living.NewMemoryPassportStore()
+	marker := living.EmptyDomain()
+	marker.Entities = map[string]living.EntityMap{"lot": {"L1": {"client": "NO"}}}
+	marker.Submissions = []living.Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted := false
+	identity.deleteOrgFn = func(_ context.Context, orgSlug string) error {
+		if orgSlug == demoLivingOrgSlug {
+			deleted = true
+		}
+		if orgSlug == demoFixtureMarkerOrgSlug {
+			t.Fatal("feragame-full must not delete organization-1")
+		}
+		delete(identity.orgs, orgSlug)
+		delete(identity.memberships, orgSlug)
+		return nil
+	}
+
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:        identity,
+		Store:           store,
+		LivingDomains:   domains,
+		LivingConfigs:   configs,
+		LivingPassports: passports,
+		LivingScope:     living.SeedScopeFeragameFull,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected Feragame org hard delete")
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug); err != nil {
+		t.Fatalf("feragame org missing: %v", err)
+	}
+	if _, err := identity.GetOrganizationBySlug(t.Context(), "organization-2"); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("orgs 1–3 must not be created: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 0 {
+		t.Fatalf("Formata taxonomy must be skipped: %d categories", len(cats))
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.Kind("lot")["L1"]; ok {
+		t.Fatal("pre-wipe L1 must not survive")
+	}
+	if _, ok := got.Kind("truck")[living.SeedTruckID]; !ok {
+		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+}
+
+func TestSeedFeragameIdentityRequiresIdentityAndLivingStores(t *testing.T) {
+	err := Seed(t.Context(), SeedDeps{
+		LivingDomains: living.NewMemoryDomainStore(),
+		LivingConfigs: living.NewMemoryConfigStore(),
+		LivingScope:   living.SeedScopeFeragameIdentity,
+	})
+	if err == nil || !strings.Contains(err.Error(), "identity is required") {
+		t.Fatalf("err = %v, want identity required", err)
+	}
+	err = Seed(t.Context(), SeedDeps{
+		Identity:      newSeedFakeIdentity(),
+		LivingDomains: living.NewMemoryDomainStore(),
+		LivingScope:   living.SeedScopeFeragameIdentity,
+	})
+	if err == nil || !strings.Contains(err.Error(), "living config store required") {
+		t.Fatalf("err = %v, want living config required", err)
+	}
+	err = Seed(t.Context(), SeedDeps{
+		Identity:      newSeedFakeIdentity(),
+		LivingConfigs: living.NewMemoryConfigStore(),
+		LivingScope:   living.SeedScopeFeragameIdentity,
+	})
+	if err == nil || !strings.Contains(err.Error(), "living domain store required") {
+		t.Fatalf("err = %v, want living domain required", err)
 	}
 }
 
@@ -454,7 +839,7 @@ func TestEnsureDemoFixtureUserErrors(t *testing.T) {
 			t.Fatalf("ensureDemoFixtureUser: %v", err)
 		}
 		if user.ID != "loaded-id" {
-			t.Fatalf("user.ID = %q, want loaded-id", user.ID)
+			t.Fatalf("user.ID = %q, want loted-id", user.ID)
 		}
 	})
 

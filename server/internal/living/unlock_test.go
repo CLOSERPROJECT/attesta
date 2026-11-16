@@ -88,20 +88,20 @@ func TestIsTaskUnlockedDistinctFromStartsWhen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lineVal, ok := cfg.Jobs.Get("line")
+	lpVal, ok := cfg.Jobs.Get("lot_processing")
 	if !ok {
-		t.Fatal("line job missing")
+		t.Fatal("lot_processing job missing")
 	}
-	line := lineVal.(Job)
-	if line.StartsWhen != nil {
-		t.Fatalf("fixture must not author line startsWhen, got %#v", line.StartsWhen)
+	lp := lpVal.(Job)
+	if lp.StartsWhen != nil {
+		t.Fatalf("fixture must not author lot_processing startsWhen, got %#v", lp.StartsWhen)
 	}
 
 	intakeVal := cfg.Jobs.Values["intake"].(Job)
 	order := OrderedTaskIDs(intakeVal.Tasks)
-	subs := []Submission{sub("line", "openTurno", "2026-10-19-1st")}
+	subs := []Submission{sub("lot_processing", "startLot", "CO-261029-1")}
 	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "intake", TaskID: "lots",
+		OrderedIDs: order, JobID: "intake", TaskID: "register",
 		JobInstanceID: "T1", Submissions: subs, Tasks: intakeVal.Tasks,
 	}) {
 		t.Fatal("Unlock must not treat other Job Submissions as in-Job predecessors")
@@ -111,7 +111,7 @@ func TestIsTaskUnlockedDistinctFromStartsWhen(t *testing.T) {
 func TestIsTaskUnlockedSubmissionGatesNext(t *testing.T) {
 	tasks := []TaskConfig{
 		{
-			"id": "lineLoad",
+			"id": "markProgress",
 			"dynamicProperties": map[string]any{
 				"progress": map[string]any{"read": "rows"},
 			},
@@ -119,14 +119,14 @@ func TestIsTaskUnlockedSubmissionGatesNext(t *testing.T) {
 		{"id": "next"},
 	}
 	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
-		JobInstanceID: "line", Submissions: nil, Tasks: tasks,
+		OrderedIDs: []string{"markProgress", "next"}, JobID: "lot_processing", TaskID: "next",
+		JobInstanceID: "lot1", Submissions: nil, Tasks: tasks,
 	}) {
 		t.Fatal("next must stay locked without predecessor Submission")
 	}
 	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
-		JobInstanceID: "line", Submissions: []Submission{sub("line", "lineLoad", "line")},
+		OrderedIDs: []string{"markProgress", "next"}, JobID: "lot_processing", TaskID: "next",
+		JobInstanceID: "lot1", Submissions: []Submission{sub("lot_processing", "markProgress", "lot1")},
 		Tasks: tasks,
 	}) {
 		t.Fatal("predecessor Submission must unlock next")

@@ -95,19 +95,19 @@ func TestCloseGroupAuthoredFlagWithoutLotsID(t *testing.T) {
 		"tasks":                        []TaskConfig{{"id": "weigh"}},
 	}
 	d := EmptyDomain()
-	d, err := SpawnGroupInstance(d, "line", "S1", "weighSeries", "W1")
+	d, err := SpawnGroupInstance(d, "lot_processing", "S1", "weighSeries", "W1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CloseGroup(d, group, "line", "S1"); err == nil || !strings.Contains(err.Error(), "zero child leaf") {
+	if _, err := CloseGroup(d, group, "lot_processing", "S1"); err == nil || !strings.Contains(err.Error(), "zero child leaf") {
 		t.Fatalf("flagged group close = %v", err)
 	}
 	d.Submissions = []Submission{{
-		JobID: "line", TaskID: "weigh", JobInstanceID: "S1",
+		JobID: "lot_processing", TaskID: "weigh", JobInstanceID: "S1",
 		GroupID: "weighSeries", GroupInstanceID: "W1",
 		UserID: "ada", Timestamp: "2026-11-02T10:00:00Z", Facts: map[string]any{},
 	}}
-	if _, err := CloseGroup(d, group, "line", "S1"); err != nil {
+	if _, err := CloseGroup(d, group, "lot_processing", "S1"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -121,11 +121,11 @@ func TestCloseGroupWithoutMinChildAllowsEmpty(t *testing.T) {
 		},
 	}
 	d := EmptyDomain()
-	closed, err := CloseGroup(d, group, "line", "S1")
+	closed, err := CloseGroup(d, group, "lot_processing", "S1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !IsGroupClosed(closed.ClosedGroups, "line", "S1", "optionalSeries") {
+	if !IsGroupClosed(closed.ClosedGroups, "lot_processing", "S1", "optionalSeries") {
 		t.Fatalf("closedGroups = %#v", closed.ClosedGroups)
 	}
 }
@@ -140,49 +140,49 @@ func TestEvaluateGroupLifecycleAuthoredCloseRequires(t *testing.T) {
 	}
 	cfg := OrgConfig{
 		Jobs: OrderedObject{
-			Keys:   []string{"line"},
-			Values: map[string]any{"line": Job{Tasks: []TaskConfig{group}}},
+			Keys:   []string{"lot_processing"},
+			Values: map[string]any{"lot_processing": Job{Tasks: []TaskConfig{group}}},
 		},
 	}
 	d := EmptyDomain()
-	d.JobInstances = []JobInstance{{JobID: "line", ID: "S1", Label: "shift"}}
+	d.JobInstances = []JobInstance{{JobID: "lot_processing", ID: "S1", Label: "shift"}}
 
 	lc := EvaluateGroupLifecycle(GroupLifecycleQuery{
-		Group: group, JobID: "line", JobInstanceID: "S1", Cfg: cfg, Domain: d,
+		Group: group, JobID: "lot_processing", JobInstanceID: "S1", Cfg: cfg, Domain: d,
 	})
 	if !lc.CanSpawn || lc.CanClose {
 		t.Fatalf("open empty authored-min = %#v", lc)
 	}
 
-	d, err := SpawnGroupInstance(d, "line", "S1", "weighSeries", "W1")
+	d, err := SpawnGroupInstance(d, "lot_processing", "S1", "weighSeries", "W1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	lc = EvaluateGroupLifecycle(GroupLifecycleQuery{
-		Group: group, JobID: "line", JobInstanceID: "S1", Cfg: cfg, Domain: d,
+		Group: group, JobID: "lot_processing", JobInstanceID: "S1", Cfg: cfg, Domain: d,
 	})
 	if !lc.CanSpawn || lc.CanClose {
 		t.Fatalf("spawned without child = %#v", lc)
 	}
 
 	d.Submissions = []Submission{{
-		JobID: "line", TaskID: "weigh", JobInstanceID: "S1",
+		JobID: "lot_processing", TaskID: "weigh", JobInstanceID: "S1",
 		GroupID: "weighSeries", GroupInstanceID: "W1",
 		UserID: "ada", Timestamp: "2026-11-02T10:00:00Z", Facts: map[string]any{},
 	}}
 	lc = EvaluateGroupLifecycle(GroupLifecycleQuery{
-		Group: group, JobID: "line", JobInstanceID: "S1", Cfg: cfg, Domain: d,
+		Group: group, JobID: "lot_processing", JobInstanceID: "S1", Cfg: cfg, Domain: d,
 	})
 	if !lc.CanSpawn || !lc.CanClose {
 		t.Fatalf("with child leaf = %#v", lc)
 	}
 
-	closed, err := CloseGroup(d, group, "line", "S1")
+	closed, err := CloseGroup(d, group, "lot_processing", "S1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	lc = EvaluateGroupLifecycle(GroupLifecycleQuery{
-		Group: group, JobID: "line", JobInstanceID: "S1", Cfg: cfg, Domain: closed,
+		Group: group, JobID: "lot_processing", JobInstanceID: "S1", Cfg: cfg, Domain: closed,
 	})
 	if lc.CanSpawn || lc.CanClose {
 		t.Fatalf("after close = %#v", lc)

@@ -107,25 +107,34 @@ func withSeedSession(
 
 // creds nil → ambient identity (standalone seed applies the runtime env file);
 // non-nil → prepare→seed by value (skip file apply; main is the Server restart adapter).
-func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
-	if creds == nil {
+// Feragame config/domain skip Appwrite open; identity/full open Appwrite. Mongo
+// still opens for living stores; Formata writes are skipped inside Seed.
+func runSeedSession(ctx context.Context, args []string, replace bool, livingScope living.SeedScope, keepDomain bool, creds *appwriteRuntimeCredentials) error {
+	needIdentity := !seedScopeFeragame(livingScope) || seedScopeFeragameNeedsIdentity(livingScope)
+	if needIdentity && creds == nil {
 		if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
 			return err
 		}
 	}
-	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
-		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
-		if creds == nil {
-			return appwriteIdentityFromEnv(opts)
+	var openIdentity func() (IdentityStore, error)
+	if needIdentity {
+		openIdentity = func() (IdentityStore, error) {
+			opts := appwriteIdentityFromEnvOptions{RequireAll: true}
+			if creds == nil {
+				return appwriteIdentityFromEnv(opts)
+			}
+			return appwriteIdentityFromCredentials(*creds, opts)
 		}
-		return appwriteIdentityFromCredentials(*creds, opts)
-	}, func(sess seedSession) error {
+	}
+	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, openIdentity, func(sess seedSession) error {
 		deps := SeedDeps{
 			Identity:       sess.Identity,
 			Store:          sess.Store,
 			ConfigDir:      sess.ConfigDir,
 			CategoriesPath: sess.CategoriesPath,
 			Replace:        replace,
+			LivingScope:    livingScope,
+			KeepDomain:     keepDomain,
 		}
 		// Mongo CLI seed must rewrite Active Org Config (e.g. tasks array shape).
 		if ms, ok := sess.Store.(*MongoStore); ok && ms != nil && ms.db != nil {
@@ -136,10 +145,29 @@ func runSeedSession(ctx context.Context, args []string, replace bool, creds *app
 		if err := Seed(ctx, deps); err != nil {
 			return err
 		}
-		if replace {
-			log.Printf("seed: replaced demo fixture")
-		} else {
-			log.Printf("seed: demo fixture ready (empty-only)")
+		switch livingScope {
+		case living.SeedScopeFeragameConfig:
+			if keepDomain {
+				log.Printf("seed: Feragame config ready (Active Config; Domain kept)")
+			} else {
+				log.Printf("seed: Feragame config ready (Active Config + empty Domain)")
+			}
+		case living.SeedScopeFeragameDomain:
+			log.Printf("seed: Feragame domain ready (Active Config + staged Domain)")
+		case living.SeedScopeFeragameIdentity:
+			if keepDomain {
+				log.Printf("seed: Feragame identity ready (Appwrite + Active Config; Domain kept)")
+			} else {
+				log.Printf("seed: Feragame identity ready (Appwrite + Active Config + empty Domain)")
+			}
+		case living.SeedScopeFeragameFull:
+			log.Printf("seed: Feragame full ready (Appwrite + Active Config + staged Domain)")
+		default:
+			if replace {
+				log.Printf("seed: replaced demo fixture")
+			} else {
+				log.Printf("seed: demo fixture ready (empty-only)")
+			}
 		}
 		return nil
 	})

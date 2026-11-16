@@ -11,7 +11,7 @@ func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
 	got, err := RunTransform(domain, RunTransformInput{
 		JobInstanceID: "1st",
 		Facts: map[string]any{
-			"sourceLoadId": "L1",
+			"sourceLotId": "L1",
 			"glass": []any{
 				map[string]any{"weight": 10.0},
 				map[string]any{"weight": nil},
@@ -38,7 +38,7 @@ func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
       function($r){{"weight": $r.weight, "material": $m.label}}
     ))
   )}, []);
-  {"sourceLoadId": sourceLoadId, "rows": $rows}
+  {"sourceLotId": sourceLotId, "rows": $rows}
 )`,
 			},
 			map[string]any{
@@ -49,7 +49,7 @@ func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
 				"set": map[string]any{
 					"weight":       "$.rows[$index].weight",
 					"material":     "$.rows[$index].material",
-					"sourceLoadId": "$.sourceLoadId",
+					"sourceLotId": "$.sourceLotId",
 				},
 			},
 		},
@@ -61,7 +61,7 @@ func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
 		t.Fatalf("ops = %#v", got.Request.Ops)
 	}
 	m0 := got.Request.Ops[0].(MintOp)
-	if m0.ID != "C-1" || m0.Set["material"] != "Glass" || m0.Set["weight"] != 10.0 || m0.Set["sourceLoadId"] != "L1" {
+	if m0.ID != "C-1" || m0.Set["material"] != "Glass" || m0.Set["weight"] != 10.0 || m0.Set["sourceLotId"] != "L1" {
 		t.Fatalf("mint0 = %#v", m0)
 	}
 	m1 := got.Request.Ops[1].(MintOp)
@@ -76,18 +76,18 @@ func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
 
 func TestBindThenMintAndPatch(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, "lot", EntityMap{"L1": {"client": "NO"}})
 	got, err := RunTransform(domain, RunTransformInput{
 		Facts: map[string]any{"rawClient": "SU", "note": "n"},
-		Allowed: map[string]struct{}{"load": {}},
+		Allowed: map[string]struct{}{"lot": {}},
 		Transform: []any{
 			map[string]any{"op": "bind", "expr": `{"client": rawClient, "id": "L2"}`},
 			map[string]any{
-				"op": "mint", "entity": "load", "id": "$.id", "as": "load",
+				"op": "mint", "entity": "lot", "id": "$.id", "as": "lot",
 				"set": map[string]any{"client": "$.client"},
 			},
 			map[string]any{
-				"op": "patch", "entity": "load", "id": `"L1"`,
+				"op": "patch", "entity": "lot", "id": `"L1"`,
 				"set": map[string]any{"client": "$.client"},
 			},
 		},

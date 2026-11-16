@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { onMount } from 'svelte';
 
+	import Archive from '@lucide/svelte/icons/archive';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import Scan from '@lucide/svelte/icons/scan';
 
@@ -21,8 +22,8 @@
 	import { livingToast } from '#lib/living/toast.svelte.js';
 	import { Badge } from '#lib/shadcn/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
-	import { route } from '#lib/router/index.js';
-	import { navigateLivingTarget } from '#lib/router/navigate-target.js';
+	import { hrefLivingTarget, navigateLivingTarget } from '#lib/router/navigate-target.js';
+	import { isActive, route } from '#lib/router/index.js';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -131,6 +132,18 @@
 					<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
 				{/each}
 			</div>
+		{/if}
+		{#if placeKind !== 'archive'}
+			<a
+				class={buttonVariants({ variant: 'outline', size: 'sm' })}
+				aria-label={m.nav_archive()}
+				aria-current={isActive('/archive') ? 'page' : undefined}
+				data-testid="nav-archive"
+				href={hrefLivingTarget({ kind: 'archive' })}
+			>
+				<Archive class="size-4" />
+				{m.nav_archive()}
+			</a>
 		{/if}
 		<Button
 			type="button"

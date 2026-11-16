@@ -15,6 +15,12 @@ describe('hrefLivingTarget', () => {
 		expect(href).toContain('/app');
 	});
 
+	test('archive target matches p("/archive")', () => {
+		const href = hrefLivingTarget({ kind: 'archive' });
+		expect(href).toBe(p('/archive'));
+		expect(href).toContain('/app/archive');
+	});
+
 	test('nested task target includes group coordinates', () => {
 		const href = hrefLivingTarget({
 			kind: 'task',

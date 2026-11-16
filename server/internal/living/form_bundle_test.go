@@ -98,9 +98,12 @@ func TestLoadJSONOmitsBulkTaskFormBundlesWhenCanStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, ok := worklistJobByID(result.Worklist, "workingDay"); ok {
+		t.Fatal("workingDay Job must be absent")
+	}
 	intake, ok := worklistJobByID(result.Worklist, "intake")
 	if !ok || !intake.CanStart {
-		t.Fatalf("intake canStart = %#v", intake)
+		t.Fatalf("intake canStart = %#v, want true on empty domain", intake)
 	}
 	if len(result.TaskFormBundles) != 0 {
 		t.Fatalf("home Load bundles = %#v, want empty (lazy task-form)", result.TaskFormBundles)
@@ -136,16 +139,13 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 		t.Fatalf("home Load must omit bulk bundles; got %#v", addresses(result.TaskFormBundles))
 	}
 
-	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
+	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", truckID, "", "")
 	if err != nil || provisional == nil {
-		t.Fatalf("provisional lots/register: %v %#v", err, provisional)
+		t.Fatalf("addressed register: %v %#v", err, provisional)
 	}
-	arrive, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", "")
-	if err != nil || arrive == nil {
-		t.Fatalf("provisional truckArrive: %v %#v", err, arrive)
-	}
-	if arrive.Surface != "live" || arrive.Schema == nil {
-		t.Fatalf("truckArrive incomplete: %#v", arrive)
+	// Prior truck still incomplete → Nuovo camion / provisional truckArrive off.
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", ""); err == nil {
+		t.Fatal("provisional truckArrive must deny while prior truck incomplete")
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", truckID, "", ""); err == nil {
 		t.Fatal("done truckArrive must be forbidden on addressed fetch")
@@ -163,8 +163,7 @@ func addresses(bundles []*TaskFormBundle) []string {
 func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
-
+	_ = commitStartLot(t, c, loadID)
 	home, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +171,7 @@ func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	if len(home.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(home.TaskFormBundles))
 	}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "line", "weigh", lineID, "palletWeight", ProvisionalGroupInstanceID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "lot_processing", "weigh", loadID, "", "")
 	if err != nil || bundle == nil {
 		t.Fatalf("missing weigh: %v", err)
 	}
@@ -200,8 +199,8 @@ func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	if tare["euro"] == nil {
 		t.Fatalf("bindings.catalogs.tareKinds = %#v", catalogsBound["tareKinds"])
 	}
-	if load, ok := domainBound["load"].(map[string]any); !ok || len(load) == 0 {
-		t.Fatalf("bindings.domain.load = %#v, want minted load kind", domainBound["load"])
+	if load, ok := domainBound["lot"].(map[string]any); !ok || len(load) == 0 {
+		t.Fatalf("bindings.domain.lot = %#v, want minted lot kind", domainBound["lot"])
 	}
 	subs, ok := domainBound["submissions"].([]any)
 	if !ok || len(subs) == 0 {
@@ -274,42 +273,31 @@ func assertConcreteDynamicMap(t *testing.T, mapSchema map[string]any, rowIDs []s
 	}
 }
 
-func TestLineLoadPartialMapAfterOnePalletWeighClose(t *testing.T) {
+func TestMarkProgressPartialMapAfterWeigh(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
-	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
-	lineID := commitOpenTurno(t, c)
+	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 
-	_ = commitWeigh(t, c, lineID, loadID+".1", 11)
-	_ = commitWeigh(t, c, lineID, loadID+".2", 22)
-	closed, err := c.CloseGroup(t.Context(), "feragame", adminOp(), CloseGroupRequest{
-		JobID: "line", JobInstanceID: lineID, GroupID: "palletWeight",
+	mark, err := BuildTaskFormBundle(mustActiveConfig(t, c), mustDomain(t, c), ActionableTaskRef{
+		JobID: "lot_processing", TaskID: "markProgress", JobInstanceID: lotID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if closed.NextTaskFormBundle != nil {
-		t.Fatalf("after weigh Close next = %s, want overview (lineLoad is a Spawn group)", bundleAddress(closed.NextTaskFormBundle))
+	if mark.TaskID != "markProgress" || mark.GroupID != "" || mark.JobInstanceID != lotID {
+		t.Fatalf("leaf form = %s, want markProgress@%s", bundleAddress(mark), lotID)
 	}
-	lineLoad, err := BuildTaskFormBundle(mustActiveConfig(t, c), closed.Domain, ActionableTaskRef{
-		JobID: "line", GroupID: "lineLoad", TaskID: "mark", JobInstanceID: lineID,
-	})
-	if err != nil {
-		t.Fatal(err)
+	if len(mark.RowIDs) == 0 {
+		t.Fatal("markProgress partial-map still projects Domain-read row ids")
 	}
-	if lineLoad.TaskID != "mark" || lineLoad.GroupID != "lineLoad" || lineLoad.JobInstanceID != lineID {
-		t.Fatalf("spawn form = %s, want lineLoad/mark@%s", bundleAddress(lineLoad), lineID)
-	}
-	if len(lineLoad.RowIDs) == 0 {
-		t.Fatal("lineLoad partial-map still projects Domain-read row ids")
-	}
-	progressProps, _ := lineLoad.Schema["properties"].(map[string]any)
+	progressProps, _ := mark.Schema["properties"].(map[string]any)
 	progressSchema, _ := progressProps["progress"].(map[string]any)
-	assertConcreteDynamicMap(t, progressSchema, lineLoad.RowIDs, false)
-	assertLineLoadCellMapBundle(t, lineLoad)
+	assertConcreteDynamicMap(t, progressSchema, mark.RowIDs, false)
+	assertMarkProgressCellMapBundle(t, mark)
+	_ = loadID
 }
 
 // Cell-map Tasks mount as live ConfigForm; enums stay on concrete cell schemas.
-func assertLineLoadCellMapBundle(t *testing.T, bundle *TaskFormBundle) {
+func assertMarkProgressCellMapBundle(t *testing.T, bundle *TaskFormBundle) {
 	t.Helper()
 	if bundle.Surface != "live" {
 		t.Fatalf("surface = %q, want live", bundle.Surface)
@@ -415,9 +403,9 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 	if _, ok := wire["roles"].([]any); !ok {
 		t.Fatalf("HTTP Load missing roles: %s", rec.Body.String())
 	}
-	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "register", truckID, "lots", ProvisionalGroupInstanceID)
+	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "register", truckID, "", "")
 	if err != nil || spawn == nil {
-		t.Fatalf("addressed lots/register after Load: %v", err)
+		t.Fatalf("addressed register after Load: %v", err)
 	}
 }
 
@@ -444,8 +432,8 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if committed.Next != CommitNextOverview && committed.Next != CommitNextHome && committed.Next != CommitNextTask {
-		t.Fatalf("advance Next = %q", committed.Next)
+	if committed.Navigation != CommitNextHome && committed.Navigation != CommitNextTask {
+		t.Fatalf("advance Navigation = %q", committed.Navigation)
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err == nil {
 		t.Fatal("addressed weightCheck must deny after it leaves available")
@@ -465,8 +453,11 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if _, has := wire["taskFormBundles"]; has {
 		t.Fatalf("Commit JSON must omit taskFormBundles: %s", string(raw))
 	}
-	if wire["next"] == nil || wire["next"] == "" {
-		t.Fatalf("Commit JSON next = %#v", wire["next"])
+	if wire["navigation"] == nil || wire["navigation"] == "" {
+		t.Fatalf("Commit JSON navigation = %#v", wire["navigation"])
+	}
+	if _, has := wire["next"]; has {
+		t.Fatalf("Commit JSON must not ship legacy next: %s", string(raw))
 	}
 }
 
@@ -474,42 +465,47 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	opLine := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 
-	loadID, lineID := seedLineReadyForLineLoad(t, c)
+	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "truckArrive", "", "", ""); err == nil {
 		t.Fatal("line viewer must not mount intake provisional truckArrive")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "openTurno", "", "", ""); err != nil {
-		t.Fatalf("line canStart provisional openTurno after first mint: %v", err)
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "startLot", "", "", ""); err == nil {
+		t.Fatal("line must not canStart startLot (logistic-only)")
 	}
 
 	loaded, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
-		TaskPath:      GroupTaskPath("line", "lineLoad", ProvisionalGroupInstanceID, "mark"),
-		JobInstanceID: lineID,
+		TaskPath:      "lot_processing/markProgress",
+		JobInstanceID: lotID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				loadID + ".1": "done",
 				loadID + ".2": "partial",
 			},
 		},
-		Mint: spawningNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.NextTaskFormBundle != nil {
-		t.Fatalf("line after lineLoad mark must hand off; got %s", bundleAddress(loaded.NextTaskFormBundle))
+	if loaded.Navigation != CommitNextStay {
+		t.Fatalf("after markProgress Navigation = %q, want stay", loaded.Navigation)
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "containerReg", lineID, "", ""); err == nil {
+	if loaded.NextTaskFormBundle == nil || loaded.NextTaskFormBundle.TaskID != "markProgress" {
+		t.Fatalf("stay bundle = %#v, want markProgress", loaded.NextTaskFormBundle)
+	}
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "containerReg", lotID, "", ""); err == nil {
 		t.Fatal("line viewer must not mount containerReg")
 	}
-	lineJobWL, ok := worklistJobByID(loaded.Worklist, "line")
+	lpWL, ok := worklistJobByID(loaded.Worklist, "lot_processing")
 	if !ok {
-		t.Fatal("missing line worklist")
+		t.Fatal("missing lot_processing worklist")
 	}
-	inst, ok := worklistInstance(lineJobWL, lineID)
+	inst, ok := worklistInstance(lpWL, lotID)
 	if !ok || inst.Tasks["containerReg"] != TaskStatusAvailable {
-		t.Fatalf("containerReg status = %#v, want available", inst)
+		t.Fatalf("containerReg status = %#v, want available (logistic-only)", inst)
+	}
+	if inst.Tasks["markProgress"] != TaskStatusActionable {
+		t.Fatalf("markProgress = %q, want actionable (many + leftover rows)", inst.Tasks["markProgress"])
 	}
 }
 
@@ -518,9 +514,9 @@ func flatSchemaDefaultsProbeConfig() OrgConfig {
 		ID:      "probe",
 		Version: "1",
 		Jobs: OrderedObject{
-			Keys: []string{"line"},
+			Keys: []string{"lot_processing"},
 			Values: map[string]any{
-				"line": Job{
+				"lot_processing": Job{
 					Repeatable: true,
 					InstanceID: `"x"`,
 					Label:      `"x"`,
@@ -558,7 +554,7 @@ func flatSchemaDefaultsProbeConfig() OrgConfig {
 
 func TestBuildTaskFormBundleFlatSeedsSchemaDefaults(t *testing.T) {
 	bundle, err := BuildTaskFormBundle(flatSchemaDefaultsProbeConfig(), EmptyDomain(), ActionableTaskRef{
-		JobID: "line", TaskID: "weigh",
+		JobID: "lot_processing", TaskID: "weigh",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -639,9 +635,9 @@ func TestBuildTaskFormBundleObjectMapKeepsRowAndFormDefaults(t *testing.T) {
 			},
 		},
 		Jobs: OrderedObject{
-			Keys: []string{"line"},
+			Keys: []string{"lot_processing"},
 			Values: map[string]any{
-				"line": Job{
+				"lot_processing": Job{
 					Repeatable: true,
 					InstanceID: `"x"`,
 					Label:      `"x"`,
@@ -693,7 +689,7 @@ func TestBuildTaskFormBundleObjectMapKeepsRowAndFormDefaults(t *testing.T) {
 		"pallet": {"P1": {}, "P2": {}},
 	})
 	bundle, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
-		JobID: "line", TaskID: "weigh", JobInstanceID: "x",
+		JobID: "lot_processing", TaskID: "weigh", JobInstanceID: "x",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -727,7 +723,7 @@ func TestFormBundleSourceOmitsPlantTaskIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := string(body)
-	for _, token := range []string{`"lineLoad"`, `"feragame"`, `"openTurno"`, `"palletWeight"`, `"containerReg"`} {
+	for _, token := range []string{`"markProgress"`, `"feragame"`, `"startLot"`, `"weigh"`, `"containerReg"`} {
 		if strings.Contains(src, token) {
 			t.Fatalf("form_bundle.go must not hard-code plant token %s", token)
 		}
@@ -1000,15 +996,15 @@ func TestBuildTaskFormBundleCellMapDoesNotInventCells(t *testing.T) {
 			},
 		},
 		Jobs: OrderedObject{
-			Keys: []string{"line"},
+			Keys: []string{"lot_processing"},
 			Values: map[string]any{
-				"line": Job{
+				"lot_processing": Job{
 					Repeatable: true,
 					InstanceID: `"x"`,
 					Label:      `"x"`,
 					Tasks: []TaskConfig{
 						{
-							"id":    "lineLoad",
+							"id":    "markProgress",
 							"roles": []any{"line"},
 							"dynamicProperties": map[string]any{
 								"progress": map[string]any{"read": "rows"},
@@ -1042,7 +1038,7 @@ func TestBuildTaskFormBundleCellMapDoesNotInventCells(t *testing.T) {
 		"pallet": {"P1": {}, "P2": {"progress": "partial"}},
 	})
 	bundle, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
-		JobID: "line", TaskID: "lineLoad", JobInstanceID: "x",
+		JobID: "lot_processing", TaskID: "markProgress", JobInstanceID: "x",
 	})
 	if err != nil {
 		t.Fatal(err)

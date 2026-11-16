@@ -71,6 +71,8 @@ type RunTransformInput struct {
 	Transform     any
 	Allowed       map[string]struct{} // entity kinds from config domain.entities; empty = unrestricted
 	Catalogs      map[string]any
+	// Today is calendar YYYY-MM-DD ($today) for plant date-stamp mint exprs.
+	Today string
 }
 
 type RunTransformResult struct {
@@ -156,14 +158,19 @@ func requireEntitySet(m map[string]any, allowed map[string]struct{}, op string) 
 }
 
 func domainBindings(domain Domain, jobInstanceID string, catalogs map[string]any) ExprBindings {
+	return domainBindingsWithToday(domain, jobInstanceID, catalogs, "")
+}
+
+func domainBindingsWithToday(domain Domain, jobInstanceID string, catalogs map[string]any, today string) ExprBindings {
 	entityMaps := domain.EntityMaps()
 	domainBag := make(map[string]any, len(entityMaps)+1)
 	for kind, m := range entityMaps {
 		domainBag[kind] = entityMapToAny(m)
 	}
+	// JSON field names (jobId, taskId, …) so readyWhen can filter like form bindings.
 	subs := make([]any, len(domain.Submissions))
 	for i, s := range domain.Submissions {
-		subs[i] = s
+		subs[i] = deepCloneJSON(s)
 	}
 	domainBag["submissions"] = subs
 	bindings := ExprBindings{
@@ -172,6 +179,9 @@ func domainBindings(domain Domain, jobInstanceID string, catalogs map[string]any
 	}
 	if jobInstanceID != "" {
 		bindings["instance"] = map[string]any{"id": jobInstanceID}
+	}
+	if today != "" {
+		bindings["today"] = today
 	}
 	return bindings
 }
@@ -287,7 +297,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 	workingFacts := any(input.Facts)
 
 	for _, op := range parsed {
-		bindings := mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases)
+		bindings := mergeBindings(domainBindingsWithToday(working, input.JobInstanceID, input.Catalogs, input.Today), aliases)
 
 		switch o := op.(type) {
 		case transformBindOp:
@@ -364,7 +374,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			}
 			for index := 0; index < count; index++ {
 				// Refresh $domain each iteration so count/id exprs see prior mints.
-				loopBindings := mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases)
+				loopBindings := mergeBindings(domainBindingsWithToday(working, input.JobInstanceID, input.Catalogs, input.Today), aliases)
 				loopBindings["index"] = index
 				idGot, err := evalScalar(o.ID, workingFacts, loopBindings)
 				if err != nil {
@@ -395,7 +405,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			Ops:           ops,
 			UserID:        input.UserID,
 		},
-		Bindings: mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases),
+		Bindings: mergeBindings(domainBindingsWithToday(working, input.JobInstanceID, input.Catalogs, input.Today), aliases),
 	}, nil
 }
 

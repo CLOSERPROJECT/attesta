@@ -14,7 +14,7 @@ const cellSchema = {
 	enum: ['partial', 'done']
 };
 
-function lineLoadProjectedSchema(): Schema {
+function markProgressProjectedSchema(): Schema {
 	return {
 		type: 'object',
 		properties: {
@@ -30,9 +30,9 @@ function lineLoadProjectedSchema(): Schema {
 	} as Schema;
 }
 
-describe('lineLoad partial cell-map submit (Ajv draft)', () => {
+describe('markProgress partial cell-map submit (Ajv draft)', () => {
 	const validator = createAjvFormValidator<Record<string, unknown>>();
-	const schema = lineLoadProjectedSchema();
+	const schema = markProgressProjectedSchema();
 
 	test('projection keeps real-value enums on each concrete cell schema', () => {
 		const progress = (
