@@ -179,9 +179,9 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/o
 | **Living glossary lock** | **Done for flat-port core nouns** (Org Config, Config version, Active Config version, Domain, Job, Task, Job instance, Task path, Unlock order, Leftovers, startsWhen, readyWhen, Submission, Draft, Role catalog, Config role, Commit, Load, OperatorIdentity) — see root [`GLOSSARY.md`](../../GLOSSARY.md). **Still TBD:** final English for **Task group** (working label only). |
 | **Task group / nesting** | Implement Task groups under Job (repeatable, parent-scoped instances); Unlock order / `readyWhen` over child instances. Decision locked above; code after flat port works. |
 | **Feragame lot intake** | Reshape `intake` for truck lots (gross → per-lot register → final tare vs sum). Depends on Task group. Do not fake with Leftovers `completeness: some`. |
-| **Code seam rename (final slice)** | **Names locked 2026-11-16; hard cut (no `/api/living` / env / Cerbos / Mongo aliases).** Target: `internal/org` + `app/src/lib/org`, `/api/org/…`, Cerbos `task`/`commit`, `DomainLoader` / `TaskCommitter` / `API` / `DPPStore`, Mongo `org_domains` / `org_configs` / `org_dpps` / …, Feragame `*@feragame.com`. Table: [`.scratch/living-flat-port/issues/13-rename-placeholders-discussion.md`](../../.scratch/living-flat-port/issues/13-rename-placeholders-discussion.md). |
+| **Code seam rename (final slice)** | **Done (2026-11-16 hard cut).** `internal/org` + `app/src/lib/org`, `/api/org/…`, Cerbos `task`/`commit`, `DomainLoader` / `TaskCommitter` / `API` / `DPPStore`, Mongo `org_domains` / `org_configs` / `org_dpps` / …, Feragame `*@feragame.com`. No `/api/living` / env / Cerbos / Mongo aliases. Law lives in ADRs **0005–0013** + root [`GLOSSARY.md`](../../GLOSSARY.md). |
 | **Config version pin policy** | Whether in-flight Jobs pin to the Config version they started on vs always follow Active Config version. |
-| **Slice design** | Done: `.scratch/living-flat-port/issues/` (01–13 flat port + rename). |
+| **Slice design** | Done: flat-port tickets 01–13 + rename hard cut (scratch trackers retired). |
 | **Wayfinder map** | Chart remaining **decisions + research** (not build tasks); destination ≈ “way clear to implement.” |
 | **Glossary merge** | Merge living [`GLOSSARY.md`](../../GLOSSARY.md) + `CONTEXT.md`; Stream terms historical where appropriate. |
 | **ADR-0025 amend in attesta** | Cerbos-as-production-Authorizer + hybrid predicates + Domain Load/Commit (retire run-id / whole-config execution hydrate). |
@@ -227,5 +227,5 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/o
 - 2026-10-29: Lock Job top-level only + Task tree (leaf vs Task group); reject jobs-all-the-way-down and lots-via-`completeness: some`; lock port-now (flat truck-loop + org Domain seams + path Commit) vs postpone nesting/lot intake.
 - 2026-10-29: Wording pass to locked root `GLOSSARY.md` (flat-port nouns); decisions unchanged; Task group final English still TBD; Config run retired as living noun in favor of “whole-config execution” / historical code names.
 - 2026-10-29: Lock code seam placeholders (`internal/living` → hard-cut `internal/org`, DomainStore/ConfigStore, `/api/org/domain` + `/commit`); final rename slice **13** (2026-11-16).
-- 2026-10-29: Flat-port tickets published under `.scratch/living-flat-port/issues/` (01–13).
+- 2026-10-29: Flat-port tickets published (01–13); scratch trackers later retired once law landed in ADRs **0005–0013**.
 - 2026-10-29: Lock experiment→attesta copy/adapt vs rewrite vs do-not-copy policy for the flat port.

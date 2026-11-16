@@ -11,7 +11,7 @@
 
 1. [`docs/research/attesta-app-living-product-decisions.md`](attesta-app-living-product-decisions.md) — locked domain, port cut, placeholders, **copy/rewrite policy**, Cerbos, persistence  
 2. [`GLOSSARY.md`](../../GLOSSARY.md) + [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md) — living nouns (Job/Task/Domain/…); legacy Stream stays in `CONTEXT.md`  
-3. Open scratch leftovers only: [`.scratch/living-flat-port/issues/`](../../.scratch/living-flat-port/issues/) **13** (rename) + **15** (gap inventory). Done flat-port tickets deleted; living law is ADRs **0005–0013**.  
+3. Scratch flat-port leftovers (**13** rename, **15** gap inventory) are retired. Living law is ADRs **0005–0013** + root [`GLOSSARY.md`](../../GLOSSARY.md).  
 4. Source behaviour: `/Users/giovanniabbatepaolo/Documents/GitHub/forkbomb/attesta-experiment` (fixture `src/lib/fixtures/truck-loop-steps.yaml`, pure `src/lib/*`)  
 5. Existing SPA mount: `server/cmd/server/app_spa.go` (`/app`, verified session)
 
