@@ -67,5 +67,7 @@
 - Demo data for empty stacks comes only from the Go seed (`attesta seed` /
   `ATTESTA_SEED`). There is no worktree volume-copy of MongoDB or Appwrite data.
   `task reset` / `task purge` clear this checkout's volumes; the next start can
-  re-apply the Go demo seed when credentials exist. Worktrunk `pre-remove`
-  deletes Compose volumes.
+  re-apply the Go demo seed when credentials exist. When a worktree manager
+  runs a pre-remove hook, Compose volumes are deleted with the checkout;
+  otherwise run `task reset` / `task purge` before removal, or
+  `task worktree:gc` / `task worktree:gc:apply` for orphaned resources.

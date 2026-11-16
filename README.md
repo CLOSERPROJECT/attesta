@@ -150,6 +150,8 @@ task dev
 
 Codex-managed worktrees use the checked-in local environment to run the same bootstrap automatically.
 Codex also copies the ignored paths allowlisted in `.worktreeinclude`.
+Cursor Agents Window / `/worktree` / CLI worktrees run the same script from `.cursor/worktrees.json` (`setup-worktree-unix`).
+Cursor does not honor `.worktreeinclude` itself; during setup it sets `$ROOT_WORKTREE_PATH` to the primary checkout, and bootstrap copies allowlisted paths from there.
 For a plain Git worktree, run bootstrap explicitly:
 
 ```bash
@@ -175,7 +177,8 @@ Parallel worktrees start with empty durable volumes. Demo data comes only from t
 `task stop` preserves the current worktree's volumes.
 `task reset` and `task purge` delete the volumes; the next start initializes empty Appwrite MariaDB, then applies the Go demo seed when `ATTESTA_SEED=true` and credentials exist.
 Worktrunk removal runs a non-interactive `pre-remove` hook that deletes the worktree's Compose volumes.
-Codex can remove managed worktrees without that hook; use the checked-in purge action before archiving, or run `task worktree:gc` from an active checkout to preview orphaned Attesta Docker resources, then `task worktree:gc:apply` to remove them.
+Codex and Cursor can remove managed worktrees without that hook (Cursor also auto-prunes under `~/.cursor/worktrees` by `cursor.worktreeMaxCount`).
+Before deleting a checkout that ran Docker, run `task reset` / `task purge`, or from an active checkout use `task worktree:gc` then `task worktree:gc:apply` for orphaned Attesta Docker resources.
 Garbage collection is scoped to this repository clone and ignores foreign or unlabeled resources.
 Reset and purge enumerate every volume in the current Compose project and refuse deletion unless all ownership labels match the current checkout.
 

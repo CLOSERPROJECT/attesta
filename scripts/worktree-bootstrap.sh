@@ -19,7 +19,14 @@ if command -v mise >/dev/null 2>&1; then
   fi
 fi
 
-primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
+# Prefer ROOT_WORKTREE_PATH when a worktree manager injects the primary root
+# (for example during .cursor/worktrees.json setup). Otherwise use the first
+# entry from git worktree list.
+if [[ -n "${ROOT_WORKTREE_PATH:-}" && -d "${ROOT_WORKTREE_PATH}" ]]; then
+  primary="$(cd "${ROOT_WORKTREE_PATH}" && pwd -P)"
+else
+  primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
+fi
 if [[ -z "${primary}" || ! -d "${primary}" ]]; then
   echo "error: could not resolve primary worktree root" >&2
   exit 1

@@ -115,6 +115,26 @@ PATH="${test_root}/bin:/usr/bin:/bin" \
 grep -q '^SECRET=primary$' "${test_root}/.env" \
   || fail "plain worktree did not receive primary .env"
 
+# ROOT_WORKTREE_PATH wins over git worktree list when a manager injects the
+# primary checkout path.
+rm "${test_root}/.env"
+injected_primary="$(mktemp -d)"
+trap 'rm -rf -- "$test_root" "$primary_root" "$injected_primary"' EXIT
+printf '.env\n' >"${injected_primary}/.worktreeinclude"
+printf 'SECRET=injected\n' >"${injected_primary}/.env"
+: >"${log_file}"
+PATH="${test_root}/bin:/usr/bin:/bin" \
+  TEST_LOG="${log_file}" \
+  ATTESTA_TEST_ROOT="${test_root}" \
+  ATTESTA_TEST_PRIMARY="${primary_root}" \
+  ROOT_WORKTREE_PATH="${injected_primary}" \
+  bash "${test_root}/scripts/worktree-bootstrap.sh" >"${test_root}/root-path-output"
+grep -q '^SECRET=injected$' "${test_root}/.env" \
+  || fail "ROOT_WORKTREE_PATH did not select the injected primary .env"
+if grep -q '^SECRET=primary$' "${test_root}/.env"; then
+  fail "ROOT_WORKTREE_PATH ignored; fell back to git worktree list primary"
+fi
+
 rm "${test_root}/.env"
 mkdir -p "${primary_root}/scripts" "${primary_root}/bin"
 cp "${test_root}/scripts/worktree-bootstrap.sh" "${primary_root}/scripts/worktree-bootstrap.sh"
