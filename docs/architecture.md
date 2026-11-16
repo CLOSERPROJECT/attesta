@@ -38,6 +38,20 @@ surface.
 | Affiliation required before stream authoring | [`adr/0002-affiliation-gated-stream-authoring.md`](adr/0002-affiliation-gated-stream-authoring.md) |
 | Email verification gate after auth | [`adr/0003-email-verification-gate.md`](adr/0003-email-verification-gate.md) |
 | Host-specific demo seed invoke | [`adr/0004-host-specific-demo-seed-invoke.md`](adr/0004-host-specific-demo-seed-invoke.md) |
+| Living Worklist is server-projected | [`adr/0005-living-worklist-server-projection.md`](adr/0005-living-worklist-server-projection.md) |
+| Living `/app` home is act-now Worklist | [`adr/0006-living-operator-worklist-home.md`](adr/0006-living-operator-worklist-home.md) |
+| Living Passport production in Org Config | [`adr/0007-living-passport-production.md`](adr/0007-living-passport-production.md) |
+| Living Task submit once/many | [`adr/0008-living-task-submit-cardinality.md`](adr/0008-living-task-submit-cardinality.md) |
+| Living client Draft + Bozza chrome | [`adr/0009-living-client-draft-persistence.md`](adr/0009-living-client-draft-persistence.md) |
+| Living HttpPort path-shaped side effects | [`adr/0010-living-http-side-effects.md`](adr/0010-living-http-side-effects.md) |
+| Living QR Config-declared resolve | [`adr/0011-living-qr-resolve.md`](adr/0011-living-qr-resolve.md) |
+| Living Commit explicit mint intent | [`adr/0012-living-commit-mint-intent.md`](adr/0012-living-commit-mint-intent.md) |
+| Living `/app` three copy tracks | [`adr/0013-living-app-locale-tracks.md`](adr/0013-living-app-locale-tracks.md) |
+
+Living Mongo collections (`living_domains`, `living_org_configs`,
+`living_active_config`) and entity/fact key `.`→`_` encoding at the Mongo
+boundary follow the same progress-key rule as Stream Process storage (see
+[`AGENTS.md`](../AGENTS.md)).
 
 ## Operational shape
 

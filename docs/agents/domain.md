@@ -4,45 +4,41 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root, or
-- **`CONTEXT-MAP.md`** at the repo root if it exists: it points at one `CONTEXT.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (Living
+  platform, Feragame plant, Legacy Stream). Then read that glossary.
+- **`docs/adr/`**: read ADRs that touch the area you're about to work in.
+  Living ADRs lock **platform** Decisions only—not plant YAML.
+- Plant fixture edits: also
+  [`plant-config.md`](plant-config.md) and
+  [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md).
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+If the map or a glossary is missing, **proceed silently**. Don't flag their
+absence; don't suggest creating them upfront. The `/domain-modeling` skill
+creates them lazily when terms or decisions actually get resolved.
 
-## File structure
-
-Single-context repo (most repos):
-
-```
-/
-├── CONTEXT.md
-├── docs/adr/
-│   ├── 0001-event-sourced-orders.md
-│   └── 0002-postgres-for-write-model.md
-└── src/
-```
-
-Multi-context repo (presence of `CONTEXT-MAP.md` at the root):
+## File structure (this repo)
 
 ```
 /
-├── CONTEXT-MAP.md
-├── docs/adr/                          ← system-wide decisions
-└── src/
-    ├── ordering/
-    │   ├── CONTEXT.md
-    │   └── docs/adr/                  ← context-specific decisions
-    └── billing/
-        ├── CONTEXT.md
-        └── docs/adr/
+├── GLOSSARY-MAP.md              ← which glossary
+├── GLOSSARY.md                  ← Living Attesta (platform)
+├── CONTEXT.md                   ← Legacy Stream
+├── docs/
+│   ├── feragame/GLOSSARY.md     ← first plant / Org Config payload
+│   └── adr/                     ← platform Decisions only
 ```
 
 ## Use the glossary's vocabulary
 
-When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
+When your output names a domain concept (in an issue title, a refactor proposal,
+a hypothesis, a test name), use the term as defined in the glossary
+`GLOSSARY-MAP.md` selected for that work. Don't drift to synonyms the glossary
+explicitly avoids. Don't promote Feragame plant nouns into Living platform
+docs or Attesta ADRs.
 
-If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+If the concept you need isn't in the right glossary yet, that's a signal:
+either you're inventing language the project doesn't use (reconsider) or
+there's a real gap (note it for `/domain-modeling`).
 
 ## Flag ADR conflicts
 

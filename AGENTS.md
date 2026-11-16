@@ -27,7 +27,9 @@
   [`README.md`](README.md), [`QUICKSTART.md`](QUICKSTART.md), and
   [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
   truth.
-- **Domain language:** for product terms, read [`CONTEXT.md`](CONTEXT.md).
+- **Domain language:** which glossary applies — Living platform, Feragame
+  plant payload, or Legacy Stream — read
+  [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
 - **Active work:** unresolved design and implementable work live as GitHub
   issues; use [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
   when creating, updating, triaging, or wayfinding tickets.
@@ -36,7 +38,8 @@
   [`docs/agents/domain.md`](docs/agents/domain.md).
 - **Plant Org Config:** before editing
   `server/internal/living/fixtures/feragame-config.yaml` (or its seed/test
-  followers), read [`docs/agents/plant-config.md`](docs/agents/plant-config.md).
+  followers), read [`docs/agents/plant-config.md`](docs/agents/plant-config.md)
+  and [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md).
 - **DPP/UNTP:** for Digital Link or credential behavior, read
   [`docs/untp.md`](docs/untp.md) and the implementation it names.
 - **Templates and CSS:** before changing `server/templates/` or

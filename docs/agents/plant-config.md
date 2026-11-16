@@ -4,12 +4,17 @@ Checklist when changing the Feragame plant fixture
 [`server/internal/living/fixtures/feragame-config.yaml`](../../server/internal/living/fixtures/feragame-config.yaml)
 (embedded Active Config + SPA `$living-fixtures`).
 
+Plant nouns (lot session, Jobs, roles):
+[`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md). Platform nouns:
+[`GLOSSARY.md`](../../GLOSSARY.md). Map:
+[`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
+
 ## Rules
 
 - **Dumb executor:** plant law lives in Config (`domain.entities`, transforms,
   `readyWhen`, **`onCommit`** navigation). Go and `/app` only evaluate;
   no Feragame- or plant-named branches in executors. See
-  [`GLOSSARY.md`](../../GLOSSARY.md).
+  [`GLOSSARY.md`](../../GLOSSARY.md) (**Dumb executor**).
 - **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over
   Domain (and `$domain.submissions` when bind-once matters). Do not encode
   entity open/closed law in **`startsWhen`**. Do not author plant **`unlockFrom`**
@@ -17,12 +22,17 @@ Checklist when changing the Feragame plant fixture
   support Unlock).
 - **Submit cardinality / lot session:** multi-pass plant work uses leaf Tasks
   with `submit: many` (not repeatable Task groups). Lot entity + session status
-  `open | fullyProcessed` only (no `parked`; no turn bookends). See
-  [`.scratch/living-two-job-plant/LOCKED.md`](../../.scratch/living-two-job-plant/LOCKED.md)
-  and [`docs/adr/0008-living-task-submit-cardinality.md`](../adr/0008-living-task-submit-cardinality.md).
-- **Same change:** when this arc ships as one PR, followers below land with the
-  YAML; on the two-job-plant branch they land in later tickets (seed / living /
-  HTTP / SPA) — do not leave day/shift/`parked` law in Config while waiting.
+  `open | fullyProcessed` only (no `parked`; no turn bookends; no working day /
+  shift Domain). Platform law:
+  [`docs/adr/0008-living-task-submit-cardinality.md`](../adr/0008-living-task-submit-cardinality.md).
+  Lot-session tables and plant entity renames:
+  [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md)—not Attesta ADRs.
+- **JSONata exprs:** chrome / transform / QR / HttpPort bodies use jsonata-go —
+  see [`jsonata-living.md`](jsonata-living.md) before blaming the executor.
+- **`/app` i18n:** SPA chrome vs Config copy vs English platform errors —
+  [`docs/adr/0013-living-app-locale-tracks.md`](../adr/0013-living-app-locale-tracks.md)
+  and [`app-i18n.md`](app-i18n.md).
+- **Same change:** every follower below lands in the same commit/PR as the YAML.
 
 ## Steps
 
@@ -30,8 +40,9 @@ Checklist when changing the Feragame plant fixture
    `readyWhen`, catalogs. Prefer existing transform ops (`mint` / `mintMany` /
    `patch` / `bind`); keep Italian plant labels as Config content.
 2. **Glossary** — if you add or rename a plant Domain concept, update
-   [`GLOSSARY.md`](../../GLOSSARY.md) in the same change. (Working day / shift
-   are not Domain entities on this plant path.)
+   [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md) in the same change.
+   Platform terms stay in root [`GLOSSARY.md`](../../GLOSSARY.md). (Working day
+   / shift are not Domain entities on this plant path.)
 3. **Seed** — update [`seed.go`](../../server/internal/living/seed.go) and
    [`demo_commits.go`](../../server/internal/living/demo_commits.go) Commit
    sequence and id constants (truck / lot grammars; no day/turno Commits).
@@ -58,8 +69,8 @@ Checklist when changing the Feragame plant fixture
 ## Commit navigation (`onCommit`)
 
 Per Task, optional `onCommit` keys control **server-side** post-Commit routing
-(ADR-0006; locked law in
-[`.scratch/commit-navigation/LOCKED.md`](../../.scratch/commit-navigation/LOCKED.md)).
+([ADR-0006](../adr/0006-living-operator-worklist-home.md); glossary
+**Commit navigation**).
 
 | Key | Values | Default |
 |-----|--------|---------|
@@ -67,11 +78,12 @@ Per Task, optional `onCommit` keys control **server-side** post-Commit routing
 | `advanceTarget` | bool | `true` |
 
 - **`navigation`:** `advance` keeps role-eligible auto-advance on the Job
-  instance; `home` / `overview` force that destination; `stay` parks on the
-  submitted Task (links, Spawn/Close chrome per group law) and Commit ships
-  deferred **Continue** via `continueNavigation` on the wire.
+  instance; `home` / `overview` force that destination (`overview` maps to
+  **home** on the wire); `stay` parks on the submitted Task (links, Spawn/Close
+  chrome per group law) and Commit ships deferred **Continue** via
+  `continueNavigation` on the wire.
 - **`advanceTarget: false`:** never auto-advance to the next Task after this
-  Commit. When nothing else is authored, land on **Job instance overview**.
+  Commit. When nothing else is authored, land on **Worklist** home.
 
 ### Feragame examples (fixture)
 

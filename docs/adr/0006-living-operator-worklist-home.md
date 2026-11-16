@@ -9,7 +9,7 @@ first Task with provisional `new`). Working a Task uses
 `/app/{jobId}/{jobInstanceId}` may remain routed; it is **not** a Commit, Continue,
 home, or Task-back target. **Archive** is the rediscovery surface: a flat list of
 past/completed Job instances that opens that existing overview (may sort by time).
-There is no day→shift→lot Archive tree and no calendar banding from Domain.
+There is no Domain calendar Archive tree.
 After Commit, auto-advance applies when the same **OperatorIdentity** has another
 role-eligible actionable Task on that instance and Config allows it; otherwise
 **home** (or **stay** when authored). Product law is evaluated **server-side**:
@@ -38,18 +38,17 @@ Archive only; unlink from Commit/Continue/Task-back. (3) Always stay on overview
 for role handoff — rejected: handoff is the next viewer’s act-now list. (4)
 Role-blind client filtering from Org Config — rejected (ADR-0005/0006). (5) SPA
 re-derives post-Commit destination from Worklist — rejected; Commit ships
-`navigation`. (6) Day→shift→lot Archive hierarchy — rejected (see amend below).
+`navigation`. (6) Domain calendar Archive hierarchy — rejected: Archive is a flat
+past-instance list into overview.
 
 **Amended by [ADR-0008](0008-living-task-submit-cardinality.md):** leaf `submit:
-once|many`; Feragame multi-pass uses `many` + stay, not Task groups. Many-submit
-Submission history on home reuses list-recap / timestamped LinkStore.
+once|many`; multi-pass same-form work uses `many` + stay, not Task groups.
+Many-submit Submission history on home reuses list-recap / timestamped LinkStore.
 
-**Amended (Archive → overview; hierarchy dead):** Product law in
-[`.scratch/living-two-job-plant/LOCKED.md`](../../.scratch/living-two-job-plant/LOCKED.md)
-narrows this ADR: Archive lists past/completed Job instances and opens the existing
-overview; home stays act-now; overview remains unlinked from Commit, Continue, and
-Task-back. The earlier “Archive hierarchy (working day → shift → lot) is explicitly
-later” plan is dead — no working-day/shift Domain and no day→shift→lot Archive tree.
+**Amended (Archive → overview):** Archive lists past/completed Job instances and
+opens the existing overview; home stays act-now; overview remains unlinked from
+Commit, Continue, and Task-back. Plant calendar Domain (if any) is not Archive
+structure—see [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md).
 
 **Consequences:** Demo seed still needs role-split users so each home differs. SPA
 must not treat overview as the board, must not show In progress/Completed on home,
