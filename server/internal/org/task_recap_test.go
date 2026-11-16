@@ -43,60 +43,6 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	}
 }
 
-func TestLoadTaskRecapNestedWithStoredLinks(t *testing.T) {
-	port := &recordingHttpPort{
-		responses: []HttpPortResponse{
-			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
-		},
-	}
-	links := NewMemoryLinkStore()
-	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
-	c.HttpPort = port
-	c.LinkStore = links
-	loader.LinkStore = links
-
-	truckID := commitTruckArrive(t, c)
-	result := commitLotRegister(t, c, truckID, registerLotValue())
-
-	var addr SubmissionAddress
-	for _, sub := range result.Domain.Submissions {
-		if sub.TaskID == "register" {
-			addr = SubmissionAddress{
-				JobID: sub.JobID, JobInstanceID: sub.JobInstanceID, TaskID: sub.TaskID,
-			}
-			break
-		}
-	}
-	if addr.TaskID == "" {
-		t.Fatalf("register address missing: %#v", result.Domain.Submissions)
-	}
-
-	list, err := loader.LoadTaskRecap(t.Context(), "feragame", addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(list.Items) != 1 {
-		t.Fatalf("items = %#v", list.Items)
-	}
-	recap := list.Items[0]
-	if recap.GroupID != "" || recap.GroupInstanceID != "" {
-		t.Fatalf("flat register address = %#v", recap)
-	}
-	if recap.UserID != "ada" || recap.Timestamp == "" {
-		t.Fatalf("actor/time = %#v", recap)
-	}
-	if recap.Facts["client"] != "CO" {
-		t.Fatalf("facts = %#v", recap.Facts)
-	}
-	if recap.Titles["client"] != "Cliente" || recap.Titles["numeroFir"] != "Numero FIR" {
-		t.Fatalf("register titles = %#v", recap.Titles)
-	}
-	if len(recap.Links) != 2 || recap.Links[0].Label != "Stampa etichette" || recap.Links[1].Filename != "reg.csv" {
-		t.Fatalf("links = %#v", recap.Links)
-	}
-}
-
 func TestLoadTaskRecapManySubmitOldestFirstWithPerRowLinks(t *testing.T) {
 	clock := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
 	port := &recordingHttpPort{
@@ -171,8 +117,7 @@ func TestLoadTaskRecapRejectsNotDoneAndUnknown(t *testing.T) {
 	}
 
 	_, err = loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
-		JobID: "intake", JobInstanceID: truckID, TaskID: "truckArrive",
-		GroupID: "lots",
+		JobID: "intake", JobInstanceID: truckID, TaskID: "",
 	})
 	if err == nil || errors.Is(err, ErrNotFound) {
 		t.Fatalf("invalid address err = %v", err)
@@ -243,13 +188,6 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?taskId=truckArrive", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("missing params = %d", rec.Code)
-	}
-
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?jobId=intake&taskId=register&jobInstanceId="+truckID+"&groupId=lots", nil))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("half group = %d", rec.Code)
 	}
 
 	// Load-level: any org Gate identity may read; no Cerbos Commit on this path.

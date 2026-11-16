@@ -64,28 +64,37 @@ successful Submission finishes the Task on that Job instance (Worklist `done`).
 _Avoid_: Repeatable Task groups for multi-submit; Close chrome on a many-submit
 Task; calling cardinality “repeatable” (that word remains Job-level)
 
-**child Task**:
-A **Task** authored under a **Task group**, completed on one occurrence of that
-group under a **Job instance**. Still a Task for Commit and Cerbos. Retained for
-engine compatibility; multi-pass same-form work prefers **submit cardinality**
-`many` instead of groups.
-_Avoid_: Subtask; task instance; treating child Tasks as a different Commit
-kind; using child Tasks instead of `submit: many`
+**child Task** *(historical / rejected)*:
+Former name for a **Task** authored under a **Task group**. Groups are removed;
+multi-pass same-form work is **submit cardinality** `many` + **readyWhen**.
+_Avoid_: Reviving child Tasks or group nesting; Subtask; task instance
 
-**Task group**:
-A composite node under a Job: ordered **child Tasks**, may be repeatable; **no**
-Commit of its own. Engine may still project Spawn/Close; **not** the model for N
-submits of the same form (use **submit cardinality** `many` + **readyWhen**).
+**Task group** *(historical / rejected)*:
+Former composite node under a Job (ordered children, optional repeatable
+occurrences, no Commit of its own). Config rejects `kind:group`. Multi-pass
+same-form work is **submit cardinality** `many` + **readyWhen** (ADR-0008).
 _Avoid_: Calling a Task group a Task; jobs all the way down; faking multi-pass
 with groups; treating Close as required law for many-submit leaves
 
-**Spawn**:
-Open a new occurrence of a **Task group** under a **Job instance** by Committing
-its first **child Task** with spawn mint (`spawningNew`). Engine affordance for
-configs that still author groups; many-submit leaf Tasks do not use Spawn.
-_Avoid_: Empty-open without the first leaf Submission as the normal operator
-path; calling Job start “Spawn”; inventing a home Spawn peer of Can start; Task
-instance; using Spawn for many-submit leaf Tasks
+**Spawn** *(historical / rejected)*:
+Former affordance: open a **Task group** occurrence by Committing its first
+child with mint `spawningNew`. Removed with groups; Job start uses
+`startingNew` / `none` only (ADR-0012).
+_Avoid_: Calling Job start “Spawn”; inventing Spawn chrome; using Spawn for
+many-submit leaf Tasks
+
+**Close** *(historical / rejected)*:
+Former affordance: end a **Task group** occurrence (Close API / Worklist chrome).
+Removed with groups; entity open/closed law stays Domain via transform +
+**readyWhen**, not Close Tasks.
+_Avoid_: Reviving `/api/org/close` or Close chrome; treating Close as law for
+many-submit leaves
+
+**spawningNew** *(historical / rejected)*:
+Former Commit mint kind for a Task group occurrence. Removed with groups; live
+mint is `startingNew` | `none` only (ADR-0012 Decision retained for history;
+removal recorded in Consequences).
+_Avoid_: Sending `spawningNew` on Commit; inventing group occurrence bags
 
 **Job instance**:
 One occurrence of a repeatable Job within the org Domain. Often created on first
@@ -288,9 +297,9 @@ Continue destination
 
 **Advance target eligibility**:
 Whether a given Task Commit may auto-advance the operator into the next
-role-eligible Task on that Job instance. Close and similar leaves disable it so
-linear sibling order does not chain into the wrong screen; open-style leaves may
-force **Worklist** home instead. When advance is disallowed and no stronger
+role-eligible Task on that Job instance. Some leaves disable it so linear
+sibling order does not chain into the wrong screen; open-style leaves may force
+**Worklist** home instead. When advance is disallowed and no stronger
 navigation is authored, return to **Worklist** home.
 _Avoid_: Treating “next Task in Config order” as always correct after Commit;
 plant-named routing branches in executors; defaulting handoff to Job instance
@@ -304,12 +313,10 @@ Adapters only. The Commit response includes an updated viewer-scoped
 authored), and when advancing to a Task, the next **Task form bundle**, so the
 SPA navigates without a blind re-Load or Worklist re-walk. If navigation is
 stay, the operator remains on a read-only view of the submitted form with any
-download links (many-submit loops typically stay). Configs that still author
-**Task groups** may also offer Spawn/Close on stay; many-submit leaves use stay
-without group chrome.
+download links (many-submit loops typically stay).
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit;
-Committing a Task group; SPA re-deriving post-Commit destination from Worklist
-or from link presence
+SPA re-deriving post-Commit destination from Worklist or from link presence;
+reviving Task-group Spawn/Close on stay
 
 **Load**:
 Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**,
@@ -366,8 +373,7 @@ target. The `/app/{jobId}/{jobInstanceId}` route may remain for that Archive
 link.
 _Avoid_: Commit or Continue navigation to overview; home deep-links into
 overview as the act-now path; day→shift→lot Archive tree; process page;
-treating overview as the operator board; Task-group Spawn/Close as
-product law (groups are being removed)
+treating overview as the operator board; reviving Task-group Spawn/Close
 
 **Task form bundle**:
 Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed
@@ -415,7 +421,9 @@ archival notes until readers catch up.
   Replace with org Domain Load/Commit.
 - **Step / Substep / Step instance**: experiment YAML/code names for Job / Task
   / Job instance.
-- **Repeatable Task groups for multi-pass same-form work**: superseded by
-  **submit cardinality** `many` + Domain **readyWhen** (ADR-0008). Plant entity
+- **Task group / child Task / Spawn / Close / `spawningNew`**: removed platform
+  surface. Config rejects `kind:group`; no Close API; Commit mint is
+  `startingNew` | `none` only. Multi-pass same-form work is **submit
+  cardinality** `many` + Domain **readyWhen** (ADR-0008, ADR-0012). Plant entity
   renames, lot-session enums, and removed day/shift/`parked` plant law live in
   [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md).

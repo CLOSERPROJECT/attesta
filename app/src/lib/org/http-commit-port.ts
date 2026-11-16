@@ -51,23 +51,9 @@ function parseWorklist(raw: unknown): Worklist {
 	return {
 		jobs: (jobs as Worklist['jobs']).map((job) => ({
 			...job,
-			instances: (job.instances ?? []).map((inst) => {
-				const groups = inst.groups
-					? Object.fromEntries(
-							Object.entries(inst.groups).map(([gid, g]) => [
-								gid,
-								{
-									...g,
-									instances: (g.instances ?? []).map((gi) =>
-										withSubmissionCounts(gi, gi.submissionCounts)
-									)
-								}
-							])
-						)
-					: undefined;
-				const next = withSubmissionCounts(inst, inst.submissionCounts);
-				return groups ? { ...next, groups } : next;
-			})
+			instances: (job.instances ?? []).map((inst) =>
+				withSubmissionCounts(inst, inst.submissionCounts)
+			)
 		}))
 	};
 }

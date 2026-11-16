@@ -1,9 +1,4 @@
-import {
-	groupTaskPath,
-	normalizeGroupInstanceId,
-	PROVISIONAL_GROUP_INSTANCE_ID,
-	taskPath
-} from './types.js';
+import { taskPath } from './types.js';
 
 /** Client-only Draft bag — never part of Domain until Commit succeeds. */
 export type DraftKey = string;
@@ -27,51 +22,22 @@ export function draftKey(taskPath: string, jobInstanceId: string): DraftKey {
 
 /**
  * Instance id passed to getDraft/setDraft/seedDraft/clearDraft/hasDirtyDraft.
- * Nested: `jobInstanceId::groupId::groupInstanceId` (provisional group → '').
- * Flat: jobInstanceId as-is (including '' for Start).
+ * Flat leaf: jobInstanceId as-is (including '' for Start).
  */
-export function draftBagInstanceKey(parts: {
-	jobInstanceId: string;
-	groupId?: string;
-	groupInstanceId?: string;
-}): string {
-	const groupId = parts.groupId ?? '';
-	if (!groupId) return parts.jobInstanceId;
-	return `${parts.jobInstanceId}::${groupId}::${parts.groupInstanceId ?? ''}`;
+export function draftBagInstanceKey(parts: { jobInstanceId: string }): string {
+	return parts.jobInstanceId;
 }
 
-/** Flat or nested Task address → Draft bag coords (incl. provisional `new` → ''). */
+/** Flat Task address → Draft bag coords (incl. provisional Start → ''). */
 export function draftAddressForTask(parts: {
 	jobId: string;
 	taskId: string;
 	jobInstanceId: string;
-	groupId?: string;
-	groupInstanceId?: string;
 }): DraftAddress {
-	const groupId = parts.groupId ?? '';
-	if (!groupId) {
-		return {
-			taskPath: taskPath(parts.jobId, parts.taskId),
-			draftBagInstanceKey: draftBagInstanceKey({
-				jobInstanceId: parts.jobInstanceId
-			})
-		};
-	}
-	const wireGroupInstanceId =
-		parts.groupInstanceId && parts.groupInstanceId.length > 0
-			? parts.groupInstanceId
-			: PROVISIONAL_GROUP_INSTANCE_ID;
 	return {
-		taskPath: groupTaskPath(
-			parts.jobId,
-			groupId,
-			wireGroupInstanceId,
-			parts.taskId
-		),
+		taskPath: taskPath(parts.jobId, parts.taskId),
 		draftBagInstanceKey: draftBagInstanceKey({
-			jobInstanceId: parts.jobInstanceId,
-			groupId,
-			groupInstanceId: normalizeGroupInstanceId(wireGroupInstanceId)
+			jobInstanceId: parts.jobInstanceId
 		})
 	};
 }

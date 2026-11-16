@@ -1,12 +1,7 @@
 import type { CommitNavigation, ContinueNavigation } from './commit-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist, WorklistInstance, WorklistJob } from './types.js';
-import {
-	normalizeGroupInstanceId,
-	PROVISIONAL_GROUP_INSTANCE_ID,
-	worklistJobFor
-} from './types.js';
-import { taskRouteInstanceSegment } from './worklist-home.js';
+import { worklistJobFor } from './types.js';
 
 /** Post-Commit / exit / deep-link SPA target (ADR-0006). */
 export type PostCommitTarget =
@@ -15,8 +10,6 @@ export type PostCommitTarget =
 			jobId: string;
 			jobInstanceId: string;
 			taskId: string;
-			groupId?: string;
-			groupInstanceId?: string;
 	  }
 	| { kind: 'overview'; jobId: string; jobInstanceId: string }
 	| { kind: 'archive' }
@@ -57,23 +50,6 @@ export function resolveContinueNavigation(
 		jobInstanceId,
 		nextTaskFormBundle
 	);
-}
-
-/** Provisional first-leaf Spawn target after post-submit "Start another". */
-export function resolveGroupStartAnotherTarget(
-	jobId: string,
-	jobInstanceId: string,
-	groupId: string,
-	firstChildTaskId: string
-): PostCommitTarget {
-	return {
-		kind: 'task',
-		jobId,
-		jobInstanceId,
-		groupId,
-		groupInstanceId: PROVISIONAL_GROUP_INSTANCE_ID,
-		taskId: firstChildTaskId
-	};
 }
 
 export type TaskDeepLinkTarget =
@@ -125,18 +101,6 @@ export function resolvePostCommitNavigation(
 			bundle.jobInstanceId &&
 			bundle.jobId === jobId
 		) {
-			const groupId = bundle.groupId ?? '';
-			const groupInstanceId = bundle.groupInstanceId ?? '';
-			if (groupId) {
-				return {
-					kind: 'task',
-					jobId: bundle.jobId,
-					jobInstanceId: bundle.jobInstanceId,
-					taskId: bundle.taskId,
-					groupId,
-					groupInstanceId: taskRouteInstanceSegment(groupInstanceId)
-				};
-			}
 			return {
 				kind: 'task',
 				jobId: bundle.jobId,
@@ -151,17 +115,15 @@ export function resolvePostCommitNavigation(
 }
 
 /**
- * Deep-link gate: provisional Start/Spawn always mounts; existing instance must
- * be projected actionable (flat or nested) or redirect to overview/Home.
+ * Deep-link gate: provisional Start always mounts; existing instance must
+ * be projected actionable or redirect Home.
  */
 export function resolveTaskDeepLink(
 	jobId: string,
 	jobInstanceId: string,
 	taskId: string,
 	provisionalJob: boolean,
-	worklist: Worklist | null | undefined,
-	groupId = '',
-	groupInstanceId = ''
+	worklist: Worklist | null | undefined
 ): TaskDeepLinkTarget {
 	if (!jobId || !taskId) return { kind: 'home' };
 	if (provisionalJob) return { kind: 'task' };
@@ -169,17 +131,6 @@ export function resolveTaskDeepLink(
 	const job = worklistJobFor(worklist, jobId);
 	const inst = job ? instanceFor(job, jobInstanceId) : null;
 	if (!job || !inst) {
-		return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
-	}
-
-	if (groupId) {
-		const provisionalSpawn = normalizeGroupInstanceId(groupInstanceId) === '';
-		if (provisionalSpawn) return { kind: 'task' };
-		const group = inst.groups?.[groupId];
-		const gi = group?.instances.find((row) => row.id === groupInstanceId);
-		if (gi && gi.tasks[taskId] === 'actionable') {
-			return { kind: 'task' };
-		}
 		return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
 	}
 

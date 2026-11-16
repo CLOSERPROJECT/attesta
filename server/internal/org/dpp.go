@@ -108,12 +108,6 @@ func orgConfigHasDPPOptIn(cfg OrgConfig) bool {
 
 func tasksHavePassportOptIn(tasks []TaskConfig) bool {
 	for _, t := range tasks {
-		if t.IsGroup() {
-			if tasksHavePassportOptIn(t.ChildTasks()) {
-				return true
-			}
-			continue
-		}
 		if taskOnSubmitDPP(map[string]any(t)) {
 			return true
 		}

@@ -27,18 +27,11 @@
 
 	let { children }: { children: Snippet } = $props();
 
-	// Pathname segments only — sv-router leaks group*/taskId across matches.
+	// Pathname segments only — avoid sv-router param leakage across matches.
 	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
 	const jobId = $derived(coords.jobId);
 	const routeInstance = $derived(coords.jobInstanceId);
-	const groupId = $derived(coords.groupId);
-	const groupRoute = $derived(coords.groupInstanceId);
-	const provisionalJob = $derived(
-		!groupId && (routeInstance === '' || routeInstance === 'new')
-	);
-	const provisionalSpawn = $derived(
-		Boolean(groupId) && (groupRoute === '' || groupRoute === 'new')
-	);
+	const provisionalJob = $derived(routeInstance === '' || routeInstance === 'new');
 	const jobInstanceId = $derived(provisionalJob ? '' : routeInstance);
 
 	const placeKind = $derived(navPlaceKindFromRoute({ pathname: route.pathname }));
@@ -51,7 +44,6 @@
 			jobInstanceId,
 			taskId,
 			provisionalJob: placeKind === 'task' ? provisionalJob : false,
-			provisionalSpawn: placeKind === 'task' ? provisionalSpawn : false,
 			worklist: orgSession.result?.worklist
 		})
 	);

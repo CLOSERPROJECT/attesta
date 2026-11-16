@@ -12,7 +12,7 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "", "", "")
+	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 		t.Fatalf("provisional = %s", bundleAddress(provisional))
 	}
 
-	viaNew, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "new", "", "")
+	viaNew, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "new")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,11 +29,11 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	}
 
 	truckID := commitTruckArrive(t, c)
-	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "", "")
+	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spawn.TaskID != "register" || spawn.GroupID != "" || spawn.JobInstanceID != truckID {
+	if spawn.TaskID != "register" || spawn.JobInstanceID != truckID {
 		t.Fatalf("register = %#v", spawn)
 	}
 }
@@ -44,7 +44,7 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
 
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 		t.Fatal(err)
 	}
 	loaded.TaskFormBundles = nil
-	again, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID, "", "")
+	again, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,13 +72,13 @@ func TestLoadTaskBundleDeniesRoleOutsideBoardScope(t *testing.T) {
 	_ = commitStartLot(t, c, loadID)
 
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	_, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID, "", "")
+	_, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID)
 	if !errors.Is(err, ErrTaskBundleForbidden) {
 		t.Fatalf("admin weigh err = %v, want forbidden", err)
 	}
 
 	lineOp := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID, "", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,11 +26,7 @@
 	let open = $state(false);
 
 	const visible = $derived(manySubmitHistoryVisible(submit, submissionCount));
-	const historyValue = $derived(
-		request.groupId && request.groupInstanceId
-			? `many:${request.groupId}:${request.groupInstanceId}:${request.taskId}`
-			: `many:${request.taskId}`
-	);
+	const historyValue = $derived(`many:${request.taskId}`);
 	const triggerTestId = $derived(`${testId}-trigger`);
 
 	function onValueChange(next: string[]) {

@@ -194,8 +194,7 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 	return job, roles, nil
 }
 
-// decodeFixtureTask decodes one YAML Task or Task group. Nested substeps become
-// living "tasks" so OrgConfig speaks Job/Task nouns only after load.
+// decodeFixtureTask decodes one YAML leaf Task under a Job.
 func decodeFixtureTask(jobID, path string, node *yaml.Node) (TaskConfig, []string, error) {
 	var payload map[string]any
 	if err := node.Decode(&payload); err != nil {
@@ -207,28 +206,8 @@ func decodeFixtureTask(jobID, path string, node *yaml.Node) (TaskConfig, []strin
 	}
 
 	m := mappingContent(node)
-	childrenNode := child(m, "substeps")
-	if childrenNode == nil {
-		childrenNode = child(m, "tasks")
-	}
-	if childrenNode != nil {
-		if childrenNode.Kind != yaml.SequenceNode {
-			return nil, nil, fmt.Errorf("jobs.%s.%s: children must be a list", jobID, path)
-		}
-		children := make([]TaskConfig, 0, len(childrenNode.Content))
-		var roles []string
-		for i, childNode := range childrenNode.Content {
-			childPath := fmt.Sprintf("%s.tasks[%d]", path, i)
-			childTask, childRoles, err := decodeFixtureTask(jobID, childPath, childNode)
-			if err != nil {
-				return nil, nil, err
-			}
-			children = append(children, childTask)
-			roles = append(roles, childRoles...)
-		}
-		delete(payload, "substeps")
-		payload["tasks"] = children
-		return TaskConfig(payload), roles, nil
+	if child(m, "substeps") != nil || child(m, "tasks") != nil {
+		return nil, nil, fmt.Errorf("jobs.%s.%s: nested tasks / kind group are not supported", jobID, path)
 	}
 
 	return TaskConfig(payload), rolesFromTask(payload), nil
@@ -245,10 +224,6 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 	}
 	ref, err := ParseTaskPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("jobs.%s.startsWhen.task must be \"<jobId>/<taskId>\"", jobID)
-	}
-	// StartsWhenRef is flat JobID/TaskID only until nested gates use LeafTaskByPath.
-	if ref.Nested() {
 		return nil, fmt.Errorf("jobs.%s.startsWhen.task must be \"<jobId>/<taskId>\"", jobID)
 	}
 	quantifier := "some"
@@ -308,7 +283,7 @@ func rolesAllowedForPath(cfg OrgConfig, ref TaskPathRef) []string {
 	if !ok {
 		return nil
 	}
-	task, ok := LeafTaskByPath(job.Tasks, ref)
+	task, ok := TaskByID(job.Tasks, ref.TaskID)
 	if !ok {
 		return nil
 	}

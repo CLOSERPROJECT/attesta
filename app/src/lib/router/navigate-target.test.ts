@@ -21,25 +21,4 @@ describe('hrefOrgTarget', () => {
 		expect(href).toContain('/app/archive');
 	});
 
-	test('nested task target includes group coordinates', () => {
-		const href = hrefOrgTarget({
-			kind: 'task',
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots',
-			groupInstanceId: 'new',
-			taskId: 'register'
-		});
-		expect(href).toBe(
-			p('/:jobId/:jobInstanceId/:groupId/:groupInstanceId/:taskId', {
-				params: {
-					jobId: 'intake',
-					jobInstanceId: 'T1',
-					groupId: 'lots',
-					groupInstanceId: 'new',
-					taskId: 'register'
-				}
-			})
-		);
-	});
 });

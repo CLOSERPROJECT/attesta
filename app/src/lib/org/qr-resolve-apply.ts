@@ -4,12 +4,7 @@ import {
 	type QrNavigate,
 	type QrResolveResult
 } from './qr-resolve-port.js';
-import {
-	groupTaskPath,
-	normalizeGroupInstanceId,
-	PROVISIONAL_GROUP_INSTANCE_ID,
-	taskPath
-} from './types.js';
+import { taskPath } from './types.js';
 import type { PostCommitTarget } from './worklist-nav.js';
 
 export type QrApplyNavigate = {
@@ -24,45 +19,20 @@ export type QrApplyOutcome =
 	| QrApplyNavigate
 	| { kind: 'error'; message: string };
 
-/** Draft bag coords matching TaskForm (provisional group → ''). */
+/** Draft bag coords matching TaskForm. */
 export function qrDraftCoords(nav: QrNavigate): {
 	taskPath: string;
 	draftInstanceKey: string;
 } {
-	const groupId = nav.groupId ?? '';
-	const provisionalSpawn =
-		Boolean(groupId) && normalizeGroupInstanceId(nav.groupInstanceId ?? '') === '';
-	const path = groupId
-		? groupTaskPath(
-				nav.jobId,
-				groupId,
-				provisionalSpawn
-					? PROVISIONAL_GROUP_INSTANCE_ID
-					: (nav.groupInstanceId as string),
-				nav.taskId
-			)
-		: taskPath(nav.jobId, nav.taskId);
 	return {
-		taskPath: path,
+		taskPath: taskPath(nav.jobId, nav.taskId),
 		draftInstanceKey: draftBagInstanceKey({
-			jobInstanceId: nav.jobInstanceId,
-			groupId: groupId || undefined,
-			groupInstanceId: provisionalSpawn ? '' : nav.groupInstanceId
+			jobInstanceId: nav.jobInstanceId
 		})
 	};
 }
 
 export function qrNavigateTarget(nav: QrNavigate): PostCommitTarget {
-	if (nav.groupId) {
-		return {
-			kind: 'task',
-			jobId: nav.jobId,
-			jobInstanceId: nav.jobInstanceId,
-			groupId: nav.groupId,
-			groupInstanceId: nav.groupInstanceId || PROVISIONAL_GROUP_INSTANCE_ID,
-			taskId: nav.taskId
-		};
-	}
 	return {
 		kind: 'task',
 		jobId: nav.jobId,

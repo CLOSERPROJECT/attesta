@@ -31,8 +31,6 @@ type WorklistTask struct {
 
 // WorklistJob is one Job's start affordance and per-instance Task statuses.
 // TaskIDs / Title / StartLabel / Color / Repeatable / Tasks are chrome-only (not a second gate body).
-// Tasks lists top-level chrome in TaskIDs order, then nested group-child chrome
-// (lookup by id; TaskIDs stays top-level only).
 type WorklistJob struct {
 	JobID      string             `json:"jobId"`
 	CanStart   bool               `json:"canStart"`
@@ -46,39 +44,12 @@ type WorklistJob struct {
 }
 
 // WorklistInstance is one Job instance's viewer-scoped Task status map.
-// Leaf statuses are locked | unavailable | available | actionable | done;
-// Groups is omitted on flat Jobs (backward-compatible wire).
-// SubmissionCounts is Domain Submission N per flat leaf taskId (GroupID empty);
+// Leaf statuses are locked | unavailable | available | actionable | done.
+// SubmissionCounts is Domain Submission N per flat leaf taskId;
 // omitted when empty. Overview uses this for many-submit chrome without recap.
 type WorklistInstance struct {
-	ID               string                   `json:"id"`
-	Label            string                   `json:"label"`
-	Tasks            map[string]TaskStatus    `json:"tasks"`
-	SubmissionCounts map[string]int           `json:"submissionCounts,omitempty"`
-	Groups           map[string]WorklistGroup `json:"groups,omitempty"`
-}
-
-// WorklistGroup is server-projected chrome for one Task group on a Job instance.
-// SPA reads canSpawn / canClose and must not re-implement Unlock or close gates.
-type WorklistGroup struct {
-	GroupID      string                  `json:"groupId"`
-	StartLabel   string                  `json:"startLabel,omitempty"`
-	CloseLabel   string                  `json:"closeLabel,omitempty"`
-	Repeatable   bool                    `json:"repeatable"`
-	CanSpawn     bool                    `json:"canSpawn"`
-	CanClose     bool                    `json:"canClose"`
-	ChildTaskIDs []string                `json:"childTaskIds"`
-	Instances    []WorklistGroupInstance `json:"instances"`
-}
-
-// WorklistGroupInstance is one open group instance's viewer-scoped child leaf statuses.
-// Label is optional overview chrome: nested Submission IDsTouched ids that exist
-// under Config instanceLabelEntity (comma-joined when several); omit when unset or no match.
-// SubmissionCounts is Domain Submission N per child leaf taskId on this group
-// instance address; omitted when empty.
-type WorklistGroupInstance struct {
 	ID               string                `json:"id"`
-	Label            string                `json:"label,omitempty"`
+	Label            string                `json:"label"`
 	Tasks            map[string]TaskStatus `json:"tasks"`
 	SubmissionCounts map[string]int        `json:"submissionCounts,omitempty"`
 }
@@ -112,16 +83,6 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 
 	ordered := OrderedTaskIDs(job.Tasks)
 	chrome := projectWorklistTasks(job.Tasks, ordered)
-	// Nested group children are not in TaskIDs; append their title/roles chrome
-	// so overview can resolve leaf titles without a Config walk.
-	for _, taskID := range ordered {
-		tc, ok := TaskByID(job.Tasks, taskID)
-		if !ok || !tc.IsGroup() {
-			continue
-		}
-		children := tc.ChildTasks()
-		chrome = append(chrome, projectWorklistTasks(children, OrderedTaskIDs(children))...)
-	}
 	// Provisional start has no instance yet; evaluate first-Task readyWhen over Domain only.
 	if canStart && len(ordered) > 0 {
 		if tc, ok := TaskByID(job.Tasks, ordered[0]); ok &&
@@ -139,19 +100,8 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 			continue
 		}
 		tasks := make(map[string]TaskStatus, len(ordered))
-		var groups map[string]WorklistGroup
 		for i, taskID := range ordered {
 			tc, ok := TaskByID(job.Tasks, taskID)
-			if ok && tc.IsGroup() {
-				// Group-node chrome stays Unlock/Close unless the group authors readyWhen.
-				tasks[taskID] = foldReadyWhen(domain, projectGroupStatus(cfg, domain, jobID, taskID, inst.ID), tc, inst.ID, cfg.Catalogs)
-				g := projectWorklistGroup(cfg, domain, jobID, inst.ID, tc, op)
-				if groups == nil {
-					groups = map[string]WorklistGroup{}
-				}
-				groups[taskID] = g
-				continue
-			}
 			unlock := projectTaskStatus(cfg, domain, jobID, taskID, inst.ID)
 			status := unlock
 			if ok {
@@ -165,7 +115,6 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 			Label:            inst.Label,
 			Tasks:            tasks,
 			SubmissionCounts: countFlatLeafSubmissions(domain.Submissions, jobID, inst.ID),
-			Groups:           groups,
 		})
 	}
 
@@ -243,122 +192,14 @@ func viewerScopedStatus(unlock TaskStatus, eligible bool) TaskStatus {
 	return TaskStatusAvailable
 }
 
-func projectGroupStatus(cfg OrgConfig, domain Domain, jobID, groupID, jobInstanceID string) TaskStatus {
-	return pathUnlockStatus(EvaluatePathUnlock(cfg, domain, TaskPathRef{JobID: jobID, TaskID: groupID}, jobInstanceID))
-}
-
-func projectWorklistGroup(
-	cfg OrgConfig,
-	domain Domain,
-	jobID, jobInstanceID string,
-	group TaskConfig,
-	op OperatorIdentity,
-) WorklistGroup {
-	groupID := group.ID()
-	children := group.ChildTasks()
-	childIDs := OrderedTaskIDs(children)
-	repeatable := taskBool(group, "repeatable")
-
-	instances := make([]WorklistGroupInstance, 0)
-	for _, gi := range domain.GroupInstances {
-		if gi.JobID != jobID || gi.JobInstanceID != jobInstanceID || gi.GroupID != groupID {
-			continue
-		}
-		childStatus := make(map[string]TaskStatus, len(childIDs))
-		for _, childID := range childIDs {
-			unlock := projectGroupChildStatus(cfg, domain, jobID, jobInstanceID, groupID, gi.ID, childID)
-			child, ok := TaskByID(children, childID)
-			status := unlock
-			if ok {
-				status = foldReadyWhen(domain, unlock, child, jobInstanceID, cfg.Catalogs)
-			}
-			eligible := ok && rolesIntersect(op.Roles, rolesFromTask(child))
-			childStatus[childID] = viewerScopedStatus(status, eligible)
-		}
-		instances = append(instances, WorklistGroupInstance{
-			ID:               gi.ID,
-			Label:            groupInstanceEntityLabel(domain, jobID, jobInstanceID, groupID, gi.ID, taskString(group, "instanceLabelEntity")),
-			Tasks:            childStatus,
-			SubmissionCounts: countGroupLeafSubmissions(domain.Submissions, jobID, jobInstanceID, groupID, gi.ID),
-		})
-	}
-
-	lc := EvaluateGroupLifecycle(GroupLifecycleQuery{
-		Group:         group,
-		JobID:         jobID,
-		JobInstanceID: jobInstanceID,
-		Cfg:           cfg,
-		Domain:        domain,
-	})
-	canSpawn := lc.CanSpawn
-	if canSpawn && len(childIDs) > 0 {
-		if child, ok := TaskByID(children, childIDs[0]); ok {
-			if !rolesIntersect(op.Roles, rolesFromTask(child)) {
-				canSpawn = false
-			}
-		}
-	}
-
-	return WorklistGroup{
-		GroupID:      groupID,
-		StartLabel:   taskString(group, "startLabel"),
-		CloseLabel:   taskString(group, "closeLabel"),
-		Repeatable:   repeatable,
-		CanSpawn:     canSpawn,
-		CanClose:     lc.CanClose,
-		ChildTaskIDs: childIDs,
-		Instances:    instances,
-	}
-}
-
-func projectGroupChildStatus(
-	cfg OrgConfig,
-	domain Domain,
-	jobID, jobInstanceID, groupID, groupInstanceID, taskID string,
-) TaskStatus {
-	return pathUnlockStatus(EvaluatePathUnlock(cfg, domain, TaskPathRef{
-		JobID: jobID, GroupID: groupID, GroupInstanceID: groupInstanceID, TaskID: taskID,
-	}, jobInstanceID))
-}
-
-// groupInstanceEntityLabel returns IDsTouched ids present under
-// domain.Kind(entityKind) for a matching nested Submission (stable touch order,
-// comma-joined); empty when entityKind is unset or nothing intersects.
-func groupInstanceEntityLabel(domain Domain, jobID, jobInstanceID, groupID, groupInstanceID, entityKind string) string {
-	if entityKind == "" {
-		return ""
-	}
-	entities := domain.Kind(entityKind)
-	if len(entities) == 0 {
-		return ""
-	}
-	for _, sub := range domain.Submissions {
-		if sub.JobID != jobID || sub.JobInstanceID != jobInstanceID ||
-			sub.GroupID != groupID || sub.GroupInstanceID != groupInstanceID {
-			continue
-		}
-		matched := make([]string, 0, len(sub.IDsTouched))
-		for _, id := range sub.IDsTouched {
-			if _, ok := entities[id]; ok {
-				matched = append(matched, id)
-			}
-		}
-		if len(matched) > 0 {
-			return strings.Join(matched, ", ")
-		}
-	}
-	return ""
-}
-
 func projectTaskStatus(cfg OrgConfig, domain Domain, jobID, taskID, jobInstanceID string) TaskStatus {
 	return pathUnlockStatus(EvaluatePathUnlock(cfg, domain, TaskPathRef{JobID: jobID, TaskID: taskID}, jobInstanceID))
 }
 
-// Flat leaf only (GroupID empty) so nested addresses do not inflate overview N.
 func countFlatLeafSubmissions(subs []Submission, jobID, jobInstanceID string) map[string]int {
 	var out map[string]int
 	for _, s := range subs {
-		if s.JobID != jobID || s.JobInstanceID != jobInstanceID || s.GroupID != "" {
+		if s.JobID != jobID || s.JobInstanceID != jobInstanceID {
 			continue
 		}
 		if out == nil {
@@ -367,38 +208,6 @@ func countFlatLeafSubmissions(subs []Submission, jobID, jobInstanceID string) ma
 		out[s.TaskID]++
 	}
 	return out
-}
-
-// Nested leaf address only; sibling group instances stay separate keys.
-func countGroupLeafSubmissions(subs []Submission, jobID, jobInstanceID, groupID, groupInstanceID string) map[string]int {
-	var out map[string]int
-	for _, s := range subs {
-		if s.JobID != jobID || s.JobInstanceID != jobInstanceID ||
-			s.GroupID != groupID || s.GroupInstanceID != groupInstanceID {
-			continue
-		}
-		if out == nil {
-			out = map[string]int{}
-		}
-		out[s.TaskID]++
-	}
-	return out
-}
-
-func taskString(t TaskConfig, key string) string {
-	if t == nil {
-		return ""
-	}
-	s, _ := t[key].(string)
-	return s
-}
-
-func taskBool(t TaskConfig, key string) bool {
-	if t == nil {
-		return false
-	}
-	v, _ := t[key].(bool)
-	return v
 }
 
 // rolesIntersect is slug∩roles board chrome (not Cerbos).
@@ -451,9 +260,9 @@ func worklistInstance(job WorklistJob, id string) (WorklistInstance, bool) {
 	return WorklistInstance{}, false
 }
 
-// worklistInstanceHasRemainingWork is true when any submit: once Task (or group
-// node) on the instance is not done. submit: many leaves are ignored — they
-// never become done and must not block Completed / home navigation (ADR-0008).
+// worklistInstanceHasRemainingWork is true when any submit: once Task on the
+// instance is not done. submit: many leaves are ignored — they never become
+// done and must not block Completed / home navigation (ADR-0008).
 func worklistInstanceHasRemainingWork(cfg OrgConfig, wl Worklist, jobID, jobInstanceID string) bool {
 	job, ok := worklistJobByID(wl, jobID)
 	if !ok {
@@ -470,7 +279,7 @@ func worklistInstanceHasRemainingWork(cfg OrgConfig, wl Worklist, jobID, jobInst
 		}
 	}
 	for _, tid := range job.TaskIDs {
-		if tc, ok := TaskByID(cfgTasks, tid); ok && !tc.IsGroup() && taskSubmitMany(tc) {
+		if tc, ok := TaskByID(cfgTasks, tid); ok && taskSubmitMany(tc) {
 			continue
 		}
 		if inst.Tasks[tid] != TaskStatusDone {
@@ -481,20 +290,15 @@ func worklistInstanceHasRemainingWork(cfg OrgConfig, wl Worklist, jobID, jobInst
 }
 
 // ActionableTaskRef addresses one Worklist-actionable Task on an instance.
-// Nested leaves set GroupID; provisional spawn uses empty GroupInstanceID
-// (Commit path uses ProvisionalGroupInstanceID with mint.spawningNew).
 type ActionableTaskRef struct {
-	JobID           string
-	GroupID         string
-	GroupInstanceID string
-	TaskID          string
-	JobInstanceID   string
+	JobID         string
+	TaskID        string
+	JobInstanceID string
 }
 
 // CollectActionableTaskRefs walks Worklist in Org Config Job order: provisional
 // first Task when canStart (empty jobInstanceId), then every actionable leaf on
-// each instance (flat + nested group children + provisional when canSpawn).
-// canStart / actionable statuses / group chrome are already viewer-scoped by
+// each instance. canStart / actionable statuses are already viewer-scoped by
 // ProjectWorklist.
 func CollectActionableTaskRefs(cfg OrgConfig, wl Worklist) []ActionableTaskRef {
 	byJob := make(map[string]WorklistJob, len(wl.Jobs))
@@ -518,7 +322,7 @@ func CollectActionableTaskRefs(cfg OrgConfig, wl Worklist) []ActionableTaskRef {
 		ordered := OrderedTaskIDs(job.Tasks)
 		if wlJob.CanStart && len(ordered) > 0 {
 			first := ordered[0]
-			if tc, ok := TaskByID(job.Tasks, first); ok && !tc.IsGroup() {
+			if _, ok := TaskByID(job.Tasks, first); ok {
 				out = append(out, ActionableTaskRef{
 					JobID:         jobID,
 					TaskID:        first,
@@ -528,41 +332,7 @@ func CollectActionableTaskRefs(cfg OrgConfig, wl Worklist) []ActionableTaskRef {
 		}
 		for _, inst := range wlJob.Instances {
 			for _, taskID := range ordered {
-				tc, ok := TaskByID(job.Tasks, taskID)
-				if !ok {
-					continue
-				}
-				if tc.IsGroup() {
-					g, hit := inst.Groups[taskID]
-					if !hit {
-						continue
-					}
-					childIDs := g.ChildTaskIDs
-					if len(childIDs) == 0 {
-						childIDs = OrderedTaskIDs(tc.ChildTasks())
-					}
-					if g.CanSpawn && len(childIDs) > 0 {
-						out = append(out, ActionableTaskRef{
-							JobID:         jobID,
-							GroupID:       taskID,
-							TaskID:        childIDs[0],
-							JobInstanceID: inst.ID,
-						})
-					}
-					for _, gi := range g.Instances {
-						for _, childID := range childIDs {
-							if gi.Tasks[childID] != TaskStatusActionable {
-								continue
-							}
-							out = append(out, ActionableTaskRef{
-								JobID:           jobID,
-								GroupID:         taskID,
-								GroupInstanceID: gi.ID,
-								TaskID:          childID,
-								JobInstanceID:   inst.ID,
-							})
-						}
-					}
+				if _, ok := TaskByID(job.Tasks, taskID); !ok {
 					continue
 				}
 				if inst.Tasks[taskID] != TaskStatusActionable {
@@ -598,20 +368,9 @@ func NormalizeJobInstanceID(jobInstanceID string) string {
 	return id
 }
 
-// NormalizeGroupInstanceID maps SPA provisional "new" to empty group instance id
-// used by CollectActionableTaskRefs provisional spawn refs.
-func NormalizeGroupInstanceID(groupInstanceID string) string {
-	id := strings.TrimSpace(groupInstanceID)
-	if id == ProvisionalGroupInstanceID {
-		return ""
-	}
-	return id
-}
-
 // NextAdvanceTaskRef picks the first projected flat actionable Task on
-// jobInstanceID that allows advanceTarget (ADR-0006 auto-advance). Nested
-// group leaves stay overview while the group is open. Empty jobInstanceID
-// never advances.
+// jobInstanceID that allows advanceTarget (ADR-0006 auto-advance). Empty
+// jobInstanceID never advances.
 func NextAdvanceTaskRef(cfg OrgConfig, wl Worklist, jobID, jobInstanceID string) (ActionableTaskRef, bool) {
 	jobID = strings.TrimSpace(jobID)
 	jobInstanceID = strings.TrimSpace(jobInstanceID)
@@ -633,9 +392,6 @@ func NextAdvanceTaskRef(cfg OrgConfig, wl Worklist, jobID, jobInstanceID string)
 		}
 	}
 	for _, taskID := range job.TaskIDs {
-		if _, isGroup := inst.Groups[taskID]; isGroup {
-			continue
-		}
 		if inst.Tasks[taskID] != TaskStatusActionable {
 			continue
 		}
@@ -655,10 +411,8 @@ func NextAdvanceTaskRef(cfg OrgConfig, wl Worklist, jobID, jobInstanceID string)
 // scope for the viewer (same CollectActionableTaskRefs law as actionable chrome).
 func ViewerMayMountTask(cfg OrgConfig, wl Worklist, ref ActionableTaskRef) bool {
 	ref.JobInstanceID = NormalizeJobInstanceID(ref.JobInstanceID)
-	ref.GroupInstanceID = NormalizeGroupInstanceID(ref.GroupInstanceID)
 	for _, got := range CollectActionableTaskRefs(cfg, wl) {
-		if got.JobID == ref.JobID && got.TaskID == ref.TaskID && got.JobInstanceID == ref.JobInstanceID &&
-			got.GroupID == ref.GroupID && got.GroupInstanceID == ref.GroupInstanceID {
+		if got.JobID == ref.JobID && got.TaskID == ref.TaskID && got.JobInstanceID == ref.JobInstanceID {
 			return true
 		}
 	}

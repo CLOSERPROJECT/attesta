@@ -20,8 +20,7 @@ func TestFixtureIncludesLockedQrRules(t *testing.T) {
 	if rule.ID != "lot-pallet-weigh" {
 		t.Fatalf("rule id = %q", rule.ID)
 	}
-	if rule.Match.JobID != "lot_processing" || rule.Match.GroupID != "" ||
-		rule.Match.TaskID != "weigh" || rule.Match.AllowSpawn {
+	if rule.Match.JobID != "lot_processing" || rule.Match.TaskID != "weigh" {
 		t.Fatalf("match = %#v", rule.Match)
 	}
 	if rule.Seed["palletId"] == "" {
@@ -49,7 +48,7 @@ func TestResolveQROneCandidateSeedsPalletID(t *testing.T) {
 		t.Fatal("expected navigate")
 	}
 	if got.Navigate.JobID != "lot_processing" || got.Navigate.JobInstanceID != loadID ||
-		got.Navigate.GroupID != "" || got.Navigate.TaskID != "weigh" {
+		got.Navigate.TaskID != "weigh" {
 		t.Fatalf("navigate = %#v", got.Navigate)
 	}
 	if got.Seed["palletId"] != palletID {

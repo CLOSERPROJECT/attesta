@@ -211,73 +211,6 @@ describe('OrgSession', () => {
 		expect(commit).toHaveBeenCalledTimes(1);
 	});
 
-	test('spawningNew clears nested provisional draft and returns overview navigation', async () => {
-		const nextWorklist: Worklist = {
-			jobs: [
-				{
-					jobId: 'intake',
-					canStart: false,
-					repeatable: true,
-					taskIds: ['lots'],
-					tasks: [{ id: 'lots', title: 'Lotti', roles: ['administration'] }],
-					instances: [
-						{
-							id: 'T1',
-							label: 'T1',
-							tasks: { lots: 'available' },
-							groups: {
-								lots: {
-									groupId: 'lots',
-									canSpawn: true,
-									canClose: true,
-									repeatable: true,
-									childTaskIds: ['register'],
-									instances: [
-										{
-											id: 'lots-1',
-											tasks: { register: 'done' }
-										}
-									]
-								}
-							}
-						}
-					]
-				}
-			]
-		};
-		const commit = vi.fn(async () => ({
-			org: 'feragame',
-			jobInstanceId: 'T1',
-			worklist: nextWorklist,
-			navigation: 'overview' as const,
-			nextTaskFormBundle: null
-		}));
-		const session = new OrgSession({
-			load: { load: async () => sample },
-			commit: { commit },
-			hydrate: false
-		});
-		session.result = structuredClone(sample);
-		const bagKey = 'T1::lots::';
-		session.setDraft('intake/lots/new/register', bagKey, { lotId: 'L1' });
-		const outcome = await session.commit({
-			taskPath: 'intake/lots/new/register',
-			jobInstanceId: 'T1',
-			value: { lotId: 'L1' },
-			mint: { kind: 'spawningNew' },
-			draftBagInstanceKey: bagKey
-		});
-		expect(outcome?.navigation).toBe('overview');
-		expect(outcome?.jobInstanceId).toBe('T1');
-		expect(session.result?.worklist).toEqual(nextWorklist);
-		expect(session.getDraft('intake/lots/new/register', bagKey)).toBeNull();
-		expect(commit).toHaveBeenCalledWith({
-			taskPath: 'intake/lots/new/register',
-			jobInstanceId: 'T1',
-			value: { lotId: 'L1' },
-			mint: { kind: 'spawningNew' }
-		});
-	});
 
 	test('provisional startingNew clears _new draft and returns response id', async () => {
 		const commit = vi.fn(async () => ({
@@ -486,124 +419,7 @@ describe('OrgSession', () => {
 		expect(session.result?.taskFormBundles).toBe(priorBundles);
 	});
 
-	test('closeGroup success replaces Worklist and returns navigation for advance', async () => {
-		const afterClose: Worklist = {
-			jobs: [
-				{
-					jobId: 'intake',
-					canStart: false,
-					repeatable: true,
-					taskIds: ['lots', 'weightCheck'],
-					tasks: [
-						{ id: 'lots', title: 'Lotti', roles: ['administration'] },
-						{ id: 'weightCheck', title: 'Peso', roles: ['logistic'] }
-					],
-					instances: [
-						{
-							id: 'T1',
-							label: 'T1',
-							tasks: { lots: 'done', weightCheck: 'actionable' },
-							groups: {
-								lots: {
-									groupId: 'lots',
-									canSpawn: false,
-									canClose: false,
-									repeatable: true,
-									childTaskIds: ['register'],
-									instances: [
-										{
-											id: 'lots-1',
-											tasks: { register: 'done' }
-										}
-									]
-								}
-							}
-						}
-					]
-				}
-			]
-		};
-		const nextBundle: TaskFormBundle = {
-			jobId: 'intake',
-			taskId: 'weightCheck',
-			jobInstanceId: 'T1',
-			title: 'Peso',
-			surface: 'live',
-			schema: { type: 'object' },
-			uiSchema: {},
-			initialData: {},
-			chrome: [],
-			chromeFieldIds: [],
-			sealFieldIds: [],
-			bindings: { domain: {} }
-		};
-		const close = vi.fn(async () => ({
-			org: 'feragame',
-			jobInstanceId: 'T1',
-			worklist: afterClose,
-			navigation: 'task' as const,
-			nextTaskFormBundle: nextBundle
-		}));
-		const session = new OrgSession({
-			load: { load: async () => sample },
-			close: { close },
-			hydrate: false
-		});
-		session.result = structuredClone(sample);
-		const outcome = await session.closeGroup({
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots'
-		});
-		expect(outcome?.navigation).toBe('task');
-		expect(outcome?.nextTaskFormBundle?.taskId).toBe('weightCheck');
-		expect(session.result?.worklist).toEqual(afterClose);
-		expect(session.result?.worklist.jobs[0]?.instances[0]?.tasks.weightCheck).toBe(
-			'actionable'
-		);
-		expect(session.commitError).toBeNull();
-		expect(close).toHaveBeenCalledWith({
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots'
-		});
-	});
 
-	test('closeGroup failure keeps board, re-Loads, and preserves stay links', async () => {
-		const reloaded = structuredClone(sample);
-		const load = vi.fn(async () => reloaded);
-		const close = vi.fn(async () => {
-			throw new CommitDomainError('cannot close', 400);
-		});
-		const session = new OrgSession({
-			load: { load },
-			close: { close },
-			hydrate: false
-		});
-		session.result = structuredClone(sample);
-		const stayLinks = [
-			{
-				label: 'Labels',
-				url: 'https://example.test/labels.pdf',
-				action: 'download' as const,
-				filename: 'labels.pdf'
-			}
-		];
-		session.lastHttpLinks = stayLinks;
-		session.lastHttpErrors = [];
-		session.linksStayActive = true;
-		const outcome = await session.closeGroup({
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots'
-		});
-		expect(outcome).toBeNull();
-		expect(session.commitError).toBe('cannot close');
-		expect(session.linksStayActive).toBe(true);
-		expect(session.lastHttpLinks).toEqual(stayLinks);
-		expect(load).toHaveBeenCalledOnce();
-		expect(session.result?.worklist).toEqual(reloaded.worklist);
-	});
 
 	test('commit denial keeps Draft and re-Loads Worklist', async () => {
 		const reloaded = structuredClone(sample);
@@ -863,7 +679,52 @@ describe('OrgSession', () => {
 		expect(readStoredDraft(storage, otherKey)).toEqual({ client: 'untouched' });
 	});
 
-	test('draftAddressForTask mark binding matches hasDirtyDraft for flat and provisional', () => {
+	test('session has no Spawn/Close surface (incl. stay-after-Commit)', async () => {
+		const absent = [
+			'closeGroup',
+			'closePort',
+			'spawnGroup',
+			'spawnPort',
+			'canSpawn',
+			'canClose'
+		] as const;
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			worklist: sample.worklist,
+			navigation: 'stay' as const,
+			continueNavigation: 'overview' as const,
+			nextTaskFormBundle: null,
+			links: []
+		}));
+		const session = new OrgSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false,
+			storage: null,
+			flushOnHide: false
+		});
+		session.result = structuredClone(sample);
+		for (const key of absent) {
+			expect(session).not.toHaveProperty(key);
+		}
+		const outcome = await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: {},
+			mint: { kind: 'none' }
+		});
+		expect(outcome?.navigation).toBe('stay');
+		expect(session.linksStayActive).toBe(true);
+		for (const key of absent) {
+			expect(session).not.toHaveProperty(key);
+		}
+		expect(JSON.stringify(session.result?.worklist)).not.toMatch(
+			/canSpawn|canClose|"groups"|spawnGroup|closeGroup/
+		);
+	});
+
+	test('draftAddressForTask mark binding matches hasDirtyDraft for flat and provisional Start', () => {
 		const session = new OrgSession({
 			load: { load: async () => sample },
 			hydrate: false,
@@ -881,17 +742,13 @@ describe('OrgSession', () => {
 		const provisional = draftAddressForTask({
 			jobId: 'intake',
 			taskId: 'register',
-			jobInstanceId: 'T1',
-			groupId: 'lots',
-			groupInstanceId: 'new'
+			jobInstanceId: ''
 		});
-		expect(provisional.taskPath).toBe('intake/lots/new/register');
-		expect(provisional.draftBagInstanceKey).toBe('T1::lots::');
-		session.setDraft(
-			provisional.taskPath,
-			provisional.draftBagInstanceKey,
-			{ lotId: 'L1' }
-		);
+		expect(provisional.taskPath).toBe('intake/register');
+		expect(provisional.draftBagInstanceKey).toBe('');
+		session.setDraft(provisional.taskPath, provisional.draftBagInstanceKey, {
+			client: 'NO'
+		});
 		expect(
 			session.hasDirtyDraft(provisional.taskPath, provisional.draftBagInstanceKey)
 		).toBe(true);

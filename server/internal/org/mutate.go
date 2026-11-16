@@ -31,8 +31,6 @@ type MutateRequest struct {
 	JobID            string
 	TaskID           string
 	JobInstanceID    string
-	GroupID          string
-	GroupInstanceID  string
 	Facts            map[string]any
 	Ops              []MutateOp
 	Timestamp        string
@@ -92,15 +90,13 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 			return Domain{}, fmt.Errorf("org: userId required when appending a Submission")
 		}
 		sub := Submission{
-			JobID:           req.JobID,
-			TaskID:          req.TaskID,
-			JobInstanceID:   req.JobInstanceID,
-			GroupID:         req.GroupID,
-			GroupInstanceID: req.GroupInstanceID,
-			Timestamp:       req.Timestamp,
-			UserID:          req.UserID,
-			Facts:           cloneFacts(req.Facts),
-			IDsTouched:      idsTouched,
+			JobID:         req.JobID,
+			TaskID:        req.TaskID,
+			JobInstanceID: req.JobInstanceID,
+			Timestamp:     req.Timestamp,
+			UserID:        req.UserID,
+			Facts:         cloneFacts(req.Facts),
+			IDsTouched:    idsTouched,
 		}
 		next.Submissions = append(next.Submissions, sub)
 	}

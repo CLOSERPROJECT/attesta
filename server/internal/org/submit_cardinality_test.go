@@ -105,7 +105,7 @@ func TestValidateTaskSubmitCardinality(t *testing.T) {
 			"submit": "many",
 			"tasks":  []TaskConfig{{"id": "child"}},
 		},
-	}); err == nil || !strings.Contains(err.Error(), "group must not declare submit") {
+	}); err == nil || !strings.Contains(err.Error(), "not supported") {
 		t.Fatalf("group submit err = %v", err)
 	}
 }
@@ -217,76 +217,6 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 	inst = wl.Jobs[0].Instances[0]
 	if inst.SubmissionCounts["start"] != 1 || inst.SubmissionCounts["repeat"] != 3 {
 		t.Fatalf("N many: counts = %#v, want start=1 repeat=3", inst.SubmissionCounts)
-	}
-
-	// Nested group leaf: same taskId under group must not inflate flat counts.
-	domain.Submissions = append(domain.Submissions, Submission{
-		JobID: "session", TaskID: "repeat", JobInstanceID: "S1",
-		GroupID: "g", GroupInstanceID: "g1",
-	})
-	wl = ProjectWorklist(cfg, domain, op)
-	inst = wl.Jobs[0].Instances[0]
-	if inst.SubmissionCounts["repeat"] != 3 {
-		t.Fatalf("nested must not count on flat: %#v", inst.SubmissionCounts)
-	}
-}
-
-func TestProjectWorklistGroupSubmissionCounts(t *testing.T) {
-	lots := TaskConfig{
-		"id":         "lots",
-		"kind":       "group",
-		"repeatable": true,
-		"tasks": []TaskConfig{
-			{"id": "register", "roles": []any{"operator"}, "schema": map[string]any{"title": "Register"}},
-		},
-	}
-	cfg := OrgConfig{
-		Jobs: OrderedObject{
-			Keys: []string{"intake"},
-			Values: map[string]any{
-				"intake": Job{
-					Repeatable: true,
-					Tasks: []TaskConfig{
-						{"id": "truckArrive", "roles": []any{"operator"}, "schema": map[string]any{"title": "Arrive"}},
-						lots,
-					},
-				},
-			},
-		},
-	}
-	op := OperatorIdentity{UserID: "ada", Org: "test", Roles: []string{"operator"}}
-	domain := EmptyDomain()
-	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "truck"}}
-	domain.GroupInstances = []GroupInstance{{JobID: "intake", JobInstanceID: "T1", GroupID: "lots", ID: "L1"}}
-	domain.Submissions = []Submission{sub("intake", "truckArrive", "T1")}
-
-	wl := ProjectWorklist(cfg, domain, op)
-	g := wl.Jobs[0].Instances[0].Groups["lots"]
-	if len(g.Instances) != 1 || len(g.Instances[0].SubmissionCounts) != 0 {
-		t.Fatalf("0 group child: %#v", g.Instances)
-	}
-
-	domain.Submissions = append(domain.Submissions, Submission{
-		JobID: "intake", TaskID: "register", JobInstanceID: "T1",
-		GroupID: "lots", GroupInstanceID: "L1",
-	})
-	wl = ProjectWorklist(cfg, domain, op)
-	g = wl.Jobs[0].Instances[0].Groups["lots"]
-	if g.Instances[0].SubmissionCounts["register"] != 1 {
-		t.Fatalf("1 group child: %#v", g.Instances[0].SubmissionCounts)
-	}
-
-	domain.Submissions = append(domain.Submissions,
-		Submission{JobID: "intake", TaskID: "register", JobInstanceID: "T1", GroupID: "lots", GroupInstanceID: "L1"},
-		Submission{JobID: "intake", TaskID: "register", JobInstanceID: "T1", GroupID: "lots", GroupInstanceID: "L1"},
-	)
-	wl = ProjectWorklist(cfg, domain, op)
-	g = wl.Jobs[0].Instances[0].Groups["lots"]
-	if g.Instances[0].SubmissionCounts["register"] != 3 {
-		t.Fatalf("N group child: %#v", g.Instances[0].SubmissionCounts)
-	}
-	if flat := wl.Jobs[0].Instances[0].SubmissionCounts["register"]; flat != 0 {
-		t.Fatalf("nested must not appear on flat counts: %#v", wl.Jobs[0].Instances[0].SubmissionCounts)
 	}
 }
 

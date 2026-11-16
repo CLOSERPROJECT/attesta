@@ -454,14 +454,6 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	}
 }
 
-func hasNestedActionableRef(refs []ActionableTaskRef, jobID, groupID, jobInstanceID, taskID string) bool {
-	for _, r := range refs {
-		if r.JobID == jobID && r.GroupID == groupID && r.JobInstanceID == jobInstanceID && r.TaskID == taskID {
-			return true
-		}
-	}
-	return false
-}
 
 func TestSeedDemoWipeRequiresDomainStore(t *testing.T) {
 	_, err := SeedDemo(t.Context(), nil, NewMemoryConfigStore(), SeedOptions{WipeDomain: true})

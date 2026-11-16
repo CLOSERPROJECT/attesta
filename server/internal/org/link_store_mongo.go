@@ -25,15 +25,13 @@ func NewMongoLinkStore(db *mongo.Database) *MongoLinkStore {
 }
 
 type mongoSubmissionLinksDoc struct {
-	ID              string         `bson:"_id"`
-	Org             string         `bson:"org"`
-	JobID           string         `bson:"jobId"`
-	JobInstanceID   string         `bson:"jobInstanceId"`
-	TaskID          string         `bson:"taskId"`
-	GroupID         string         `bson:"groupId,omitempty"`
-	GroupInstanceID string         `bson:"groupInstanceId,omitempty"`
-	Timestamp       string         `bson:"timestamp"`
-	Links           []HttpLinkItem `bson:"links"`
+	ID            string         `bson:"_id"`
+	Org           string         `bson:"org"`
+	JobID         string         `bson:"jobId"`
+	JobInstanceID string         `bson:"jobInstanceId"`
+	TaskID        string         `bson:"taskId"`
+	Timestamp     string         `bson:"timestamp"`
+	Links         []HttpLinkItem `bson:"links"`
 }
 
 func (s *MongoLinkStore) coll() *mongo.Collection {
@@ -49,15 +47,13 @@ func (s *MongoLinkStore) Put(ctx context.Context, org string, addr SubmissionAdd
 	org = strings.TrimSpace(org)
 	timestamp = strings.TrimSpace(timestamp)
 	doc := mongoSubmissionLinksDoc{
-		ID:              key,
-		Org:             org,
-		JobID:           addr.JobID,
-		JobInstanceID:   addr.JobInstanceID,
-		TaskID:          addr.TaskID,
-		GroupID:         addr.GroupID,
-		GroupInstanceID: addr.GroupInstanceID,
-		Timestamp:       timestamp,
-		Links:           cloneHTTPLinks(links),
+		ID:            key,
+		Org:           org,
+		JobID:         addr.JobID,
+		JobInstanceID: addr.JobInstanceID,
+		TaskID:        addr.TaskID,
+		Timestamp:     timestamp,
+		Links:         cloneHTTPLinks(links),
 	}
 	if doc.Links == nil {
 		doc.Links = []HttpLinkItem{}

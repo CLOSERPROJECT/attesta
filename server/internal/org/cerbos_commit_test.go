@@ -133,7 +133,7 @@ func TestCommitLotRegisterAllowedViaCerbosInUnlockOrder(t *testing.T) {
 		t.Fatalf("domain = %#v", result.Domain.Kind("lot")[loadID])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || last.GroupID != "" {
+	if last.TaskID != "register" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }

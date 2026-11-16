@@ -7,7 +7,7 @@ multi-pass same-form work: those are the same form submitted repeatedly while
 Domain still has eligible subjects. Worklist **`done`** remains Submission law
 for `once` only; `many` never becomes `done` from a single Commit. When Domain
 already holds the prerequisite, author **`readyWhen`** and omit **`unlockFrom`**
-(engine keeps Unlock for now).
+(engine keeps Unlock for flat sibling graphs).
 
 **Amends [ADR-0005](0005-org-worklist-server-projection.md):** “A Task is
 `done` after Submission on the instance” holds only for `submit: once` (omit ⇒
@@ -29,6 +29,7 @@ without a fixed Unlock chain. Plant mid-states (if any) are Config payload—see
 [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md).
 
 **Consequences:** Config schema gains `submit`; Worklist/Commit/Cerbos honor
-many-submit. Task-group engine code may remain until a later removal pass. Demo
-plant (Feragame) flattens groups, prefers `readyWhen`, and authors lot session /
-entity renames in fixture payload—illustration, not this Decision.
+many-submit. Task-group engine, Close API, and `spawningNew` mint are removed
+(Config rejects `kind:group`). Demo plant (Feragame) flattens groups, prefers
+`readyWhen`, and authors lot session / entity renames in fixture
+payload—illustration, not this Decision.

@@ -1,5 +1,4 @@
 import { navigate, p } from './index.js';
-import { PROVISIONAL_GROUP_INSTANCE_ID } from '../org/types.js';
 import type { PostCommitTarget } from '../org/worklist-nav.js';
 
 /** Resolve ADR-0006 target to an href for `<a>` / Button `href` navigation. */
@@ -15,17 +14,6 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 			params: {
 				jobId: target.jobId,
 				jobInstanceId: target.jobInstanceId
-			}
-		});
-	}
-	if (target.groupId) {
-		return p('/:jobId/:jobInstanceId/:groupId/:groupInstanceId/:taskId', {
-			params: {
-				jobId: target.jobId,
-				jobInstanceId: target.jobInstanceId,
-				groupId: target.groupId,
-				groupInstanceId: target.groupInstanceId || PROVISIONAL_GROUP_INSTANCE_ID,
-				taskId: target.taskId
 			}
 		});
 	}
@@ -53,18 +41,6 @@ export function navigateOrgTarget(target: PostCommitTarget): void {
 			params: {
 				jobId: target.jobId,
 				jobInstanceId: target.jobInstanceId
-			}
-		});
-		return;
-	}
-	if (target.groupId) {
-		void navigate('/:jobId/:jobInstanceId/:groupId/:groupInstanceId/:taskId', {
-			params: {
-				jobId: target.jobId,
-				jobInstanceId: target.jobInstanceId,
-				groupId: target.groupId,
-				groupInstanceId: target.groupInstanceId || PROVISIONAL_GROUP_INSTANCE_ID,
-				taskId: target.taskId
 			}
 		});
 		return;

@@ -22,12 +22,6 @@ function taskRecapUrl(base: string, req: TaskRecapRequest): string {
 		taskId: req.taskId,
 		jobInstanceId: req.jobInstanceId
 	});
-	if (req.groupId) {
-		params.set('groupId', req.groupId);
-	}
-	if (req.groupInstanceId !== undefined && req.groupId) {
-		params.set('groupInstanceId', req.groupInstanceId);
-	}
 	return `${base}/api/org/task-recap?${params}`;
 }
 
@@ -64,8 +58,6 @@ function parseTaskRecap(raw: unknown): TaskRecap {
 		jobId: typeof body.jobId === 'string' ? body.jobId : '',
 		jobInstanceId: typeof body.jobInstanceId === 'string' ? body.jobInstanceId : '',
 		taskId: typeof body.taskId === 'string' ? body.taskId : '',
-		groupId: typeof body.groupId === 'string' ? body.groupId : undefined,
-		groupInstanceId: typeof body.groupInstanceId === 'string' ? body.groupInstanceId : undefined,
 		timestamp: typeof body.timestamp === 'string' ? body.timestamp : '',
 		userId: typeof body.userId === 'string' ? body.userId : '',
 		facts,

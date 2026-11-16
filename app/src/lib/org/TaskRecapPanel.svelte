@@ -26,13 +26,7 @@
 	let fetchedKey = $state.raw('');
 
 	const requestKey = $derived(
-		[
-			request.jobId,
-			request.jobInstanceId,
-			request.taskId,
-			request.groupId ?? '',
-			request.groupInstanceId ?? ''
-		].join(':')
+		[request.jobId, request.jobInstanceId, request.taskId].join(':')
 	);
 
 	$effect(() => {

@@ -195,34 +195,6 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.continueNavigation).toBe('home');
 	});
 
-	test('spawningNew mint posts nested taskPath with real jobInstanceId', async () => {
-		const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-			expect(JSON.parse(String(init?.body))).toEqual({
-				taskPath: 'intake/lots/new/register',
-				jobInstanceId: 'T1',
-				value: { lotId: 'L1' },
-				mint: { kind: 'spawningNew' }
-			});
-			return new Response(
-				JSON.stringify({
-					...sampleResult,
-					jobInstanceId: 'T1',
-					navigation: 'overview',
-					nextTaskFormBundle: null
-				}),
-				{ status: 200, headers: { 'Content-Type': 'application/json' } }
-			);
-		});
-		const port = createHttpCommitDomainPort({ fetch: fetchFn });
-		const got = await port.commit({
-			taskPath: 'intake/lots/new/register',
-			jobInstanceId: 'T1',
-			value: { lotId: 'L1' },
-			mint: { kind: 'spawningNew' }
-		});
-		expect(got.navigation).toBe('home');
-	});
-
 	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {
 		const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
 			expect(JSON.parse(String(init?.body))).toEqual({

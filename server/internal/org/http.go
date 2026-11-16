@@ -40,8 +40,6 @@ func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleTaskRecap(w, r)
 	case path == "/api/org/commit":
 		h.handleCommit(w, r)
-	case path == "/api/org/close":
-		h.handleClose(w, r)
 	case path == "/api/org/qr-resolve":
 		h.handleQrResolve(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
@@ -114,14 +112,12 @@ func (h *API) handleTaskForm(w http.ResponseWriter, r *http.Request) {
 	jobID := strings.TrimSpace(q.Get("jobId"))
 	taskID := strings.TrimSpace(q.Get("taskId"))
 	jobInstanceID := q.Get("jobInstanceId")
-	groupID := strings.TrimSpace(q.Get("groupId"))
-	groupInstanceID := q.Get("groupInstanceId")
 	if jobID == "" || taskID == "" {
 		http.Error(w, "jobId and taskId required", http.StatusBadRequest)
 		return
 	}
 
-	bundle, err := h.DomainLoader.LoadTaskBundle(r.Context(), org, op, jobID, taskID, jobInstanceID, groupID, groupInstanceID)
+	bundle, err := h.DomainLoader.LoadTaskBundle(r.Context(), org, op, jobID, taskID, jobInstanceID)
 	if err != nil {
 		if errors.Is(err, ErrTaskBundleForbidden) {
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -165,18 +161,12 @@ func (h *API) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	addr := SubmissionAddress{
-		JobID:           strings.TrimSpace(q.Get("jobId")),
-		JobInstanceID:   strings.TrimSpace(q.Get("jobInstanceId")),
-		TaskID:          strings.TrimSpace(q.Get("taskId")),
-		GroupID:         strings.TrimSpace(q.Get("groupId")),
-		GroupInstanceID: strings.TrimSpace(q.Get("groupInstanceId")),
+		JobID:         strings.TrimSpace(q.Get("jobId")),
+		JobInstanceID: strings.TrimSpace(q.Get("jobInstanceId")),
+		TaskID:        strings.TrimSpace(q.Get("taskId")),
 	}
 	if addr.JobID == "" || addr.TaskID == "" || addr.JobInstanceID == "" {
 		http.Error(w, "jobId, jobInstanceId, and taskId required", http.StatusBadRequest)
-		return
-	}
-	if (addr.GroupID == "") != (addr.GroupInstanceID == "") {
-		http.Error(w, "groupId and groupInstanceId must both be set or both omitted", http.StatusBadRequest)
 		return
 	}
 
@@ -217,26 +207,6 @@ func (h *API) handleCommit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.TaskCommitter.Commit(r.Context(), org, op, req)
-	if err != nil {
-		writeCommitError(w, err)
-		return
-	}
-	writeCommitResult(w, result)
-}
-
-func (h *API) handleClose(w http.ResponseWriter, r *http.Request) {
-	op, org, body, ok := h.preparePOSTAuth(w, r, "org close not configured", h.TaskCommitter != nil)
-	if !ok {
-		return
-	}
-
-	var req CloseGroupRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
-		return
-	}
-
-	result, err := h.TaskCommitter.CloseGroup(r.Context(), org, op, req)
 	if err != nil {
 		writeCommitError(w, err)
 		return
@@ -389,7 +359,7 @@ func writeCommitError(w http.ResponseWriter, err error) {
 		switch ce.Kind {
 		case "unauthorized":
 			http.Error(w, "forbidden", http.StatusForbidden)
-		case "unknown-target", "prep", "missing-child-submission":
+		case "unknown-target", "prep":
 			http.Error(w, ce.Message, http.StatusBadRequest)
 		case "forbidden":
 			http.Error(w, ce.Message, http.StatusForbidden)

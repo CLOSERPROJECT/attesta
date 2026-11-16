@@ -4,48 +4,10 @@ import type {
 	TaskStatus,
 	TaskSubmit,
 	Worklist,
-	WorklistGroup,
-	WorklistGroupInstance,
 	WorklistInstance,
 	WorklistJob
 } from './types.js';
 import { worklistJobFor } from './types.js';
-
-export type OverviewGroupChrome = {
-	canSpawn: boolean;
-	startLabel: string;
-	firstChildTaskId: string;
-	canClose: boolean;
-	closeLabel: string;
-};
-
-export type OverviewChildTaskRow = {
-	taskId: string;
-	title: string;
-	status: TaskStatus;
-	linkable: boolean;
-	/** Config submit cardinality; many-submit history chrome reads this. */
-	submit?: TaskSubmit;
-	/** Domain Submission N when `submit === 'many'` (from Worklist counts). */
-	submissionCount?: number;
-};
-
-export type OverviewGroupInstanceRow = {
-	id: string;
-	/** Projected lot id when present; else group instance id. */
-	displayId: string;
-	status: TaskStatus;
-	/**
-	 * Nested child Task rows when the group has 2+ children.
-	 * Empty when `flatChild` is set (single-child flatten).
-	 */
-	children: OverviewChildTaskRow[];
-	/**
-	 * When the Task group has exactly one child Task, the occurrence presents
-	 * that child's interaction directly (title stays `displayId`).
-	 */
-	flatChild?: OverviewChildTaskRow;
-};
 
 export type OverviewTaskRow = {
 	taskId: string;
@@ -58,9 +20,6 @@ export type OverviewTaskRow = {
 	submit?: TaskSubmit;
 	/** Domain Submission N when `submit === 'many'` (from Worklist counts). */
 	submissionCount?: number;
-	/** Present when this Config node is a Task group (Spawn/Close chrome; not a leaf). */
-	group?: OverviewGroupChrome;
-	groupInstances?: OverviewGroupInstanceRow[];
 };
 
 export type JobInstanceOverviewModel = {
@@ -90,41 +49,11 @@ function taskChrome(job: WorklistJob, taskId: string) {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
 }
 
-function groupChrome(
-	group: WorklistGroup | undefined,
-	chromeTitle: string
-): OverviewGroupChrome | undefined {
-	if (!group) return undefined;
-	const firstChildTaskId = group.childTaskIds?.[0] ?? '';
-	return {
-		canSpawn: Boolean(group.canSpawn && firstChildTaskId),
-		startLabel: group.startLabel?.trim() || chromeTitle || m.fallback_spawn(),
-		firstChildTaskId,
-		canClose: Boolean(group.canClose),
-		closeLabel: group.closeLabel?.trim() || m.fallback_close()
-	};
-}
-
-export function aggregateGroupInstanceStatus(
-	instance: WorklistGroupInstance,
-	childTaskIds?: string[]
-): TaskStatus {
-	const ids =
-		childTaskIds && childTaskIds.length > 0
-			? childTaskIds
-			: Object.keys(instance.tasks);
-	const statuses = ids.map((id) => (instance.tasks[id] ?? 'locked') as TaskStatus);
-	if (statuses.some((s) => s === 'actionable')) return 'actionable';
-	if (statuses.some((s) => s === 'available')) return 'available';
-	if (statuses.length > 0 && statuses.every((s) => s === 'done')) return 'done';
-	return 'locked';
-}
-
 function manySubmitFields(
 	chromeSubmit: TaskSubmit | undefined,
 	counts: Record<string, number> | undefined,
 	taskId: string
-): Pick<OverviewChildTaskRow, 'submit' | 'submissionCount'> {
+): Pick<OverviewTaskRow, 'submit' | 'submissionCount'> {
 	if (chromeSubmit !== 'many') return {};
 	return {
 		submit: 'many',
@@ -143,52 +72,6 @@ export function manySubmitHistoryVisible(
 export function formatSubmissionCount(count: number): string {
 	if (count === 1) return m.submission_count_one({ count });
 	return m.submission_count_many({ count });
-}
-
-function projectChildTasks(
-	job: WorklistJob,
-	instance: WorklistGroupInstance,
-	childTaskIds: string[]
-): OverviewChildTaskRow[] {
-	return childTaskIds.map((taskId) => {
-		const chrome = taskChrome(job, taskId);
-		const status = (instance.tasks[taskId] ?? 'locked') as TaskStatus;
-		return {
-			taskId,
-			title: chrome?.title || taskId,
-			status,
-			linkable: status === 'actionable',
-			...manySubmitFields(chrome?.submit, instance.submissionCounts, taskId)
-		};
-	});
-}
-
-function projectGroupInstances(
-	job: WorklistJob,
-	group: WorklistGroup | undefined
-): OverviewGroupInstanceRow[] | undefined {
-	if (!group) return undefined;
-	const childTaskIds = group.childTaskIds ?? [];
-	const singleChild = childTaskIds.length === 1;
-	return group.instances.map((gi) => {
-		const children = projectChildTasks(job, gi, childTaskIds);
-		const status = aggregateGroupInstanceStatus(gi, childTaskIds);
-		if (singleChild) {
-			return {
-				id: gi.id,
-				displayId: gi.label || gi.id,
-				status,
-				children: [],
-				flatChild: children[0]
-			};
-		}
-		return {
-			id: gi.id,
-			displayId: gi.label || gi.id,
-			status,
-			children
-		};
-	});
 }
 
 export function taskStatusLabel(status: TaskStatus): string {
@@ -217,40 +100,6 @@ export function formatFactValue(value: unknown): string {
 	}
 }
 
-/**
- * When Spawn is offered and the provisional first-child Draft is dirty, overview
- * paints a linkable task row (groupInstanceId `new`) instead of the Spawn CTA.
- */
-export function provisionalSpawnDraftRowVisible(
-	group: OverviewGroupChrome | undefined,
-	provisionalFirstChildDirty: boolean
-): boolean {
-	return Boolean(
-		group?.canSpawn && group.firstChildTaskId && provisionalFirstChildDirty
-	);
-}
-
-/**
- * Open-group Spawn/Close chrome for post-submit links loop (ticket 05).
- * Null when the group is missing on the Worklist instance.
- */
-export function openGroupLoopChrome(
-	worklist: Worklist | null | undefined,
-	jobId: string,
-	jobInstanceId: string,
-	groupId: string
-): OverviewGroupChrome | null {
-	if (!jobId || !jobInstanceId || !groupId) return null;
-	const job = worklistJobFor(worklist, jobId);
-	if (!job) return null;
-	const inst = instanceFor(job, jobInstanceId);
-	if (!inst) return null;
-	const chrome = taskChrome(job, groupId);
-	return (
-		groupChrome(inst.groups?.[groupId], chrome?.title || groupId) ?? null
-	);
-}
-
 export function jobInstanceOverview(
 	worklist: Worklist | null | undefined,
 	jobId: string,
@@ -269,21 +118,14 @@ export function jobInstanceOverview(
 		const chrome = taskChrome(job, taskId);
 		const roles = chrome?.roles ?? [];
 		const status = (inst.tasks[taskId] ?? 'locked') as TaskStatus;
-		const worklistGroup = inst.groups?.[taskId];
-		const group = groupChrome(worklistGroup, chrome?.title || taskId);
-		const groupInstances = projectGroupInstances(job, worklistGroup);
-		const linkable = group ? false : status === 'actionable';
+		const linkable = status === 'actionable';
 		const row: OverviewTaskRow = {
 			taskId,
 			title: chrome?.title || taskId,
 			status,
 			roles,
 			linkable,
-			...(group
-				? {}
-				: manySubmitFields(chrome?.submit, inst.submissionCounts, taskId)),
-			...(group ? { group } : {}),
-			...(groupInstances ? { groupInstances } : {})
+			...manySubmitFields(chrome?.submit, inst.submissionCounts, taskId)
 		};
 		tasks.push(row);
 		if (firstOpen == null && (status === 'available' || status === 'actionable')) {
@@ -291,13 +133,9 @@ export function jobInstanceOverview(
 		}
 	}
 
-	// "Next" = first unlocked leaf/group in Config order; handoff when that Task is not ours.
+	// "Next" = first unlocked leaf in Config order; handoff when that Task is not ours.
 	const handoffRoles =
-		firstOpen &&
-		!firstOpen.linkable &&
-		!firstOpen.group?.canSpawn &&
-		!firstOpen.group?.canClose &&
-		firstOpen.roles.length > 0
+		firstOpen && !firstOpen.linkable && firstOpen.roles.length > 0
 			? [...firstOpen.roles]
 			: null;
 

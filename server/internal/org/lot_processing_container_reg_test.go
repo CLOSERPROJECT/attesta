@@ -79,7 +79,7 @@ func TestCommitContainerRegMintsContainersLeavesLotOpen(t *testing.T) {
 		t.Fatal("expected containers")
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "containerReg" || last.GroupID != "" || last.JobInstanceID != lotID {
+	if last.TaskID != "containerReg" || last.JobInstanceID != lotID {
 		t.Fatalf("submission = %#v", last)
 	}
 }
@@ -124,7 +124,7 @@ func TestContainerRegIncompleteContinuationPrefill(t *testing.T) {
 		t.Fatal("expected incomplete container")
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "lot_processing", "containerReg", lotID, "", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "lot_processing", "containerReg", lotID)
 	if err != nil {
 		t.Fatal(err)
 	}

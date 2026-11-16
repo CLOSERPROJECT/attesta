@@ -7,11 +7,7 @@ export type EntityMap = Record<string, EntityFacts>;
 export type Submission = {
 	jobId?: string;
 	taskId?: string;
-	/** Experiment legacy keys still present on some fixtures/tests. */
-	stepId?: string;
-	substepId?: string;
 	jobInstanceId?: string;
-	stepInstanceId?: string;
 	timestamp?: string;
 	userId?: string;
 	facts: Record<string, unknown>;

@@ -12,14 +12,12 @@ import (
 // plus any post-Commit links side record. No schema, uiSchema, or Domain —
 // only optional property titles from Active Org Config.
 type TaskRecap struct {
-	JobID           string            `json:"jobId"`
-	JobInstanceID   string            `json:"jobInstanceId"`
-	TaskID          string            `json:"taskId"`
-	GroupID         string            `json:"groupId,omitempty"`
-	GroupInstanceID string            `json:"groupInstanceId,omitempty"`
-	Timestamp       string            `json:"timestamp"`
-	UserID          string            `json:"userId"`
-	Facts           map[string]any    `json:"facts"`
+	JobID         string         `json:"jobId"`
+	JobInstanceID string         `json:"jobInstanceId"`
+	TaskID        string         `json:"taskId"`
+	Timestamp     string         `json:"timestamp"`
+	UserID        string         `json:"userId"`
+	Facts         map[string]any `json:"facts"`
 	// Titles maps authored property keys → schema title (Italian plant copy).
 	// Omitted keys fall back to the raw fact key in the SPA.
 	Titles map[string]string `json:"titles,omitempty"`
@@ -73,15 +71,13 @@ func (l *DomainLoader) LoadTaskRecap(
 	items := make([]TaskRecap, 0, len(matched))
 	for _, sub := range matched {
 		recap := TaskRecap{
-			JobID:           sub.JobID,
-			JobInstanceID:   sub.JobInstanceID,
-			TaskID:          sub.TaskID,
-			GroupID:         sub.GroupID,
-			GroupInstanceID: sub.GroupInstanceID,
-			Timestamp:       sub.Timestamp,
-			UserID:          sub.UserID,
-			Facts:           cloneFacts(sub.Facts),
-			Titles:          titles,
+			JobID:         sub.JobID,
+			JobInstanceID: sub.JobInstanceID,
+			TaskID:        sub.TaskID,
+			Timestamp:     sub.Timestamp,
+			UserID:        sub.UserID,
+			Facts:         cloneFacts(sub.Facts),
+			Titles:        titles,
 		}
 		if l.LinkStore != nil {
 			links, err := l.LinkStore.Get(ctx, org, addr, sub.Timestamp)
@@ -119,12 +115,7 @@ func (l *DomainLoader) factTitlesFromConfig(ctx context.Context, org string, add
 	if !ok {
 		return nil
 	}
-	leaf, ok := LeafTaskByPath(job.Tasks, TaskPathRef{
-		JobID:           addr.JobID,
-		GroupID:         addr.GroupID,
-		GroupInstanceID: addr.GroupInstanceID,
-		TaskID:          addr.TaskID,
-	})
+	leaf, ok := TaskByID(job.Tasks, addr.TaskID)
 	if !ok {
 		return nil
 	}
@@ -165,9 +156,7 @@ func submissionsMatching(subs []Submission, addr SubmissionAddress) []Submission
 	for _, s := range subs {
 		if s.JobID == addr.JobID &&
 			s.TaskID == addr.TaskID &&
-			s.JobInstanceID == addr.JobInstanceID &&
-			s.GroupID == addr.GroupID &&
-			s.GroupInstanceID == addr.GroupInstanceID {
+			s.JobInstanceID == addr.JobInstanceID {
 			out = append(out, s)
 		}
 	}

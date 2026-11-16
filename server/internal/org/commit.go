@@ -8,13 +8,12 @@ import (
 	"time"
 )
 
-// MintKind selects Job-instance or group-instance mint behavior on Commit.
+// MintKind selects Job-instance mint behavior on Commit.
 type MintKind string
 
 const (
 	MintKindNone        MintKind = "none"
 	MintKindStartingNew MintKind = "startingNew"
-	MintKindSpawningNew MintKind = "spawningNew"
 )
 
 // CommitMint is the Commit wire mint knob (omit → none).
@@ -39,10 +38,6 @@ func (req CommitRequest) mintKind() MintKind {
 
 func startingNewMint() *CommitMint {
 	return &CommitMint{Kind: MintKindStartingNew}
-}
-
-func spawningNewMint() *CommitMint {
-	return &CommitMint{Kind: MintKindSpawningNew}
 }
 
 // CommitNext is the ADR-0006 post-Commit destination (SPA navigates; does not re-derive).
@@ -122,9 +117,9 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	}
 	mintKind := req.mintKind()
 	switch mintKind {
-	case MintKindNone, MintKindStartingNew, MintKindSpawningNew:
+	case MintKindNone, MintKindStartingNew:
 	default:
-		return CommitResult{}, &CommitError{Kind: "prep", Message: "mint.kind must be startingNew, spawningNew, or none"}
+		return CommitResult{}, &CommitError{Kind: "prep", Message: "mint.kind must be startingNew or none"}
 	}
 	jobInstanceID := strings.TrimSpace(req.JobInstanceID)
 	if jobInstanceID == "_new" {
@@ -135,33 +130,11 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	}
 	switch mintKind {
 	case MintKindStartingNew:
-		if ref.Nested() {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: "mint.startingNew is for Job instances; use mint.spawningNew for groups"}
-		}
 		// Client id is ignored; authorize/Unlock with empty instance (first Task only).
 		jobInstanceID = ""
-	case MintKindSpawningNew:
-		if !ref.Nested() {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: "mint.spawningNew requires a nested task path"}
-		}
-		if jobInstanceID == "" {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: "jobInstanceId required to spawn a group instance"}
-		}
-		if ref.GroupInstanceID != ProvisionalGroupInstanceID {
-			return CommitResult{}, &CommitError{
-				Kind:    "prep",
-				Message: "mint.spawningNew requires group instance id " + ProvisionalGroupInstanceID + " in the task path",
-			}
-		}
 	case MintKindNone:
 		if jobInstanceID == "" {
 			return CommitResult{}, &CommitError{Kind: "prep", Message: "jobInstanceId required"}
-		}
-		if ref.Nested() && (ref.GroupInstanceID == "" || ref.GroupInstanceID == ProvisionalGroupInstanceID) {
-			return CommitResult{}, &CommitError{
-				Kind:    "prep",
-				Message: "nested commit requires a real groupInstanceId; use mint.spawningNew with " + ProvisionalGroupInstanceID,
-			}
 		}
 	}
 	if req.Value == nil {
@@ -201,10 +174,6 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 		domain = EmptyDomain()
 	}
 
-	authRef := ref
-	if mintKind == MintKindSpawningNew {
-		authRef.GroupInstanceID = ProvisionalGroupInstanceID
-	}
 	allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 		Operator:      op,
 		Org:           org,
@@ -213,7 +182,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 		TaskID:        ref.TaskID,
 		JobInstanceID: jobInstanceID,
 		RolesAllowed:  rolesAllowedForPath(cfg, ref),
-		SequenceOk:    sequenceOkForPath(cfg, domain, authRef, jobInstanceID),
+		SequenceOk:    sequenceOkForPath(cfg, domain, ref, jobInstanceID),
 		ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID, cfg.Catalogs),
 	})
 	if err != nil {
@@ -236,10 +205,6 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 		var ce *CommitError
 		if errors.As(err, &ce) {
 			return CommitResult{}, ce
-		}
-		var ge *GroupError
-		if errors.As(err, &ge) {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: ge.Error()}
 		}
 		var te TransformError
 		if errors.As(err, &te) {
@@ -321,7 +286,7 @@ func resolveCommitDestination(
 	authored := commitNavAdvance
 	if jobVal, ok := cfg.Jobs.Get(ref.JobID); ok {
 		if job, ok := AsJob(jobVal); ok {
-			if leaf, ok := LeafTaskByPath(job.Tasks, ref); ok {
+			if leaf, ok := TaskByID(job.Tasks, ref.TaskID); ok {
 				authored = taskCommitNavigation(map[string]any(leaf))
 			}
 		}
@@ -340,9 +305,9 @@ func resolveCommitDestination(
 	}
 }
 
-// resolveDefaultCommitDestination: nested child while group open → home;
-// else auto-advance (skipping !advanceTarget) → home when remaining work
-// or finished (ADR-0006 hard cut: overview is not a Commit destination).
+// resolveDefaultCommitDestination: auto-advance (skipping !advanceTarget) →
+// home when remaining work or finished (ADR-0006 hard cut: overview is not a
+// Commit destination).
 func resolveDefaultCommitDestination(
 	cfg OrgConfig,
 	domain Domain,
@@ -351,9 +316,6 @@ func resolveDefaultCommitDestination(
 	jobInstanceID string,
 ) (CommitNext, *TaskFormBundle, error) {
 	jobID := ref.JobID
-	if ref.Nested() && !IsGroupClosed(domain.ClosedGroups, jobID, jobInstanceID, ref.GroupID) {
-		return CommitNextHome, nil, nil
-	}
 	if advance, ok := NextAdvanceTaskRef(cfg, wl, jobID, jobInstanceID); ok {
 		b, err := BuildTaskFormBundle(cfg, domain, advance)
 		if err != nil {
@@ -365,23 +327,19 @@ func resolveDefaultCommitDestination(
 }
 
 type appliedCommit struct {
-	Domain          Domain
-	JobInstanceID   string
-	GroupID         string
-	GroupInstanceID string
-	JobID           string
-	TaskID          string
-	Facts           map[string]any
-	Bindings        ExprBindings
+	Domain        Domain
+	JobInstanceID string
+	JobID         string
+	TaskID        string
+	Facts         map[string]any
+	Bindings      ExprBindings
 }
 
 func (a appliedCommit) submissionAddress() SubmissionAddress {
 	return SubmissionAddress{
-		JobID:           a.JobID,
-		JobInstanceID:   a.JobInstanceID,
-		TaskID:          a.TaskID,
-		GroupID:         a.GroupID,
-		GroupInstanceID: a.GroupInstanceID,
+		JobID:         a.JobID,
+		JobInstanceID: a.JobInstanceID,
+		TaskID:        a.TaskID,
 	}
 }
 
@@ -399,8 +357,6 @@ func applyConfigCommit(
 ) (appliedCommit, error) {
 	jobID := ref.JobID
 	taskID := ref.TaskID
-	groupID := ref.GroupID
-	groupInstanceID := ref.GroupInstanceID
 
 	var rowIDs []string
 	if needsRowProjection(task) {
@@ -459,56 +415,18 @@ func applyConfigCommit(
 		resultInstanceID = id
 	}
 
-	working := domain
-	if mintKind == MintKindSpawningNew {
-		group, ok := TaskByID(job.Tasks, groupID)
-		if !ok || !group.IsGroup() {
-			return appliedCommit{}, &CommitError{Kind: "unknown-target", Message: fmt.Sprintf("unknown Task group %q", groupID)}
-		}
-		ids := OrderedTaskIDs(group.ChildTasks())
-		if len(ids) == 0 || ids[0] != taskID {
-			return appliedCommit{}, &CommitError{
-				Kind:    "prep",
-				Message: "mint.spawningNew requires the first leaf in the Task group",
-			}
-		}
-		groupInstanceID = nextGroupInstanceID(working, jobID, jobInstanceID, groupID)
-		spawned, err := SpawnGroupInstance(working, jobID, jobInstanceID, groupID, groupInstanceID)
-		if err != nil {
-			return appliedCommit{}, err
-		}
-		working = spawned
-	}
-
-	if groupID != "" {
-		req.GroupID = groupID
-		req.GroupInstanceID = groupInstanceID
-	}
-
-	next, err := Mutate(working, req)
+	next, err := Mutate(domain, req)
 	if err != nil {
 		return appliedCommit{}, err
 	}
 	return appliedCommit{
-		Domain:          next,
-		JobInstanceID:   resultInstanceID,
-		JobID:           jobID,
-		TaskID:          taskID,
-		GroupID:         groupID,
-		GroupInstanceID: groupInstanceID,
-		Facts:           prep.Facts,
-		Bindings:        run.Bindings,
+		Domain:        next,
+		JobInstanceID: resultInstanceID,
+		JobID:         jobID,
+		TaskID:        taskID,
+		Facts:         prep.Facts,
+		Bindings:      run.Bindings,
 	}, nil
-}
-
-func nextGroupInstanceID(domain Domain, jobID, jobInstanceID, groupID string) string {
-	n := 0
-	for _, g := range domain.GroupInstances {
-		if g.JobID == jobID && g.JobInstanceID == jobInstanceID && g.GroupID == groupID {
-			n++
-		}
-	}
-	return fmt.Sprintf("%s-%d", groupID, n+1)
 }
 
 func lookupLeafTask(cfg OrgConfig, ref TaskPathRef) (Job, map[string]any, error) {
@@ -520,7 +438,7 @@ func lookupLeafTask(cfg OrgConfig, ref TaskPathRef) (Job, map[string]any, error)
 	if !ok {
 		return Job{}, nil, fmt.Errorf("invalid Job %q", ref.JobID)
 	}
-	leaf, ok := LeafTaskByPath(job.Tasks, ref)
+	leaf, ok := TaskByID(job.Tasks, ref.TaskID)
 	if !ok {
 		return Job{}, nil, fmt.Errorf("unknown Task %q", ref.String())
 	}

@@ -17,12 +17,6 @@ function taskFormUrl(base: string, req: TaskFormRequest): string {
 	if (req.jobInstanceId !== undefined) {
 		params.set('jobInstanceId', req.jobInstanceId);
 	}
-	if (req.groupId) {
-		params.set('groupId', req.groupId);
-	}
-	if (req.groupInstanceId !== undefined && req.groupId) {
-		params.set('groupInstanceId', req.groupInstanceId);
-	}
 	return `${base}/api/org/task-form?${params}`;
 }
 

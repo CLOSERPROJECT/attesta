@@ -127,7 +127,7 @@ func TestContainerRegDoesNotSetFullyProcessed(t *testing.T) {
 		t.Fatal("expected minted containers")
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "containerReg" || last.GroupID != "" {
+	if last.TaskID != "containerReg" {
 		t.Fatalf("containerReg submission = %#v", last)
 	}
 }

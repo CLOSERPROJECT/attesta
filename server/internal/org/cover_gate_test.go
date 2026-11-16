@@ -58,122 +58,7 @@ func TestDecodeScanEntityIDSubstringAndBadURL(t *testing.T) {
 	}
 }
 
-func TestPrepGroupLifecycleAndCloseErrorPaths(t *testing.T) {
-	c, domains, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	op := adminOp()
-	var ce *CommitError
-
-	_, err := c.CloseGroup(t.Context(), "  ", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "T", GroupID: "lots"})
-	if !asCommitError(err, &ce) || ce.Kind != "forbidden" {
-		t.Fatalf("empty org = %v", err)
-	}
-	_, err = (&TaskCommitter{}).CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "T", GroupID: "lots"})
-	if err == nil {
-		t.Fatal("nil stores")
-	}
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "", JobInstanceID: "T", GroupID: "lots"})
-	if !asCommitError(err, &ce) || ce.Kind != "prep" {
-		t.Fatalf("missing ids = %v", err)
-	}
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "missing", JobInstanceID: "T", GroupID: "lots"})
-	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
-		t.Fatalf("unknown job = %v", err)
-	}
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "lot_processing", JobInstanceID: "ghost", GroupID: "weigh"})
-	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
-		t.Fatalf("line leaf CloseGroup = %v, want unknown-target", err)
-	}
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "T", GroupID: "truckArrive"})
-	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
-		t.Fatalf("non-group = %v", err)
-	}
-
-	configs := NewMemoryConfigStore()
-	if err := configs.Put(t.Context(), "badorg", "v1", OrgConfig{
-		ID: "bad", Org: "badorg", Version: "v1",
-		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{"j": "not-a-job"}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := configs.SetActiveVersion(t.Context(), "badorg", "v1"); err != nil {
-		t.Fatal(err)
-	}
-	bad := &TaskCommitter{Domains: NewMemoryDomainStore(), Configs: configs, Authorizer: AllowAllAuthorizer{}}
-	_, err = bad.CloseGroup(t.Context(), "badorg", op, CloseGroupRequest{JobID: "j", JobInstanceID: "T", GroupID: "g"})
-	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
-		t.Fatalf("invalid job = %v", err)
-	}
-
-	noActive := &TaskCommitter{Domains: NewMemoryDomainStore(), Configs: NewMemoryConfigStore(), Authorizer: AllowAllAuthorizer{}}
-	if _, err := noActive.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{JobID: "intake", JobInstanceID: "T", GroupID: "lots"}); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("missing active = %v", err)
-	}
-
-	_, lotID := seedLotReadyAfterWeigh(t, c)
-	_, err = c.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "lot_processing", JobInstanceID: lotID, GroupID: "weigh",
-	})
-	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
-		t.Fatalf("feragame lot_processing has no groups: CloseGroup = %v", err)
-	}
-
-	// Feragame has no groups; probe config so Domain Get runs after group lookup.
-	probeConfigs := NewMemoryConfigStore()
-	if err := probeConfigs.Put(t.Context(), "probe", "v1", OrgConfig{
-		ID: "probe", Org: "probe", Version: "v1",
-		Jobs: OrderedObject{
-			Keys: []string{"j"},
-			Values: map[string]any{
-				"j": Job{Tasks: []TaskConfig{{
-					"id": "g", "kind": "group",
-					"tasks": []any{map[string]any{"id": "child"}},
-				}}},
-			},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := probeConfigs.SetActiveVersion(t.Context(), "probe", "v1"); err != nil {
-		t.Fatal(err)
-	}
-	boomGet := &TaskCommitter{
-		Domains:    &errDomainStore{err: errors.New("get boom")},
-		Configs:    probeConfigs,
-		Authorizer: AllowAllAuthorizer{},
-	}
-	_, err = boomGet.CloseGroup(t.Context(), "probe", op, CloseGroupRequest{
-		JobID: "j", JobInstanceID: "T", GroupID: "g",
-	})
-	if err == nil || !strings.Contains(err.Error(), "get boom") {
-		t.Fatalf("get boom = %v", err)
-	}
-
-	emptyDomain := &TaskCommitter{
-		Domains:    &errDomainStore{err: ErrNotFound},
-		Configs:    c.Configs,
-		Authorizer: AllowAllAuthorizer{},
-	}
-	_, err = emptyDomain.CloseGroup(t.Context(), "feragame", op, CloseGroupRequest{
-		JobID: "lot_processing", JobInstanceID: "ghost", GroupID: "weigh",
-	})
-	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
-		t.Fatalf("empty domain CloseGroup leaf = %v", err)
-	}
-	_ = domains
-}
-
-type getOKPutErrDomainStore struct {
-	get func(context.Context, string) (Domain, error)
-	err error
-}
-
-func (s *getOKPutErrDomainStore) Get(ctx context.Context, org string) (Domain, error) {
-	return s.get(ctx, org)
-}
-
-func (s *getOKPutErrDomainStore) Put(context.Context, string, Domain) error { return s.err }
-
-func TestHandlerTaskFormRecapCloseQrErrorEdges(t *testing.T) {
+func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	gateOK := func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
 		return OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}, true
@@ -281,20 +166,8 @@ func TestHandlerTaskFormRecapCloseQrErrorEdges(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	(&API{Gate: gateOK}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/close", strings.NewReader(`{}`)))
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("close unconfigured = %d", rec.Code)
-	}
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/close", strings.NewReader(`{`)))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("close bad json = %d", rec.Code)
-	}
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/close", strings.NewReader(
-		`{"jobId":"intake","jobInstanceId":"ghost","groupId":"lots"}`,
-	)))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("close prep err = %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("close gone = %d", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
@@ -346,26 +219,21 @@ func TestPassportValidateAndOptInErrorEdges(t *testing.T) {
 	}) {
 		t.Fatal("non-job value")
 	}
-	nested := OrgConfig{
+	leafOptIn := OrgConfig{
 		Jobs: OrderedObject{
 			Keys: []string{"issue"},
 			Values: map[string]any{
 				"issue": Job{
 					Tasks: []TaskConfig{{
-						"id": "g", "kind": "group",
-						"tasks": []any{
-							map[string]any{
-								"id": "lock",
-								"onSubmit": map[string]any{"passport": "yes"},
-							},
-						},
+						"id": "lock",
+						"onSubmit": map[string]any{"passport": "yes"},
 					}},
 				},
 			},
 		},
 	}
-	if !orgConfigHasDPPOptIn(nested) {
-		t.Fatal("nested group opt-in")
+	if !orgConfigHasDPPOptIn(leafOptIn) {
+		t.Fatal("leaf passport opt-in")
 	}
 	if !taskOnSubmitDPP(map[string]any{"onSubmit": map[string]any{"passport": 1}}) {
 		t.Fatal("passport non-bool non-map")

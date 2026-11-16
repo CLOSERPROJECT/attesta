@@ -10,24 +10,22 @@ import (
 // TaskFormBundle is the minimum payload to mount one Task form without
 // client FormPlan compile from full authored Task + full Domain.
 type TaskFormBundle struct {
-	JobID           string                 `json:"jobId"`
-	TaskID          string                 `json:"taskId"`
-	JobInstanceID   string                 `json:"jobInstanceId"`
-	GroupID         string                 `json:"groupId,omitempty"`
-	GroupInstanceID string                 `json:"groupInstanceId,omitempty"`
-	Title           string                 `json:"title"`
-	Surface         string                 `json:"surface"` // live
-	Schema          map[string]any         `json:"schema"`
-	UiSchema        map[string]any         `json:"uiSchema"`
-	InitialData     map[string]any         `json:"initialData"`
-	RowIDs          []string               `json:"rowIds,omitempty"`
-	Columns         *FormColumns           `json:"columns,omitempty"`
-	Chrome          []ChromeRule           `json:"chrome"`
-	Derived         map[string]DerivedRule `json:"derived,omitempty"`
-	ChromeFieldIDs  []string               `json:"chromeFieldIds"`
-	SealFieldIDs    []string               `json:"sealFieldIds"`
-	ProjectionKey   string                 `json:"projectionKey,omitempty"`
-	Bindings        map[string]any         `json:"bindings"`
+	JobID          string                 `json:"jobId"`
+	TaskID         string                 `json:"taskId"`
+	JobInstanceID  string                 `json:"jobInstanceId"`
+	Title          string                 `json:"title"`
+	Surface        string                 `json:"surface"` // live
+	Schema         map[string]any         `json:"schema"`
+	UiSchema       map[string]any         `json:"uiSchema"`
+	InitialData    map[string]any         `json:"initialData"`
+	RowIDs         []string               `json:"rowIds,omitempty"`
+	Columns        *FormColumns           `json:"columns,omitempty"`
+	Chrome         []ChromeRule           `json:"chrome"`
+	Derived        map[string]DerivedRule `json:"derived,omitempty"`
+	ChromeFieldIDs []string               `json:"chromeFieldIds"`
+	SealFieldIDs   []string               `json:"sealFieldIds"`
+	ProjectionKey  string                 `json:"projectionKey,omitempty"`
+	Bindings       map[string]any         `json:"bindings"`
 }
 
 // FormColumns labels for row / map-table Id header.
@@ -64,19 +62,9 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 	if !ok {
 		return nil, fmt.Errorf("org: invalid job %q", ref.JobID)
 	}
-	pathRef := TaskPathRef{
-		JobID:           ref.JobID,
-		GroupID:         ref.GroupID,
-		GroupInstanceID: ref.GroupInstanceID,
-		TaskID:          ref.TaskID,
-	}
-	task, ok := LeafTaskByPath(job.Tasks, pathRef)
+	task, ok := TaskByID(job.Tasks, ref.TaskID)
 	if !ok {
-		addr := ref.JobID + "/" + ref.TaskID
-		if ref.GroupID != "" {
-			addr = ref.JobID + "/" + ref.GroupID + "/" + ref.TaskID
-		}
-		return nil, fmt.Errorf("org: unknown task %s", addr)
+		return nil, fmt.Errorf("org: unknown task %s/%s", ref.JobID, ref.TaskID)
 	}
 	payload := taskPayload(task)
 	if payload == nil {
@@ -133,24 +121,22 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 	}
 
 	bundle := &TaskFormBundle{
-		JobID:           ref.JobID,
-		TaskID:          ref.TaskID,
-		JobInstanceID:   ref.JobInstanceID,
-		GroupID:         ref.GroupID,
-		GroupInstanceID: ref.GroupInstanceID,
-		Title:           title,
-		Surface:         "live",
-		Schema:          schema,
-		UiSchema:        uiSchema,
-		InitialData:     initial,
-		RowIDs:          projected.RowIDs,
-		Columns:         projected.Columns,
-		Chrome:          chrome,
-		Derived:         derived,
-		ChromeFieldIDs:  chromeFieldIDs,
-		SealFieldIDs:    sealFieldIDs,
-		ProjectionKey:   projectionKey,
-		Bindings:        bindings,
+		JobID:          ref.JobID,
+		TaskID:         ref.TaskID,
+		JobInstanceID:  ref.JobInstanceID,
+		Title:          title,
+		Surface:        "live",
+		Schema:         schema,
+		UiSchema:       uiSchema,
+		InitialData:    initial,
+		RowIDs:         projected.RowIDs,
+		Columns:        projected.Columns,
+		Chrome:         chrome,
+		Derived:        derived,
+		ChromeFieldIDs: chromeFieldIDs,
+		SealFieldIDs:   sealFieldIDs,
+		ProjectionKey:  projectionKey,
+		Bindings:       bindings,
 	}
 	return bundle, nil
 }
@@ -277,7 +263,6 @@ func taskTitle(payload map[string]any, taskID string) string {
 			return title
 		}
 	}
-	// Groups cannot author schema; optional top-level title for Worklist chrome.
 	if title, ok := payload["title"].(string); ok && title != "" {
 		return title
 	}

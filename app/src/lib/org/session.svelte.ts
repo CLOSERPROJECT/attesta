@@ -14,8 +14,6 @@ import {
 	writeStoredDraft,
 	type StorageLike
 } from './draft-storage.js';
-import type { CloseGroupPort, CloseGroupRequest } from './group-close-port.js';
-import { createHttpCloseGroupPort } from './http-group-close-port.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
 import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
@@ -43,7 +41,6 @@ const defaultClock: DraftPersistClock = {
 export type OrgSessionOptions = {
 	load?: LoadDomainPort;
 	commit?: CommitDomainPort;
-	close?: CloseGroupPort;
 	taskForm?: TaskFormPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
@@ -60,7 +57,6 @@ type DraftIdentity = { org: string; userId: string };
 export class OrgSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
-	readonly closePort: CloseGroupPort;
 	readonly taskFormPort: TaskFormPort;
 	readonly #storage: StorageLike | null;
 	readonly #debounceMs: number;
@@ -87,7 +83,6 @@ export class OrgSession {
 	constructor(options: OrgSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
-		this.closePort = options.close ?? createHttpCloseGroupPort();
 		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 		this.#storage =
 			options.storage !== undefined ? options.storage : browserStorage();
@@ -295,51 +290,6 @@ export class OrgSession {
 		this.linksStayActive = false;
 		this.lastHttpLinks = [];
 		this.lastHttpErrors = [];
-	};
-
-	/**
-	 * Close a Task group. On success: replace Worklist from response, return
-	 * Commit-shaped outcome for post-Close routing. On failure: re-Load, surface error.
-	 */
-	closeGroup = async (req: CloseGroupRequest): Promise<CommitOutcome | null> => {
-		this.committing = true;
-		this.commitError = null;
-		try {
-			const closed = await this.closePort.close(req);
-			const prior = this.result;
-			if (prior) {
-				this.result = {
-					...prior,
-					org: closed.org || prior.org,
-					worklist: closed.worklist
-				};
-			} else {
-				await this.refreshKeepDrafts();
-				const loaded = this.result;
-				if (loaded) {
-					this.result = {
-						...loaded,
-						worklist: closed.worklist
-					};
-				}
-			}
-			this.lastHttpLinks = [];
-			this.lastHttpErrors = [];
-			this.linksStayActive = false;
-			return {
-				jobInstanceId: closed.jobInstanceId,
-				worklist: closed.worklist,
-				navigation: closed.navigation,
-				continueNavigation: closed.continueNavigation ?? null,
-				nextTaskFormBundle: closed.nextTaskFormBundle ?? null
-			};
-		} catch (err) {
-			this.commitError = err instanceof Error ? err.message : String(err);
-			await this.refreshKeepDrafts();
-			return null;
-		} finally {
-			this.committing = false;
-		}
 	};
 
 	#syncIdentityFromResult = (

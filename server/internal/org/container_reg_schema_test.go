@@ -8,7 +8,7 @@ func containerRegLeafTask(t *testing.T) map[string]any {
 	t.Helper()
 	lp := lotProcessingJob(t)
 	task, ok := TaskByID(lp.Tasks, "containerReg")
-	if !ok || task.IsGroup() {
+	if !ok {
 		t.Fatal("containerReg leaf missing")
 	}
 	return task

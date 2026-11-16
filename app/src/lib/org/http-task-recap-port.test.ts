@@ -7,8 +7,6 @@ const sampleItem = {
 	jobId: 'intake',
 	jobInstanceId: 'T1',
 	taskId: 'register',
-	groupId: 'lots',
-	groupInstanceId: 'lots-1',
 	timestamp: '2026-10-29T15:00:00Z',
 	userId: 'ada',
 	facts: { client: 'NO' },
@@ -22,36 +20,6 @@ const sampleItem = {
 const sample = { items: [sampleItem] };
 
 describe('HttpTaskRecapPort', () => {
-	test('GET /api/org/task-recap with address + nested group', async () => {
-		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe(
-				'/api/org/task-recap?jobId=intake&taskId=register&jobInstanceId=T1&groupId=lots&groupInstanceId=lots-1'
-			);
-			expect(init?.method).toBe('GET');
-			expect(init?.credentials).toBe('include');
-			return new Response(JSON.stringify(sample), {
-				status: 200,
-				headers: { 'Content-Type': 'application/json' }
-			});
-		});
-
-		const port = createHttpTaskRecapPort({ fetch: fetchFn, baseUrl: '' });
-		const got = await port.fetch({
-			jobId: 'intake',
-			taskId: 'register',
-			jobInstanceId: 'T1',
-			groupId: 'lots',
-			groupInstanceId: 'lots-1'
-		});
-		expect(got.items).toHaveLength(1);
-		expect(got.items[0]?.taskId).toBe('register');
-		expect(got.items[0]?.facts.client).toBe('NO');
-		expect(got.items[0]?.titles).toEqual({ client: 'Cliente', numeroFir: 'Numero FIR' });
-		expect(got.items[0]?.links).toHaveLength(2);
-		expect(got.items[0]?.links[1]?.filename).toBe('reg.csv');
-		expect(fetchFn).toHaveBeenCalledOnce();
-	});
-
 	test('flat address omits group params; normalizes missing links', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			expect(String(input)).toBe(

@@ -144,14 +144,14 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatal("intake must not author lots Task group")
 	}
 	register, ok := TaskByID(intake.Tasks, "register")
-	if !ok || register.IsGroup() || !taskSubmitMany(register) {
+	if !ok || !taskSubmitMany(register) {
 		t.Fatalf("register leaf many = %#v", register)
 	}
 	if taskCommitNavigation(map[string]any(register)) != commitNavStay {
 		t.Fatalf("register onCommit.navigation = %#v, want stay", register["onCommit"])
 	}
 	weightCheck, ok := TaskByID(intake.Tasks, "weightCheck")
-	if !ok || weightCheck.IsGroup() {
+	if !ok {
 		t.Fatalf("weightCheck = %#v", weightCheck)
 	}
 	if rw, _ := weightCheck["readyWhen"].(string); !strings.Contains(rw, "lot") {
@@ -199,7 +199,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	}
 	for _, id := range wantLPTasks {
 		task, ok := TaskByID(lp.Tasks, id)
-		if !ok || task.IsGroup() {
+		if !ok {
 			t.Fatalf("lot_processing.%s must be a leaf, got %#v", id, task)
 		}
 		if _, has := task["unlockFrom"]; has {

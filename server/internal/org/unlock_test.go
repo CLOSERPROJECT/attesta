@@ -7,17 +7,17 @@ import (
 func TestOrderedTaskIDsPreservesAuthoredOrder(t *testing.T) {
 	tasks := []TaskConfig{
 		{"id": "truckArrive"},
-		{"id": "lots", "kind": "group", "tasks": []TaskConfig{{"id": "register"}}},
+		{"id": "register"},
 		{"id": "weightCheck"},
 	}
 	got := OrderedTaskIDs(tasks)
-	want := []string{"truckArrive", "lots", "weightCheck"}
+	want := []string{"truckArrive", "register", "weightCheck"}
 	if len(got) != len(want) {
-		t.Fatalf("got = %#v", got)
+		t.Fatalf("len=%d want %d (%v)", len(got), len(want), got)
 	}
 	for i := range want {
 		if got[i] != want[i] {
-			t.Fatalf("got = %#v want %#v", got, want)
+			t.Fatalf("order[%d]=%q want %q", i, got[i], want[i])
 		}
 	}
 }
@@ -25,7 +25,7 @@ func TestOrderedTaskIDsPreservesAuthoredOrder(t *testing.T) {
 func TestIsTaskUnlockedFirstAlwaysOpen(t *testing.T) {
 	tasks := intakeUnlockTasks()
 	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs:  []string{"truckArrive", "lots", "weightCheck"},
+		OrderedIDs:  []string{"truckArrive", "register", "weightCheck"},
 		JobID:       "intake",
 		TaskID:      "truckArrive",
 		Submissions: nil,
@@ -37,44 +37,47 @@ func TestIsTaskUnlockedFirstAlwaysOpen(t *testing.T) {
 
 func TestIsTaskUnlockedRequiresPriorSubmissionOnSameInstance(t *testing.T) {
 	tasks := intakeUnlockTasks()
-	order := []string{"truckArrive", "lots", "weightCheck"}
+	order := []string{"truckArrive", "register", "weightCheck"}
 
 	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "intake", TaskID: "lots",
+		OrderedIDs: order, JobID: "intake", TaskID: "register",
 		JobInstanceID: "T1", Submissions: nil, Tasks: tasks,
 	}) {
-		t.Fatal("lots locked before truckArrive Submission")
+		t.Fatal("register locked before truckArrive Submission")
 	}
 
 	afterArrive := []Submission{sub("intake", "truckArrive", "T1")}
 	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "intake", TaskID: "lots",
+		OrderedIDs: order, JobID: "intake", TaskID: "register",
 		JobInstanceID: "T1", Submissions: afterArrive, Tasks: tasks,
 	}) {
-		t.Fatal("lots should unlock after truckArrive on same instance")
+		t.Fatal("register should unlock after truckArrive on same instance")
 	}
 	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: order, JobID: "intake", TaskID: "weightCheck",
 		JobInstanceID: "T1", Submissions: afterArrive, Tasks: tasks,
 	}) {
-		t.Fatal("weightCheck must stay locked until lots close")
+		t.Fatal("weightCheck must stay locked until register Submission")
 	}
 
+	afterRegister := []Submission{
+		sub("intake", "truckArrive", "T1"),
+		sub("intake", "register", "T1"),
+	}
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: order, JobID: "intake", TaskID: "weightCheck",
-		JobInstanceID: "T1", Submissions: afterArrive, Tasks: tasks,
-		ClosedGroups: []ClosedGroup{{JobID: "intake", JobInstanceID: "T1", GroupID: "lots"}},
+		JobInstanceID: "T1", Submissions: afterRegister, Tasks: tasks,
 	}) {
-		t.Fatal("weightCheck unlocks after lots close")
+		t.Fatal("weightCheck unlocks after register")
 	}
 }
 
 func TestIsTaskUnlockedIgnoresOtherJobInstance(t *testing.T) {
 	tasks := intakeUnlockTasks()
 	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs:    []string{"truckArrive", "lots"},
+		OrderedIDs:    []string{"truckArrive", "register"},
 		JobID:         "intake",
-		TaskID:        "lots",
+		TaskID:        "register",
 		JobInstanceID: "T1",
 		Submissions:   []Submission{sub("intake", "truckArrive", "T2")},
 		Tasks:         tasks,
@@ -134,7 +137,6 @@ func TestIsTaskUnlockedSubmissionGatesNext(t *testing.T) {
 }
 
 func TestIsTaskUnlockedFanOutFromSharedPredecessor(t *testing.T) {
-	// Synthetic: after open Submission, linear sibling mid and unlockFrom sibling side both unlock.
 	tasks := []TaskConfig{
 		{"id": "open"},
 		{"id": "mid"},
@@ -183,59 +185,10 @@ func TestIsTaskUnlockedFanOutFromSharedPredecessor(t *testing.T) {
 	}
 }
 
-func TestIsTaskUnlockedFanOutGroupPredecessorStillRequiresClose(t *testing.T) {
-	tasks := []TaskConfig{
-		{"id": "open"},
-		{
-			"id":   "batch",
-			"kind": "group",
-			"tasks": []TaskConfig{
-				{"id": "item"},
-			},
-		},
-		{"id": "follow", "unlockFrom": "batch"},
-		{"id": "linearAfter"},
-	}
-	order := OrderedTaskIDs(tasks)
-	afterOpen := []Submission{sub("job", "open", "J1")}
-	childOnly := append(afterOpen, Submission{
-		JobID: "job", TaskID: "item", JobInstanceID: "J1",
-		GroupID: "batch", GroupInstanceID: "B1",
-		Timestamp: "2026-11-04T10:00:00Z", UserID: "ada", Facts: map[string]any{},
-	})
-
-	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "job", TaskID: "follow",
-		JobInstanceID: "J1", Submissions: childOnly, Tasks: tasks,
-	}) {
-		t.Fatal("unlockFrom group predecessor must not unlock on child Submission")
-	}
-	if IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "job", TaskID: "linearAfter",
-		JobInstanceID: "J1", Submissions: childOnly, Tasks: tasks,
-	}) {
-		t.Fatal("linear successor of unlockFrom leaf stays locked until that leaf submits")
-	}
-
-	closed := []ClosedGroup{{JobID: "job", JobInstanceID: "J1", GroupID: "batch"}}
-	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: order, JobID: "job", TaskID: "follow",
-		JobInstanceID: "J1", Submissions: childOnly, ClosedGroups: closed, Tasks: tasks,
-	}) {
-		t.Fatal("unlockFrom group predecessor unlocks on Close")
-	}
-}
-
 func intakeUnlockTasks() []TaskConfig {
 	return []TaskConfig{
 		{"id": "truckArrive"},
-		{
-			"id":   "lots",
-			"kind": "group",
-			"tasks": []TaskConfig{
-				{"id": "register"},
-			},
-		},
+		{"id": "register"},
 		{"id": "weightCheck"},
 	}
 }

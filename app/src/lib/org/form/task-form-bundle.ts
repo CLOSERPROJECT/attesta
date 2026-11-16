@@ -7,10 +7,6 @@ export type TaskFormBundle = {
 	jobId: string;
 	taskId: string;
 	jobInstanceId: string;
-	/** Nested leaf under a Task group; omitted for flat Tasks. */
-	groupId?: string;
-	/** Empty when provisional spawn (mirror empty jobInstanceId for Job start). */
-	groupInstanceId?: string;
 	title: string;
 	surface: 'live';
 	schema: Schema;
@@ -30,17 +26,13 @@ export function bundleMatches(
 	bundle: TaskFormBundle | null | undefined,
 	jobId: string,
 	taskId: string,
-	jobInstanceId: string,
-	groupId = '',
-	groupInstanceId = ''
+	jobInstanceId: string
 ): bundle is TaskFormBundle {
 	return (
 		bundle != null &&
 		bundle.jobId === jobId &&
 		bundle.taskId === taskId &&
-		bundle.jobInstanceId === jobInstanceId &&
-		(bundle.groupId ?? '') === groupId &&
-		(bundle.groupInstanceId ?? '') === groupInstanceId
+		bundle.jobInstanceId === jobInstanceId
 	);
 }
 
@@ -49,16 +41,10 @@ export function findTaskFormBundle(
 	bundles: readonly TaskFormBundle[] | null | undefined,
 	jobId: string,
 	taskId: string,
-	jobInstanceId: string,
-	groupId = '',
-	groupInstanceId = ''
+	jobInstanceId: string
 ): TaskFormBundle | null {
 	if (!bundles?.length) return null;
-	return (
-		bundles.find((b) =>
-			bundleMatches(b, jobId, taskId, jobInstanceId, groupId, groupInstanceId)
-		) ?? null
-	);
+	return bundles.find((b) => bundleMatches(b, jobId, taskId, jobInstanceId)) ?? null;
 }
 
 /** Frozen FormPlan from a server Task form bundle — no authored+Domain compile. */

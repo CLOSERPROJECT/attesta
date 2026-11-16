@@ -11,7 +11,6 @@ func TestMemoryLinkStorePutGetByAddressAndTimestamp(t *testing.T) {
 	store := NewMemoryLinkStore()
 	addr := SubmissionAddress{
 		JobID: "intake", JobInstanceID: "T1", TaskID: "register",
-		GroupID: "lots", GroupInstanceID: "lots-1",
 	}
 	ts := "2026-11-13T12:00:00.000000000Z"
 	links := []HttpLinkItem{
@@ -35,11 +34,6 @@ func TestMemoryLinkStorePutGetByAddressAndTimestamp(t *testing.T) {
 	}
 	if again[0].URL != "blob:labels" {
 		t.Fatalf("store leaked mutation: %#v", again)
-	}
-	if _, err := store.Get(t.Context(), "feragame", SubmissionAddress{
-		JobID: "intake", JobInstanceID: "T1", TaskID: "register",
-	}, ts); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("flat address should miss nested record: %v", err)
 	}
 	if _, err := store.Get(t.Context(), "feragame", addr, "2026-11-13T12:00:01Z"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("wrong timestamp should miss: %v", err)
@@ -74,7 +68,6 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 		if sub.TaskID == "register" {
 			addr = SubmissionAddress{
 				JobID: sub.JobID, JobInstanceID: sub.JobInstanceID, TaskID: sub.TaskID,
-				GroupID: sub.GroupID, GroupInstanceID: sub.GroupInstanceID,
 			}
 			ts = sub.Timestamp
 			found = true
@@ -83,9 +76,6 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("register submission missing: %#v", result.Domain.Submissions)
-	}
-	if addr.GroupID != "" || addr.GroupInstanceID != "" {
-		t.Fatalf("flat register address must omit group: %#v", addr)
 	}
 	if ts == "" {
 		t.Fatal("register submission missing timestamp")

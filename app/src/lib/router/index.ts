@@ -8,8 +8,6 @@ export const { p, navigate, isActive, route } = createRouter({
 	layout,
 	'/': () => import('./home.svelte'),
 	'/archive': () => import('./archive.svelte'),
-	'/:jobId/:jobInstanceId/:groupId/:groupInstanceId/:taskId': () =>
-		import('./task.svelte'),
 	'/:jobId/:jobInstanceId/:taskId': () => import('./task.svelte'),
 	'/:jobId/:jobInstanceId': () => import('./overview.svelte')
 });

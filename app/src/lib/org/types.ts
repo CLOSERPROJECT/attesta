@@ -45,12 +45,8 @@ export type WorklistJob = {
 	startLabel?: string;
 	/** Authored CSS color for board Job card left border (chrome). */
 	color?: string;
-	/** Authored Task id order for chrome iteration (top-level only). */
+	/** Authored Task id order for chrome iteration. */
 	taskIds: string[];
-	/**
-	 * Config-free Task title + roles chrome: top-level in taskIds order, then
-	 * nested group-child chrome (lookup by id; not listed in taskIds).
-	 */
 	tasks: WorklistTask[];
 	instances: WorklistInstance[];
 };
@@ -61,47 +57,16 @@ export type WorklistInstance = {
 	/** Viewer-scoped Unlock/Submission status. */
 	tasks: Record<string, TaskStatus>;
 	/**
-	 * Domain Submission N per flat leaf taskId (no group). Omitted when empty.
+	 * Domain Submission N per flat leaf taskId. Omitted when empty.
 	 * Overview many-submit chrome reads this without calling recap.
 	 */
-	submissionCounts?: Record<string, number>;
-	/** Present when the Job authors Task groups; omitted for flat Jobs. */
-	groups?: Record<string, WorklistGroup>;
-};
-
-/** Server-projected Task group chrome (spawn/close); SPA must not re-gate. */
-export type WorklistGroup = {
-	groupId: string;
-	startLabel?: string;
-	closeLabel?: string;
-	repeatable: boolean;
-	canSpawn: boolean;
-	canClose: boolean;
-	childTaskIds: string[];
-	instances: WorklistGroupInstance[];
-};
-
-export type WorklistGroupInstance = {
-	id: string;
-	/** Overview chrome from Config instanceLabelEntity ∩ nested IDsTouched. */
-	label?: string;
-	tasks: Record<string, TaskStatus>;
-	/** Domain Submission N per child leaf taskId on this group instance. */
 	submissionCounts?: Record<string, number>;
 };
 
 export type TaskStatus = 'locked' | 'unavailable' | 'available' | 'actionable' | 'done';
 
-/** Wire / URL sentinel for provisional spawn (mint.spawningNew). */
-export const PROVISIONAL_GROUP_INSTANCE_ID = 'new';
-
-/** Empty / `new` → '' for draft keys and deep-link gates. */
-export function normalizeGroupInstanceId(groupInstanceId: string): string {
-	if (!groupInstanceId || groupInstanceId === PROVISIONAL_GROUP_INSTANCE_ID) {
-		return '';
-	}
-	return groupInstanceId;
-}
+/** URL / wire sentinel for provisional Job start (empty jobInstanceId). */
+export const PROVISIONAL_JOB_INSTANCE_ID = 'new';
 
 export function emptyWorklist(): Worklist {
 	return { jobs: [] };
@@ -148,15 +113,6 @@ export type JobInstance = {
 
 export function taskPath(jobId: string, taskId: string): string {
 	return `${jobId}/${taskId}`;
-}
-
-export function groupTaskPath(
-	jobId: string,
-	groupId: string,
-	groupInstanceId: string,
-	taskId: string
-): string {
-	return `${jobId}/${groupId}/${groupInstanceId}/${taskId}`;
 }
 
 export function emptyDomain(): Domain {

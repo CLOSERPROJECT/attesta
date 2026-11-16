@@ -139,9 +139,6 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	if !ok || inst.Tasks["register"] != TaskStatusActionable {
 		t.Fatalf("register after arrive = %#v", inst)
 	}
-	if _, has := inst.Groups["lots"]; has {
-		t.Fatalf("intake must not project lots group chrome: %#v", inst.Groups)
-	}
 
 	lot1 := registerLotValue()
 	first := commitLotRegister(t, c, truckID, lot1)
@@ -249,9 +246,6 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	if _, has := lotInst.Tasks["closeTurno"]; has {
 		t.Fatalf("closeTurno must not project: %#v", lotInst.Tasks)
 	}
-	if len(lotInst.Groups) != 0 {
-		t.Fatalf("lot_processing must not project group chrome: %#v", lotInst.Groups)
-	}
 
 	_ = commitWeigh(t, c, load1, load1+".1", 11)
 	weighed := commitWeigh(t, c, load1, load1+".2", 22)
@@ -265,7 +259,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 		t.Fatalf("markProgress after weigh = %q, want actionable", lotInst.Tasks["markProgress"])
 	}
 	last := weighed.Domain.Submissions[len(weighed.Domain.Submissions)-1]
-	if last.TaskID != "weigh" || last.GroupID != "" {
+	if last.TaskID != "weigh" {
 		t.Fatalf("weigh submission = %#v", last)
 	}
 	if weighed.Domain.Kind("lot")[load1]["status"] != "open" {

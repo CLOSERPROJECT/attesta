@@ -85,14 +85,6 @@ describe('navPlaceKindFromRoute', () => {
 		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2/' })).toBe('overview');
 	});
 
-	test('5 path segments → task (nested group)', () => {
-		expect(
-			navPlaceKindFromRoute({ pathname: '/intake/NIR-2/lots/new/register' })
-		).toBe('task');
-	});
-});
-
-describe('resolveNavPlace', () => {
 	test('home: Home label, no back, no job title line', () => {
 		expect(
 			resolveNavPlace({
@@ -178,25 +170,6 @@ describe('resolveNavPlace', () => {
 		});
 	});
 
-	test('task provisional Spawn: job · instance muted, task primary, back home', () => {
-		expect(
-			resolveNavPlace({
-				kind: 'task',
-				jobId: 'intake',
-				jobInstanceId: 'NIR-2',
-				taskId: 'register',
-				provisionalJob: false,
-				provisionalSpawn: true,
-				worklist
-			})
-		).toEqual({
-			showBack: true,
-			backTarget: { kind: 'home' },
-			primaryLabel: 'Registrazione',
-			jobTitleLine: 'Camion · Camion B'
-		});
-	});
-
 	test('task minted: job · instance muted, task primary, back home', () => {
 		expect(
 			resolveNavPlace({
@@ -261,48 +234,39 @@ describe('resolveNavPlace', () => {
 });
 
 describe('orgRouteCoordsFromPath', () => {
-	test('flat Can-start 3-seg ignores leaked groupId (sv-router pollution)', () => {
-		// matchRoute leaves groupId=truckArrive on winning 3-seg; pathname wins.
+	test('flat Can-start 3-seg Task coords', () => {
 		expect(orgRouteCoordsFromPath({ pathname: '/intake/new/truckArrive' })).toEqual({
 			jobId: 'intake',
 			jobInstanceId: 'new',
-			taskId: 'truckArrive',
-			groupId: '',
-			groupInstanceId: ''
+			taskId: 'truckArrive'
 		});
 	});
 
-	test('flat minted 3-seg ignores leaked groupId (weightCheck bounce class)', () => {
+	test('flat minted 3-seg Task coords', () => {
 		expect(
 			orgRouteCoordsFromPath({ pathname: '/intake/261102-1st-2/weightCheck' })
 		).toEqual({
 			jobId: 'intake',
 			jobInstanceId: '261102-1st-2',
-			taskId: 'weightCheck',
-			groupId: '',
-			groupInstanceId: ''
+			taskId: 'weightCheck'
 		});
 	});
 
-	test('5-seg nested Spawn keeps group coords', () => {
+	test('legacy 5-seg nested group path is rejected', () => {
 		expect(
 			orgRouteCoordsFromPath({ pathname: '/intake/NIR-2/lots/new/register' })
 		).toEqual({
-			jobId: 'intake',
-			jobInstanceId: 'NIR-2',
-			groupId: 'lots',
-			groupInstanceId: 'new',
-			taskId: 'register'
+			jobId: '',
+			jobInstanceId: '',
+			taskId: ''
 		});
 	});
 
-	test('2-seg overview clears task and group coords', () => {
+	test('2-seg overview clears task coords', () => {
 		expect(orgRouteCoordsFromPath({ pathname: '/intake/NIR-2' })).toEqual({
 			jobId: 'intake',
 			jobInstanceId: 'NIR-2',
-			taskId: '',
-			groupId: '',
-			groupInstanceId: ''
+			taskId: ''
 		});
 	});
 });

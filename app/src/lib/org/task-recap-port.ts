@@ -4,9 +4,6 @@ export type TaskRecapRequest = {
 	jobId: string;
 	taskId: string;
 	jobInstanceId: string;
-	/** Nested leaf under a Task group. */
-	groupId?: string;
-	groupInstanceId?: string;
 };
 
 /** Thin done-Task overview expand payload (no full schema / Domain). */
@@ -14,8 +11,6 @@ export type TaskRecap = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	groupId?: string;
-	groupInstanceId?: string;
 	timestamp: string;
 	userId: string;
 	facts: Record<string, unknown>;

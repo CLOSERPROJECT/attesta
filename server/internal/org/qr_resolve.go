@@ -19,10 +19,8 @@ type QrRule struct {
 }
 
 type QrMatch struct {
-	JobID      string `json:"jobId" yaml:"jobId"`
-	GroupID    string `json:"groupId,omitempty" yaml:"groupId,omitempty"`
-	TaskID     string `json:"taskId" yaml:"taskId"`
-	AllowSpawn bool   `json:"allowSpawn,omitempty" yaml:"allowSpawn,omitempty"`
+	JobID  string `json:"jobId" yaml:"jobId"`
+	TaskID string `json:"taskId" yaml:"taskId"`
 }
 
 type QrMessages struct {
@@ -32,11 +30,9 @@ type QrMessages struct {
 }
 
 type QrNavigate struct {
-	JobID           string `json:"jobId"`
-	JobInstanceID   string `json:"jobInstanceId"`
-	GroupID         string `json:"groupId,omitempty"`
-	GroupInstanceID string `json:"groupInstanceId,omitempty"`
-	TaskID          string `json:"taskId"`
+	JobID         string `json:"jobId"`
+	JobInstanceID string `json:"jobInstanceId"`
+	TaskID        string `json:"taskId"`
 }
 
 type QrResolveError struct {
@@ -135,7 +131,6 @@ func msgOr(authored, fallback string) string {
 func matchQrCandidates(wl Worklist, match QrMatch) []QrNavigate {
 	jobID := strings.TrimSpace(match.JobID)
 	taskID := strings.TrimSpace(match.TaskID)
-	groupID := strings.TrimSpace(match.GroupID)
 	if jobID == "" || taskID == "" {
 		return nil
 	}
@@ -145,33 +140,6 @@ func matchQrCandidates(wl Worklist, match QrMatch) []QrNavigate {
 			continue
 		}
 		for _, inst := range job.Instances {
-			if groupID != "" {
-				g, ok := inst.Groups[groupID]
-				if !ok {
-					continue
-				}
-				for _, gi := range g.Instances {
-					if gi.Tasks[taskID] == TaskStatusActionable {
-						out = append(out, QrNavigate{
-							JobID:           jobID,
-							JobInstanceID:   inst.ID,
-							GroupID:         groupID,
-							GroupInstanceID: gi.ID,
-							TaskID:          taskID,
-						})
-					}
-				}
-				if match.AllowSpawn && g.CanSpawn {
-					out = append(out, QrNavigate{
-						JobID:           jobID,
-						JobInstanceID:   inst.ID,
-						GroupID:         groupID,
-						GroupInstanceID: ProvisionalGroupInstanceID,
-						TaskID:          taskID,
-					})
-				}
-				continue
-			}
 			if inst.Tasks[taskID] == TaskStatusActionable {
 				out = append(out, QrNavigate{
 					JobID:         jobID,

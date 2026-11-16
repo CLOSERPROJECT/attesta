@@ -260,54 +260,6 @@ describe('worklist-home bands', () => {
 		expect(progressFraction(5, 3)).toBe(1);
 	});
 
-	test('instanceTaskProgress ignores submit: many for done/total and Completed band', () => {
-		const job: Worklist['jobs'][number] = {
-			jobId: 'intake',
-			canStart: false,
-			repeatable: true,
-			title: 'Camion',
-			taskIds: ['truckArrive', 'register', 'weightCheck'],
-			tasks: [
-				{ id: 'truckArrive', title: 'Arrive', roles: ['administration'], submit: 'once' },
-				{ id: 'register', title: 'Register', roles: ['administration'], submit: 'many' },
-				{ id: 'weightCheck', title: 'Weight', roles: ['administration'], submit: 'once' }
-			],
-			instances: [
-				{
-					id: 'T1',
-					label: 'Truck 1',
-					tasks: {
-						truckArrive: 'done',
-						register: 'actionable',
-						weightCheck: 'done'
-					}
-				},
-				{
-					id: 'T2',
-					label: 'Truck 2',
-					tasks: {
-						truckArrive: 'done',
-						register: 'actionable',
-						weightCheck: 'locked'
-					}
-				}
-			]
-		};
-		const wl: Worklist = { jobs: [job] };
-
-		expect(instanceTaskProgress(job, job.instances[0]!)).toEqual({ done: 2, total: 2 });
-		expect(instanceTaskProgress(job, job.instances[1]!)).toEqual({ done: 1, total: 2 });
-
-		expect(completedRowsFromWorklist(wl).map((r) => r.jobInstanceId)).toEqual(['T1']);
-		expect(inProgressRowsFromWorklist(wl).map((r) => r.jobInstanceId)).toEqual(['T2']);
-
-		// Flat many-submit still appears in Available while readyWhen keeps it actionable.
-		expect(
-			availableRowsFromWorklist(wl).map((r) => `${r.jobInstanceId}/${r.taskId}`)
-		).toEqual(['T1/register', 'T2/register']);
-		expect(availableRowsFromWorklist(wl).every((r) => !r.groupId)).toBe(true);
-	});
-
 	test('canStartRows use startLabel and first Task; provisional segment is new', () => {
 		expect(canStartRowsFromWorklist(adminWorklist)).toEqual([
 			{
@@ -350,116 +302,6 @@ describe('worklist-home bands', () => {
 		]);
 	});
 
-	test('available / act-now task rows enrich submit + submissionCount (flat + group)', () => {
-		const flat: Worklist = {
-			jobs: [
-				{
-					jobId: 'intake',
-					canStart: false,
-					repeatable: true,
-					title: 'Camion',
-					taskIds: ['register', 'palletWeight'],
-					tasks: [
-						{
-							id: 'register',
-							title: 'Registrazione',
-							roles: ['administration'],
-							submit: 'many'
-						},
-						{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
-					],
-					instances: [
-						{
-							id: 'NIR-1',
-							label: 'NIR-1',
-							tasks: { register: 'actionable', palletWeight: 'locked' },
-							submissionCounts: { register: 2 }
-						}
-					]
-				}
-			]
-		};
-		const flatRows = availableRowsFromWorklist(flat);
-		expect(flatRows).toHaveLength(1);
-		expect(flatRows[0]).toMatchObject({
-			taskId: 'register',
-			submit: 'many',
-			submissionCount: 2
-		});
-		const actNowFlat = actNowRowsFromWorklist(flat)[0];
-		expect(actNowFlat).toMatchObject({
-			kind: 'task',
-			submit: 'many',
-			submissionCount: 2
-		});
-		// Slice D: home many-history chrome gates on submit + count (same helper as overview).
-		expect(
-			actNowFlat?.kind === 'task' &&
-				manySubmitHistoryVisible(actNowFlat.submit, actNowFlat.submissionCount)
-		).toBe(true);
-
-		// once / omit: no submit/count fields → history hidden.
-		const onceRow = availableRowsFromWorklist(adminWorklist)[0];
-		expect(onceRow?.submit).toBeUndefined();
-		expect(onceRow?.submissionCount).toBeUndefined();
-		expect(manySubmitHistoryVisible(onceRow?.submit, onceRow?.submissionCount)).toBe(
-			false
-		);
-
-		const nested: Worklist = {
-			jobs: [
-				{
-					jobId: 'intake',
-					canStart: false,
-					repeatable: true,
-					title: 'Camion',
-					taskIds: ['lots'],
-					tasks: [
-						{ id: 'lots', title: 'Lots', roles: [] },
-						{
-							id: 'register',
-							title: 'Register lot',
-							roles: ['administration'],
-							submit: 'many'
-						}
-					],
-					instances: [
-						{
-							id: 'T1',
-							label: 'Truck 1',
-							tasks: { lots: 'available' },
-							groups: {
-								lots: {
-									groupId: 'lots',
-									repeatable: true,
-									canSpawn: false,
-									canClose: false,
-									childTaskIds: ['register'],
-									instances: [
-										{
-											id: 'L1',
-											tasks: { register: 'actionable' },
-											submissionCounts: { register: 3 }
-										}
-									]
-								}
-							}
-						}
-					]
-				}
-			]
-		};
-		const nestedRows = availableRowsFromWorklist(nested);
-		expect(nestedRows).toHaveLength(1);
-		expect(nestedRows[0]).toMatchObject({
-			groupId: 'lots',
-			groupInstanceId: 'L1',
-			taskId: 'register',
-			submit: 'many',
-			submissionCount: 3
-		});
-	});
-
 	test('empty Worklist yields empty bands', () => {
 		expect(availableRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(canStartRowsFromWorklist({ jobs: [] })).toEqual([]);
@@ -470,6 +312,28 @@ describe('worklist-home bands', () => {
 		expect(actNowRowsFromWorklist(null)).toEqual([]);
 		expect(inProgressRowsFromWorklist(null)).toEqual([]);
 		expect(completedRowsFromWorklist(null)).toEqual([]);
+	});
+
+	test('home rows omit Spawn/Close / group chrome', () => {
+		const banned = /canSpawn|canClose|"groups"|spawnGroup|closeGroup|closeLabel/;
+		expect(JSON.stringify(adminWorklist)).not.toMatch(banned);
+		for (const row of actNowRowsFromWorklist(adminWorklist)) {
+			expect(['task', 'start']).toContain(row.kind);
+			expect(row).not.toHaveProperty('canSpawn');
+			expect(row).not.toHaveProperty('canClose');
+			expect(row).not.toHaveProperty('groups');
+			expect(JSON.stringify(row)).not.toMatch(banned);
+		}
+		for (const row of [
+			...availableRowsFromWorklist(adminWorklist),
+			...canStartRowsFromWorklist(adminWorklist),
+			...inProgressRowsFromWorklist(adminWorklist),
+			...completedRowsFromWorklist(adminWorklist)
+		]) {
+			expect(row).not.toHaveProperty('canSpawn');
+			expect(row).not.toHaveProperty('canClose');
+			expect(row).not.toHaveProperty('groups');
+		}
 	});
 
 	test('inProgressRows include unfinished Job instances; finished excluded; Job → instance order', () => {
@@ -686,148 +550,5 @@ describe('worklist-home bands', () => {
 			jobId: 'intake',
 			jobInstanceId: 'NIR-done'
 		});
-	});
-
-	test('nested ready Tasks and canSpawn provisional first-leaf appear in Available', () => {
-		const nested: Worklist = {
-			jobs: [
-				{
-					jobId: 'intake',
-					canStart: false,
-					repeatable: true,
-					title: 'Camion',
-					taskIds: ['truckArrive', 'lots', 'weightCheck'],
-					tasks: [
-						{ id: 'truckArrive', title: 'Arrive', roles: ['administration'] },
-						{ id: 'lots', title: 'Lots', roles: [] },
-						{ id: 'weightCheck', title: 'Weight', roles: ['administration'] },
-						{ id: 'register', title: 'Register lot', roles: ['administration'] }
-					],
-					instances: [
-						{
-							id: 'T1',
-							label: 'Truck 1',
-							tasks: {
-								truckArrive: 'done',
-								lots: 'available',
-								weightCheck: 'locked'
-							},
-							groups: {
-								lots: {
-									groupId: 'lots',
-									startLabel: 'Nuovo lotto',
-									closeLabel: 'Chiudi scarico',
-									repeatable: true,
-									canSpawn: true,
-									canClose: true,
-									childTaskIds: ['register'],
-									instances: [
-										{
-											id: 'L1',
-											tasks: { register: 'actionable' }
-										}
-									]
-								}
-							}
-						}
-					]
-				}
-			]
-		};
-
-		const rows = availableRowsFromWorklist(nested);
-		expect(rows).toHaveLength(2);
-		expect(rows[0]).toMatchObject({
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots',
-			groupInstanceId: 'L1',
-			taskId: 'register',
-			title: 'Register lot',
-			instanceLabel: 'Truck 1'
-		});
-		expect(availableRowKey(rows[0]!)).toBe('intake/T1/lots/L1/register');
-		expect(hrefOrgTarget(availableRowTarget(rows[0]!))).toBe(
-			'/app/intake/T1/lots/L1/register'
-		);
-
-		expect(rows[1]).toMatchObject({
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots',
-			groupInstanceId: 'new',
-			taskId: 'register',
-			title: 'Register lot',
-			instanceLabel: 'Truck 1'
-		});
-		expect(availableRowKey(rows[1]!)).toBe('intake/T1/lots/new/register');
-		expect(availableRowTarget(rows[1]!)).toEqual({
-			kind: 'task',
-			jobId: 'intake',
-			jobInstanceId: 'T1',
-			groupId: 'lots',
-			groupInstanceId: 'new',
-			taskId: 'register'
-		});
-		expect(hrefOrgTarget(availableRowTarget(rows[1]!))).toBe(
-			'/app/intake/T1/lots/new/register'
-		);
-
-		// truckArrive-shaped: canSpawn, empty open group → provisional first-leaf only.
-		const spawnOnly: Worklist = {
-			jobs: [
-				{
-					...nested.jobs[0]!,
-					instances: [
-						{
-							...nested.jobs[0]!.instances[0]!,
-							groups: {
-								lots: {
-									...nested.jobs[0]!.instances[0]!.groups!.lots,
-									canSpawn: true,
-									canClose: false,
-									instances: []
-								}
-							}
-						}
-					]
-				}
-			]
-		};
-		const spawnRows = availableRowsFromWorklist(spawnOnly);
-		expect(spawnRows).toHaveLength(1);
-		expect(spawnRows[0]).toMatchObject({
-			groupId: 'lots',
-			groupInstanceId: 'new',
-			taskId: 'register',
-			title: 'Register lot'
-		});
-		expect(hrefOrgTarget(availableRowTarget(spawnRows[0]!))).toBe(
-			'/app/intake/T1/lots/new/register'
-		);
-		// Still no separate Spawn / Can start peer for the group.
-		expect(canStartRowsFromWorklist(spawnOnly)).toEqual([]);
-
-		const noSpawn: Worklist = {
-			jobs: [
-				{
-					...nested.jobs[0]!,
-					instances: [
-						{
-							...nested.jobs[0]!.instances[0]!,
-							groups: {
-								lots: {
-									...nested.jobs[0]!.instances[0]!.groups!.lots,
-									canSpawn: false,
-									canClose: false,
-									instances: []
-								}
-							}
-						}
-					]
-				}
-			]
-		};
-		expect(availableRowsFromWorklist(noSpawn)).toEqual([]);
 	});
 });

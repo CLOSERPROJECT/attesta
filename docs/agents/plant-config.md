@@ -79,9 +79,9 @@ Per Task, optional `onCommit` keys control **server-side** post-Commit routing
 
 - **`navigation`:** `advance` keeps role-eligible auto-advance on the Job
   instance; `home` / `overview` force that destination (`overview` maps to
-  **home** on the wire); `stay` parks on the submitted Task (links, Spawn/Close
-  chrome per group law) and Commit ships deferred **Continue** via
-  `continueNavigation` on the wire.
+  **home** on the wire); `stay` parks on the submitted Task (download links;
+  many-submit loops typically stay — ADR-0008) and Commit ships deferred
+  **Continue** via `continueNavigation` on the wire.
 - **`advanceTarget: false`:** never auto-advance to the next Task after this
   Commit. When nothing else is authored, land on **Worklist** home.
 

@@ -2541,7 +2541,6 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.Handle("/api/org/task-form", orgHTTP)
 	mux.Handle("/api/org/task-recap", orgHTTP)
 	mux.Handle("/api/org/commit", orgHTTP)
-	mux.Handle("/api/org/close", orgHTTP)
 	mux.Handle("/api/org/qr-resolve", orgHTTP)
 	mux.Handle("/api/org/artifacts/", orgHTTP)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)

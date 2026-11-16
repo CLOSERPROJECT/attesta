@@ -30,20 +30,6 @@ describe('interpretQrResolve', () => {
 		});
 	});
 
-	test('nested navigate still builds group draft key when groupId present', () => {
-		const coords = qrDraftCoords({
-			jobId: 'line',
-			jobInstanceId: 'L1',
-			groupId: 'palletWeight',
-			groupInstanceId: 'pw-3',
-			taskId: 'weigh'
-		});
-		expect(coords).toEqual({
-			taskPath: 'line/palletWeight/pw-3/weigh',
-			draftInstanceKey: 'L1::palletWeight::pw-3'
-		});
-	});
-
 	test('server error message surfaces for toast', () => {
 		const got = interpretQrResolve({
 			error: {

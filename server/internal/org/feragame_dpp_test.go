@@ -99,7 +99,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("passport Job canStart after eligible load = %#v", passportWL)
 	}
 
-	selectBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "select", "", "", "")
+	selectBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "select", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("Job instance id = %q, want lot subject %q", selected.JobInstanceID, loadID)
 	}
 
-	lockBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "lock", loadID, "", "")
+	lockBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "passport", "lock", loadID)
 	if err != nil {
 		t.Fatal(err)
 	}

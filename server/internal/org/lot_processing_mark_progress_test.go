@@ -8,7 +8,7 @@ import (
 func TestFixtureMarkProgressReadsOpenLotPallets(t *testing.T) {
 	lp := lotProcessingJob(t)
 	task, ok := TaskByID(lp.Tasks, "markProgress")
-	if !ok || task.IsGroup() {
+	if !ok {
 		t.Fatalf("markProgress leaf = %#v", task)
 	}
 	dyn := task["dynamicProperties"].(map[string]any)

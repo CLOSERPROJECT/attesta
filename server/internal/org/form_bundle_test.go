@@ -139,15 +139,15 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 		t.Fatalf("home Load must omit bulk bundles; got %#v", addresses(result.TaskFormBundles))
 	}
 
-	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", truckID, "", "")
+	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", truckID)
 	if err != nil || provisional == nil {
 		t.Fatalf("addressed register: %v %#v", err, provisional)
 	}
 	// Prior truck still incomplete → Nuovo camion / provisional truckArrive off.
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", ""); err == nil {
 		t.Fatal("provisional truckArrive must deny while prior truck incomplete")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", truckID, "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", truckID); err == nil {
 		t.Fatal("done truckArrive must be forbidden on addressed fetch")
 	}
 }
@@ -171,7 +171,7 @@ func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	if len(home.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(home.TaskFormBundles))
 	}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "lot_processing", "weigh", loadID, "", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "lot_processing", "weigh", loadID)
 	if err != nil || bundle == nil {
 		t.Fatalf("missing weigh: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestMarkProgressPartialMapAfterWeigh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mark.TaskID != "markProgress" || mark.GroupID != "" || mark.JobInstanceID != lotID {
+	if mark.TaskID != "markProgress" || mark.JobInstanceID != lotID {
 		t.Fatalf("leaf form = %s, want markProgress@%s", bundleAddress(mark), lotID)
 	}
 	if len(mark.RowIDs) == 0 {
@@ -403,7 +403,7 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 	if _, ok := wire["roles"].([]any); !ok {
 		t.Fatalf("HTTP Load missing roles: %s", rec.Body.String())
 	}
-	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "register", truckID, "", "")
+	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "register", truckID)
 	if err != nil || spawn == nil {
 		t.Fatalf("addressed register after Load: %v", err)
 	}
@@ -420,7 +420,7 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if len(loaded.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(loaded.TaskFormBundles))
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID); err != nil {
 		t.Fatalf("pre-commit addressed weightCheck: %v", err)
 	}
 
@@ -435,10 +435,10 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if committed.Navigation != CommitNextHome && committed.Navigation != CommitNextTask {
 		t.Fatalf("advance Navigation = %q", committed.Navigation)
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID, "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID); err == nil {
 		t.Fatal("addressed weightCheck must deny after it leaves available")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", "", "", ""); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", ""); err != nil {
 		t.Fatalf("provisional truckArrive while canStart: %v", err)
 	}
 
@@ -467,10 +467,10 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "truckArrive", "", "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "truckArrive", ""); err == nil {
 		t.Fatal("line viewer must not mount intake provisional truckArrive")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "startLot", "", "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "startLot", ""); err == nil {
 		t.Fatal("line must not canStart startLot (logistic-only)")
 	}
 
@@ -493,7 +493,7 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	if loaded.NextTaskFormBundle == nil || loaded.NextTaskFormBundle.TaskID != "markProgress" {
 		t.Fatalf("stay bundle = %#v, want markProgress", loaded.NextTaskFormBundle)
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "containerReg", lotID, "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "containerReg", lotID); err == nil {
 		t.Fatal("line viewer must not mount containerReg")
 	}
 	lpWL, ok := worklistJobByID(loaded.Worklist, "lot_processing")
@@ -915,7 +915,7 @@ func TestLoadTaskBundleAuthoredInitialDataEndToEnd(t *testing.T) {
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	op := OperatorIdentity{UserID: "bo", Org: "seedorg", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "", "", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -959,7 +959,7 @@ func TestCommitAuthoredInitialDataTaskUsesClientValue(t *testing.T) {
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	op := OperatorIdentity{UserID: "bo", Org: "seedorg", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "", "", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "")
 	if err != nil {
 		t.Fatal(err)
 	}

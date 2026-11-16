@@ -7,36 +7,26 @@ import (
 	"sync"
 )
 
-// SubmissionAddress keys a Submission path (job / instance / task [+ group]).
+// SubmissionAddress keys a Submission path (job / instance / task).
 // LinkStore also requires Submission.Timestamp so many-submit Commits under the
 // same address keep distinct link docs.
 type SubmissionAddress struct {
-	JobID           string
-	JobInstanceID   string
-	TaskID          string
-	GroupID         string
-	GroupInstanceID string
+	JobID         string
+	JobInstanceID string
+	TaskID        string
 }
 
 func (a SubmissionAddress) normalized() SubmissionAddress {
 	return SubmissionAddress{
-		JobID:           strings.TrimSpace(a.JobID),
-		JobInstanceID:   strings.TrimSpace(a.JobInstanceID),
-		TaskID:          strings.TrimSpace(a.TaskID),
-		GroupID:         strings.TrimSpace(a.GroupID),
-		GroupInstanceID: strings.TrimSpace(a.GroupInstanceID),
+		JobID:         strings.TrimSpace(a.JobID),
+		JobInstanceID: strings.TrimSpace(a.JobInstanceID),
+		TaskID:        strings.TrimSpace(a.TaskID),
 	}
 }
 
 func (a SubmissionAddress) valid() bool {
 	a = a.normalized()
-	if a.JobID == "" || a.JobInstanceID == "" || a.TaskID == "" {
-		return false
-	}
-	if (a.GroupID == "") != (a.GroupInstanceID == "") {
-		return false
-	}
-	return true
+	return a.JobID != "" && a.JobInstanceID != "" && a.TaskID != ""
 }
 
 // LinkStore persists post-Commit HTTP links separately from Submission facts.
@@ -65,11 +55,7 @@ func linkStoreKey(org string, addr SubmissionAddress, timestamp string) (string,
 	if org == "" || !addr.valid() || timestamp == "" {
 		return "", fmt.Errorf("org: link store key requires org, submission address, and timestamp")
 	}
-	parts := []string{org, addr.JobID, addr.JobInstanceID, addr.TaskID}
-	if addr.GroupID != "" {
-		parts = append(parts, addr.GroupID, addr.GroupInstanceID)
-	}
-	parts = append(parts, timestamp)
+	parts := []string{org, addr.JobID, addr.JobInstanceID, addr.TaskID, timestamp}
 	return strings.Join(parts, "\x00"), nil
 }
 

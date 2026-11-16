@@ -2,7 +2,6 @@ import * as m from '#lib/paraglide/messages.js';
 
 import type { PostCommitTarget } from './worklist-nav.js';
 import {
-	PROVISIONAL_GROUP_INSTANCE_ID,
 	type TaskSubmit,
 	type Worklist,
 	type WorklistInstance,
@@ -14,9 +13,6 @@ export type AvailableRow = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	/** Nested leaf only — open group instance coordinates. */
-	groupId?: string;
-	groupInstanceId?: string;
 	/** Job instance label (product-facing name); falls back to instance id. */
 	instanceLabel: string;
 	/** Job display title; falls back to jobId when absent. */
@@ -105,7 +101,7 @@ function jobColorOf(job: WorklistJob): string | undefined {
 	return color || undefined;
 }
 
-/** Mirror overview: only when chrome is `many`; count from instance or group instance. */
+/** Mirror overview: only when chrome is `many`; count from instance. */
 function manySubmitFields(
 	chromeSubmit: TaskSubmit | undefined,
 	counts: Record<string, number> | undefined,
@@ -123,23 +119,14 @@ function pushAvailableRow(
 	job: WorklistJob,
 	inst: WorklistInstance,
 	taskId: string,
-	progress: { done: number; total: number },
-	group?: {
-		groupId: string;
-		groupInstanceId: string;
-		submissionCounts?: Record<string, number>;
-	}
+	progress: { done: number; total: number }
 ): void {
 	const chrome = taskChrome(job, taskId);
 	const jobColor = jobColorOf(job);
-	const counts = group ? group.submissionCounts : inst.submissionCounts;
 	out.push({
 		jobId: job.jobId,
 		jobInstanceId: inst.id,
 		taskId,
-		...(group
-			? { groupId: group.groupId, groupInstanceId: group.groupInstanceId }
-			: {}),
 		instanceLabel: inst.label || inst.id,
 		jobTitle: job.title?.trim() || job.jobId,
 		...(jobColor ? { jobColor } : {}),
@@ -147,15 +134,12 @@ function pushAvailableRow(
 		roles: chrome?.roles ?? [],
 		tasksDone: progress.done,
 		tasksTotal: progress.total,
-		...manySubmitFields(chrome?.submit, counts, taskId)
+		...manySubmitFields(chrome?.submit, inst.submissionCounts, taskId)
 	});
 }
 
 /**
- * Sort: Job → instance → Config taskIds (flat actionable + nested group
- * children). When group.canSpawn, also a provisional first-leaf row
- * (`groupInstanceId` = `new`) — Available chrome for Spawn-via-first-leaf;
- * no separate home Spawn band. Close stays overview-only.
+ * Sort: Job → instance → Config taskIds (flat actionable leaves only).
  */
 export function availableRowsFromWorklist(
 	worklist: Worklist | null | undefined
@@ -167,28 +151,6 @@ export function availableRowsFromWorklist(
 		for (const inst of job.instances ?? []) {
 			const progress = instanceTaskProgress(job, inst);
 			for (const taskId of jobConfigTaskIds(job)) {
-				const group = inst.groups?.[taskId];
-				if (group) {
-					const childIds = group.childTaskIds ?? [];
-					for (const gi of group.instances ?? []) {
-						for (const childId of childIds) {
-							if (gi.tasks[childId] !== 'actionable') continue;
-							pushAvailableRow(out, job, inst, childId, progress, {
-								groupId: taskId,
-								groupInstanceId: gi.id,
-								submissionCounts: gi.submissionCounts
-							});
-						}
-					}
-					const firstChildId = childIds[0];
-					if (group.canSpawn && firstChildId) {
-						pushAvailableRow(out, job, inst, firstChildId, progress, {
-							groupId: taskId,
-							groupInstanceId: PROVISIONAL_GROUP_INSTANCE_ID
-						});
-					}
-					continue;
-				}
 				if (inst.tasks[taskId] !== 'actionable') continue;
 				pushAvailableRow(out, job, inst, taskId, progress);
 			}
@@ -312,24 +274,11 @@ export function taskRouteInstanceSegment(jobInstanceId: string): string {
 }
 
 export function availableRowKey(row: AvailableRow): string {
-	if (row.groupId && row.groupInstanceId) {
-		return `${row.jobId}/${row.jobInstanceId}/${row.groupId}/${row.groupInstanceId}/${row.taskId}`;
-	}
 	return `${row.jobId}/${row.jobInstanceId}/${row.taskId}`;
 }
 
-/** Deep-link target for a home Available row (nested includes group coords). */
+/** Deep-link target for a home Available row. */
 export function availableRowTarget(row: AvailableRow): Extract<PostCommitTarget, { kind: 'task' }> {
-	if (row.groupId && row.groupInstanceId) {
-		return {
-			kind: 'task',
-			jobId: row.jobId,
-			jobInstanceId: row.jobInstanceId,
-			groupId: row.groupId,
-			groupInstanceId: row.groupInstanceId,
-			taskId: row.taskId
-		};
-	}
 	return {
 		kind: 'task',
 		jobId: row.jobId,

@@ -23,63 +23,49 @@ const ARCHIVE_SEGMENT = 'archive';
 
 /**
  * Task/overview coords from pathname only.
- * Ignore route.params.groupId / groupInstanceId unless the path has 5 org
- * segments — sv-router matchRoute leaks those keys from a failed 5-seg
- * candidate into the winning 3-seg (flat Task) or 2-seg (overview) match.
+ * Nested group paths (5+ segments) are rejected — flat leaf routes only.
  */
 export type OrgRouteCoords = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	groupId: string;
-	groupInstanceId: string;
 };
 
 export function orgRouteCoordsFromPath(input: {
 	pathname: string;
 }): OrgRouteCoords {
 	const segments = orgPathSegments(input.pathname);
-	if (segments.length >= 5) {
+	if (segments.length > 3) {
 		return {
-			jobId: segments[0] ?? '',
-			jobInstanceId: segments[1] ?? '',
-			groupId: segments[2] ?? '',
-			groupInstanceId: segments[3] ?? '',
-			taskId: segments[4] ?? ''
-		};
-	}
-	if (segments.length >= 3) {
-		return {
-			jobId: segments[0] ?? '',
-			jobInstanceId: segments[1] ?? '',
-			groupId: '',
-			groupInstanceId: '',
-			taskId: segments[2] ?? ''
-		};
-	}
-	if (segments.length >= 2) {
-		return {
-			jobId: segments[0] ?? '',
-			jobInstanceId: segments[1] ?? '',
-			groupId: '',
-			groupInstanceId: '',
+			jobId: '',
+			jobInstanceId: '',
 			taskId: ''
 		};
 	}
-	if (segments.length >= 1) {
+	if (segments.length === 3) {
+		return {
+			jobId: segments[0] ?? '',
+			jobInstanceId: segments[1] ?? '',
+			taskId: segments[2] ?? ''
+		};
+	}
+	if (segments.length === 2) {
+		return {
+			jobId: segments[0] ?? '',
+			jobInstanceId: segments[1] ?? '',
+			taskId: ''
+		};
+	}
+	if (segments.length === 1) {
 		return {
 			jobId: segments[0] ?? '',
 			jobInstanceId: '',
-			groupId: '',
-			groupInstanceId: '',
 			taskId: ''
 		};
 	}
 	return {
 		jobId: '',
 		jobInstanceId: '',
-		groupId: '',
-		groupInstanceId: '',
 		taskId: ''
 	};
 }
@@ -90,7 +76,7 @@ export function orgRouteCoordsFromPath(input: {
  * stale taskId on 2-segment overview, which would mis-classify as task and
  * make Back navigate to the same overview (no-op).
  * Trailing slash → still home at `/`.
- * Nested Task: job / jobInstance / group / groupInstance / task (5 segments).
+ * Flat Task: job / jobInstance / task (3 segments).
  * Static `/archive` is Archive (not a Job id).
  */
 export function navPlaceKindFromRoute(input: {
@@ -103,10 +89,13 @@ export function navPlaceKindFromRoute(input: {
 	if (segments.length === 1 && segments[0] === ARCHIVE_SEGMENT) {
 		return 'archive';
 	}
-	if (segments.length >= 3) {
+	if (segments.length > 3) {
+		return 'home';
+	}
+	if (segments.length === 3) {
 		return 'task';
 	}
-	if (segments.length >= 2) {
+	if (segments.length === 2) {
 		return 'overview';
 	}
 	return 'overview';
@@ -117,10 +106,8 @@ export type NavPlaceInput = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	/** Job-level Start only — nested Spawn keeps a real jobInstanceId. */
+	/** Job-level Start — provisional empty / `new` jobInstanceId. */
 	provisionalJob: boolean;
-	/** Nested provisional Spawn — same chrome as minted Task; Back → home. */
-	provisionalSpawn?: boolean;
 	worklist: Worklist | null | undefined;
 };
 

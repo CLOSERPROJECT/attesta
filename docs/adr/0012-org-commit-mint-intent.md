@@ -52,3 +52,9 @@ append. SPA TaskForm derives `mint` from provisional instance bag (`''` ⇒
 sends `_new` on Commit. Tests cover second-`startingNew` duplicate denial and
 mid-Job `none` commits. Draft keys may keep local provisional ids; wire and
 Domain use evaluated ids from the Commit response.
+
+**Later (Task group removal):** Decision text above keeps the original mint
+vocabulary for history. Live platform dropped Task groups / Spawn / Close and
+rejects mint `spawningNew`; wire mint is `startingNew` | `none` only (Config
+rejects `kind:group`; ADR-0008 consequences). Flat many-submit continues with
+`none` + real Job instance ids.

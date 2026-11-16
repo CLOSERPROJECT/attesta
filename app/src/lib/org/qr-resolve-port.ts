@@ -9,8 +9,6 @@ export type QrNavigate = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	groupId?: string;
-	groupInstanceId?: string;
 };
 
 export type QrResolveError = {
@@ -51,12 +49,7 @@ function parseNavigate(raw: unknown): QrNavigate | null {
 	const jobInstanceId = typeof rec.jobInstanceId === 'string' ? rec.jobInstanceId : '';
 	const taskId = typeof rec.taskId === 'string' ? rec.taskId : '';
 	if (!jobId || !jobInstanceId || !taskId) return null;
-	const out: QrNavigate = { jobId, jobInstanceId, taskId };
-	if (typeof rec.groupId === 'string' && rec.groupId) out.groupId = rec.groupId;
-	if (typeof rec.groupInstanceId === 'string' && rec.groupInstanceId) {
-		out.groupInstanceId = rec.groupInstanceId;
-	}
-	return out;
+	return { jobId, jobInstanceId, taskId };
 }
 
 function parseError(raw: unknown): QrResolveError | null {

@@ -1,6 +1,6 @@
 # Handoff: coordinate living flat-port implementation
 
-> **Archival:** Historical flat-port coordinator notes. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers and `completeness` are retired product grammar (Domain reads + Submission law apply instead). Keep this narrative for context; do not treat Leftovers/`completeness` here as current law.
+> **Archival:** Historical flat-port coordinator notes. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers/`completeness` and Task groups / Spawn / Close / “don’t implement groups yet” are retired—multi-pass is **submit many** + **readyWhen** (ADR-0008); groups are removed, not deferred. Keep this narrative for context; do not treat those lines as current law.
 
 **Date:** 2026-10-29  
 **Repo:** `forkbomb/attesta`  

@@ -96,7 +96,7 @@ func TestCommitLotRegisterMintsLoadAndPallets(t *testing.T) {
 		t.Fatalf("truck last reading = %#v", result.Domain.Kind("truck")[truckID])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || last.GroupID != "" {
+	if last.TaskID != "register" {
 		t.Fatalf("submission = %#v", last)
 	}
 }
@@ -172,7 +172,6 @@ func TestCommitRegisterUnlocksAfterArrive(t *testing.T) {
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
 		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
-		ClosedGroups: domain.ClosedGroups,
 	}) {
 		t.Fatal("weightCheck must unlock after truckArrive (many-skip over register)")
 	}

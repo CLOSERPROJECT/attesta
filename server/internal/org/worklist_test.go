@@ -169,9 +169,6 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 	if inst.Tasks["markProgress"] != TaskStatusActionable {
 		t.Fatalf("markProgress = %q, want actionable (many + leftover)", inst.Tasks["markProgress"])
 	}
-	if _, has := inst.Groups["markProgress"]; has {
-		t.Fatalf("markProgress must not project as group: %#v", inst.Groups)
-	}
 	if inst.Tasks["containerReg"] != TaskStatusActionable {
 		t.Fatalf("containerReg = %q, want actionable (open lot; FixtureAllRoles includes logistic)", inst.Tasks["containerReg"])
 	}
@@ -305,9 +302,6 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	}
 	if inst.Tasks["markProgress"] != TaskStatusActionable {
 		t.Fatalf("markProgress = %q, want actionable after partial mark (many)", inst.Tasks["markProgress"])
-	}
-	if _, has := inst.Groups["markProgress"]; has {
-		t.Fatalf("markProgress must not project as group: %#v", inst.Groups)
 	}
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg = %q, want available for line viewer (open lot)", inst.Tasks["containerReg"])
@@ -471,10 +465,10 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	if len(adminLoaded.TaskFormBundles) != 0 || len(lineLoaded.TaskFormBundles) != 0 {
 		t.Fatal("home Load must omit bulk Task form bundles for all viewers")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID, "", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID); err == nil {
 		t.Fatal("administration addressed fetch must forbid weigh")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID, "", ""); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID); err != nil {
 		t.Fatalf("line addressed fetch must allow weigh: %v", err)
 	}
 }
@@ -497,114 +491,6 @@ func bundleHasTask(bundles []*TaskFormBundle, taskID string) bool {
 	return false
 }
 
-func TestProjectWorklistGroupChromeSpawnCloseAndChildStatuses(t *testing.T) {
-	lots := TaskConfig{
-		"id":                           "lots",
-		"kind":                         "group",
-		"repeatable":                   true,
-		"startLabel":                   "Nuovo lotto",
-		"closeLabel":                   "Chiudi scarico",
-		"closeRequiresChildSubmission": true,
-		"tasks": []TaskConfig{
-			{
-				"id": "register", "roles": []any{"administration"},
-				"schema": map[string]any{"title": "Register"},
-			},
-		},
-	}
-	cfg := OrgConfig{
-		Jobs: OrderedObject{
-			Keys: []string{"intake"},
-			Values: map[string]any{
-				"intake": Job{
-					Repeatable: true,
-					Tasks: []TaskConfig{
-						{
-							"id": "truckArrive", "roles": []any{"administration"},
-							"schema": map[string]any{"title": "Arrive"},
-						},
-						lots,
-						{
-							"id": "weightCheck", "roles": []any{"administration"},
-							"schema": map[string]any{"title": "Weight"},
-						},
-					},
-				},
-			},
-		},
-	}
-	op := OperatorIdentity{UserID: "ada", Org: "test", Roles: []string{"administration"}}
-
-	domain := EmptyDomain()
-	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "truck"}}
-	domain.Submissions = []Submission{sub("intake", "truckArrive", "T1")}
-
-	wl := ProjectWorklist(cfg, domain, op)
-	intake, ok := worklistJobByID(wl, "intake")
-	if !ok {
-		t.Fatal("missing intake")
-	}
-	inst, ok := worklistInstance(intake, "T1")
-	if !ok {
-		t.Fatal("missing instance")
-	}
-	if inst.Tasks["lots"] != TaskStatusAvailable {
-		t.Fatalf("lots = %q, want available", inst.Tasks["lots"])
-	}
-	if inst.Tasks["weightCheck"] != TaskStatusLocked {
-		t.Fatalf("weightCheck = %q, want locked", inst.Tasks["weightCheck"])
-	}
-	g, ok := inst.Groups["lots"]
-	if !ok || !g.CanSpawn || g.CanClose || g.StartLabel != "Nuovo lotto" || g.CloseLabel != "Chiudi scarico" {
-		t.Fatalf("open empty lots chrome = %#v", g)
-	}
-	regChrome, ok := worklistTaskByID(intake, "register")
-	if !ok || regChrome.Title != "Register" {
-		t.Fatalf("nested child chrome on job.Tasks = %#v ok=%v", regChrome, ok)
-	}
-	if refs := CollectActionableTaskRefs(cfg, wl); hasActionableRef(refs, "intake", "weightCheck", "T1") {
-		t.Fatalf("no flat actionable while only group is open: %#v", refs)
-	}
-
-	domain, err := SpawnGroupInstance(domain, "intake", "T1", "lots", "L1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	domain = withLotsChildSub(domain, "T1", "L1")
-	wl = ProjectWorklist(cfg, domain, op)
-	inst, _ = worklistInstance(worklistMustJob(t, wl, "intake"), "T1")
-	g = inst.Groups["lots"]
-	if !g.CanSpawn || !g.CanClose || len(g.Instances) != 1 {
-		t.Fatalf("after child submit lots = %#v", g)
-	}
-	if g.Instances[0].ID != "L1" || g.Instances[0].Tasks["register"] != TaskStatusDone {
-		t.Fatalf("group instance chrome = %#v", g.Instances[0])
-	}
-	if inst.Tasks["weightCheck"] != TaskStatusLocked {
-		t.Fatalf("weightCheck before close = %q", inst.Tasks["weightCheck"])
-	}
-
-	closed, err := CloseGroup(domain, lots, "intake", "T1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	wl = ProjectWorklist(cfg, closed, op)
-	inst, _ = worklistInstance(worklistMustJob(t, wl, "intake"), "T1")
-	if inst.Tasks["lots"] != TaskStatusDone {
-		t.Fatalf("lots after close = %q", inst.Tasks["lots"])
-	}
-	g = inst.Groups["lots"]
-	if g.CanSpawn || g.CanClose {
-		t.Fatalf("closed group affordances = %#v", g)
-	}
-	if inst.Tasks["weightCheck"] != TaskStatusActionable {
-		t.Fatalf("weightCheck after close = %q, want actionable", inst.Tasks["weightCheck"])
-	}
-	if refs := CollectActionableTaskRefs(cfg, wl); !hasActionableRef(refs, "intake", "weightCheck", "T1") {
-		t.Fatalf("actionable weightCheck missing from CollectActionable: %#v", refs)
-	}
-}
-
 func TestProjectWorklistFlatRegisterMintsLotWithoutGroup(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
@@ -615,9 +501,6 @@ func TestProjectWorklistFlatRegisterMintsLotWithoutGroup(t *testing.T) {
 	if !ok {
 		t.Fatal("missing truck instance")
 	}
-	if _, has := inst.Groups["lots"]; has {
-		t.Fatalf("intake must not project lots group: %#v", inst.Groups)
-	}
 	if inst.Tasks["register"] != TaskStatusActionable {
 		t.Fatalf("register = %q, want actionable", inst.Tasks["register"])
 	}
@@ -626,7 +509,7 @@ func TestProjectWorklistFlatRegisterMintsLotWithoutGroup(t *testing.T) {
 		t.Fatal("expected minted lot")
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || last.GroupID != "" || !containsString(last.IDsTouched, loadID) {
+	if last.TaskID != "register" || !containsString(last.IDsTouched, loadID) {
 		t.Fatalf("register submission must touch lot id %q: %#v", loadID, last)
 	}
 }
@@ -643,14 +526,11 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 	if !ok {
 		t.Fatal("missing lot_processing instance")
 	}
-	if _, has := inst.Groups["palletWeight"]; has {
-		t.Fatalf("line must not project palletWeight group: %#v", inst.Groups)
-	}
 	if inst.Tasks["weigh"] != TaskStatusActionable {
 		t.Fatalf("weigh = %q, want actionable (many + leftover pallet)", inst.Tasks["weigh"])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "weigh" || last.GroupID != "" || !containsString(last.IDsTouched, palletID) {
+	if last.TaskID != "weigh" || !containsString(last.IDsTouched, palletID) {
 		t.Fatalf("weigh submission must touch pallet %q: %#v", palletID, last)
 	}
 	if _, ok := result.Domain.Kind("pallet")[palletID]; !ok {
@@ -658,74 +538,6 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 	}
 }
 
-func TestGroupInstanceEntityLabelIgnoresNonMatchingIDsTouched(t *testing.T) {
-	domain := EmptyDomain()
-	putKind(&domain, "lot", EntityMap{"L-real": {"client": "NO"}})
-	putKind(&domain, "pallet", EntityMap{"P1": {"lotId": "L-real"}})
-	domain.Submissions = []Submission{{
-		JobID: "intake", TaskID: "register", JobInstanceID: "T1",
-		GroupID: "lots", GroupInstanceID: "lots-1",
-		IDsTouched: []string{"P1", "L-real"},
-	}}
-	got := groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "lot")
-	if got != "L-real" {
-		t.Fatalf("label = %q, want L-real (IDsTouched ∩ entity kind)", got)
-	}
-	domain.Submissions[0].IDsTouched = []string{"L-a", "P1", "L-b"}
-	putKind(&domain, "lot", EntityMap{"L-a": {"client": "CO"}, "L-b": {"client": "DA"}})
-	got = groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "lot")
-	if got != "L-a, L-b" {
-		t.Fatalf("label = %q, want joined matching ids", got)
-	}
-	if groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-2", "lot") != "" {
-		t.Fatal("unrelated group instance must omit label")
-	}
-}
-
-func TestGroupInstanceEntityLabelEmptyWithoutEntityKind(t *testing.T) {
-	domain := EmptyDomain()
-	putKind(&domain, "lot", EntityMap{"L-real": {"client": "NO"}})
-	domain.Submissions = []Submission{{
-		JobID: "intake", TaskID: "register", JobInstanceID: "T1",
-		GroupID: "lots", GroupInstanceID: "lots-1",
-		IDsTouched: []string{"L-real"},
-	}}
-	if groupInstanceEntityLabel(domain, "intake", "T1", "lots", "lots-1", "") != "" {
-		t.Fatal("empty entityKind must omit label even when matching entities exist")
-	}
-
-	lots := TaskConfig{
-		"id": "lots", "kind": "group", "repeatable": true,
-		"tasks": []TaskConfig{{"id": "register", "roles": []any{"administration"}}},
-	}
-	cfg := OrgConfig{
-		Jobs: OrderedObject{
-			Keys: []string{"intake"},
-			Values: map[string]any{
-				"intake": Job{
-					Repeatable: true,
-					Tasks: []TaskConfig{
-						{"id": "truckArrive", "roles": []any{"administration"}},
-						lots,
-					},
-				},
-			},
-		},
-	}
-	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1"}}
-	domain.GroupInstances = []GroupInstance{{
-		JobID: "intake", JobInstanceID: "T1", GroupID: "lots", ID: "lots-1",
-	}}
-	wl := ProjectWorklist(cfg, domain, OperatorIdentity{UserID: "ada", Org: "x", Roles: []string{"administration"}})
-	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), "T1")
-	if !ok {
-		t.Fatal("missing instance")
-	}
-	g := inst.Groups["lots"]
-	if len(g.Instances) != 1 || g.Instances[0].Label != "" {
-		t.Fatalf("group without instanceLabelEntity must omit label: %#v", g.Instances)
-	}
-}
 
 func worklistMustJob(t *testing.T, wl Worklist, jobID string) WorklistJob {
 	t.Helper()
@@ -736,7 +548,6 @@ func worklistMustJob(t *testing.T, wl Worklist, jobID string) WorklistJob {
 	return job
 }
 
-// Synthetic Job/Task ids only — plant ids must not appear in this fold suite.
 func TestProjectWorklistReadyWhenFold(t *testing.T) {
 	op := OperatorIdentity{UserID: "u", Org: "test", Roles: []string{"ops"}}
 	other := OperatorIdentity{UserID: "v", Org: "test", Roles: []string{"other"}}
@@ -860,44 +671,6 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 		}
 	})
 
-	t.Run("group_child_readyWhen", func(t *testing.T) {
-		cfg := OrgConfig{
-			Jobs: OrderedObject{
-				Keys: []string{"gateJob"},
-				Values: map[string]any{
-					"gateJob": Job{
-						Tasks: []TaskConfig{
-							leaf("opener", nil),
-							{
-								"id": "bundle", "kind": "group",
-								"tasks": []TaskConfig{
-									{
-										"id": "childGate", "roles": []any{"ops"},
-										"readyWhen": "false",
-										"schema":    map[string]any{"title": "Child"},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-		domain := EmptyDomain()
-		domain.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
-		domain.Submissions = []Submission{sub("gateJob", "opener", "I1")}
-		var err error
-		domain, err = SpawnGroupInstance(domain, "gateJob", "I1", "bundle", "G1")
-		if err != nil {
-			t.Fatal(err)
-		}
-		wl := ProjectWorklist(cfg, domain, op)
-		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
-		g := inst.Groups["bundle"]
-		if len(g.Instances) != 1 || g.Instances[0].Tasks["childGate"] != TaskStatusUnavailable {
-			t.Fatalf("group child readyWhen false = %#v", g.Instances)
-		}
-	})
 
 	t.Run("canStart_folds_first_task_readyWhen", func(t *testing.T) {
 		cfg := OrgConfig{
@@ -942,4 +715,3 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 		}
 	})
 }
-

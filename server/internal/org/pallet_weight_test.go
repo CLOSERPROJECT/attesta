@@ -17,7 +17,7 @@ func TestCommitWeighPatchesOnePalletLeavesOtherUnweighted(t *testing.T) {
 		t.Fatalf("pallet .2 must stay unweighted; got %#v", result.Domain.Kind("pallet")[loadID+".2"])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "weigh" || last.GroupID != "" {
+	if last.TaskID != "weigh" {
 		t.Fatalf("weigh submission = %#v", last)
 	}
 	if last.Facts["palletId"] != loadID+".1" {

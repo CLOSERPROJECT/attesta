@@ -30,9 +30,7 @@
 		const addr = draftAddressForTask({
 			jobId: row.jobId,
 			taskId: row.taskId,
-			jobInstanceId: row.jobInstanceId,
-			groupId: row.groupId,
-			groupInstanceId: row.groupInstanceId
+			jobInstanceId: row.jobInstanceId
 		});
 		return orgSession.hasDirtyDraft(addr.taskPath, addr.draftBagInstanceKey);
 	}
@@ -70,8 +68,6 @@
 									data-testid="available-row"
 									data-job-id={row.jobId}
 									data-instance-id={row.jobInstanceId}
-									data-group-id={row.groupId}
-									data-group-instance-id={row.groupInstanceId}
 									data-task-id={row.taskId}
 									ready
 									showDraft={rowHasDirtyDraft(row)}
@@ -97,9 +93,7 @@
 									request={{
 										jobId: row.jobId,
 										jobInstanceId: row.jobInstanceId,
-										taskId: row.taskId,
-										groupId: row.groupId,
-										groupInstanceId: row.groupInstanceId
+										taskId: row.taskId
 									}}
 									data-testid="home-many-history"
 								/>

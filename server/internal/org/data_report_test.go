@@ -55,7 +55,6 @@ func dataReportProbeDomain() Domain {
 	})
 	d.Submissions = []Submission{{
 		JobID: "lot_processing", TaskID: "weigh", JobInstanceID: "2026-10-19-1st",
-		GroupID: "palletWeight", GroupInstanceID: "pw-1",
 		Facts: map[string]any{
 			"tareKind": "euro",
 			"weights":  map[string]any{"P1": map[string]any{}, "P2": map[string]any{}},

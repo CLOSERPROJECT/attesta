@@ -1,10 +1,7 @@
 import type { TaskFormBundle, Worklist } from './types.js';
 
 /** Commit wire mint knob (omit → none on server). */
-export type CommitMint =
-	| { kind: 'none' }
-	| { kind: 'startingNew' }
-	| { kind: 'spawningNew' };
+export type CommitMint = { kind: 'none' } | { kind: 'startingNew' };
 
 export type CommitRequest = {
 	taskPath: string;

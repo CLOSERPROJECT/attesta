@@ -7,11 +7,7 @@
 	import type { CommitOutcome } from './commit-port.js';
 	import { orgSession } from './org-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
-	import {
-		groupTaskPath,
-		PROVISIONAL_GROUP_INSTANCE_ID,
-		taskPath
-	} from './types.js';
+	import { taskPath } from './types.js';
 	import ConfigForm from './form/ConfigForm.svelte';
 	import HttpLinkStrip from './form/HttpLinkStrip.svelte';
 	import type { TaskFormPlan } from './form/task-form-plan.js';
@@ -31,8 +27,6 @@
 		taskId: string;
 		/** Empty string = provisional start (first Task / mint). */
 		jobInstanceId: string;
-		groupId?: string;
-		groupInstanceId?: string;
 		bundle: TaskFormBundle;
 		disabled?: boolean;
 		onCommitted?: (outcome: CommitOutcome) => void;
@@ -42,26 +36,13 @@
 		jobId,
 		taskId,
 		jobInstanceId,
-		groupId = '',
-		groupInstanceId = '',
 		bundle,
 		disabled = false,
 		onCommitted
 	}: Props = $props();
 
-	const path = $derived(
-		groupId
-			? groupTaskPath(
-					jobId,
-					groupId,
-					groupInstanceId || PROVISIONAL_GROUP_INSTANCE_ID,
-					taskId
-				)
-			: taskPath(jobId, taskId)
-	);
-	const draftInstanceKey = $derived(
-		draftBagInstanceKey({ jobInstanceId, groupId, groupInstanceId })
-	);
+	const path = $derived(taskPath(jobId, taskId));
+	const draftInstanceKey = $derived(draftBagInstanceKey({ jobInstanceId }));
 	const drafts = $derived(orgSession.drafts);
 
 	let submitError = $state.raw<string | null>(null);
@@ -107,13 +88,10 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		if (orgSession.committing) return;
 		submitError = null;
-		const provisionalJob = !groupId && jobInstanceId === '';
-		const provisionalSpawn = Boolean(groupId) && groupInstanceId === '';
+		const provisionalJob = jobInstanceId === '';
 		const mint = provisionalJob
 			? ({ kind: 'startingNew' } as const)
-			: provisionalSpawn
-				? ({ kind: 'spawningNew' } as const)
-				: ({ kind: 'none' } as const);
+			: ({ kind: 'none' } as const);
 		const outcome = await orgSession.commit({
 			taskPath: path,
 			jobInstanceId: provisionalJob ? '' : jobInstanceId,
@@ -187,8 +165,6 @@
 	data-testid={`task-${taskId}`}
 	data-task-path={path}
 	data-instance-id={jobInstanceId || 'provisional'}
-	data-group-id={groupId || undefined}
-	data-group-instance-id={groupInstanceId || (groupId ? 'provisional' : undefined)}
 	data-from-bundle="1"
 >
 	{#if live?.form}

@@ -88,21 +88,17 @@ func (l *DomainLoader) Load(ctx context.Context, org string, op OperatorIdentity
 }
 
 // LoadTaskBundle returns one Task form bundle for jobId+taskId+jobInstanceId
-// (empty or "new" = provisional start). Optional groupId + groupInstanceId
-// address nested leaves (provisional group instance "new" → empty). Denied
-// when outside viewer Worklist scope.
+// (empty or "new" = provisional start). Denied when outside viewer Worklist scope.
 func (l *DomainLoader) LoadTaskBundle(
 	ctx context.Context,
 	org string,
 	op OperatorIdentity,
-	jobID, taskID, jobInstanceID, groupID, groupInstanceID string,
+	jobID, taskID, jobInstanceID string,
 ) (*TaskFormBundle, error) {
 	org = strings.TrimSpace(org)
 	jobID = strings.TrimSpace(jobID)
 	taskID = strings.TrimSpace(taskID)
-	groupID = strings.TrimSpace(groupID)
 	jobInstanceID = NormalizeJobInstanceID(jobInstanceID)
-	groupInstanceID = NormalizeGroupInstanceID(groupInstanceID)
 	if org == "" || jobID == "" || taskID == "" {
 		return nil, fmt.Errorf("org: org, jobId, and taskId required")
 	}
@@ -129,11 +125,9 @@ func (l *DomainLoader) LoadTaskBundle(
 
 	wl := ProjectWorklist(cfg, domain, op)
 	ref := ActionableTaskRef{
-		JobID:           jobID,
-		TaskID:          taskID,
-		JobInstanceID:   jobInstanceID,
-		GroupID:         groupID,
-		GroupInstanceID: groupInstanceID,
+		JobID:         jobID,
+		TaskID:        taskID,
+		JobInstanceID: jobInstanceID,
 	}
 	if !ViewerMayMountTask(cfg, wl, ref) {
 		return nil, ErrTaskBundleForbidden
