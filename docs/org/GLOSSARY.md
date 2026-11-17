@@ -65,32 +65,6 @@ Submission without finishing the Task from that Commit alone. See
 _Avoid_: Repeatable Task groups for multi-submit; calling cardinality
 “repeatable” (that word remains Job-level)
 
-**child Task** *(historical / rejected)*:
-Former name for a Task under a Task group; replaced by **submit cardinality**
-`many` + **readyWhen**. See [ADR-0008](../adr/0008-org-task-submit-cardinality.md).
-_Avoid_: Reviving child Tasks or group nesting; Subtask; task instance
-
-**Task group** *(historical / rejected)*:
-Former composite node under a Job; removed. Multi-pass same-form work is
-**submit cardinality** `many` + **readyWhen**. See
-[ADR-0008](../adr/0008-org-task-submit-cardinality.md).
-_Avoid_: Calling a Task group a Task; jobs all the way down
-
-**Spawn** *(historical / rejected)*:
-Former affordance to open a Task group occurrence; removed with groups. See
-[ADR-0012](../adr/0012-org-commit-mint-intent.md).
-_Avoid_: Calling Job start “Spawn”; inventing Spawn chrome
-
-**Close** *(historical / rejected)*:
-Former affordance to end a Task group occurrence; removed with groups. See
-[ADR-0008](../adr/0008-org-task-submit-cardinality.md).
-_Avoid_: Reviving Close chrome; treating Close as entity open/closed law
-
-**spawningNew** *(historical / rejected)*:
-Former Commit mint kind for a Task group occurrence; removed with groups. See
-[ADR-0012](../adr/0012-org-commit-mint-intent.md).
-_Avoid_: Sending `spawningNew` on Commit
-
 **Job instance**:
 One occurrence of a repeatable Job within the org Domain. Often created on first
 Task submit; id/label from config and/or submitted data. Distinct from Domain
@@ -300,17 +274,44 @@ Domain. See [ADR-0010](../adr/0010-org-http-side-effects.md).
 _Avoid_: Rolling back Domain on side-effect failure; `onSubmit.http` as the
 product noun (that is the Config key)
 
-### Rejected / historical code names
+## Historical / rejected
 
-Do not revive as Org nouns.
+Do not revive as Org nouns. Living multi-pass work is **submit cardinality**
+`many` + **readyWhen** (see [ADR-0008](../adr/0008-org-task-submit-cardinality.md)).
 
-- **Whole-config execution** (historical name `Config run`): one “run of the
-  config” with its own Domain — replaced by one org Domain + repeated Job
-  instances.
-- **`LoadRunPort` / run-id load shape**: replaced by org Domain Load/Commit
-  ([ADR-0005](../adr/0005-org-worklist-server-projection.md)).
-- **Step / Substep / Step instance**: experiment names for Job / Task / Job
-  instance.
-- **Task group / child Task / Spawn / Close / `spawningNew`**: removed; see
-  [ADR-0008](../adr/0008-org-task-submit-cardinality.md) and
-  [ADR-0012](../adr/0012-org-commit-mint-intent.md).
+**child Task**:
+Former name for a Task under a Task group; replaced by **submit cardinality**
+`many` + **readyWhen**. See [ADR-0008](../adr/0008-org-task-submit-cardinality.md).
+_Avoid_: Reviving child Tasks or group nesting; Subtask; task instance
+
+**Task group**:
+Former composite node under a Job; removed. Multi-pass same-form work is
+**submit cardinality** `many` + **readyWhen**. See
+[ADR-0008](../adr/0008-org-task-submit-cardinality.md).
+_Avoid_: Calling a Task group a Task; jobs all the way down
+
+**Spawn**:
+Former affordance to open a Task group occurrence; removed with groups. See
+[ADR-0012](../adr/0012-org-commit-mint-intent.md).
+_Avoid_: Calling Job start “Spawn”; inventing Spawn chrome
+
+**Close**:
+Former affordance to end a Task group occurrence; removed with groups. See
+[ADR-0008](../adr/0008-org-task-submit-cardinality.md).
+_Avoid_: Reviving Close chrome; treating Close as entity open/closed law
+
+**spawningNew**:
+Former Commit mint kind for a Task group occurrence; removed with groups. See
+[ADR-0012](../adr/0012-org-commit-mint-intent.md).
+_Avoid_: Sending `spawningNew` on Commit
+
+**Whole-config execution** (historical name `Config run`):
+One “run of the config” with its own Domain — replaced by one org Domain +
+repeated Job instances.
+
+**LoadRunPort** / run-id load shape:
+Replaced by org Domain Load/Commit
+([ADR-0005](../adr/0005-org-worklist-server-projection.md)).
+
+**Step** / **Substep** / **Step instance**:
+Experiment names for Job / Task / Job instance.

@@ -88,7 +88,16 @@ _Avoid_: Plant-named role branches in executors
 > **Domain expert:** “No — **closeLot** sets **fullyProcessed**; Passport still
 > needs an explicit Lock Commit on that **lot**.”
 
-## Historical plant names
+## Historical / rejected
 
-Do not revive: **load** (now **lot**); working day / shift / whole-day as Domain;
-**`parked`** lot session status.
+Do not revive as Feragame nouns.
+
+**load**:
+Former name for **lot**.
+
+**working day** / **shift** / whole-day Domain peers:
+Former Domain calendar layer; not plant Domain entities.
+
+**`parked`**:
+Former lot session status; not in the living enum (`open` | `fullyProcessed`).
+
