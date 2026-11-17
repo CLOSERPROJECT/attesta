@@ -29,7 +29,7 @@ viewer-scoped Worklist (title + roles + counts chrome); Task form bundles load o
 Task open (`GET /api/org/task-form`) or Commit advance. **readyWhen** stays
 Commit-path law (ADR-0005). Amends ADR-0005’s bulk Available bundles-on-Load for the
 home path. Stream Operator home stays out of scope. Task-group Spawn/Close as a
-product hub is out of scope (groups pending full removal).
+product hub is out of scope (groups removed per ADR-0008).
 
 **Considered options:** (1) Keep four home bands + overview handoff — rejected:
 home should be act-now only; finished/non-actionable rediscovery is Archive, not
