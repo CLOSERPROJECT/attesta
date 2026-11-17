@@ -103,24 +103,24 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		t.Fatalf("memberships = %d, want platform admin + org admin", len(memberships))
 	}
 
-	livingOrg, err := identity.GetOrganizationBySlug(t.Context(), demoFeragameOrgSlug)
+	feragameOrg, err := identity.GetOrganizationBySlug(t.Context(), demoFeragameOrgSlug)
 	if err != nil {
-		t.Fatalf("living org: %v", err)
+		t.Fatalf("org: %v", err)
 	}
-	if livingOrg.Slug != demoFeragameOrgSlug {
-		t.Fatalf("living org slug = %q", livingOrg.Slug)
+	if feragameOrg.Slug != demoFeragameOrgSlug {
+		t.Fatalf("org slug = %q", feragameOrg.Slug)
 	}
-	livingMemberships, err := identity.ListOrganizationMemberships(t.Context(), demoFeragameOrgSlug)
+	feragameMemberships, err := identity.ListOrganizationMemberships(t.Context(), demoFeragameOrgSlug)
 	if err != nil {
-		t.Fatalf("living memberships: %v", err)
+		t.Fatalf("org memberships: %v", err)
 	}
 	// platform admin + org all-roles + administration / logistic / line
-	if len(livingMemberships) < 5 {
-		t.Fatalf("org memberships = %d, want platform admin + 4 org operators", len(livingMemberships))
+	if len(feragameMemberships) < 5 {
+		t.Fatalf("org memberships = %d, want platform admin + 4 org operators", len(feragameMemberships))
 	}
 }
 
-func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
+func TestSeedOrgStoresWipeDomainOnReplace(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
 	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
 
@@ -571,7 +571,7 @@ func TestSeedFeragameIdentityHardResetsIdentityWipesDomainSkipsFormata(t *testin
 		demoOrgAdminUserEmail, demoAdministrationUserEmail, demoLogisticUserEmail, demoLineUserEmail,
 	} {
 		if _, err := identity.GetUserByEmail(t.Context(), email); err != nil {
-			t.Fatalf("living user %s: %v", email, err)
+			t.Fatalf("org user %s: %v", email, err)
 		}
 	}
 }
