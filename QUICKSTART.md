@@ -1,119 +1,150 @@
-# Quick Start Guide
+# Quick Start
 
-This demo runs MongoDB + Cerbos + Appwrite with Docker Compose, a Go server, and a Vite-built asset bundle.
+Ordered local-dev recipe for this checkout. Product overview → [README.md](README.md). Compose services, Coolify, lifecycle detail → [DOCKER.md](DOCKER.md).
 
 ## Prerequisites
+
 - Docker + Docker Compose 2.24.4+
 - Go 1.25+
-- Node.js 18+
-- Task
+- Node.js 18+ (npm) and Bun (for `/app`)
+- [Task](https://taskfile.dev)
 
-For parallel worktrees, install the repo-pinned Worktrunk tool with `mise install`.
-Worktrunk-created worktrees run `scripts/worktree-bootstrap.sh` from `.config/wt.toml`.
-Codex-managed worktrees run it through the checked-in local environment; for a plain Git worktree, run it explicitly.
-Like Credimi, it derives deterministic candidates with Worktrunk's `hash_port`, skips live listeners and ports reserved by sibling worktrees, and writes the result once in `.env.worktree`.
-The flat `KEY=value` file can be edited afterward and is never overwritten.
-Each worktree starts with its own empty Compose volumes; demo data comes from the Go seed after Appwrite credentials exist (`ATTESTA_SEED=true` / `task seed`).
+Or install the pinned toolchain with [mise](https://mise.jdx.dev/installing-mise.html):
 
-Before the first unattended Worktrunk operation, review and approve the shared
-hooks with `wt config approvals add`.
+```bash
+mise trust
+mise install
+```
 
-## Start services
+For parallel worktrees, `mise install` also pins Worktrunk (`wt`).
+
+## Clone and env
+
+```bash
+git clone https://github.com/CLOSERPROJECT/attesta
+cd attesta
+cp .env.example .env
+```
+
+Ports and Compose identity live in gitignored `.env.worktree` (written once by bootstrap; later edits are preserved). Appwrite runtime credentials after prepare live in `.env.appwrite`.
+
+## Worktrees
+
+```bash
+mise install
+wt config shell install
+wt config approvals add   # once: review shared bootstrap/cleanup hooks
+wt switch -c my-feature
+```
+
+- Worktrunk / Codex / Cursor worktrees run `scripts/worktree-bootstrap.sh` automatically; plain Git worktrees: `bash scripts/worktree-bootstrap.sh`.
+- Bootstrap writes `.env.worktree` only when missing (path-qualified Compose project + host ports).
+- Each checkout starts with empty Compose volumes. Demo data comes only from the Go seed after Appwrite credentials exist (`ATTESTA_SEED` / `task seed`).
+
+## Start infrastructure
+
 ```bash
 task start
 ```
 
-This starts a Compose project named after the checkout.
-Its containers, networks, MongoDB volume, and Appwrite volumes are independent of every other worktree.
-Host ports come from `.env.worktree`.
+Brings up this checkout’s Compose project (MongoDB, Cerbos, Appwrite, Mailpit, …) and runs `attesta prepare` when `ATTESTA_SEED` is set (worktree-env default: `true`).
 
-Use `task start:docker` for the full containerized stack, or `task start:docker:build` to rebuild it.
-The containerized app is available on `DOCKER_APP_PORT`; `task start` remains infrastructure-only for host development.
+Alternatives:
+
+- `task start:docker` — full stack including the containerized app on `DOCKER_APP_PORT`
+- `task start:docker:build` — rebuild that image first
+
+`task start` is infrastructure-only; host app processes come from `task dev` below.
+
+Stop / reset / purge / orphan GC for this checkout: see [DOCKER.md](DOCKER.md). After `task reset` or `task purge`, the next start can re-apply the Go demo seed when credentials exist.
 
 ## Bootstrap Appwrite
-Preferred path: with `ATTESTA_SEED=true` (worktree-env default), `task start` / `task start:docker` run `attesta prepare`, which bootstraps Appwrite when needed, seeds by value (empty-only), and writes checkout-scoped `.env.appwrite` (gitignored; `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY`) for the server restart adapter. The server and `task seed` load that file when credentials are ambient.
 
-Manual console bootstrap is still possible after the Compose stack is up:
-1. Open the Appwrite console on `http://localhost`.
-2. Create the first Appwrite console account.
-3. Create the Attesta Appwrite project.
+Preferred: with `ATTESTA_SEED=true`, `task start` / `task start:docker` run `attesta prepare --policy=worktree` (wait → bootstrap → empty-only seed by value). Prepare writes checkout-scoped `.env.appwrite` (`APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY`) for the server. Soft-skips when bootstrap cannot finish yet; re-run `task start` after credentials exist, or run `task seed`.
+
+Console defaults when unset: `admin@appwrite.local` / `admin@appwrite.local`.
+
+Manual console fallback (stack already up):
+
+1. Open the Appwrite console (`APPWRITE_CONSOLE_URL` from `bash scripts/worktree-env.sh print`).
+2. Create the first console account.
+3. Create the Attesta project.
 4. Create an API key for Attesta.
-5. Open Mailpit on `http://localhost:8025` if you want to inspect invite and recovery emails locally.
-6. Create the `org-assets` storage bucket.
-7. Put `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` in `.env` or let prepare write `.env.appwrite`.
-8. Re-run `task start` (or `task start:docker`) so the empty-only Go seed can apply, or run `task seed` once.
+5. Create the `org-assets` storage bucket.
+6. Put `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` in `.env`, or let prepare write `.env.appwrite`.
+7. Re-run `task start` (or `task seed`) so the empty-only Go seed can apply.
 
-Invite, reset, and verify links use `PUBLIC_BASE_URL` (from worktree-env / compose) plus fixed paths; if unset, they use the request host.
+Invite / reset / verify links use `PUBLIC_BASE_URL` (from worktree-env / compose) plus fixed paths; if unset, they use the request host. Inspect mail on `MAILPIT_UI_URL` from the same print command.
 
-New parallel worktrees start empty. After Appwrite credentials exist (`.env.appwrite` or ambient env), the Go demo seed (`ATTESTA_SEED=true`) is the only demo-data path.
+## Run the app
 
-After credentials exist, `task start` / `task start:docker` run the Go demo seed automatically (`ATTESTA_SEED=true` from worktree-env; empty-only). Run `task seed` manually anytime, or `task seed -- --replace` to rewrite.
-
-After `task reset` or `task purge`, the next start re-applies the Go demo seed when credentials exist.
-
-### Org Domain (`/app`) demo seed
-
-Only `task seed` / `attesta seed` seeds org Domain + Active Config (and identity). Product boot does not auto-load Feragame or wipe Domain.
-
-- Identity: `attesta seed` creates org `feragame`, all-roles `admin@feragame.com`, plus single-role `administration@feragame.com`, `logistic@feragame.com`, and `line@feragame.com` (password = email) so each login’s Worklist home differs. Existing stacks need `task seed -- --replace` once to pick this up.
-- Domain + Active Config fixture: the same seed puts the feragame-config Org Config as Active and, when Domain is missing or empty (no JobInstances / Submissions) or `--replace` is used, rebuilds a staged Domain (intake after register / after codiceFir / weightCheck-ready, plus line after shift). There is no harness `/api/runs` snapshot PUT.
-- Feragame scopes (skip Formata; always run): `task seed:feragame-config` — Active Config + wipe Domain to empty (no Appwrite); `task seed:feragame-domain` — Config + staged Domain; `task seed:feragame-identity` — Feragame Appwrite + Config + empty Domain; `task seed:feragame-full` — Appwrite + Config + staged Domain. Add `--keep-domain` on config/identity only to refresh Active Config without touching Domain. Default `task seed` still does the full demo stack. See `attesta seed --help`.
-- If the seed marker org already exists and Feragame Domain is still empty (pre-staging seed), run `task seed -- --replace` (or `task seed:feragame-full`) once to pick up the staged matrix and new users — empty-only seed is a no-op while the marker is set.
-- In-memory Domain clears on server restart; re-run `task seed` (or `task seed:feragame-full` / `task seed -- --replace`) after a Memory-backed restart if you need the demo fixture again.
-
-## Migration Notes
-- Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
-- Existing Mongo invite and password-reset tokens are not migrated. Re-issue any still-needed invite or reset from the Appwrite-backed Attesta flows.
-- If you are cutting over an existing demo dataset, migrate organizations, roles, and active users into Appwrite before relying on `/my/organization/*`.
-
-## Build frontend assets
 ```bash
-cd web
-npm install
-npm run build
+task dev
 ```
 
-## Run the Go server
-```bash
-cd ../server
-go mod tidy
-go run ./cmd/server
-```
+Starts infrastructure (via `task start`), then hot-reloads the Go server, Vite (`web`), and SvelteKit `/app` on this checkout’s ports.
+
+One-shot backend without HMR: `task run:server`. Prefer Task over bare `npm` / `go run`.
 
 ## Open the demo
-- Appwrite Console: `http://localhost:${APPWRITE_HTTP_PORT}`
-- Public homepage: `http://localhost:${PORT}/`
-- Stream picker (after login): `http://localhost:${PORT}/my`
-- Platform admin (when enabled): `http://localhost:${PORT}/admin`
-- Mailpit: `http://localhost:${MAILPIT_UI_PORT}`
 
-After login, the stream picker is at `/my`. Stream and instance routes live under `/my/streams/{workflowKey}/...` (legacy `/w/` and `/org-admin/` paths return 404).
+Print this checkout’s URLs and ports:
 
-## Configure DPP Digital Link (optional)
-Edit `server/config/workflow.yaml` and add:
-
-```yaml
-dpp:
-  enabled: true
-  gtin: "09506000134352"
-```
-
-When enabled, completing a workflow generates a Digital Link at `/01/{GTIN}/10/{LOT}/21/{SERIAL}`.
-
-## Run tests
-Unit tests:
 ```bash
-task test
+bash scripts/worktree-env.sh print
 ```
 
-Coverage with 90% unit-test gate:
-```bash
-task cover
-```
-`task cover` enforces `>= 90.0%` total coverage on the unit suite.
+Use the printed values (do not assume `:3000` / `:80` / `:8025` on every worktree):
 
-Optional integration command:
+| Surface | Env key |
+| --- | --- |
+| Attesta (host-dev) | `PORT` → `http://localhost:${PORT}/` |
+| Vite HMR | `VITE_PORT` |
+| SvelteKit `/app` HMR | `APP_PORT` |
+| Appwrite console | `APPWRITE_CONSOLE_URL` |
+| Mailpit | `MAILPIT_UI_URL` |
+| Containerized app | `DOCKER_APP_PORT` (after `task start:docker`) |
+
+After login, the stream picker is `/my`. Stream routes live under `/my/streams/{workflowKey}/...` (legacy `/w/` and `/org-admin/` return 404). Platform admin (when enabled): `/admin`. API docs: `/docs`.
+
+## Seed
+
+Demo data comes only from the Go seed (`attesta seed` / `ATTESTA_SEED`). Product boot does not auto-load Feragame or wipe Domain.
+
+- Empty-only (default): `task seed` / prepare seed is a no-op while the marker org exists.
+- Rewrite: `task seed -- --replace` (wipes and rebuilds org Domain + passports).
+- Identity: org `feragame`, all-roles `admin@feragame.com`, plus `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com` (password = email). Existing stacks need `--replace` once to pick up new users.
+- Domain + Active Config: same seed sets feragame-config as Active and, when Domain is missing/empty or `--replace` is used, rebuilds a staged Domain. No harness `/api/runs` snapshot PUT.
+- Feragame scopes (skip Formata; always run):
+  - `task seed:feragame-config` — Active Config + wipe Domain empty (no Appwrite)
+  - `task seed:feragame-domain` — Config + staged Domain
+  - `task seed:feragame-identity` — Feragame Appwrite + Config + empty Domain
+  - `task seed:feragame-full` — Appwrite + Config + staged Domain
+  - `--keep-domain` on config/identity only: refresh Active Config without touching Domain
+- If the marker org exists but Feragame Domain is still empty (pre-staging seed), run `task seed -- --replace` or `task seed:feragame-full` once.
+- Memory-backed Domain clears on server restart; re-run `task seed` (or `task seed:feragame-full` / `--replace`) after a Memory-backed restart if you need the fixture again. Normal host-dev with Mongo uses durable Domain stores.
+
+See `attesta seed --help` (via `task seed -- --help`).
+
+## Migration notes
+
+- Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
+- Existing Mongo invite and password-reset tokens are not migrated. Re-issue any still-needed invite or reset from the Appwrite-backed Attesta flows.
+- Cutting over an existing demo dataset: migrate organizations, roles, and active users into Appwrite before relying on `/my/organization/*`.
+
+## Tests
+
 ```bash
-cd server
-go test -tags=integration ./...
+task test    # unit suite (Go + worktree scripts + CSS lint + /app unit)
+task cover   # same suite with >= 90% Go coverage gate (override with COVER_MIN)
 ```
+
+Integration (needs Compose Mongo/Cerbos):
+
+```bash
+task test:integration
+```
+
+## Optional DPP
+
+Digital Link / UNTP behavior: [README.md](README.md) (Digital Product Passport) and [docs/untp.md](docs/untp.md).

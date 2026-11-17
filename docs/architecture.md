@@ -56,7 +56,6 @@ boundary follow the same progress-key rule as Stream Process storage (see
 ## Operational shape
 
 Local infrastructure is the shared Docker Compose stack under `deployment/`.
-The Go server, its Vite bundle, and configuration are documented for humans in
-the [README](../README.md), [Quickstart](../QUICKSTART.md), and
-[Docker notes](../DOCKER.md). Those documents defer to scripts and
-configuration when they differ.
+Ops doc ownership: [README](../README.md) for pitch/env, [QUICKSTART](../QUICKSTART.md)
+for the day-1 local recipe, [DOCKER](../DOCKER.md) for Compose/Coolify/lifecycle.
+Those documents defer to scripts and configuration when they differ.

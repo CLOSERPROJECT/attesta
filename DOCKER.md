@@ -1,85 +1,86 @@
-# Docker Compose Setup
+# Docker Compose and Coolify
 
-This demo uses one Docker Compose project per checkout to run MongoDB, Cerbos, Appwrite, and optionally the containerized Attesta app.
-All Docker-related files live under `deployment/`.
+Compose and Coolify/deploy reference for Attesta. For day-1 local setup (clone, `task start`, Appwrite prepare/seed, host Go + Vite), use [QUICKSTART.md](QUICKSTART.md). Product overview and host env vars live in [README.md](README.md) and `.env.example`. Worktree install hooks (`wt`, Codex, Cursor) are summarized in QUICKSTART/README; this file covers Docker-scoped mechanics only.
+
+All Docker-related files live under `deployment/`. Scripts under `scripts/` remain the source of truth; this doc caches layout and gotchas.
 
 ## Services
 
-### MongoDB Community Edition
-- **Image**: `mongo:7.0`
-- **Port**: 27017
-- **Auth**: Disabled for local demo simplicity
+Local stack: `deployment/docker-compose.local.yaml` (includes the Appwrite baseline + worktree override). Host ports come from `.env.worktree` (defaults shown below).
 
-### Cerbos Policy Engine
+### MongoDB
+- **Image**: `mongo:7.0`
+- **Host port**: `${MONGODB_PORT:-27017}` → 27017
+- **Auth**: disabled for local demo
+
+### Cerbos
 - **Image**: `ghcr.io/cerbos/cerbos:0.50.0`
-- **HTTP Port**: 3592
+- **Host port**: `${CERBOS_PORT:-3592}` → 3592
 - **Config**: `cerbos/config/config.yaml`
 - **Policies**: `cerbos/policies/*.yaml`
 
 ### Appwrite
 - **Baseline**: `deployment/appwrite/docker-compose.appwrite.yaml`
+- **Local override**: `deployment/appwrite/docker-compose.worktree.yaml`
 - **Env template**: `deployment/appwrite/.env.appwrite.example`
-- **HTTP entrypoint**: `http://localhost`
 - **Purpose**: identity, teams, memberships, labels, and org asset storage
 
 ### Mongo Express (optional)
 - **Image**: `mongo-express:1.0.2`
-- **Port**: 8081
+- **Host port**: `${MONGO_EXPRESS_PORT:-8081}` → 8081
 
 ### Attesta app
-- **Image**: Built from local `deployment/Dockerfile.local`
-- **Container port**: 3000 (`DOCKER_APP_PORT` on the host when explicitly run)
+- **Local image**: build from `deployment/Dockerfile.local`
+- **Container port**: 3000 (`${DOCKER_APP_PORT:-3030}` on the host when run via `task start:docker`)
 - **Mongo**: `mongodb://mongodb:27017`
 - **Cerbos**: `http://cerbos:3592`
 
-## Quick Start
-```bash
-task start
-```
+Also in the local compose file (not the Coolify focus of this doc): Mailpit (`axllent/mailpit:v1.29.3`) and the plant `org-http` peer (`deployment/Dockerfile.org-http`).
 
-`scripts/worktree-compose.sh` loads the generated or manually edited ports from `.env.worktree` and sets a Compose project name derived from the checkout's canonical path.
-Compose therefore scopes container names, networks, and volumes to that worktree, including checkouts with the same directory name.
-`task start` starts infrastructure only; `task dev` runs Attesta and Vite on the host.
-`task start:docker` starts the full containerized stack and publishes Attesta on `DOCKER_APP_PORT`; use `task start:docker:build` to rebuild it first.
-The wrapper checks Docker Compose 2.24.4+ before loading the local override.
+## Layout under `deployment/`
 
-The local Compose path applies `deployment/appwrite/docker-compose.worktree.yaml` as a local-only override to the vendored Appwrite baseline.
-That override owns the worktree-specific ports, resource labels, and scoped names.
-The standalone operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the Coolify paths in `deployment/docker-compose.coolify.yaml` and `deployment/Dockerfile.coolify` remain unchanged and do not consume the local override.
+| Path | Role |
+|---|---|
+| `docker-compose.local.yaml` | Local Compose entry (infra + optional Attesta) |
+| `appwrite/docker-compose.appwrite.yaml` | Vendored Appwrite baseline |
+| `appwrite/docker-compose.worktree.yaml` | Local-only override: worktree ports, resource labels, scoped names |
+| `appwrite/.env.appwrite.example` | Appwrite env template for local include |
+| `Dockerfile.local` | Local Attesta image |
+| `Dockerfile.org-http` | Plant HttpPort peer |
+| `Dockerfile.cerbos` | Cerbos image used by Coolify |
+| `docker-compose.coolify.yaml` | Coolify stack (no local Appwrite override; no Traefik `ports:`) |
+| `Dockerfile.coolify` | Coolify Attesta image |
+| `coolify-entrypoint.sh` | Coolify entrypoint (`prepare` then server when seeding) |
 
-New checkouts get a path-qualified Compose project name automatically.
-Parallel worktrees get isolated Compose projects and empty durable volumes.
-Demo data comes from the Go seed after Appwrite is ready and credentials exist (`ATTESTA_SEED=true` / `task seed`).
+## Worktree Compose
 
-Open:
-- Run `bash scripts/worktree-env.sh print` to see the current checkout's URLs.
-- `task dev` serves the app on `PORT` and Vite on `VITE_PORT`.
-- `task start:docker` serves the containerized app on `DOCKER_APP_PORT`.
+`scripts/worktree-compose.sh` is the Compose entrypoint for one isolated stack per checkout. Task targets (`task start`, `start:docker`, `stop`, `reset`, …) call it.
 
-After the primary checkout's first boot:
-1. Create the first Appwrite console account.
-2. Create the Attesta Appwrite project.
-3. Create an API key for Attesta.
-4. Open Mailpit on `http://localhost:8025` to inspect invite, recovery, and affiliation emails.
-5. Create the `org-assets` bucket.
-6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then run `task start:docker` if using the containerized app.
+Mechanics:
+- Requires Docker Compose **2.24.4+** (local Appwrite override uses `!override` / `!reset`).
+- Loads ports from `.env.worktree` (generated once; later manual edits are preserved) via `scripts/worktree-env.sh`.
+- Sets `COMPOSE_PROJECT_NAME` from the checkout’s canonical path so containers, networks, and volumes never collide across primary, linked, or independent clones—even when directory names match.
+- Local path applies `docker-compose.worktree.yaml` on top of the Appwrite baseline. Coolify (`docker-compose.coolify.yaml` / `Dockerfile.coolify`) does **not** consume that override.
+- `task start` / `worktree-compose.sh up` starts infrastructure only; `task start:docker` / `up-app` also runs the containerized Attesta service. Host development uses `task dev` (see QUICKSTART).
 
-Fresh stacks start with empty Appwrite MariaDB; demo data comes from the Go seed after credentials exist.
+Demo data is not a volume copy between worktrees. Empty stacks get demo fixtures from the Go prepare/seed path documented in [QUICKSTART.md](QUICKSTART.md).
 
-`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and run `go run ./cmd/server prepare --policy=worktree` (wait → bootstrap → empty-only seed by value; soft-skips bootstrap failure and missing credentials). Prepare writes `$ATTESTA_ROOT_DIR/.env.appwrite` for the server restart adapter (`main` / ambient `attesta seed`). `task start:docker` order is infra → prepare → attesta; when that file exists it is optionally mounted into the attesta container. If soft-skip left no file, recreate/re-run `task start:docker` after credentials appear. Bootstrap defaults console credentials to `admin@appwrite.local` / `admin@appwrite.local` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
+## Verify setup
 
-## Verifying the Setup
 ```bash
 source <(bash scripts/worktree-env.sh export)
 curl "http://localhost:${CERBOS_PORT}/_cerbos/health"
 ```
 
-## Stopping the Services
+`bash scripts/worktree-env.sh print` lists the current checkout’s ports and URLs.
+
+## Lifecycle
+
 ```bash
 # Remove only this worktree's containers and networks; keep its data
 task stop
 
-# Remove only this worktree's containers, networks, and data
+# Remove only this worktree's containers, networks, and volumes
 task reset
 
 # Same as reset after an interactive confirmation
@@ -92,22 +93,22 @@ task worktree:gc
 task worktree:gc:apply
 ```
 
-Cleanup only considers resources carrying this clone's repository identity and the exact worktree owner.
-Foreign-clone and unlabeled resources are skipped.
-`task reset` and `task purge` inspect every volume in the current Compose project and fail closed if any ownership label is missing or different.
+Cleanup only considers resources carrying this clone’s repository identity and the exact worktree owner. Foreign-clone and unlabeled resources are skipped. `task reset` and `task purge` inspect every volume in the current Compose project and fail closed if any ownership label is missing or different.
 
 ## Coolify
+
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
-`deployment/docker-compose.coolify.yaml`). The Coolify stack will include the
+`deployment/docker-compose.coolify.yaml`). The Coolify stack includes the
 vendored Appwrite module instead of assuming an external identity deployment.
 
 Coolify-specific notes:
 - Coolify owns public routing (no Traefik in this compose). Expose Appwrite with Coolify `SERVICE_FQDN_APPWRITE` / `SERVICE_URL_*` on the Appwrite services.
-- Attesta's compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
+- Attesta’s compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
 - The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
 - MariaDB uses stock `image: mariadb:10.11` (same as the local Appwrite baseline). Demo identity data comes from the Go seed after console bootstrap.
 
 ### Coolify Preview env checklist
+
 Set these on the `attesta` service for automatic Appwrite project + demo fixture:
 
 | Variable | Preview | Notes |
@@ -124,4 +125,4 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 
 Attesta service env vars that must differ per Preview use bare `${VAR}` in compose (no `:-` / `:?`). Coolify inlines self-referential `${VAR:-default}` from Production into deployable compose, so Preview UI values never win. After compose/env changes: **Reload Compose**, confirm deployable still shows `${VAR}` (not literals), then redeploy.
 
-When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → empty-only seed by value) then `exec`s the server. Prepare writes `$ATTESTA_ROOT_DIR/.env.appwrite`; the server loads it at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`).
+When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → empty-only seed by value) then `exec`s the server. Prepare writes `$ATTESTA_ROOT_DIR/.env.appwrite`; the server loads it at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`). Local prepare/seed sequencing for worktrees is in [QUICKSTART.md](QUICKSTART.md).

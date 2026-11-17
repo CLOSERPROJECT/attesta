@@ -23,10 +23,10 @@
 
 - **Architecture:** for system boundaries or where behavior lives, read
   [`docs/architecture.md`](docs/architecture.md).
-- **Operations:** for setup, commands, ports, Docker, or worktrees, read
-  [`README.md`](README.md), [`QUICKSTART.md`](QUICKSTART.md), and
-  [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
-  truth.
+- **Operations:** pitch/env → [`README.md`](README.md); day-1
+  prepare/seed/worktrees → [`QUICKSTART.md`](QUICKSTART.md);
+  Compose/Coolify/lifecycle → [`DOCKER.md`](DOCKER.md). Scripts and
+  configuration remain the source of truth.
 - **Glossary layer:** before naming product nouns, pick the layer (shared
   membership, Org `/app`, Stream `/my`, Feragame plant) via
   [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
