@@ -319,7 +319,7 @@ European Union nor the granting authority can be held responsible for them.
 ## 📖 More Documentation
 
 - [AGENTS.md](AGENTS.md) - agent behavior, title conventions, and guidance pointers.
-- [GLOSSARY-MAP.md](GLOSSARY-MAP.md) - which glossary applies (shared org, Org product, Legacy Stream, Feragame).
+- [GLOSSARY-MAP.md](GLOSSARY-MAP.md) - which glossary applies (shared membership, Org `/app`, Stream `/my`, Feragame).
 - [QUICKSTART.md](QUICKSTART.md) - step-by-step local setup.
 - [DOCKER.md](DOCKER.md) - Docker Compose, Coolify, and preview deployment notes.
 - [docs/architecture.md](docs/architecture.md) - system boundaries, ADRs, and source navigation.

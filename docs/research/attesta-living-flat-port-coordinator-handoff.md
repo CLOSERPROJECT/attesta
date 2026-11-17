@@ -1,6 +1,6 @@
 # Handoff: coordinate living flat-port implementation
 
-> **Archival:** Historical flat-port coordinator notes. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers/`completeness` and Task groups / Spawn / Close / “don’t implement groups yet” are retired—multi-pass is **submit many** + **readyWhen** (ADR-0008); groups are removed, not deferred. Keep this narrative for context; do not treat those lines as current law.
+> **Archival:** Historical flat-port coordinator notes. Live Org vocabulary is [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) and ADRs; shared membership is root [`GLOSSARY.md`](../../GLOSSARY.md). Leftovers/`completeness` and Task groups / Spawn / Close / “don’t implement groups yet” are retired—multi-pass is **submit many** + **readyWhen** (ADR-0008); groups are removed, not deferred. Keep this narrative for context; do not treat those lines as current law.
 
 **Date:** 2026-10-29  
 **Repo:** `forkbomb/attesta`  

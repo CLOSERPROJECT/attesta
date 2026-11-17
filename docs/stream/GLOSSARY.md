@@ -4,8 +4,9 @@ Multi-party **Stream** blueprints and instances on Legacy `/my` (Formata,
 discovery, notarized substeps, optional Stream DPP). Historical product surface;
 still accurate for that runtime. Not Org Config / `/app`.
 
-Shared org/people vocabulary: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).
-Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
+Shared membership: [`GLOSSARY.md`](../../GLOSSARY.md). Org (`/app`):
+[`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Map:
+[`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
 
 ## Language
 
@@ -54,7 +55,7 @@ _Avoid_: Process page, action list
 **Operator home**:
 The authenticated Legacy `/my` landing for an affiliated user. Surfaces Attention
 items, Upcoming stream instances, and Stream discovery; Org admin and Onboarding
-meanings live in [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).
+meanings live in [`GLOSSARY.md`](../../GLOSSARY.md).
 _Avoid_: Home (alone), Dashboard (vague), Stream picker (as the name of Operator
 home), `/app` Worklist home
 
@@ -106,7 +107,7 @@ _Avoid_: Metadata (vague), tags, executable config
 **Stream role**:
 A role named on a Stream blueprint to gate Substeps. Matched to **Organization
 roles** by slug; not itself a Role catalog entry. See
-[`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).
+[`GLOSSARY.md`](../../GLOSSARY.md).
 _Avoid_: Catalog role, workflow role (in domain docs), Organization role (when
 meaning the blueprint gate), Config role
 
@@ -134,7 +135,7 @@ _Avoid_: Workflow timeline, traceability timeline, action list
 
 **My tasks filter**:
 A Stream instance detail switch that shows only Substeps the viewer owns. Org
-admin visibility is defined in [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).
+admin visibility is defined in [`GLOSSARY.md`](../../GLOSSARY.md).
 _Avoid_: My roles filter, Role filter (vague)
 
 **Substep summary**:
@@ -151,6 +152,6 @@ _Avoid_: Action detail, action content
 - A **Stream** blueprint is started as many **Stream instances**.
 - A **Step** belongs to one **Organization**; **Substeps** are gated by **Stream
   roles** matched to **Organization roles**
-  ([`docs/org/GLOSSARY.md`](../org/GLOSSARY.md)).
-- Org Config / Domain / Job / Task are the other product surface—see root
-  [`GLOSSARY.md`](../../GLOSSARY.md).
+  ([`GLOSSARY.md`](../../GLOSSARY.md)).
+- Org Config / Domain / Job / Task are the other product surface—see
+  [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).

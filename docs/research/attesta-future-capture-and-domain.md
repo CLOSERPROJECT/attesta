@@ -1,11 +1,12 @@
 # Future capture and Domain — salvage notes
 
-> **Not product law.** Living vocabulary and decisions live in root
-> [`GLOSSARY.md`](../../GLOSSARY.md) and [`docs/adr/`](../adr/) (through
-> ADR-0013 on current master). This note records north-stars and backlog
-> kept from the interpretation-package / resource-model exploration after
-> that plant model was simplified (act-now home, `submit: many`, no
-> day/shift Domain calendar). Do not treat it as an ADR or roadmap.
+> **Not product law.** Living Org vocabulary is
+> [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md); shared membership is root
+> [`GLOSSARY.md`](../../GLOSSARY.md); decisions in [`docs/adr/`](../adr/)
+> (through ADR-0013). This note records north-stars and backlog kept from
+> the interpretation-package / resource-model exploration after that plant
+> model was simplified (act-now home, `submit: many`, no day/shift Domain
+> calendar). Do not treat it as an ADR or roadmap.
 
 Offline support is **eventual**. Until then, Commit may keep mutating the
 Domain; new work should not make a later offline cut harder than it needs

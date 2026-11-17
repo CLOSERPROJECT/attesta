@@ -1,6 +1,6 @@
 # Handoff: challenge one plant scenario vs living glossary + experiment YAML
 
-> **Archival:** Historical challenge handoff. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers/`completeness` and Task-group nesting deferrals are retired—multi-pass is **submit many** + **readyWhen**. Keep this narrative for context; do not treat those lines as current law.
+> **Archival:** Historical challenge handoff. Live Org vocabulary is [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) and ADRs; shared membership is root [`GLOSSARY.md`](../../GLOSSARY.md). Leftovers/`completeness` and Task-group nesting deferrals are retired—multi-pass is **submit many** + **readyWhen**. Keep this narrative for context; do not treat those lines as current law.
 
 Use this in a **new chat**. Goal: pressure-test **one concrete plant/operations scenario** against **(A)** living Attesta glossary vocabulary and **(B)** `attesta-experiment` truck-loop YAML as it exists on disk today.
 

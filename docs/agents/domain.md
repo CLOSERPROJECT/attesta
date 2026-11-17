@@ -4,10 +4,10 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (shared org,
-  Org product, Legacy Stream, Feragame). Then read that glossary.
+- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (shared
+  membership, Org `/app`, Stream `/my`, Feragame). Then read that glossary.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
-  Org product ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
+  Org ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
   When writing or editing an ADR, follow [`../adr/README.md`](../adr/README.md).
 - Org Config authoring (gates, `onCommit`, transforms):
   [`org-config-authoring.md`](org-config-authoring.md).
@@ -24,10 +24,10 @@ creates them lazily when terms or decisions actually get resolved.
 ```
 /
 ├── GLOSSARY-MAP.md                   ← which glossary
-├── GLOSSARY.md                       ← Org product (`/app`)
+├── GLOSSARY.md                       ← Org vs Stream + shared membership
 ├── docs/
-│   ├── org/GLOSSARY.md               ← shared Organization & affiliation
-│   ├── stream/GLOSSARY.md            ← Legacy Stream (`/my`)
+│   ├── org/GLOSSARY.md               ← Org (`/app`) product vocabulary
+│   ├── stream/GLOSSARY.md            ← Stream (`/my`)
 │   ├── feragame/GLOSSARY.md          ← first plant / Org Config payload
 │   └── adr/                          ← platform Decisions; format in README.md
 ├── docs/agents/
@@ -40,8 +40,8 @@ creates them lazily when terms or decisions actually get resolved.
 When your output names a domain concept (in an issue title, a refactor proposal,
 a hypothesis, a test name), use the term as defined in the glossary
 `GLOSSARY-MAP.md` selected for that work. Don't drift to synonyms the glossary
-explicitly avoids. Don't promote Feragame plant nouns into Org platform
-docs or Attesta ADRs.
+explicitly avoids. Don't promote Feragame plant nouns into Org docs or
+Attesta ADRs.
 
 If the concept you need isn't in the right glossary yet, that's a signal:
 either you're inventing language the project doesn't use (reconsider) or

@@ -28,8 +28,8 @@
   [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
   truth.
 - **Domain language:** before naming product nouns or editing a glossary —
-  pick the layer (shared org, Org product `/app`, Legacy Stream `/my`,
-  Feragame plant) via [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
+  pick the layer (shared membership, Org `/app`, Stream `/my`, Feragame plant)
+  via [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
 - **ADRs:** before writing or editing `docs/adr/`, read
   [`docs/adr/README.md`](docs/adr/README.md).
 - **Active work:** unresolved design and implementable work live as GitHub
@@ -57,7 +57,7 @@
 - Org Go (`server/internal/org`) and the `/app` SPA are **dumb executors** of Org Config: plant
   business rules (entity shapes, transforms, `readyWhen`, open/close laws) live
   in Config, not as Feragame- or domain-named branches in executors. See
-  [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**) and
+  [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md) (**Dumb executor**) and
   [`docs/agents/org-config-authoring.md`](docs/agents/org-config-authoring.md).
 - Progress keys containing dots are encoded for Mongo storage (`.` becomes
   `_`) and normalized on reads. Preserve that boundary when changing progress

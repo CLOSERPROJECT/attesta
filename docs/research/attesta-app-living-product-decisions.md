@@ -1,6 +1,6 @@
 # Living product into `/app` — decisions dump
 
-> **Archival:** Historical grill / challenge notes. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers/`completeness` and Task group / nesting / Spawn / Close / “implementation deferred” rows below are retired—multi-pass is **submit many** + **readyWhen** (ADR-0008); groups are removed, not deferred. Keep this narrative for context; do not treat those lines as current law.
+> **Archival:** Historical grill / challenge notes. Live Org vocabulary is [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) and ADRs; shared membership is root [`GLOSSARY.md`](../../GLOSSARY.md). Leftovers/`completeness` and Task group / nesting / Spawn / Close / “implementation deferred” rows below are retired—multi-pass is **submit many** + **readyWhen** (ADR-0008); groups are removed, not deferred. Keep this narrative for context; do not treat those lines as current law.
 
 Status: working notes (2026-10-29). Not an ADR. Captures a grill on transplanting living Attesta (`attesta-experiment`) into `forkbomb/attesta` `/app` + Go JSON, without losing deferred work.
 

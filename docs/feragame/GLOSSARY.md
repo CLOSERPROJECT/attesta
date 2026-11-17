@@ -4,8 +4,8 @@ First **Org Config** demo plant: one Organization’s Domain shape and Jobs for 
 recycling intake / lot-processing line. Nouns here are **payload** authored in
 Config—not Attesta platform product law.
 
-Platform vocabulary: [`GLOSSARY.md`](../../GLOSSARY.md). Shared org:
-[`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Map:
+Org platform vocabulary: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Shared
+membership: [`GLOSSARY.md`](../../GLOSSARY.md). Map:
 [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md). Fixture edit checklist:
 [`docs/agents/feragame-fixture-authoring.md`](../agents/feragame-fixture-authoring.md).
 
@@ -64,8 +64,8 @@ Lot session chapter (open through close for a lot).
 
 **Passport Lock Job**:
 Issues a Passport whose subject is a **lot**. Still needs Lock after the lot is
-**fullyProcessed** — see root [`GLOSSARY.md`](../../GLOSSARY.md) (Passport
-lock).
+**fullyProcessed** — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md)
+(Passport lock).
 
 **administration** / **line** / **logistic**:
 Plant Config role slugs (office, line floor, logistics). Which Tasks each may

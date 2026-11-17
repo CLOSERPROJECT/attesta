@@ -3,8 +3,9 @@
 Platform authoring reference for **any** Org Config: gates, transforms, and
 post-Commit navigation. Not a plant fixture checklist.
 
-Vocabulary: [`GLOSSARY.md`](../../GLOSSARY.md) (**Dumb executor**, **readyWhen**,
-**startsWhen**, **Unlock order**, **Commit navigation**, **submit cardinality**).
+Vocabulary: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**,
+**readyWhen**, **startsWhen**, **Unlock order**, **Commit navigation**,
+**submit cardinality**).
 Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0013). Feragame
 fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
 

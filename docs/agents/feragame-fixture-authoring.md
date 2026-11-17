@@ -6,8 +6,8 @@ Change checklist for the Feragame plant fixture
 authoring reference—that is
 [`org-config-authoring.md`](org-config-authoring.md).
 
-Plant nouns: [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md). Platform
-nouns: [`GLOSSARY.md`](../../GLOSSARY.md). Map:
+Plant nouns: [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md). Org
+platform nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Map:
 [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
 
 ## Steps
@@ -18,7 +18,7 @@ nouns: [`GLOSSARY.md`](../../GLOSSARY.md). Map:
    [`org-config-authoring.md`](org-config-authoring.md) for gates and `onCommit`.
 2. **Glossary** — if you add or rename a plant Domain concept, update
    [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md) in the same change.
-   Platform terms stay in root [`GLOSSARY.md`](../../GLOSSARY.md).
+   Platform terms stay in [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).
 3. **Seed** — update [`seed.go`](../../server/internal/org/seed.go) and
    [`demo_commits.go`](../../server/internal/org/demo_commits.go) Commit
    sequence and id constants (truck / lot grammars; no day/turno Commits).
