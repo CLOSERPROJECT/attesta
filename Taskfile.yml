@@ -179,6 +179,11 @@ tasks:
     cmds:
       - sh -c 'cd app && bun install && bun run build'
 
+  app:test:unit:
+    desc: Run SvelteKit /app Vitest unit tests (non-watch).
+    cmds:
+      - sh -c 'cd app && { [ -d node_modules ] || bun install; } && bun run test:unit -- --run'
+
   run:server:
     desc: Generate Goa artifacts, sync Go deps, and run the backend on the configured worktree port.
     cmds:
@@ -210,6 +215,7 @@ tasks:
     cmds:
       - task: test:worktree
       - task: css:lint
+      - task: app:test:unit
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
 
@@ -256,6 +262,7 @@ tasks:
     cmds:
       - task: test:worktree
       - task: css:lint
+      - task: app:test:unit
       - task: goa:generate
       - |
           sh -c '

@@ -23,8 +23,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: true
-      - name: 🥢 Set up go@1.25.5 and task@latest
+      - name: 🥢 Set up go@1.25.5, bun, and task@latest
         uses: jdx/mise-action@v3
-      - name: 🧪 Run tests
+      - name: 🧪 Run tests (Go cover + SPA vitest)
         run: COVER_MIN=90.0 task cover
         shell: bash
