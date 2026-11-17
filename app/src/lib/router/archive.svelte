@@ -4,8 +4,8 @@
 	import * as m from '#lib/paraglide/messages.js';
 
 	import { orgSession } from '../org/org-app.svelte.js';
-	import WorklistJobLine from '../org/WorklistJobLine.svelte';
-	import WorklistRow from '../org/WorklistRow.svelte';
+	import WorklistJobLine from '../org/worklist-job-line.svelte';
+	import WorklistRow from '../org/worklist-row.svelte';
 	import {
 		completedRowKey,
 		completedRowsFromWorklist,

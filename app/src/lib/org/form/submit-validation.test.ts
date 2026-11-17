@@ -49,7 +49,7 @@ describe('submit validation visibility', () => {
 	test('createConfigForm / mapTable / TaskForm wire onSubmitError path', () => {
 		const createCfg = readFileSync(join(libDir, 'create-config-form.svelte.ts'), 'utf8');
 		const mapSrc = readFileSync(join(libDir, 'map-table-field.svelte'), 'utf8');
-		const task = readFileSync(join(libDir, '../TaskForm.svelte'), 'utf8');
+		const task = readFileSync(join(libDir, '../task-form.svelte'), 'utf8');
 		const ajvSrc = readFileSync(join(libDir, 'ajv-form-validator.ts'), 'utf8');
 		const bundleSrc = readFileSync(join(libDir, 'task-form-bundle.ts'), 'utf8');
 		expect(createCfg).toContain('onSubmitError');

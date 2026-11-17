@@ -3,7 +3,7 @@
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 
 	import type { CommitOutcome } from '../org/commit-port.js';
-	import TaskForm from '../org/TaskForm.svelte';
+	import TaskForm from '../org/task-form.svelte';
 	import type { TaskFormBundle } from '../org/form/task-form-bundle.js';
 	import { orgSession } from '../org/org-app.svelte.js';
 	import { orgRouteCoordsFromPath } from '../org/nav-place.js';

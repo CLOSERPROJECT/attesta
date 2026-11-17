@@ -5,8 +5,8 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
-	import DraftBozzaMark from './DraftBozzaMark.svelte';
-	import TaskStatusTag from './TaskStatusTag.svelte';
+	import DraftBozzaMark from './draft-bozza-mark.svelte';
+	import TaskStatusTag from './task-status-tag.svelte';
 	import type { TaskStatus } from './types.js';
 
 	type Props = {

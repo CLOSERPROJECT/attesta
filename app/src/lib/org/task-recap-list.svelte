@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as m from '#lib/paraglide/messages.js';
 
-	import TaskRecapFacts from './TaskRecapFacts.svelte';
+	import TaskRecapFacts from './task-recap-facts.svelte';
 	import { createHttpTaskRecapPort } from './http-task-recap-port.js';
 	import {
 		TaskRecapError,

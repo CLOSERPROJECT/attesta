@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Accordion from '#lib/shadcn/ui/accordion/index.js';
 
-	import TaskRecapList from './TaskRecapList.svelte';
+	import TaskRecapList from './task-recap-list.svelte';
 	import type { TaskRecapRequest } from './task-recap-port.js';
 	import type { TaskSubmit } from './types.js';
 	import {

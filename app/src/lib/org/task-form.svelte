@@ -8,8 +8,8 @@
 	import { orgSession } from './org-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
 	import { taskPath } from './types.js';
-	import ConfigForm from './form/ConfigForm.svelte';
-	import HttpLinkStrip from './form/HttpLinkStrip.svelte';
+	import ConfigForm from './form/config-form.svelte';
+	import HttpLinkStrip from './form/http-link-strip.svelte';
 	import type { TaskFormPlan } from './form/task-form-plan.js';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {

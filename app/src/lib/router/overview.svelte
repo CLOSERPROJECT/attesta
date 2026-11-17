@@ -5,9 +5,9 @@
 	import * as Accordion from '#lib/shadcn/ui/accordion/index.js';
 
 	import { draftAddressForTask } from '../org/drafts.js';
-	import ManySubmitHistory from '../org/ManySubmitHistory.svelte';
-	import OverviewRowChrome from '../org/OverviewRowChrome.svelte';
-	import TaskRecapPanel from '../org/TaskRecapPanel.svelte';
+	import ManySubmitHistory from '../org/many-submit-history.svelte';
+	import OverviewRowChrome from '../org/overview-row-chrome.svelte';
+	import TaskRecapPanel from '../org/task-recap-panel.svelte';
 	import { orgSession } from '../org/org-app.svelte.js';
 	import type { TaskStatus, TaskSubmit } from '../org/types.js';
 	import { PROVISIONAL_JOB_INSTANCE_ID } from '../org/types.js';

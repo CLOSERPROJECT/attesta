@@ -2,7 +2,7 @@
 	import * as m from '#lib/paraglide/messages.js';
 
 	import type { HttpLinkItem } from './commit-port.js';
-	import TaskRecapFacts from './TaskRecapFacts.svelte';
+	import TaskRecapFacts from './task-recap-facts.svelte';
 	import { createHttpTaskRecapPort } from './http-task-recap-port.js';
 	import { TaskRecapError, type TaskRecapRequest } from './task-recap-port.js';
 

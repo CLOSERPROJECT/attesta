@@ -9,8 +9,8 @@
 	import attestaMark from '#lib/assets/attesta-mark.svg';
 	import * as m from '#lib/paraglide/messages.js';
 	import { orgSession } from '#lib/org/org-app.svelte.js';
-	import OrgToast from '#lib/org/OrgToast.svelte';
-	import ScanDialog from '#lib/org/ScanDialog.svelte';
+	import OrgToast from '#lib/org/org-toast.svelte';
+	import ScanDialog from '#lib/org/scan-dialog.svelte';
 	import { createHttpQrResolvePort } from '#lib/org/http-qr-resolve-port.js';
 	import {
 		orgRouteCoordsFromPath,

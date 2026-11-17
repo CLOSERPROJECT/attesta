@@ -7,9 +7,9 @@
 	import { hrefOrgTarget } from '../router/navigate-target.js';
 	import { draftAddressForTask } from './drafts.js';
 	import { orgSession } from './org-app.svelte.js';
-	import ManySubmitHistory from './ManySubmitHistory.svelte';
-	import WorklistJobLine from './WorklistJobLine.svelte';
-	import WorklistRow from './WorklistRow.svelte';
+	import ManySubmitHistory from './many-submit-history.svelte';
+	import WorklistJobLine from './worklist-job-line.svelte';
+	import WorklistRow from './worklist-row.svelte';
 	import {
 		actNowRowKey,
 		actNowRowsFromWorklist,

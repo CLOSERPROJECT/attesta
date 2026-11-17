@@ -4,7 +4,7 @@
 
 	import * as m from '#lib/paraglide/messages.js';
 
-	import DraftBozzaMark from './DraftBozzaMark.svelte';
+	import DraftBozzaMark from './draft-bozza-mark.svelte';
 
 	type Props = {
 		href?: string | null;

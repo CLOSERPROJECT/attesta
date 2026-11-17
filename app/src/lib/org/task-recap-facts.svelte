@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { HttpLinkItem } from './commit-port.js';
-	import HttpLinkStrip from './form/HttpLinkStrip.svelte';
+	import HttpLinkStrip from './form/http-link-strip.svelte';
 	import { formatFactValue } from './worklist-overview.js';
 
 	type Props = {
