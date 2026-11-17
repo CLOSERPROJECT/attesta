@@ -96,14 +96,14 @@ bash scripts/worktree-env.sh print
 
 Use the printed values (do not assume `:3000` / `:80` / `:8025` on every worktree):
 
-| Surface | Env key |
-| --- | --- |
-| Attesta (host-dev) | `PORT` → `http://localhost:${PORT}/` |
-| Vite HMR | `VITE_PORT` |
-| SvelteKit `/app` HMR | `APP_PORT` |
-| Appwrite console | `APPWRITE_CONSOLE_URL` |
-| Mailpit | `MAILPIT_UI_URL` |
-| Containerized app | `DOCKER_APP_PORT` (after `task start:docker`) |
+| Surface              | Env key                                       |
+| -------------------- | --------------------------------------------- |
+| Attesta (host-dev)   | `PORT` → `http://localhost:${PORT}/`          |
+| Vite HMR             | `VITE_PORT`                                   |
+| SvelteKit `/app` HMR | `APP_PORT`                                    |
+| Appwrite console     | `APPWRITE_CONSOLE_URL`                        |
+| Mailpit              | `MAILPIT_UI_URL`                              |
+| Containerized app    | `DOCKER_APP_PORT` (after `task start:docker`) |
 
 After login, the stream picker is `/my`. Stream routes live under `/my/streams/{workflowKey}/...` (legacy `/w/` and `/org-admin/` return 404). Platform admin (when enabled): `/admin`. API docs: `/docs`.
 

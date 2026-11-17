@@ -9,27 +9,32 @@ All Docker-related files live under `deployment/`. Scripts under `scripts/` rema
 Local stack: `deployment/docker-compose.local.yaml` (includes the Appwrite baseline + worktree override). Host ports come from `.env.worktree` (defaults shown below).
 
 ### MongoDB
+
 - **Image**: `mongo:7.0`
 - **Host port**: `${MONGODB_PORT:-27017}` → 27017
 - **Auth**: disabled for local demo
 
 ### Cerbos
+
 - **Image**: `ghcr.io/cerbos/cerbos:0.50.0`
 - **Host port**: `${CERBOS_PORT:-3592}` → 3592
 - **Config**: `cerbos/config/config.yaml`
 - **Policies**: `cerbos/policies/*.yaml`
 
 ### Appwrite
+
 - **Baseline**: `deployment/appwrite/docker-compose.appwrite.yaml`
 - **Local override**: `deployment/appwrite/docker-compose.worktree.yaml`
 - **Env template**: `deployment/appwrite/.env.appwrite.example`
 - **Purpose**: identity, teams, memberships, labels, and org asset storage
 
 ### Mongo Express (optional)
+
 - **Image**: `mongo-express:1.0.2`
 - **Host port**: `${MONGO_EXPRESS_PORT:-8081}` → 8081
 
 ### Attesta app
+
 - **Local image**: build from `deployment/Dockerfile.local`
 - **Container port**: 3000 (`${DOCKER_APP_PORT:-3030}` on the host when run via `task start:docker`)
 - **Mongo**: `mongodb://mongodb:27017`
@@ -40,7 +45,7 @@ Also in the local compose file (not the Coolify focus of this doc): Mailpit (`ax
 ## Layout under `deployment/`
 
 | Path | Role |
-|---|---|
+| --- | --- |
 | `docker-compose.local.yaml` | Local Compose entry (infra + optional Attesta) |
 | `appwrite/docker-compose.appwrite.yaml` | Vendored Appwrite baseline |
 | `appwrite/docker-compose.worktree.yaml` | Local-only override: worktree ports, resource labels, scoped names |
@@ -57,6 +62,7 @@ Also in the local compose file (not the Coolify focus of this doc): Mailpit (`ax
 `scripts/worktree-compose.sh` is the Compose entrypoint for one isolated stack per checkout. Task targets (`task start`, `start:docker`, `stop`, `reset`, …) call it.
 
 Mechanics:
+
 - Requires Docker Compose **2.24.4+** (local Appwrite override uses `!override` / `!reset`).
 - Loads ports from `.env.worktree` (generated once; later manual edits are preserved) via `scripts/worktree-env.sh`.
 - Sets `COMPOSE_PROJECT_NAME` from the checkout’s canonical path so containers, networks, and volumes never collide across primary, linked, or independent clones—even when directory names match.
@@ -97,11 +103,10 @@ Cleanup only considers resources carrying this clone’s repository identity and
 
 ## Coolify
 
-Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
-`deployment/docker-compose.coolify.yaml`). The Coolify stack includes the
-vendored Appwrite module instead of assuming an external identity deployment.
+Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in `deployment/docker-compose.coolify.yaml`). The Coolify stack includes the vendored Appwrite module instead of assuming an external identity deployment.
 
 Coolify-specific notes:
+
 - Coolify owns public routing (no Traefik in this compose). Expose Appwrite with Coolify `SERVICE_FQDN_APPWRITE` / `SERVICE_URL_*` on the Appwrite services.
 - Attesta’s compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
 - The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
@@ -112,7 +117,7 @@ Coolify-specific notes:
 Set these on the `attesta` service for automatic Appwrite project + demo fixture:
 
 | Variable | Preview | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `ATTESTA_SEED` | `true` | Leave unset/`false` in production. Org Domain + Active Config fixture come only from this Go seed (`attesta seed` / `task seed`), not product boot |
 | `ATTESTA_ROOT_DIR` | `/app` | App root for `.env.appwrite` (Dockerfile/entrypoint set this; matches image app root, not `WORKDIR /app/server`) |
 | `APPWRITE_PROJECT_ID` | `attesta` | Required; bootstrap creates this project id. Do **not** reuse production’s id on Preview |

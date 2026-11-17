@@ -1,6 +1,6 @@
 # Org DPP production is a platform capability declared in Org Config
 
-Digital Product Passports must be a first-class Org product feature, not a plant Domain entity or a Stream process side effect. Plants still need to author *what* to gather and *how* to identify the product without forking the issuer.
+Digital Product Passports must be a first-class Org product feature, not a plant Domain entity or a Stream process side effect. Plants still need to author _what_ to gather and _how_ to identify the product without forking the issuer.
 
 **Decision:** Org Config declares a root **`passport`** block (subject, identity, snapshot projection). A Lock Task opts in with thin **`onSubmit.passport`** after transform; that Commit freezes a **Passport snapshot** onto a platform Passport record (org + subject) and returns public Digital Link / UNTP links. Go/SPA only execute; plant YAML is payload. Operator recap and freeze must evaluate the **same** snapshot projection. Issuance is an explicit operator lock—not auto-issue when a Domain predicate flips, not HttpPort, and not Stream process completion. v1: one passport shape per Config version; no re-lock/amend; Job instance id is the subject id.
 
