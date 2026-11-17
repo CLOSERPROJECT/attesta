@@ -5,9 +5,10 @@ jobs/tasks) and one accumulating **Domain** per org. Operators repeat **Jobs**
 inside the config; they do not run the whole config as an instance. Product UI
 for this context lives under `/app`.
 
-Which glossary applies: [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md) (Org platform,
-Feragame plant payload, Legacy Stream). Org product ADRs: [`docs/adr/`](docs/adr/)
-(0005–0013).
+Which glossary applies: [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md) (shared org,
+Org product, Legacy Stream, Feragame). Org product ADRs: [`docs/adr/`](docs/adr/)
+(0005–0013). Shared membership:
+[`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md).
 
 ## Language
 
@@ -24,8 +25,8 @@ One immutable revision of an Org Config.
 _Avoid_: Blueprint executable hash; treating every save as a new org
 
 **Active Config version**:
-The Config version the Organization uses for new work and for Load unless a pin
-policy says otherwise. Pin-in-flight policy is open.
+The Config version the Organization uses for new work and for Load. Pinning
+policy is separate.
 _Avoid_: Implied “latest file on disk” without an org pointer
 
 **Domain**:
@@ -35,7 +36,7 @@ _Avoid_: One Domain per whole-config execution; Stream instance; Process
 progress bag
 
 **Domain store**:
-The Module that holds Domain (entities + submit entries). Only config-declared
+The store that holds Domain (entities + submit entries). Only config-declared
 transforms write entities.
 _Avoid_: Forms writing entities directly; free-form query language as the sole
 mutator
@@ -51,50 +52,43 @@ Job as a single submit leaf
 **Task**:
 A **leaf** submit unit: schema, gates, Domain **reads** into the form, and
 **Submission** via **Commit**. Authored **submit cardinality** is `once`
-(default) or `many`. Names which **Config roles** may complete it. Cerbos Commit
-targets Tasks only.
+(default) or `many`. Names which **Config roles** may complete it.
 _Avoid_: Substep (legacy experiment name); Form (when meaning this unit);
 modeling multi-pass work as a Task group; leaf Job; task instance
 
 **submit cardinality**:
-Authored Task key `submit: once | many` (omit ⇒ `once`). **Once:** one
-successful Submission finishes the Task on that Job instance (Worklist `done`).
-**Many:** each Commit appends a Submission; Worklist status stays Domain-gated
-(`readyWhen` + roles) and does not become `done` from a single Commit.
-_Avoid_: Repeatable Task groups for multi-submit; Close chrome on a many-submit
-Task; calling cardinality “repeatable” (that word remains Job-level)
+Authored Task choice of `once` or `many`. **Once:** one successful Submission
+finishes the Task on that Job instance. **Many:** each Commit appends a
+Submission without finishing the Task from that Commit alone. See
+[ADR-0008](docs/adr/0008-org-task-submit-cardinality.md).
+_Avoid_: Repeatable Task groups for multi-submit; calling cardinality
+“repeatable” (that word remains Job-level)
 
 **child Task** *(historical / rejected)*:
-Former name for a **Task** authored under a **Task group**. Groups are removed;
-multi-pass same-form work is **submit cardinality** `many` + **readyWhen**.
+Former name for a Task under a Task group; replaced by **submit cardinality**
+`many` + **readyWhen**. See [ADR-0008](docs/adr/0008-org-task-submit-cardinality.md).
 _Avoid_: Reviving child Tasks or group nesting; Subtask; task instance
 
 **Task group** *(historical / rejected)*:
-Former composite node under a Job (ordered children, optional repeatable
-occurrences, no Commit of its own). Config rejects `kind:group`. Multi-pass
-same-form work is **submit cardinality** `many` + **readyWhen** (ADR-0008).
-_Avoid_: Calling a Task group a Task; jobs all the way down; faking multi-pass
-with groups; treating Close as required law for many-submit leaves
+Former composite node under a Job; removed. Multi-pass same-form work is
+**submit cardinality** `many` + **readyWhen**. See
+[ADR-0008](docs/adr/0008-org-task-submit-cardinality.md).
+_Avoid_: Calling a Task group a Task; jobs all the way down
 
 **Spawn** *(historical / rejected)*:
-Former affordance: open a **Task group** occurrence by Committing its first
-child with mint `spawningNew`. Removed with groups; Job start uses
-`startingNew` / `none` only (ADR-0012).
-_Avoid_: Calling Job start “Spawn”; inventing Spawn chrome; using Spawn for
-many-submit leaf Tasks
+Former affordance to open a Task group occurrence; removed with groups. See
+[ADR-0012](docs/adr/0012-org-commit-mint-intent.md).
+_Avoid_: Calling Job start “Spawn”; inventing Spawn chrome
 
 **Close** *(historical / rejected)*:
-Former affordance: end a **Task group** occurrence (Close API / Worklist chrome).
-Removed with groups; entity open/closed law stays Domain via transform +
-**readyWhen**, not Close Tasks.
-_Avoid_: Reviving `/api/org/close` or Close chrome; treating Close as law for
-many-submit leaves
+Former affordance to end a Task group occurrence; removed with groups. See
+[ADR-0008](docs/adr/0008-org-task-submit-cardinality.md).
+_Avoid_: Reviving Close chrome; treating Close as entity open/closed law
 
 **spawningNew** *(historical / rejected)*:
-Former Commit mint kind for a Task group occurrence. Removed with groups; live
-mint is `startingNew` | `none` only (ADR-0012 Decision retained for history;
-removal recorded in Consequences).
-_Avoid_: Sending `spawningNew` on Commit; inventing group occurrence bags
+Former Commit mint kind for a Task group occurrence; removed with groups. See
+[ADR-0012](docs/adr/0012-org-commit-mint-intent.md).
+_Avoid_: Sending `spawningNew` on Commit
 
 **Job instance**:
 One occurrence of a repeatable Job within the org Domain. Often created on first
@@ -102,111 +96,82 @@ Task submit; id/label from config and/or submitted data. Distinct from Domain
 entities the Config may mint for the same real-world beat.
 _Avoid_: Step instance (legacy experiment name); whole-config execution
 instance; Stream instance; Node (domain docs); treating the Job instance as a
-substitute for a Domain entity; inventing calendar Domain peers of Job instances
+substitute for a Domain entity
 
 **Task path**:
-Stable address of a Task (or later a node) under a Job, e.g. `intake/register`.
-Commit and Submission keys use Task path plus Job instance id so deeper trees
-stay additive.
+Stable address of a Task under a Job (for example `intake/register`).
 _Avoid_: Hard one-level child index as the only public address; bare substep id
 without Job context when paths matter
 
 **Unlock order**:
 In-Job rule for which Tasks become completable after prior Submissions on the
-same Job instance (optional `unlockFrom` names a predecessor). Distinct from
-**startsWhen** (Job start) and **readyWhen** (Domain readiness). Engine keeps
-the mechanic; when Domain already holds the prerequisite, author **readyWhen**
-and omit `unlockFrom` (Unlock may be removed later).
-_Avoid_: Calling unlock “startsWhen”; Seal-gated unlock; encoding entity
-open/close law in Unlock when Domain status exists
+same Job instance (optional predecessor). Distinct from **startsWhen** and
+**readyWhen**.
+_Avoid_: Calling unlock “startsWhen”; encoding entity open/close law in Unlock
+when Domain status exists
 
 **startsWhen**:
-Job-level start gate: quantifier (`some` | `all`) over Submissions of a named
-Task. Distinct from Unlock order and from Domain readiness. Do not encode entity
-open/closed exclusivity here—those are Domain facts via **readyWhen**.
-_Avoid_: Locked (as the gate state word); Seal-gated start; encoding entity
-open/closed or “previous closed” law; availableWhen
+Job-level start gate over Submissions of a named Task. Distinct from Unlock
+order and from Domain readiness (**readyWhen**).
+_Avoid_: Locked (as the gate state word); encoding entity open/closed law;
+availableWhen
 
 **readyWhen**:
-Task-level Domain readiness (boolean expression over Domain). Combined with the
-Task’s role gate. When false: visible but unavailable. Primary gate for Domain
-entity state and for which actions are available without a fixed Unlock
-pipeline.
+Task-level Domain readiness (boolean expression over Domain), combined with the
+Task’s role gate. Distinct from Unlock order and **startsWhen**.
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into
-the expression; overloading startsWhen or Unlock for Domain facts; encoding
-calendar day/shift as Domain readiness
+the expression; overloading startsWhen or Unlock for Domain facts
 
-**Domain reads** (map/table Tasks):
-Authored `reads` + `dynamicProperties` that project current entity ids into a
-form map (row projection / `rowIds` on the Task form bundle). Projection
-**materializes** those ids into concrete `schema.properties`; authored
-`additionalProperties` is the per-id **template** only (`additionalProperties:
-false` after project). Full-map Tasks list the map property in `schema.required`
-so every current read id is required; partial maps omit that and leave untouched
-keys unforced. Not a separate subsystem; not spawn-many of full child registers.
-Two shapes share one authored `ui:field: mapTable`: a **cell map** (template
-scalar — one value column, sjsf field per cell schema) and an **object map**
-(template object — property columns, sjsf field per property). Cell enums are
-**real values only** — no `null` in enum. Stock sjsf clearable is for draft fix
-only: emptying a cell drops the key (`omit`/`undefined`); Commit treats omit as
-untouched (set-or-skip). Never unset Domain facts via Commit.
-_Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product
-grammar; SPA twin Domain-read id helpers; SPA cell-map normalize; densify
-first-enum without `default`; densify `default: null` into Draft cell maps;
-form-level `""` as untouched sentinel; conflating map reads with Task group;
-dual markers (`rowTable`); table-owned enum paint; `enum: [null,…]` Domain
-clear; stamping `clearable: false` for enum-null law; `anyOf` null|enum as
-product clear; Commit nil as Domain unset
+**Domain reads**:
+Authored projections that map current Domain entity ids into Task form maps.
+Not a separate subsystem.
+_Avoid_: Completeness or Leftovers as product grammar; conflating map reads with
+Task group; Domain clear via Commit omit
 
 **Submission**:
 Record that a Task succeeded on a Job instance: time, actor, facts snapshot;
-keyed with Task path. Unlock order and startsWhen read Submissions. Worklist
-`done` applies after one successful Submission only for **submit** `once`; for
-`many`, Submissions append while status stays readyWhen-gated. Post-Commit HTTP
-**links** are not facts: they are stored in a separate step after Commit
-(+ HttpPort), and may appear on overview recap without replaying HTTP.
+keyed with Task path. Unlock order and startsWhen read Submissions.
 _Avoid_: Treating entity fields alone as completion; putting the submitter only
-inside form facts; row-id reopen as done law for once Tasks; folding link
-persistence into the facts Commit write; HTTP replay to rebuild links
+inside form facts
 
 **Draft**:
-Working data of an in-progress Task before Submission. Operators keep WIP in
-draft and Invia once. Not part of Domain until Commit succeeds.
-_Avoid_: Submission; Domain; multi-pass Task reopen while “row ids remain”
+Working data of an in-progress Task before Submission. Not part of Domain until
+Commit succeeds.
+_Avoid_: Submission; Domain
 
 ### Roles
 
 **Role catalog**:
-The set of **Config roles** declared on the Org Config.
+The set of **Config roles** declared on the Org Config. Distinct from the
+Organization **Role catalog** of membership roles
+([`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md)).
 _Avoid_: Putting platform-only standing in the catalog; Stream role (legacy
-blueprint gate name)
+blueprint gate name); conflating with Organization roles
 
 **Config role**:
 One named role in the Org Config catalog (slug). Tasks list which Config roles
-may complete them; Cerbos allow/deny uses principal roles matched by slug.
+may complete them.
 _Avoid_: Stream role; conflating with Org admin standing; Operator (the default
-membership role name) for every Config role; plant-named role branches in Go/SPA
+membership role name) for every Config role; plant-named role branches in
 executors
 
 **Org catalogs** / `$catalogs`:
 Authored bag on Org Config for stable org knowledge (lookups, enums, labels).
-Bound as `$catalogs` wherever Load/Commit exprs see `$domain` (transform,
-readyWhen, reads.where, onSubmit.http, form Derived/Chrome). Not Domain
-entities, not the Role catalog, not Chrome.
+Not Domain entities, not the Role catalog, not Chrome.
 _Avoid_: Treating catalogs as Domain kinds; conflating with Role catalog or
 Chrome display catalog
 
 ### Authoring details
 
-**bind** (transform op):
-Authored JSONata step in `onSubmit.transform` whose result replaces `$` for
-later ops in that list. Does not emit Domain mutations itself.
-_Avoid_: Conflating with form **bindings** bag, **reads** bindings, or Org
-**catalogs** (`$catalogs`)
+**bind**:
+Authored transform step whose result replaces `$` for later ops in that list.
+Does not emit Domain mutations itself.
+_Avoid_: Conflating with form bindings, **reads**, or Org **catalogs**
+(`$catalogs`)
 
 **reads**:
-Authored Domain query bindings used at open time to project enums / property
-names into a Task — never bake instance ids into the Org Config.
+Authored Domain query bindings used at open time to project into a Task — never
+bake instance ids into the Org Config.
 _Avoid_: Ref / `$refs` / `optionsFor` (retired kernel names)
 
 **Derived value**:
@@ -217,213 +182,141 @@ _Avoid_: Putting GUI-only chrome under `derived`
 **Chrome**:
 Task-root display catalog (readonly, dataReport, …). Sibling to `derived`;
 stripped before Submission facts. Not the operator board (see **Worklist**).
-`dataReport` is evaluated on Load/Commit into `bindings.chromeDisplay`
-(Domain-only; flat or sections DTO); live kinds that still need draft/operator
-(`readonly`) stay client-side.
 _Avoid_: Encoding live readouts as schema fields meant for submit; naming the
-Worklist “Chrome”; SPA Domain aggregation for dataReport
+Worklist “Chrome”
 
 **dynamicProperties**:
 Field-keyed map config: each property names a Domain **read** whose ids fill
-that map. Those ids are materialized into `properties`; authored
-`additionalProperties` is template only. Full vs partial Commit is
-`schema.required` projection, not completeness. Drives both cell maps and object
-maps under `mapTable`.
-_Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`;
-`ui:field: rowTable`
+that map.
+_Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`
 
 ### Passport / DPP
 
-**Passport** (Config + operator prose):
+**Passport**:
 The issued Digital Product Passport for one Domain subject. Public credential
 and human page are projections of a **Passport snapshot**, not a live Domain
-walk. **Passport production** is a core Org platform capability. Org Config
-declares scheme in a root **`passport`** block (subject binding, identity,
-snapshot projection); a Lock leaf opts in with thin **`onSubmit.passport`** (not
-HttpPort). Which entity is the subject is Config payload (see Feragame glossary
-for the demo plant). **Code and storage** use **DPP** (`DPPStore`, `org_dpps`,
-`onSubmit.passport` still names the Config hook).
+walk. Org Config declares scheme; a Lock leaf opts in. See
+[ADR-0007](docs/adr/0007-org-dpp-production.md).
 _Avoid_: Stream Process DPP as the Org `/app` issue path; SPA-assembled passport
-payloads; treating one plant’s YAML as the feature itself; gather graph only on
-the Task with no root scheme; Job-level “produces DPP” with no Commit leaf
+payloads; treating one plant’s YAML as the feature itself
 
 **Passport lock**:
 The operator Task that approves a subject’s gathered facts and issues its
-**Passport**: Load shows eligibility + recap; one Commit runs transform (Domain
-locked fact) then the Passport producer. Dedicated repeatable Job; Job instance
-id is the subject id. Distinct from Worklist status `locked` and from form seal.
-Post-Commit Digital Link / DPP links come from the producer, not **HttpPort** /
-`onSubmit.http`.
-_Avoid_: Auto-issue on Domain predicate alone; treating a plant terminal status
-alone as passport issued; Lock as a new HTTP Seam; conflating with Unlock-order
-`locked`; minting passport URLs via outbound HTTP; producer as sole writer of
-eligibility Domain facts
+**Passport**. Distinct from Worklist status `locked` and from form seal. See
+[ADR-0007](docs/adr/0007-org-dpp-production.md).
+_Avoid_: Auto-issue on Domain predicate alone; conflating with Unlock-order
+`locked`; minting passport URLs via outbound HTTP
 
 **Passport snapshot**:
-Immutable projection of related Domain facts (and named Submissions) from the
-root `passport.snapshot` declaration. Evaluated live on **Passport lock** Load
-for the operator recap; frozen into the platform Passport record (org + subject)
-on Commit. Later Domain edits do not rewrite what the Passport claims.
-_Avoid_: Live Domain as the passport body; a second hand-authored recap expr
-that can drift from freeze; mutable “current view” credentials; “passport” as
-just another Domain entity row
+Immutable projection of related Domain facts (and named Submissions) frozen
+into the platform Passport record on Commit. Later Domain edits do not rewrite
+what the Passport claims. See [ADR-0007](docs/adr/0007-org-dpp-production.md).
+_Avoid_: Live Domain as the passport body; mutable “current view” credentials;
+“passport” as just another Domain entity row
 
 ### Operator and seams
 
 **Dumb executor**:
-Go and the `/app` SPA only evaluate Org Config and project Worklist/forms; plant
-business rules (entity shapes, open/close transforms, readyWhen) are authored in
-Config, not hard-coded in executors.
-_Avoid_: Plant- or domain-named branches in Go or SPA; exclusivity law outside
-Org Config; “the engine knows what a plant entity is”
+Platform executors only evaluate Org Config; plant business rules live in
+Config, not hard-coded in executors. See [`AGENTS.md`](AGENTS.md).
+_Avoid_: Plant- or domain-named branches in executors; exclusivity law outside
+Org Config
 
 **OperatorIdentity**:
-Host-injected `{ userId, org, roles }` for role gates, chrome, and Submission
-actor. Not the Org Config document.
+Host-injected actor context for role gates, chrome, and Submission actor. Not
+the Org Config document.
 _Avoid_: Principal; forging actor via schema fields; Operator (catalog role
 label) for this bag
 
 **Commit navigation**:
-Server-authored instruction in the Commit response telling the SPA where to go
-after a successful Task Commit: advance to another Task on the same Job
-instance, return to **Worklist** home, or **stay** on the submitted form. On
-stay, Commit also carries a deferred **Continue** target (home or next Task) so
-the operator can leave the parked screen without the client guessing. Evaluated
-in Go from Org Config and Worklist eligibility; the SPA follows Commit only.
-**Job instance overview** is not a navigation target.
-_Avoid_: Re-walking Worklist after Commit to pick destination; inferring stay
-from HTTP links in the SPA; client-side auto-advance; overview as Commit or
-Continue destination
+Server-authored instruction after a successful Task Commit: advance to another
+Task, return to **Worklist** home, or stay. See
+[ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
+_Avoid_: Re-walking Worklist after Commit to pick destination; client-side
+auto-advance; overview as Commit destination
 
 **Advance target eligibility**:
-Whether a given Task Commit may auto-advance the operator into the next
-role-eligible Task on that Job instance. Some leaves disable it so linear
-sibling order does not chain into the wrong screen; open-style leaves may force
-**Worklist** home instead. When advance is disallowed and no stronger
-navigation is authored, return to **Worklist** home.
+Whether a given Task Commit may auto-advance into the next role-eligible Task
+on that Job instance. See
+[ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
 _Avoid_: Treating “next Task in Config order” as always correct after Commit;
-plant-named routing branches in executors; defaulting handoff to Job instance
-overview
+plant-named routing branches in executors
 
 **Commit**:
-Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by
-Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are
-Adapters only. The Commit response includes an updated viewer-scoped
-**Worklist**, explicit **Commit navigation** (including stay with Continue when
-authored), and when advancing to a Task, the next **Task form bundle**, so the
-SPA navigates without a blind re-Load or Worklist re-walk. If navigation is
-stay, the operator remains on a read-only view of the submitted form with any
-download links (many-submit loops typically stay).
+Authoritative accept of a sealed **Task** into Domain, addressed by Task path +
+Job instance id. See [ADR-0005](docs/adr/0005-org-worklist-server-projection.md)
+and [ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit;
-SPA re-deriving post-Commit destination from Worklist or from link presence;
-reviving Task-group Spawn/Close on stay
+SPA re-deriving post-Commit destination
 
 **Load**:
 Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**,
-viewer Config **roles** (for Available affordances), and Active Config version
-metadata for the home board; not a dump of full Domain + full Org Config.
-**Task form bundle**s load when opening a Task route via addressed fetch (`GET
-/api/org/task-form`; provisional `jobInstanceId` empty / `new`) and may
-return on Commit when **Commit navigation** advances to a Task — home Load omits
-bulk bundles (ADR-0006). SPA post-Commit routing consumes Commit navigation (+
-bundle when advancing to a Task).
-_Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as
-product shape; treating Kit load functions as the Seam; shipping full Domain/Org
-Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport;
-treating bulk Available bundles as the lasting home-Load or Commit shape
+viewer Config **roles**, and Active Config version metadata — not a dump of
+full Domain + full Org Config. See
+[ADR-0005](docs/adr/0005-org-worklist-server-projection.md) and
+[ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
+_Avoid_: Hydrate by whole-config execution id; shipping full Domain/Org Config
+so the SPA re-derives gates
 
 **Worklist**:
-Go-projected operator board for one org: which Jobs may start (`canStart`); per
-Job, authored `taskIds`, `startLabel`, `repeatable`, and Config-free Task title
-+ roles chrome; and per Job instance, each Task’s status as a viewer-scoped enum
-(`locked` | `unavailable` | `available` | `actionable` | `done`), plus per-leaf
-**submissionCounts** when useful for chrome. Unlock/Submission law yields locked
-/ unlocked; **submit once** may become `done` after Submission; **submit many**
-never uses Submission alone for `done`. Unlocked-not-done folds Task
-**readyWhen** (false ⇒ `unavailable`, skip role split); else unlocked splits by
-Config-role eligibility into `available` (not for this viewer) vs `actionable`
-(Per te). `/app` home is a **single act-now list**: viewer **`actionable`**
-Tasks and **Can start** rows (mount gates stay actionable-only). For
-**`submit: many`** act-now rows, Submission history chrome may sit under the row
-when count N > 0 (lazy facts/links). No home In progress / Completed bands;
-finished rediscovery is **Archive**, not home; `unavailable` / `available` are
-not home rows. The SPA does not re-derive eligibility or readyWhen from a
-parallel id list. Not legacy Operator home at `/my`; not a full Job-instance
-tree.
-_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock /
-startsWhen / readyWhen; `viewerAvailable[]` as a second eligibility channel;
-inventing Task order/labels from a client Org Config snapshot; Operator home
-(the `/my` Stream landing); peer home bands for In progress / Completed;
-embedding Archive or the full instance tree on home
+Go-projected operator board for one org: which Jobs may start; per Job instance,
+each Task’s viewer-scoped status (`locked` | `unavailable` | `available` |
+`actionable` | `done`). Home is act-now; finished rediscovery is **Archive**.
+See [ADR-0005](docs/adr/0005-org-worklist-server-projection.md) and
+[ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
+_Avoid_: Job surface; Chrome; SPA copies of Unlock / startsWhen / readyWhen;
+Operator home (the `/my` Stream landing); peer home bands for In progress /
+Completed
 
 **Archive**:
-Operator surface listing past/completed **Job instances** (flat list; may sort
-by time). Each row opens the existing **Job instance overview**. Distinct from
-**Worklist** home act-now. Not a Domain calendar tree.
-_Avoid_: day→shift→lot Archive hierarchy; Archive bands on home; inventing
-overview as Commit/Continue/Task-back destination; calendar Domain as Archive
-structure
+Operator surface listing past/completed **Job instances**. Each row opens the
+**Job instance overview**. Distinct from **Worklist** home act-now.
+_Avoid_: day→shift→lot Archive hierarchy; Archive bands on home
 
 **Job instance overview**:
-Read-only Job-instance surface reached from **Archive** (past/completed
-instances). Live work stays on **Worklist** home act-now, Task routes, and
-stay-after-Commit; many-submit Submission history attaches under home act-now
-rows. Still **not** a **Commit navigation**, Continue, home, or Task-back
-target. The `/app/{jobId}/{jobInstanceId}` route may remain for that Archive
-link.
-_Avoid_: Commit or Continue navigation to overview; home deep-links into
-overview as the act-now path; day→shift→lot Archive tree; process page;
-treating overview as the operator board; reviving Task-group Spawn/Close
+Read-only Job-instance surface reached from **Archive**. Not a **Commit
+navigation**, Continue, home, or Task-back target. See
+[ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
+_Avoid_: Commit or Continue navigation to overview; treating overview as the
+operator board
 
 **Task form bundle**:
-Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed
-data, projected read ids/columns when needed, Chrome and Derived *rules*,
-seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag
-(including `submissions`) for live Chrome/Derived — not the full Domain or
-authored Org Config Task document. On Load-of-Task and Commit, server-evaluated
-`dataReport` results land in `bindings.chromeDisplay` for SPA paint-only;
-draft-driven Chrome stays live on the client. Fetched addressed by `jobId` +
-`taskId` + `jobInstanceId` (provisional empty / `new` when starting); Commit may
-include the next bundle when **Commit navigation** advances or when Continue
-targets a Task. Home Load and Commit omit bulk Available bundles; Task routes
-mount from addressed fetch.
+Minimum payload to mount one Task form — not the full Domain or authored Org
+Config Task document. See
+[ADR-0005](docs/adr/0005-org-worklist-server-projection.md) and
+[ADR-0006](docs/adr/0006-org-operator-worklist-home.md).
 _Avoid_: Client compile from full authored Task + full Domain; calling this
-Chrome; baking live draft-driven Chrome results as static strings; SPA Domain
-walk for dataReport or row ids
+Chrome
 
 **AuthPort / AuthorizerPort**:
 Who is calling (`OperatorIdentity`) vs who may complete a Task; Commit uses
-both. Production AuthorizerPort Adapter is Cerbos.
-_Avoid_: Forging actor from sealed facts; IdentityStore as AuthPort; bypassing
-Cerbos on product Commit
+both.
+_Avoid_: Forging actor from sealed facts; treating an identity store as AuthPort
 
-**HttpPort / onSubmit.http**:
+**HttpPort**:
 Config-declared HTTP after successful Domain mutate; failures do not roll back
-Domain.
-_Avoid_: Rolling back Domain on side-effect failure
+Domain. See [ADR-0010](docs/adr/0010-org-http-side-effects.md).
+_Avoid_: Rolling back Domain on side-effect failure; `onSubmit.http` as the
+product noun (that is the Config key)
 
 ### Legacy (other context — do not use for `/app` product prose)
 
 **Stream / Stream instance / Process**:
-Multi-party linear flow vocabulary for the HTMX `/my` surface. See
-[`CONTEXT.md`](CONTEXT.md).
+Multi-party linear flow vocabulary for the Legacy `/my` surface. See
+[`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md).
 _Avoid_: Using these as names for Org Config, Domain, Job, or Task
 
 ### Rejected / historical code names
 
-Do not revive as Org product nouns. Experiment/code may still say them in
-archival notes until readers catch up.
+Do not revive as Org product nouns.
 
 - **Whole-config execution** (historical name `Config run`): one “run of the
-  config” with its own Domain. The Org product uses one org Domain and repeated
-  Job instances instead.
-- **`LoadRunPort` / `/api/runs` / `RunStore`**: run-id shaped load/persist.
-  Replace with org Domain Load/Commit.
-- **Step / Substep / Step instance**: experiment YAML/code names for Job / Task
-  / Job instance.
-- **Task group / child Task / Spawn / Close / `spawningNew`**: removed platform
-  surface. Config rejects `kind:group`; no Close API; Commit mint is
-  `startingNew` | `none` only. Multi-pass same-form work is **submit
-  cardinality** `many` + Domain **readyWhen** (ADR-0008, ADR-0012). Plant entity
-  renames, lot-session enums, and removed day/shift/`parked` plant law live in
-  [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md).
+  config” with its own Domain — replaced by one org Domain + repeated Job
+  instances.
+- **`LoadRunPort` / run-id load shape**: replaced by org Domain Load/Commit
+  ([ADR-0005](docs/adr/0005-org-worklist-server-projection.md)).
+- **Step / Substep / Step instance**: experiment names for Job / Task / Job
+  instance.
+- **Task group / child Task / Spawn / Close / `spawningNew`**: removed; see
+  [ADR-0008](docs/adr/0008-org-task-submit-cardinality.md) and
+  [ADR-0012](docs/adr/0012-org-commit-mint-intent.md).

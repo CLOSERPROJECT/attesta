@@ -27,9 +27,9 @@
   [`README.md`](README.md), [`QUICKSTART.md`](QUICKSTART.md), and
   [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
   truth.
-- **Domain language:** which glossary applies — Org platform (`/app`), Feragame
-  plant payload, or Legacy Stream — read
-  [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
+- **Domain language:** before naming product nouns or editing a glossary —
+  pick the layer (shared org, Org product `/app`, Legacy Stream `/my`,
+  Feragame plant) via [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
 - **ADRs:** before writing or editing `docs/adr/`, read
   [`docs/adr/README.md`](docs/adr/README.md).
 - **Active work:** unresolved design and implementable work live as GitHub

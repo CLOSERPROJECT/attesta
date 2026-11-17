@@ -40,7 +40,7 @@ Mechanics from the experiment (Step / Substep / unlock / `startsWhen` / `readyWh
 
 Source: `/Users/giovanniabbatepaolo/Documents/GitHub/forkbomb/attesta/GLOSSARY.md`  
 Map vs legacy Stream: `/Users/giovanniabbatepaolo/Documents/GitHub/forkbomb/attesta/GLOSSARY-MAP.md`  
-Legacy Stream only: `/Users/giovanniabbatepaolo/Documents/GitHub/forkbomb/attesta/CONTEXT.md` (do **not** use for `/app` challenge prose).
+Legacy Stream only: `docs/stream/GLOSSARY.md` (do **not** use for `/app` challenge prose). Shared org: `docs/org/GLOSSARY.md`.
 
 | Living term | One-line def | Experiment legacy name |
 | --- | --- | --- |
@@ -237,7 +237,7 @@ Optional mechanics:
 - Redesigning Cerbos policies or CEL attr schemas  
 - Implementing Go/Svelte/YAML changes  
 - Rewriting `attesta-app-living-product-decisions.md`  
-- Merging living glossary with `CONTEXT.md` Stream language  
+- Merging living glossary with Stream / shared-org glossaries  
 - Challenging multiple unrelated scenarios in one pass (pick **one**)
 
 ---

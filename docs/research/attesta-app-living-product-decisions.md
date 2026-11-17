@@ -10,7 +10,7 @@ Status: working notes (2026-10-29). Not an ADR. Captures a grill on transplantin
 - SPA handoff: temp `attesta-svelte-app-handoff.md` (branch `feat/attesta-rework`, PR #276)
 - Server layout epic: [#249](https://github.com/CLOSERPROJECT/attesta/issues/249) `refactor(server): thin cmd/server and extract deep internal packages`
 - Settled product law (experiment): ADR-0025 client/server ports; living language: root [`GLOSSARY.md`](../../GLOSSARY.md)
-- Legacy product language: root `CONTEXT.md` (Stream / Stream instance); map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md)
+- Legacy product language: [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md) (Stream / Stream instance); shared org: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md); map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md)
 
 ---
 
@@ -26,7 +26,7 @@ Living product nouns match the locked root [`GLOSSARY.md`](../../GLOSSARY.md) (f
 
 ### Domain model (locked 2026-10-29)
 
-Supersedes experiment-centric whole-config execution (historical name **Config run**) as the runtime identity for this transplant. Multi-org linear **Stream** flow remains legacy (`CONTEXT.md` / `/my`); living `/app` is single-org.
+Supersedes experiment-centric whole-config execution (historical name **Config run**) as the runtime identity for this transplant. Multi-org linear **Stream** flow remains legacy ([`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md) / `/my`); living `/app` is single-org.
 
 - **Org Config (versioned):** the durable authored document for an Organization — **Role catalog** + the map of **Jobs/Tasks** (the org’s whole operating picture). Not “a blueprint you instantiate many times as whole-config executions.” Not multiple streams per org.
 - **Domain (per org):** one accumulating Domain store (+ Submissions / work log) keyed by **org**. Tasks write entities/knowledge; later Tasks read and extend them. Connections are explicit (sequence, spawn-many) and/or Domain conditions (`readyWhen`).
@@ -158,7 +158,7 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/o
 ### Frontend / law / docs
 
 - Living UI/ports go under `app/` (Kit static shell + sv-router); Kit `+server` is not production authority ([ADR-0025](https://github.com/CLOSERPROJECT/attesta-experiment/blob/feat/client-server-ports/docs/adr/0025-client-server-ports.md)).
-- **Two glossaries until merge**: living terms in root [`GLOSSARY.md`](../../GLOSSARY.md) (locked for the flat port); `CONTEXT.md` Stream language for legacy. **Merge later**. This dump’s wording follows the living glossary; decisions stay as locked above.
+- **Two product glossaries**: living terms in root [`GLOSSARY.md`](../../GLOSSARY.md) (locked for the flat port); Stream language in [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md); shared membership in [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). This dump’s wording follows the living glossary; decisions stay as locked above.
 - Copy/fence living ADRs into `attesta` when docs land; amend ADR-0025 for Cerbos + Domain Load/Commit (not run-id / whole-config execution hydrate). Point AGENTS / architecture at `/app` + living law for product UI work.
 
 ### Explicit non-goals (this effort / first cuts)
@@ -183,7 +183,7 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/o
 | **Config version pin policy** | Whether in-flight Jobs pin to the Config version they started on vs always follow Active Config version. |
 | **Slice design** | Done: flat-port tickets 01–13 + rename hard cut (scratch trackers retired). |
 | **Wayfinder map** | Chart remaining **decisions + research** (not build tasks); destination ≈ “way clear to implement.” |
-| **Glossary merge** | Merge living [`GLOSSARY.md`](../../GLOSSARY.md) + `CONTEXT.md`; Stream terms historical where appropriate. |
+| **Glossary merge** | Historical note: living [`GLOSSARY.md`](../../GLOSSARY.md) + Stream [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md) stay separate; shared org extracted to [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). |
 | **ADR-0025 amend in attesta** | Cerbos-as-production-Authorizer + hybrid predicates + Domain Load/Commit (retire run-id / whole-config execution hydrate). |
 | **Identity package extract** | When living AuthPort needs session → `OperatorIdentity` beyond wiring. |
 | **Cerbos on Load / `/app`** | After Commit path is solid. |

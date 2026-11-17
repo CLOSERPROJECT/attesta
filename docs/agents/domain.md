@@ -4,8 +4,8 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (Org
-  platform, Feragame plant, Legacy Stream). Then read that glossary.
+- **`GLOSSARY-MAP.md`** at the repo root: which glossary applies (shared org,
+  Org product, Legacy Stream, Feragame). Then read that glossary.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
   Org product ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
   When writing or editing an ADR, follow [`../adr/README.md`](../adr/README.md).
@@ -23,12 +23,13 @@ creates them lazily when terms or decisions actually get resolved.
 
 ```
 /
-├── GLOSSARY-MAP.md              ← which glossary
-├── GLOSSARY.md                  ← Org product (platform)
-├── CONTEXT.md                   ← Legacy Stream
+├── GLOSSARY-MAP.md                   ← which glossary
+├── GLOSSARY.md                       ← Org product (`/app`)
 ├── docs/
-│   ├── feragame/GLOSSARY.md     ← first plant / Org Config payload
-│   └── adr/                     ← platform Decisions; format in README.md
+│   ├── org/GLOSSARY.md               ← shared Organization & affiliation
+│   ├── stream/GLOSSARY.md            ← Legacy Stream (`/my`)
+│   ├── feragame/GLOSSARY.md          ← first plant / Org Config payload
+│   └── adr/                          ← platform Decisions; format in README.md
 ├── docs/agents/
 │   ├── org-config-authoring.md       ← platform Config authoring
 │   └── feragame-fixture-authoring.md ← Feragame fixture checklist
