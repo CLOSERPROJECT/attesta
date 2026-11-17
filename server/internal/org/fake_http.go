@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 )
 
-// FakeHttpPort is a test double for fixture /fake/* onSubmit.http endpoints.
+// FakeHttpPort is a test double for fixture /effects/* onSubmit.http endpoints.
 // Product Commit uses SidecarHttpPort; keep this for unit/integration doubles only.
 type FakeHttpPort struct {
 	seq atomic.Uint64
@@ -23,12 +23,12 @@ func (f *FakeHttpPort) Request(_ context.Context, req HttpRequest) (HttpPortResp
 	path := fakeHTTPPath(req.URL)
 	method := strings.ToUpper(strings.TrimSpace(req.Method))
 	switch {
-	case method == "POST" && path == "/fake/labels":
+	case method == "POST" && path == "/effects/labels":
 		_ = f.seq.Add(1)
 		return HttpPortResponse{
 			URL: "data:application/pdf;base64," + base64.StdEncoding.EncodeToString(minimalLabelsPDF(req.Body)),
 		}, nil
-	case method == "POST" && path == "/fake/register-csv":
+	case method == "POST" && path == "/effects/register-csv":
 		body, ok := req.Body.(map[string]any)
 		if !ok {
 			return HttpPortResponse{}, fmt.Errorf("register-csv body must be an object")

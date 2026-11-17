@@ -10,7 +10,7 @@ func TestFakeHttpPortLabelsAndRegisterCSV(t *testing.T) {
 	port := NewFakeHttpPort()
 	labels, err := port.Request(t.Context(), HttpRequest{
 		Method: "POST",
-		URL:    "/fake/labels",
+		URL:    "/effects/labels",
 		Body: map[string]any{
 			"lotId": "NIR-1",
 			"labels": []any{map[string]any{"id": "NIR-1.1"}},
@@ -25,7 +25,7 @@ func TestFakeHttpPortLabelsAndRegisterCSV(t *testing.T) {
 
 	csvResp, err := port.Request(t.Context(), HttpRequest{
 		Method: "POST",
-		URL:    "/fake/register-csv",
+		URL:    "/effects/register-csv",
 		Body: map[string]any{
 			"client":    "NO",
 			"lotId":    "NIR-1",
@@ -52,7 +52,7 @@ func TestFakeHttpPortLabelsAndRegisterCSV(t *testing.T) {
 }
 
 func TestFakeHttpPortUnknownEndpoint(t *testing.T) {
-	_, err := NewFakeHttpPort().Request(t.Context(), HttpRequest{Method: "GET", URL: "/fake/other"})
+	_, err := NewFakeHttpPort().Request(t.Context(), HttpRequest{Method: "GET", URL: "/effects/other"})
 	if err == nil || !strings.Contains(err.Error(), "unknown fake http endpoint") {
 		t.Fatalf("err = %v", err)
 	}

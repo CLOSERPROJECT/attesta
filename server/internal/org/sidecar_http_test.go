@@ -28,14 +28,14 @@ func TestSidecarHttpPortSuccessRewritesArtifactURL(t *testing.T) {
 	port := NewSidecarHttpPort(srv.URL, "secret", srv.Client())
 	resp, err := port.Request(t.Context(), HttpRequest{
 		Method: "POST",
-		URL:    "/fake/register-csv",
+		URL:    "/effects/register-csv",
 		Org:    "feragame",
 		Body:   map[string]any{"lotId": "NIR-1"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotAuth != "Bearer secret" || gotOrg != "feragame" || gotPath != "/fake/register-csv" {
+	if gotAuth != "Bearer secret" || gotOrg != "feragame" || gotPath != "/effects/register-csv" {
 		t.Fatalf("request auth=%q org=%q path=%q", gotAuth, gotOrg, gotPath)
 	}
 	if gotCT != "application/json" || !strings.Contains(string(gotBody), `"lotId":"NIR-1"`) {
@@ -68,7 +68,7 @@ func TestSidecarHttpPortSoftErrorOnUpstreamFailure(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	port := NewSidecarHttpPort(srv.URL, "t", srv.Client())
-	_, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/fake/labels"})
+	_, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/effects/labels"})
 	if err == nil || !strings.Contains(err.Error(), "status 502") {
 		t.Fatalf("err = %v", err)
 	}
@@ -83,14 +83,14 @@ func TestSidecarHttpPortTimeoutSoftError(t *testing.T) {
 	client := srv.Client()
 	client.Timeout = 20 * time.Millisecond
 	port := NewSidecarHttpPort(srv.URL, "t", client)
-	_, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/fake/labels"})
+	_, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/effects/labels"})
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
 }
 
 func TestUnconfiguredHttpPortSoftError(t *testing.T) {
-	_, err := UnconfiguredHttpPort{}.Request(t.Context(), HttpRequest{Method: "POST", URL: "/fake/labels"})
+	_, err := UnconfiguredHttpPort{}.Request(t.Context(), HttpRequest{Method: "POST", URL: "/effects/labels"})
 	if err == nil || !strings.Contains(err.Error(), "not configured") {
 		t.Fatalf("err = %v", err)
 	}
@@ -232,10 +232,10 @@ func TestFetchArtifact(t *testing.T) {
 }
 
 func TestRequirePathOnlyURL(t *testing.T) {
-	if _, err := requirePathOnlyURL("/fake/labels"); err != nil {
+	if _, err := requirePathOnlyURL("/effects/labels"); err != nil {
 		t.Fatal(err)
 	}
-	for _, bad := range []string{"http://x/y", "https://x/y", "//x/y", "fake/labels", ""} {
+	for _, bad := range []string{"http://x/y", "https://x/y", "//x/y", "effects/labels", ""} {
 		if _, err := requirePathOnlyURL(bad); err == nil {
 			t.Fatalf("expected reject for %q", bad)
 		}

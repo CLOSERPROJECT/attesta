@@ -26,10 +26,10 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if len(port.calls) != 2 {
 		t.Fatalf("http calls = %#v", port.calls)
 	}
-	if port.calls[0].Method != "POST" || port.calls[0].URL != "/fake/labels" {
+	if port.calls[0].Method != "POST" || port.calls[0].URL != "/effects/labels" {
 		t.Fatalf("call0 = %#v", port.calls[0])
 	}
-	if port.calls[1].URL != "/fake/register-csv" {
+	if port.calls[1].URL != "/effects/register-csv" {
 		t.Fatalf("call1 = %#v", port.calls[1])
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)

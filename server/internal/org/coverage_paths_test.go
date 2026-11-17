@@ -1446,17 +1446,17 @@ func TestBuildTaskFormBundleErrorsAndFakeHTTP(t *testing.T) {
 	}
 
 	port := NewFakeHttpPort()
-	if _, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/fake/register-csv", Body: "nope"}); err == nil {
+	if _, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/effects/register-csv", Body: "nope"}); err == nil {
 		t.Fatal("csv body type")
 	}
-	if _, err := port.Request(t.Context(), HttpRequest{Method: "GET", URL: "/fake/labels"}); err == nil {
+	if _, err := port.Request(t.Context(), HttpRequest{Method: "GET", URL: "/effects/labels"}); err == nil {
 		t.Fatal("unknown method")
 	}
-	resp, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "http://h/fake/labels?x=1", Body: map[string]any{}})
+	resp, err := port.Request(t.Context(), HttpRequest{Method: "POST", URL: "http://h/effects/labels?x=1", Body: map[string]any{}})
 	if err != nil || !strings.HasPrefix(resp.URL, "data:application/pdf") {
 		t.Fatalf("labels = %#v %v", resp, err)
 	}
-	resp, err = port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/fake/register-csv", Body: map[string]any{
+	resp, err = port.Request(t.Context(), HttpRequest{Method: "POST", URL: "/effects/register-csv", Body: map[string]any{
 		"client": "NO", "palletIds": []any{"a", "b"},
 	}})
 	if err != nil || resp.Headers["Content-Disposition"] == "" {
