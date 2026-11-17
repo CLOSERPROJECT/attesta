@@ -20,7 +20,7 @@ type OperatorIdentity struct {
 // Gate authenticates the caller; on failure it writes the HTTP error and returns ok=false.
 type Gate func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool)
 
-// API serves Load, addressed Task form / recap, Commit, Close, QR resolve, and artifact proxy over HTTP seams.
+// API serves Load, addressed Task form / recap, Commit, QR resolve, and artifact proxy over HTTP seams.
 type API struct {
 	DomainLoader    *DomainLoader
 	TaskCommitter *TaskCommitter

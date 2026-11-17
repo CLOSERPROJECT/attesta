@@ -24,9 +24,6 @@ import {
 	completedRowKey,
 	completedRowsFromWorklist,
 	completedRowTarget,
-	inProgressRowKey,
-	inProgressRowsFromWorklist,
-	inProgressRowTarget,
 	instanceTaskProgress,
 	progressFraction,
 	taskRouteInstanceSegment
@@ -306,11 +303,9 @@ describe('worklist-home bands', () => {
 		expect(availableRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(canStartRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(actNowRowsFromWorklist({ jobs: [] })).toEqual([]);
-		expect(inProgressRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(completedRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(availableRowsFromWorklist(null)).toEqual([]);
 		expect(actNowRowsFromWorklist(null)).toEqual([]);
-		expect(inProgressRowsFromWorklist(null)).toEqual([]);
 		expect(completedRowsFromWorklist(null)).toEqual([]);
 	});
 
@@ -327,101 +322,12 @@ describe('worklist-home bands', () => {
 		for (const row of [
 			...availableRowsFromWorklist(adminWorklist),
 			...canStartRowsFromWorklist(adminWorklist),
-			...inProgressRowsFromWorklist(adminWorklist),
 			...completedRowsFromWorklist(adminWorklist)
 		]) {
 			expect(row).not.toHaveProperty('canSpawn');
 			expect(row).not.toHaveProperty('canClose');
 			expect(row).not.toHaveProperty('groups');
 		}
-	});
-
-	test('inProgressRows include unfinished Job instances; finished excluded; Job → instance order', () => {
-		const mixed: Worklist = {
-			jobs: [
-				{
-					jobId: 'intake',
-					canStart: false,
-					repeatable: true,
-					title: 'Camion',
-					taskIds: ['register', 'palletWeight'],
-					tasks: [...chrome.intake],
-					instances: [
-						{
-							id: 'NIR-1',
-							label: 'NIR-1',
-							tasks: { register: 'done', palletWeight: 'actionable' }
-						},
-						{
-							id: 'NIR-done',
-							label: 'Finished truck',
-							tasks: { register: 'done', palletWeight: 'done' }
-						},
-						{
-							id: 'NIR-2',
-							label: 'Camion B',
-							tasks: { register: 'actionable', palletWeight: 'locked' }
-						}
-					]
-				},
-				{
-					jobId: 'lot_processing',
-					canStart: false,
-					repeatable: true,
-					title: 'Lavorazione',
-					taskIds: ['startLot', 'markProgress'],
-					tasks: [...chrome.lot_processing],
-					instances: [
-						{
-							id: 'CO-1',
-							label: 'Lotto: CO-1',
-							tasks: { startLot: 'done', markProgress: 'available' }
-						}
-					]
-				}
-			]
-		};
-
-		const rows = inProgressRowsFromWorklist(mixed);
-		expect(rows.map((r) => inProgressRowKey(r))).toEqual([
-			'intake/NIR-1',
-			'intake/NIR-2',
-			'lot_processing/CO-1'
-		]);
-		expect(rows[0]).toMatchObject({
-			jobId: 'intake',
-			jobInstanceId: 'NIR-1',
-			instanceLabel: 'NIR-1',
-			jobTitle: 'Camion',
-			tasksDone: 1,
-			tasksTotal: 2
-		});
-		expect(rows[1]).toMatchObject({
-			instanceLabel: 'Camion B',
-			tasksDone: 0,
-			tasksTotal: 2
-		});
-		expect(rows[2]).toMatchObject({
-			jobId: 'lot_processing',
-			jobInstanceId: 'CO-1',
-			jobTitle: 'Lavorazione',
-			tasksDone: 1,
-			tasksTotal: 2
-		});
-
-		// Overlap-friendly: instances with actionable Tasks still appear in In progress.
-		const availableKeys = availableRowsFromWorklist(mixed).map(
-			(r) => `${r.jobId}/${r.jobInstanceId}`
-		);
-		expect(availableKeys).toContain('intake/NIR-1');
-		expect(rows.map((r) => inProgressRowKey(r))).toContain('intake/NIR-1');
-
-		expect(inProgressRowTarget(rows[0]!)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-1'
-		});
-		expect(hrefOrgTarget(inProgressRowTarget(rows[0]!))).toBe('/app/intake/NIR-1');
 	});
 
 	test('completedRows include finished Job instances; unfinished excluded; Job → instance order', () => {
@@ -497,11 +403,8 @@ describe('worklist-home bands', () => {
 			tasksTotal: 2
 		});
 
-		const inProgressKeys = inProgressRowsFromWorklist(mixed).map((r) =>
-			inProgressRowKey(r)
-		);
-		for (const key of rows.map((r) => completedRowKey(r))) {
-			expect(inProgressKeys).not.toContain(key);
+		for (const key of ['intake/NIR-1', 'intake/NIR-2', 'lot_processing/CO-1']) {
+			expect(rows.map((r) => completedRowKey(r))).not.toContain(key);
 		}
 
 		expect(completedRowTarget(rows[0]!)).toEqual({

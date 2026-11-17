@@ -44,19 +44,6 @@ export type ActNowRow =
 	| ({ kind: 'task' } & AvailableRow)
 	| ({ kind: 'start' } & CanStartRow);
 
-export type InProgressRow = {
-	jobId: string;
-	jobInstanceId: string;
-	/** Job instance label (product-facing name); falls back to instance id. */
-	instanceLabel: string;
-	/** Job display title; falls back to jobId when absent. */
-	jobTitle: string;
-	/** Authored Job color for card left border; omit when unset. */
-	jobColor?: string;
-	tasksDone: number;
-	tasksTotal: number;
-};
-
 function taskChrome(job: WorklistJob, taskId: string): WorklistTask | null {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
 }
@@ -205,43 +192,23 @@ export function actNowRowKey(row: ActNowRow): string {
 	return `start:${row.jobId}`;
 }
 
-/**
- * Unfinished Job instances (Config taskIds via instanceTaskProgress:
- * include when done < total). Order: Worklist Job → instance.
- * Overlaps Available when an instance still has actionable Tasks.
- */
-export function inProgressRowsFromWorklist(
-	worklist: Worklist | null | undefined
-): InProgressRow[] {
-	const jobs = worklist?.jobs;
-	if (!jobs?.length) return [];
-	const out: InProgressRow[] = [];
-	for (const job of jobs) {
-		for (const inst of job.instances ?? []) {
-			const progress = instanceTaskProgress(job, inst);
-			if (progress.done >= progress.total) continue;
-			const jobColor = jobColorOf(job);
-			out.push({
-				jobId: job.jobId,
-				jobInstanceId: inst.id,
-				instanceLabel: inst.label || inst.id,
-				jobTitle: job.title?.trim() || job.jobId,
-				...(jobColor ? { jobColor } : {}),
-				tasksDone: progress.done,
-				tasksTotal: progress.total
-			});
-		}
-	}
-	return out;
-}
-
-/** Same shape as In progress; finished instances (done >= total). */
-export type CompletedRow = InProgressRow;
+/** Finished Job instance (done >= total over Config taskIds). */
+export type CompletedRow = {
+	jobId: string;
+	jobInstanceId: string;
+	/** Job instance label (product-facing name); falls back to instance id. */
+	instanceLabel: string;
+	/** Job display title; falls back to jobId when absent. */
+	jobTitle: string;
+	/** Authored Job color for card left border; omit when unset. */
+	jobColor?: string;
+	tasksDone: number;
+	tasksTotal: number;
+};
 
 /**
  * Finished Job instances (Config taskIds via instanceTaskProgress:
  * include when done >= total). Order: Worklist Job → instance.
- * Inverse of In progress; no overlap with that band.
  */
 export function completedRowsFromWorklist(
 	worklist: Worklist | null | undefined
@@ -287,28 +254,17 @@ export function availableRowTarget(row: AvailableRow): Extract<PostCommitTarget,
 	};
 }
 
-export function inProgressRowKey(row: InProgressRow): string {
+export function completedRowKey(row: CompletedRow): string {
 	return `${row.jobId}/${row.jobInstanceId}`;
 }
 
-/** Deep-link target for a home In progress row → Job instance overview. */
-export function inProgressRowTarget(
-	row: InProgressRow
+/** Deep-link target for an Archive Completed row → Job instance overview. */
+export function completedRowTarget(
+	row: CompletedRow
 ): Extract<PostCommitTarget, { kind: 'overview' }> {
 	return {
 		kind: 'overview',
 		jobId: row.jobId,
 		jobInstanceId: row.jobInstanceId
 	};
-}
-
-export function completedRowKey(row: CompletedRow): string {
-	return inProgressRowKey(row);
-}
-
-/** Deep-link target for a home Completed row → Job instance overview. */
-export function completedRowTarget(
-	row: CompletedRow
-): Extract<PostCommitTarget, { kind: 'overview' }> {
-	return inProgressRowTarget(row);
 }
