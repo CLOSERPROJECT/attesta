@@ -21,7 +21,7 @@
 
 ## Source guidance
 
-- **Architecture:** for system boundaries or where behavior lives, read
+- **Architecture:** how product and package seams connect, read
   [`docs/architecture.md`](docs/architecture.md).
 - **Operations:** pitch/env → [`README.md`](README.md); day-1
   prepare/seed/worktrees → [`QUICKSTART.md`](QUICKSTART.md);

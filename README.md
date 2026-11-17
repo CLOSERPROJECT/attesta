@@ -252,7 +252,7 @@ European Union nor the granting authority can be held responsible for them.
 - [GLOSSARY-MAP.md](GLOSSARY-MAP.md) - which glossary applies (shared membership, Org `/app`, Stream `/my`, Feragame).
 - [QUICKSTART.md](QUICKSTART.md) - prepare-first local setup, seed, and worktrees.
 - [DOCKER.md](DOCKER.md) - Compose services, Coolify, stop/reset/purge, and containerized app.
-- [docs/architecture.md](docs/architecture.md) - system boundaries, ADRs, and source navigation.
+- [docs/architecture.md](docs/architecture.md) - how Stream, Org, and shared seams connect.
 - [docs/untp.md](docs/untp.md) - Digital Product Passport and UNTP implementation.
 - [Taskfile.yml](Taskfile.yml) - available local commands.
 - GitHub issues - active and deferred work (see [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)).
