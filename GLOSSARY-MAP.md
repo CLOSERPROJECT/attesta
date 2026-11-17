@@ -9,8 +9,9 @@ mix plant nouns into platform ADRs or the Org platform glossary.
   Worklist, Commit, Archive, Passport-as-capability under `/app`. Source of
   truth for Attesta product law and Org ADRs (0005–0013).
 - [Feragame](./docs/feragame/GLOSSARY.md): first **Org Config** use case
-  (demo plant fixture). Lot session, Jobs `intake` / `lot_processing` /
-  passport, Italian labels—**payload**, not platform Decisions.
+  (demo plant). Lot session, Jobs `intake` / `lot_processing` / passport—
+  **payload**, not platform Decisions. Fixture checklist:
+  [`docs/agents/feragame-fixture-authoring.md`](docs/agents/feragame-fixture-authoring.md).
 - [Legacy Stream UI](./CONTEXT.md): multi-org Streams, `/my`, HTMX. Historical
   and still accurate for that surface.
 

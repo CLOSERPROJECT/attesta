@@ -40,7 +40,7 @@ Widget-only strings (combobox empty, date placeholders) use `extraUiOptions` / u
 | Track | Code behavior |
 | --- | --- |
 | SPA shell | `m.*` only; no new EN/IT literals outside `app/messages/`. |
-| Plant copy | Display Worklist / form bundle / QR messages verbatim — edit YAML via [`plant-config.md`](plant-config.md), not Paraglide. |
+| Plant copy | Display Worklist / form bundle / QR messages verbatim — edit YAML via [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md), not Paraglide. |
 | Platform errors | Show Go HTTP bodies as English v1; Paraglide prefixes only. Role slugs are ids, not copy. |
 
 **Verify:** e2e expects Italian chrome by default; CI must run `app` build so Paraglide compiles. Go Commit/Load/QR catalogs and dual-locale Config are out of scope for this wiring.

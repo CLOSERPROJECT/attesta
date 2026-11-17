@@ -38,9 +38,13 @@
 - **Domain exploration:** before codebase exploration that depends on glossary
   or ADR vocabulary, read
   [`docs/agents/domain.md`](docs/agents/domain.md).
-- **Plant Org Config:** before editing
+- **Org Config authoring:** before changing platform Config gates, `onCommit`,
+  or transform authoring patterns, read
+  [`docs/agents/org-config-authoring.md`](docs/agents/org-config-authoring.md).
+- **Feragame fixture authoring:** before editing
   `server/internal/org/fixtures/feragame-config.yaml` (or its seed/test
-  followers), read [`docs/agents/plant-config.md`](docs/agents/plant-config.md)
+  followers), read
+  [`docs/agents/feragame-fixture-authoring.md`](docs/agents/feragame-fixture-authoring.md)
   and [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md).
 - **DPP/UNTP:** for Digital Link or credential behavior, read
   [`docs/untp.md`](docs/untp.md) and the implementation it names.
@@ -53,8 +57,8 @@
 - Org Go (`server/internal/org`) and the `/app` SPA are **dumb executors** of Org Config: plant
   business rules (entity shapes, transforms, `readyWhen`, open/close laws) live
   in Config, not as Feragame- or domain-named branches in executors. See
-  [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**) and the plant checklist in
-  [`docs/agents/plant-config.md`](docs/agents/plant-config.md).
+  [`GLOSSARY.md`](GLOSSARY.md) (**Dumb executor**) and
+  [`docs/agents/org-config-authoring.md`](docs/agents/org-config-authoring.md).
 - Progress keys containing dots are encoded for Mongo storage (`.` becomes
   `_`) and normalized on reads. Preserve that boundary when changing progress
   persistence.

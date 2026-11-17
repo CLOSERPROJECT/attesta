@@ -9,8 +9,10 @@ How the engineering skills should consume this repo's domain documentation when 
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
   Org product ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
   When writing or editing an ADR, follow [`../adr/README.md`](../adr/README.md).
-- Plant fixture edits: also
-  [`plant-config.md`](plant-config.md) and
+- Org Config authoring (gates, `onCommit`, transforms):
+  [`org-config-authoring.md`](org-config-authoring.md).
+- Feragame fixture edits: also
+  [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md) and
   [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md).
 
 If the map or a glossary is missing, **proceed silently**. Don't flag their
@@ -27,6 +29,9 @@ creates them lazily when terms or decisions actually get resolved.
 ├── docs/
 │   ├── feragame/GLOSSARY.md     ← first plant / Org Config payload
 │   └── adr/                     ← platform Decisions; format in README.md
+├── docs/agents/
+│   ├── org-config-authoring.md       ← platform Config authoring
+│   └── feragame-fixture-authoring.md ← Feragame fixture checklist
 ```
 
 ## Use the glossary's vocabulary
