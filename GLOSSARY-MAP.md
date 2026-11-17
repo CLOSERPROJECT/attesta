@@ -16,7 +16,7 @@ Every vocabulary file is named `GLOSSARY.md`. This map is `GLOSSARY-MAP.md`.
 
 - [Org](./docs/org/GLOSSARY.md) (`/app`): platform Org Config, Domain,
   Jobs/Tasks, Worklist, Commit, Archive, Passport-as-capability. Source of truth
-  for Attesta product law and Org ADRs (0005–0013). Matches `server/internal/org`.
+  for Attesta product law and Org ADRs (0005–0013).
 - [Stream](./docs/stream/GLOSSARY.md) (`/my`, Formata): multi-org Streams, Stream
   instances, Steps/Substeps, HTMX operator UI. Historical surface; still accurate
   for that runtime.

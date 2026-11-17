@@ -5,7 +5,7 @@ post-Commit navigation. Not a plant fixture checklist.
 
 Vocabulary: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**,
 **readyWhen**, **startsWhen**, **Unlock order**, **Commit navigation**,
-**submit cardinality**).
+**submit cardinality**, **bind**, **reads**, **Chrome**, **dynamicProperties**).
 Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0013). Feragame
 fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
 
@@ -13,7 +13,13 @@ fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
 
 - **Dumb executor:** plant business rules live in Config (`domain.entities`,
   transforms, `readyWhen`, `onCommit`). Go and `/app` only evaluate—no
-  plant-named branches in executors.
+  plant-named branches in executors. Only config-declared transforms write
+  Domain entities.
+- **Transforms:** `bind` rebinds `$` for later ops in that list (no Domain
+  mutate by itself). `reads` project Domain at open time—never bake instance
+  ids into Config. `derived` may persist on successful submit when configured.
+  Chrome is display-only and stripped before Submission facts.
+  `dynamicProperties` keys come from Domain reads.
 - **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over
   Domain (and `$domain.submissions` when bind-once matters). Encode those facts
   in **`readyWhen`**, not in **`startsWhen`**. When Domain already holds the

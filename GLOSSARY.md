@@ -3,11 +3,8 @@
 **Org** and **Stream** are the two words we use for different parts of the
 product. Do not mix their nouns.
 
-- **Org** (`/app`): single-organization Config, Domain, Jobs/Tasks, Worklist,
-  Commit, Passport — [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md). Code:
-  `server/internal/org`, `/app` SPA. ADRs 0005–0013.
-- **Stream** (`/my`): multi-org Stream blueprints and instances (Legacy Formata)
-  — [`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md).
+- **Org** (`/app`): [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md)
+- **Stream** (`/my`): [`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md)
 
 Plant Config payloads (demo fixture nouns):
 [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md). Which file to open:
@@ -24,59 +21,45 @@ owners; Org gives each Organization one **Org Config** and **Domain**.
 _Avoid_: Department, company, team (infra wording)
 
 **Registration**:
-Open self-serve account creation. A registered user may have zero organizations
-until a join or creation path completes.
+Open self-serve account creation. A registered user may have zero organizations.
 _Avoid_: Closed signup, invite-only registration (as the product default);
 restating email-control rules—see [ADR-0003](docs/adr/0003-email-verification-gate.md)
 
 **Email verification**:
-Proof that a registered user controls their account email. Until verified,
-authenticated app use is limited to the **verification waiting path**. See
+Proof that a registered user controls their account email. See
 [ADR-0003](docs/adr/0003-email-verification-gate.md).
 _Avoid_: Confirmed account, activated, email confirmation (as the glossary name),
 conflating with Affiliation or Onboarding
 
 **Verification waiting path**:
-The authenticated-only path for an unverified user after Registration or login
-while still unverified. Distinct from Onboarding.
+The authenticated-only path for an unverified user. Distinct from Onboarding.
 _Avoid_: Onboarding, signup success page, confirm page (when meaning the
 email-link landing)
 
 **Invitation**:
-An Org-admin-initiated (or platform-admin-initiated) outbound membership offer
-to an email. The inviter may grant Org admin standing and/or one or more
-**Organization roles**—those are separate choices. Distinct from a Join request.
-An invitee who already has an Affiliation may only accept (or be invited into)
-that same Organization.
+An outbound membership offer to an email (Org admin or platform admin). Distinct
+from a Join request. May grant Org admin standing and/or **Organization roles**.
 _Avoid_: Join request, membership request (when meaning outbound invite)
 
 **Join request**:
 A registered user’s inbound ask to join an existing organization as a Member,
-naming one or more Organization roles. Org admins approve or reject; approval
-grants Member standing with those Organization roles (never Org admin standing).
-While pending, the requester may withdraw the request.
+naming one or more Organization roles.
 _Avoid_: Invite, application (vague), membership (the lasting affiliation),
 requesting Org admin
 
 **Organization creation request**:
-A registered user’s ask to create a new organization. Platform admins approve or
-reject; approval creates the organization and grants the requester Org admin
-standing. Platform admins may still create organizations directly without a
-request. While pending, the requester may withdraw the request.
+A registered user’s ask to create a new organization (platform-admin approval).
 _Avoid_: Org signup, self-serve org (when meaning live create without approval)
 
 **Affiliation**:
 A user’s membership in at most one organization at a time. Unaffiliated means
-zero organizations. Switching requires leaving (or being removed) before a new
-join or creation request can complete. Within an Affiliation, standing (Org
-admin vs Member) is independent of which Organization roles the user holds.
+zero organizations. Within an Affiliation, standing (Org admin vs Member) is
+independent of which Organization roles the user holds.
 _Avoid_: Multi-org membership, active org switcher, workspace
 
 **Onboarding**:
-The unaffiliated-user surface to obtain an Affiliation: accept or decline
-Invitations, join an organization, request a new organization, or wait on /
-withdraw a pending request. Only for verified users. Distinct from Legacy
-Operator home and from the Org Worklist.
+The unaffiliated-user surface to obtain an Affiliation. Only for verified users.
+Distinct from Legacy Operator home and from the Org Worklist.
 _Avoid_: Signup (account creation), registration wizard, folding Onboarding into
 Operator home, Email verification waiting path
 
@@ -87,18 +70,17 @@ _Avoid_: Notification, Attention item, pending (when meaning actionable work for
 the current user)
 
 **Attention item**:
-Something that requires the current user to act: pending Join request (Org
-admin), pending Organization creation request (platform admin), open Invitation
-(invitee), or—on Legacy Stream—an actionable Substep waiting on them. Distinct
-from Waiting (requester’s own pending request).
+Something that requires the current user to act (e.g. pending Join request, open
+Invitation, or—on Legacy Stream—an actionable Substep waiting on them). Distinct
+from Waiting.
 _Avoid_: Notification, alert, badge, task (vague), pending (when meaning
 “waiting on others”)
 
 **Org admin**:
 Privileged standing within an Affiliation: can manage organization profile, Role
-catalog, and members. Orthogonal to Organization roles—an Org admin may hold
-zero or more. Never an entry in the Role catalog. A sole Org admin cannot lose
-that standing (including via Leave) until another Org admin exists.
+catalog, and members. Orthogonal to Organization roles. Never an entry in the
+Role catalog. A sole Org admin cannot lose that standing (including via Leave)
+until another Org admin exists.
 _Avoid_: Treating Org admin as a catalog / Organization role
 
 **Member**:
@@ -116,17 +98,14 @@ Config roles
 
 **Organization role**:
 One named entry in an Organization’s Role catalog. Affiliated users may each
-hold zero or more. Chosen on Join request and (alongside standing) on
-Invitation. Slugs should align with Stream roles
-([`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md)) and Config roles
-([`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md)).
+hold zero or more.
 _Avoid_: Catalog role, org role (vague), membership role, Org admin, Config role
 
 **Operator**:
 The default Organization role created with every new organization so Members
 have a joinable role.
-_Avoid_: Default member, basic role, Org admin; conflating with
-**OperatorIdentity** (Org); treating an empty Role catalog as valid
+_Avoid_: Default member, basic role, Org admin; conflating with Org actor
+identity (**OperatorIdentity**); treating an empty Role catalog as valid
 
 **Account settings**:
 The affiliated user’s account-level actions on their current Affiliation
@@ -144,8 +123,8 @@ _Avoid_: Delete self, resign, unlink, soft-delete (when meaning self-serve exit)
 - An **Affiliation** binds one user to at most one **Organization**.
 - **Org admin** / **Member** is standing; **Organization roles** are catalog
   entries—orthogonal.
-- **Organization role** slugs should align with Stream roles and Config roles
-  (see those glossaries).
 - **Org** and **Stream** share this membership layer; their operating nouns stay
   in [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md) and
   [`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md).
+  Slug alignment across Organization / Stream / Config roles:
+  [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).

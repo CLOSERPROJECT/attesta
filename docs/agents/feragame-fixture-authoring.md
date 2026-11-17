@@ -16,6 +16,9 @@ platform nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Map:
    `readyWhen`, catalogs, Italian labels. Prefer existing transform ops (`mint` /
    `mintMany` / `patch` / `bind`). Follow
    [`org-config-authoring.md`](org-config-authoring.md) for gates and `onCommit`.
+   Lot session: at most one lot `open`; close sets `fullyProcessed` only when
+   every pallet on that lot has weight and `progress = done`; Passport Lock is
+   still a separate Job after close. Intake Job instance id matches truck id.
 2. **Glossary** — if you add or rename a plant Domain concept, update
    [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md) in the same change.
    Platform terms stay in [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).

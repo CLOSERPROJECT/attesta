@@ -14,12 +14,11 @@ membership: [`GLOSSARY.md`](../../GLOSSARY.md). Map:
 ### Domain entities
 
 **truck**:
-Intake truck row (gross weight, scale readings, weight-check fields).
+Intake truck row.
 _Avoid_: Treating truck as the Passport subject; conflating with Job instance
 
 **lot**:
-One FIR/intake lot. Owns pallets; is the Passport subject. Lot-processing work
-runs under a **lot session status** on this entity.
+One FIR/intake lot. Owns pallets; is the Passport subject.
 _Avoid_: load (former name); conflating with Job instance
 
 **pallet**:
@@ -32,16 +31,14 @@ physical bin continues on a later register.
 ### Lot session and row facts
 
 **lot session status**:
-Enum on a **lot**: `open` | `fullyProcessed`. Opening a lot session sets `open`;
-closing it sets `fullyProcessed` when every pallet on that lot has weight and
-`progress = done`. At most one lot is `open`; the next open waits until that
-lot is `fullyProcessed`.
+Lifecycle state of a lot session on a **lot**: `open` | `fullyProcessed`.
 _Avoid_: `parked`; open/close working day or shift as Domain peers; separate
 boolean fullyProcessed beside open; parallel open lots
 
 **fullyProcessed**:
-Terminal **lot session status**: the lot is closed for line processing. Set by
-close; Passport still needs Lock on that lot (see root glossary / ADRs).
+Terminal **lot session status**: the lot is closed for line processing.
+Passport still needs Lock on that lot — see
+[`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).
 _Avoid_: boolean `processed`; container register as the writer of this status
 
 **progress**:
@@ -56,11 +53,11 @@ _Avoid_: Treating incomplete as operator-board status or progress
 ### Jobs and roles
 
 **intake** (Job):
-Truck arrival chapter: arrive → register → weight check.
+Truck arrival chapter.
 _Avoid_: Treating intake as the Passport path
 
 **lot_processing** (Job):
-Lot session chapter (open through close for a lot).
+Lot session chapter.
 
 **Passport Lock Job**:
 Issues a Passport whose subject is a **lot**. Still needs Lock after the lot is
@@ -68,8 +65,7 @@ Issues a Passport whose subject is a **lot**. Still needs Lock after the lot is
 (Passport lock).
 
 **administration** / **line** / **logistic**:
-Plant Config role slugs (office, line floor, logistics). Which Tasks each may
-run: [`feragame-fixture-authoring.md`](../agents/feragame-fixture-authoring.md).
+Plant Config role slugs (office, line floor, logistics).
 _Avoid_: Plant-named role branches in executors
 
 ## Relationships
@@ -77,16 +73,11 @@ _Avoid_: Plant-named role branches in executors
 - A **lot** owns zero or more **pallets** and zero or more **containers**.
 - At most one **lot** has **lot session status** `open` at a time.
 - **Passport** subject for this plant is a **lot**, not a **truck**.
-- An **intake** Job instance id matches the **truck** id.
 - An **incomplete** **container** may be continued by a later register on another
   lot.
 
-## Example dialogue
-
-> **Dev:** “When every pallet on a **lot** has **progress** `done`, is the
-> Passport issued?”
-> **Domain expert:** “No — **closeLot** sets **fullyProcessed**; Passport still
-> needs an explicit Lock Commit on that **lot**.”
+Open/close and Job sequencing:
+[`feragame-fixture-authoring.md`](../agents/feragame-fixture-authoring.md).
 
 ## Historical / rejected
 
@@ -100,4 +91,3 @@ Former Domain calendar layer; not plant Domain entities.
 
 **`parked`**:
 Former lot session status; not in the living enum (`open` | `fullyProcessed`).
-
