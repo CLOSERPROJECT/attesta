@@ -30,6 +30,8 @@
 - **Domain language:** which glossary applies — Org platform (`/app`), Feragame
   plant payload, or Legacy Stream — read
   [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
+- **ADRs:** before writing or editing `docs/adr/`, read
+  [`docs/adr/README.md`](docs/adr/README.md).
 - **Active work:** unresolved design and implementable work live as GitHub
   issues; use [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
   when creating, updating, triaging, or wayfinding tickets.

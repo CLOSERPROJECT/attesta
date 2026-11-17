@@ -8,6 +8,7 @@ How the engineering skills should consume this repo's domain documentation when 
   platform, Feragame plant, Legacy Stream). Then read that glossary.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
   Org product ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
+  When writing or editing an ADR, follow [`../adr/README.md`](../adr/README.md).
 - Plant fixture edits: also
   [`plant-config.md`](plant-config.md) and
   [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md).
@@ -25,7 +26,7 @@ creates them lazily when terms or decisions actually get resolved.
 ├── CONTEXT.md                   ← Legacy Stream
 ├── docs/
 │   ├── feragame/GLOSSARY.md     ← first plant / Org Config payload
-│   └── adr/                     ← platform Decisions only
+│   └── adr/                     ← platform Decisions; format in README.md
 ```
 
 ## Use the glossary's vocabulary
