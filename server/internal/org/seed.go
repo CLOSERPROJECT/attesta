@@ -19,10 +19,10 @@ const (
 	SeedScopeFeragameConfig
 	// SeedScopeFeragameDomain puts Active Config and always wipes+stages Domain.
 	SeedScopeFeragameDomain
-	// SeedScopeFeragameIdentity is living-identical to Config;
+	// SeedScopeFeragameIdentity is identical to Config;
 	// cmd/server pairs it with Feragame Appwrite hard reset.
 	SeedScopeFeragameIdentity
-	// SeedScopeFeragameFull is living-identical to Domain (wipe+stage);
+	// SeedScopeFeragameFull is identical to Domain (wipe+stage);
 	// cmd/server pairs it with Feragame Appwrite hard reset.
 	SeedScopeFeragameFull
 )
