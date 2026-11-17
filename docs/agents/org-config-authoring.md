@@ -3,9 +3,10 @@
 Platform authoring reference for **any** Org Config: gates, transforms, and
 post-Commit navigation. Not a plant fixture checklist.
 
-Vocabulary: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**,
+Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**,
 **readyWhen**, **startsWhen**, **Unlock order**, **Commit navigation**,
-**submit cardinality**, **bind**, **reads**, **Chrome**, **dynamicProperties**).
+**submit cardinality**, **Chrome**). Transform keys (`bind`, `reads`,
+`derived`, `dynamicProperties`) are authored here—not glossary entries.
 Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0013). Feragame
 fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
 
@@ -16,9 +17,9 @@ fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
   plant-named branches in executors. Only config-declared transforms write
   Domain entities.
 - **Transforms:** `bind` rebinds `$` for later ops in that list (no Domain
-  mutate by itself). `reads` project Domain at open time—never bake instance
-  ids into Config. `derived` may persist on successful submit when configured.
-  Chrome is display-only and stripped before Submission facts.
+  mutate by itself). `reads` (Domain reads) project Domain at open time—never
+  bake instance ids into Config. `derived` may persist on successful submit when
+  configured. Chrome is display-only and stripped before Submission facts.
   `dynamicProperties` keys come from Domain reads.
 - **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over
   Domain (and `$domain.submissions` when bind-once matters). Encode those facts

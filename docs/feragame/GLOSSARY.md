@@ -66,7 +66,7 @@ Issues a Passport whose subject is a **lot**. Still needs Lock after the lot is
 
 **administration** / **line** / **logistic**:
 Plant Config role slugs (office, line floor, logistics).
-_Avoid_: Plant-named role branches in executors
+_Avoid_: Treating these as platform standing (Org admin / Member)
 
 ## Relationships
 

@@ -38,8 +38,7 @@ progress bag
 
 **Domain store**:
 The persistence of Domain (entities + submit entries).
-_Avoid_: Forms writing entities directly; free-form query language as the sole
-mutator
+_Avoid_: Forms writing entities directly
 
 ### Jobs and tasks
 
@@ -95,12 +94,6 @@ Task’s role gate. Distinct from Unlock order and **startsWhen**.
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into
 the expression; overloading startsWhen or Unlock for Domain facts
 
-**Domain reads**:
-Authored projections of current Domain entity ids into Task form maps. Not a
-separate subsystem.
-_Avoid_: Completeness or Leftovers as product grammar; conflating map reads with
-Task group; Domain clear via Commit omit
-
 **Submission**:
 Record that a Task succeeded on a Job instance: time, actor, facts snapshot;
 keyed with Task path.
@@ -134,34 +127,10 @@ Not Domain entities, not the Role catalog, not Chrome.
 _Avoid_: Treating catalogs as Domain kinds; conflating with Role catalog or
 Chrome display catalog
 
-### Authoring vocabulary
-
-Config transform and form nouns. Mechanics:
-[`org-config-authoring.md`](../agents/org-config-authoring.md).
-
-**bind**:
-Authored transform step that rebinds the working value for later steps in that
-list. Does not itself write Domain.
-_Avoid_: Conflating with form bindings, **reads**, or Org **catalogs**
-
-**reads**:
-Authored Domain query bindings that project into a Task form. Never bake
-instance ids into the Org Config.
-_Avoid_: Ref / `$refs` / `optionsFor` (retired kernel names)
-
-**Derived value**:
-Task field value from an expression under `derived`.
-_Avoid_: Putting GUI-only chrome under `derived`
-
 **Chrome**:
-Task-root display catalog (not submit facts). Not the operator board (see
+Task display catalog (not submit facts). Not the operator board (see
 **Worklist**).
-_Avoid_: Encoding live readouts as schema fields meant for submit; naming the
-Worklist “Chrome”
-
-**dynamicProperties**:
-Authored map whose keys come from Domain **reads**.
-_Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`
+_Avoid_: Naming the Worklist “Chrome”
 
 ### Passport / DPP
 
@@ -216,9 +185,9 @@ Authoritative accept of a sealed **Task** into Domain. See
 _Avoid_: Folding Drafts into Commit; SPA re-deriving post-Commit destination
 
 **Load**:
-Hydration of what the operator UI needs for the org (not a full Domain + Config
-dump). See [ADR-0005](../adr/0005-org-worklist-server-projection.md).
-_Avoid_: Hydrate by whole-config execution id
+Bring Worklist and Active Config context into the operator UI. See
+[ADR-0005](../adr/0005-org-worklist-server-projection.md).
+_Avoid_: Whole-config execution id as the load key
 
 **Worklist**:
 Operator board for one org: act-now Jobs and Task statuses. Finished rediscovery
@@ -237,21 +206,6 @@ Read-only Job-instance surface reached from **Archive**. Not a Commit, Continue,
 home, or Task-back target. See
 [ADR-0006](../adr/0006-org-operator-worklist-home.md).
 _Avoid_: Treating overview as the operator board
-
-**Task form bundle**:
-Payload to mount one Task form. See
-[ADR-0005](../adr/0005-org-worklist-server-projection.md).
-_Avoid_: Calling this Chrome
-
-**AuthPort** / **AuthorizerPort**:
-Seams for who is calling vs who may complete a Task. See
-[ADR-0005](../adr/0005-org-worklist-server-projection.md).
-_Avoid_: Forging actor from sealed facts
-
-**HttpPort**:
-Config-declared HTTP after a successful Domain mutate. See
-[ADR-0010](../adr/0010-org-http-side-effects.md).
-_Avoid_: `onSubmit.http` as the product noun (that is the Config key)
 
 ## Historical / rejected
 
@@ -276,8 +230,12 @@ Former Task-group affordances and Commit mint kind; removed with groups. See
 One “run of the config” with its own Domain — replaced by one org Domain +
 repeated Job instances.
 
-**LoadRunPort**:
-Retired load seam name; living nouns are Domain **Load** / **Commit**.
+**LoadRunPort** / **AuthPort** / **AuthorizerPort** / **HttpPort** /
+**Task form bundle**:
+Retired or seam-only names. Living operator nouns are **Load**, **Commit**,
+**Worklist**, **OperatorIdentity**. Side-effect and projection Decisions:
+[ADR-0005](../adr/0005-org-worklist-server-projection.md),
+[ADR-0010](../adr/0010-org-http-side-effects.md).
 
 **Step** / **Substep** / **Step instance**:
 Experiment names for Job / Task / Job instance.
