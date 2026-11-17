@@ -28,7 +28,7 @@ Plant nouns (lot session, Jobs, roles):
   Lot-session tables and plant entity renames:
   [`docs/feragame/GLOSSARY.md`](../feragame/GLOSSARY.md)—not Attesta ADRs.
 - **JSONata exprs:** chrome / transform / QR / HttpPort bodies use jsonata-go —
-  see [`jsonata-living.md`](jsonata-living.md) before blaming the executor.
+  see [`jsonata-org.md`](jsonata-org.md) before blaming the executor.
 - **`/app` i18n:** SPA chrome vs Config copy vs English platform errors —
   [`docs/adr/0013-org-app-locale-tracks.md`](../adr/0013-org-app-locale-tracks.md)
   and [`app-i18n.md`](app-i18n.md).

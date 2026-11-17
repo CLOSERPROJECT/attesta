@@ -486,7 +486,7 @@ func TestFixtureConfigRolesMatchesFeragameConfig(t *testing.T) {
 }
 
 func TestSeedDemoReplaceIsNotHarnessRunsAPI(t *testing.T) {
-	// Guard: living reset is SeedDemo (Domain wipe + fixture), not /api/runs PUT.
+	// Guard: org reset is SeedDemo (Domain wipe + fixture), not /api/runs PUT.
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{WipeDomain: true}); err != nil {

@@ -289,7 +289,7 @@ tasks:
           '
 
   seed:
-    desc: Apply integrated demo fixture (identity + taxonomy + catalog + living). Empty-only by default; --replace rewrites. Feragame scopes - config / domain / identity / full. See seed --help.
+    desc: Apply integrated demo fixture (identity + taxonomy + catalog + org). Empty-only by default; --replace rewrites. Feragame scopes - config / domain / identity / full. See seed --help.
     cmds:
       - |
           bash -c '

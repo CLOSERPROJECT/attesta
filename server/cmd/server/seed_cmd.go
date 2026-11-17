@@ -10,11 +10,11 @@ import (
 
 const seedUsage = `Usage: attesta seed [flags]
 
-Demo fixture seed (identity + taxonomy + catalog + living by default).
+Demo fixture seed (identity + taxonomy + catalog + org by default).
 
 Flags:
   --replace              Rewrite even when the empty-only marker org exists;
-                         living Domain (+ passports) is wiped and rebuilt.
+                         org Domain (+ passports) is wiped and rebuilt.
   --feragame-config      Active Config + wipe Domain (+ passports) to empty.
                          No Appwrite. Skips Formata. Always runs.
   --feragame-domain      Active Config + wipe and stage demo Domain.
