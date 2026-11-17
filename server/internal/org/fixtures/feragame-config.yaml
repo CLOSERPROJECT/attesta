@@ -264,7 +264,7 @@ steps:
                         lastScaleReading: $.truckWeightAfter
                 http:
                     - method: '"POST"'
-                      url: '"/fake/labels"'
+                      url: '"/effects/labels"'
                       label: '"Stampa etichette"'
                       action: link
                       body: >-
@@ -284,7 +284,7 @@ steps:
                           )]
                         }
                     - method: '"POST"'
-                      url: '"/fake/register-csv"'
+                      url: '"/effects/register-csv"'
                       label: '"Scarica CSV registrazione"'
                       action: download
                       body: >-

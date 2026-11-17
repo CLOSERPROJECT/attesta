@@ -39,7 +39,7 @@ type SeedDeps struct {
 	CategoriesPath string
 	// Rewrite even when the marker org exists (local only).
 	Replace bool
-	// Optional living stores. When set, SeedDemo runs after identity+catalog;
+	// Optional org stores. When set, SeedDemo runs after identity+catalog;
 	// Replace wipes Domain (+ DPPs when OrgDPPs is set). Only the
 	// seed command / task seed wires these — product boot (ensureOrgStores)
 	// must not call SeedDemo.

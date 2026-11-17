@@ -21,7 +21,7 @@ type demoFixture struct {
 	Users []demoFixtureUser
 }
 
-// Living Feragame demo org / operators (Cerbos Commit demos on /app).
+// Feragame demo org / operators (Cerbos Commit demos on /app).
 const (
 	demoFeragameOrgSlug           = "feragame"
 	demoOrgAdminUserEmail         = "admin@feragame.com"

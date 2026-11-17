@@ -47,13 +47,13 @@ func TestAuthRejectsMissingAndWrongToken(t *testing.T) {
 	h := srv.routes()
 
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "", map[string]any{"lotId": "x"}))
+	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/effects/labels", "", map[string]any{"lotId": "x"}))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("missing token status = %d", rr.Code)
 	}
 
 	rr = httptest.NewRecorder()
-	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "wrong", map[string]any{"lotId": "x"}))
+	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/effects/labels", "wrong", map[string]any{"lotId": "x"}))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong token status = %d", rr.Code)
 	}
@@ -64,7 +64,7 @@ func TestLabelsAndRegisterCSVRoundTrip(t *testing.T) {
 	h := srv.routes()
 
 	rr := httptest.NewRecorder()
-	req := authReq(t, http.MethodPost, "/fake/labels", "test-token", map[string]any{
+	req := authReq(t, http.MethodPost, "/effects/labels", "test-token", map[string]any{
 		"lotId": "NIR-1",
 		"labels": []any{map[string]any{"id": "NIR-1.1"}},
 	})
@@ -79,7 +79,7 @@ func TestLabelsAndRegisterCSVRoundTrip(t *testing.T) {
 	}
 
 	rr = httptest.NewRecorder()
-	req = authReq(t, http.MethodPost, "/fake/register-csv", "test-token", map[string]any{
+	req = authReq(t, http.MethodPost, "/effects/register-csv", "test-token", map[string]any{
 		"client":    "NO",
 		"lotId":    "NIR-1",
 		"palletIds": []any{"NIR-1.1", "NIR-1.2"},
@@ -158,7 +158,7 @@ func TestGetArtifactRequiresToken(t *testing.T) {
 	h := srv.routes()
 
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/fake/labels", "test-token", map[string]any{"lotId": "x"}))
+	h.ServeHTTP(rr, authReq(t, http.MethodPost, "/effects/labels", "test-token", map[string]any{"lotId": "x"}))
 	url := strings.TrimSpace(rr.Body.String())
 
 	rr = httptest.NewRecorder()

@@ -108,9 +108,9 @@ func withSeedSession(
 // creds nil → ambient identity (standalone seed applies the runtime env file);
 // non-nil → prepare→seed by value (skip file apply; main is the Server restart adapter).
 // Feragame config/domain skip Appwrite open; identity/full open Appwrite. Mongo
-// still opens for living stores; Formata writes are skipped inside Seed.
-func runSeedSession(ctx context.Context, args []string, replace bool, livingScope org.SeedScope, keepDomain bool, creds *appwriteRuntimeCredentials) error {
-	needIdentity := !seedScopeFeragame(livingScope) || seedScopeFeragameNeedsIdentity(livingScope)
+// still opens for org stores; Formata writes are skipped inside Seed.
+func runSeedSession(ctx context.Context, args []string, replace bool, orgScope org.SeedScope, keepDomain bool, creds *appwriteRuntimeCredentials) error {
+	needIdentity := !seedScopeFeragame(orgScope) || seedScopeFeragameNeedsIdentity(orgScope)
 	if needIdentity && creds == nil {
 		if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
 			return err
@@ -133,7 +133,7 @@ func runSeedSession(ctx context.Context, args []string, replace bool, livingScop
 			ConfigDir:      sess.ConfigDir,
 			CategoriesPath: sess.CategoriesPath,
 			Replace:        replace,
-			OrgScope:    livingScope,
+			OrgScope:       orgScope,
 			KeepDomain:     keepDomain,
 		}
 		// Mongo CLI seed must rewrite Active Org Config (e.g. tasks array shape).
@@ -145,7 +145,7 @@ func runSeedSession(ctx context.Context, args []string, replace bool, livingScop
 		if err := Seed(ctx, deps); err != nil {
 			return err
 		}
-		switch livingScope {
+		switch orgScope {
 		case org.SeedScopeFeragameConfig:
 			if keepDomain {
 				log.Printf("seed: Feragame config ready (Active Config; Domain kept)")

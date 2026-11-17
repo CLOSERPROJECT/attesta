@@ -102,7 +102,7 @@ func TestProjectWorklistOmitsGroupChrome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(raw), `"groups"`) || strings.Contains(string(raw), "canSpawn") {
+	if strings.Contains(string(raw), `"groups"`) || strings.Contains(string(raw), "canSpawn") || strings.Contains(string(raw), "canClose") {
 		t.Fatalf("Worklist instance still projects group chrome: %s", raw)
 	}
 }
