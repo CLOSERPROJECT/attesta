@@ -231,8 +231,9 @@ fi
 
 grep -Fq -- "--project-name ${expected_project}" "${tmpdir}/calls" \
   || fail "Compose project name missing"
-grep -q ' up -d .*mongodb.*appwrite.*traefik' "${tmpdir}/calls" || fail "infra services missing"
-if grep ' up -d ' "${tmpdir}/calls" | sed 's/.* up -d //' | grep -q '\(^\| \)attesta\($\| \)'; then
+grep -q ' up -d --remove-orphans .*mongodb.*appwrite.*traefik' "${tmpdir}/calls" \
+  || fail "infra services missing (expected up -d --remove-orphans …)"
+if grep ' up -d ' "${tmpdir}/calls" | sed -E 's/.* up -d (--build )?--remove-orphans //' | grep -q '\(^\| \)attesta\($\| \)'; then
   fail "host-dev up unexpectedly starts the attesta container"
 fi
 grep -q '^attesta-prepare$' "${tmpdir}/calls" || fail "attesta prepare did not run after infra up"
@@ -254,9 +255,10 @@ assert_up_app_call_order() {
       continue
     fi
     [[ "${line}" == *" up -d"* ]] || continue
-    # Service list follows "up -d" / "up -d --build"; project paths may contain "attesta".
+    # Service list follows "up -d" / "up -d --build" / "… --remove-orphans"; project paths may contain "attesta".
     services="${line##* up -d }"
     services="${services#--build }"
+    services="${services#--remove-orphans }"
     if [[ "${services}" == "attesta" ]]; then
       [[ "${prepare}" -eq 1 ]] || fail "up-app started attesta before prepare"
       attesta_up=1

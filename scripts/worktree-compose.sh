@@ -104,9 +104,9 @@ up() {
     exit 1
   }
   if [[ "${build}" -eq 1 ]]; then
-    compose up -d --build "${services[@]}"
+    compose up -d --build --remove-orphans "${services[@]}"
   else
-    compose up -d "${services[@]}"
+    compose up -d --remove-orphans "${services[@]}"
   fi
   maybe_run_attesta_prepare
   compose ps
@@ -139,9 +139,9 @@ up_app() {
     exit 1
   }
   if [[ "${build}" -eq 1 ]]; then
-    compose up -d --build "${services[@]}"
+    compose up -d --build --remove-orphans "${services[@]}"
   else
-    compose up -d "${services[@]}"
+    compose up -d --remove-orphans "${services[@]}"
   fi
   maybe_run_attesta_prepare
 
