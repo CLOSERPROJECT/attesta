@@ -4,6 +4,7 @@ Attesta has multiple vocabularies. **Org** and **Stream** name different product
 surfaces—do not mix their nouns. Shared membership lives in the root glossary.
 
 Every vocabulary file is named `GLOSSARY.md`. This map is `GLOSSARY-MAP.md`.
+How to edit an entry: [`docs/agents/glossary.md`](docs/agents/glossary.md).
 
 ## Shared (both product surfaces)
 

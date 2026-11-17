@@ -9,6 +9,8 @@ How the engineering skills should consume this repo's domain documentation when 
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
   Org ADRs (0005–0013) lock **platform** Decisions only—not plant YAML.
   When writing or editing an ADR, follow [`../adr/README.md`](../adr/README.md).
+- When adding or changing a glossary entry, follow
+  [`glossary.md`](glossary.md).
 - Org Config authoring (gates, `onCommit`, transforms):
   [`org-config-authoring.md`](org-config-authoring.md).
 - Feragame fixture edits: also
@@ -17,7 +19,8 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If the map or a glossary is missing, **proceed silently**. Don't flag their
 absence; don't suggest creating them upfront. The `/domain-modeling` skill
-creates them lazily when terms or decisions actually get resolved.
+creates them lazily when terms or decisions actually get resolved; new entries
+still follow [`glossary.md`](glossary.md).
 
 ## File structure (this repo)
 
@@ -31,6 +34,8 @@ creates them lazily when terms or decisions actually get resolved.
 │   ├── feragame/GLOSSARY.md          ← first plant / Org Config payload
 │   └── adr/                          ← platform Decisions; format in README.md
 ├── docs/agents/
+│   ├── glossary.md                   ← how to edit glossary entries
+│   ├── domain.md                     ← this file (consume while exploring)
 │   ├── org-config-authoring.md       ← platform Config authoring
 │   └── feragame-fixture-authoring.md ← Feragame fixture checklist
 ```
@@ -45,7 +50,8 @@ Attesta ADRs.
 
 If the concept you need isn't in the right glossary yet, that's a signal:
 either you're inventing language the project doesn't use (reconsider) or
-there's a real gap (note it for `/domain-modeling`).
+there's a real gap — resolve it with `/domain-modeling` and
+[`glossary.md`](glossary.md).
 
 ## Flag ADR conflicts
 

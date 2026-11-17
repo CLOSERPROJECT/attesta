@@ -27,9 +27,11 @@
   [`README.md`](README.md), [`QUICKSTART.md`](QUICKSTART.md), and
   [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
   truth.
-- **Domain language:** before naming product nouns or editing a glossary —
-  pick the layer (shared membership, Org `/app`, Stream `/my`, Feragame plant)
-  via [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
+- **Glossary layer:** before naming product nouns, pick the layer (shared
+  membership, Org `/app`, Stream `/my`, Feragame plant) via
+  [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
+- **Glossary edit:** before adding or changing a glossary entry, read
+  [`docs/agents/glossary.md`](docs/agents/glossary.md).
 - **ADRs:** before writing or editing `docs/adr/`, read
   [`docs/adr/README.md`](docs/adr/README.md).
 - **Active work:** unresolved design and implementable work live as GitHub
