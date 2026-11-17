@@ -2,13 +2,13 @@
 
 Platform authoring reference for **any** Org Config: gates, transforms, and post-Commit navigation. Not a plant fixture checklist.
 
-Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, **readyWhen**, **startsWhen**, **Unlock order**, **Commit navigation**, **submit cardinality**, **Chrome**). Transform keys (`bind`, `reads`, `derived`, `dynamicProperties`) are authored here—not glossary entries. Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0013). Feragame fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
+Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, **readyWhen**, **startsWhen**, **Commit navigation**, **submit cardinality**, **Chrome**). Transform keys (`bind`, `reads`, `derived`, `dynamicProperties`) are authored here—not glossary entries. Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0013). Feragame fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
 
 ## Rules
 
 - **Dumb executor:** plant business rules live in Config (`domain.entities`, transforms, `readyWhen`, `onCommit`). Go and `/app` only evaluate—no plant-named branches in executors. Only config-declared transforms write Domain entities.
 - **Transforms:** `bind` rebinds `$` for later ops in that list (no Domain mutate by itself). `reads` (Domain reads) project Domain at open time—never bake instance ids into Config. `derived` may persist on successful submit when configured. Chrome is display-only and stripped before Submission facts. `dynamicProperties` keys come from Domain reads.
-- **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over Domain (and `$domain.submissions` when bind-once matters). Encode those facts in **`readyWhen`**, not in **`startsWhen`**. When Domain already holds the prerequisite, author **`readyWhen`** and omit **`unlockFrom`**.
+- **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over Domain (and `$domain.submissions` when bind-once matters). Encode those facts in **`readyWhen`**, not in **`startsWhen`**. Do not author **`unlockFrom`** (Config rejects it; sibling/Domain gates belong in **`readyWhen`**).
 - **Submit cardinality:** multi-pass same-form work uses leaf Tasks with `submit: many` + Domain **`readyWhen`**, not Task groups ([ADR-0008](../adr/0008-org-task-submit-cardinality.md)).
 - **JSONata:** chrome / transform / QR / HttpPort bodies use jsonata-go — see [`jsonata-org.md`](jsonata-org.md) before blaming the executor.
 - **Copy tracks:** SPA chrome vs Config product copy vs English engine errors — [ADR-0013](../adr/0013-org-app-locale-tracks.md) and [`app-i18n.md`](app-i18n.md). Plant Italian labels stay in YAML.

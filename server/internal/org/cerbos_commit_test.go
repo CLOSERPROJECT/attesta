@@ -85,27 +85,32 @@ func roleIntersect(principal any, allowed any) bool {
 	return false
 }
 
-func TestCommitWeightCheckDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
+func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFails(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
 	c, domains, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	truckID := commitTruckArrive(t, c)
 	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath:      "intake/weightCheck",
-		JobInstanceID: "261029-1",
+		JobInstanceID: truckID,
 		Value:         map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("err = %v", err)
 	}
-	if _, getErr := domains.Get(t.Context(), "feragame"); getErr == nil {
-		t.Fatal("domain must stay unset when Unlock order denies")
+	before, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before.Submissions) != 1 {
+		t.Fatalf("domain must keep only arrive Submission when readyWhen denies: %#v", before.Submissions)
 	}
 }
 
-func TestCommitLotRegisterAllowedViaCerbosInUnlockOrder(t *testing.T) {
+func TestCommitLotRegisterAllowedViaCerbosWhenReadyWhenOk(t *testing.T) {
 	pdp := policySimulatingPDP(t)
 	defer pdp.Close()
 
@@ -156,7 +161,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
-		t.Fatalf("weightCheck before register should deny via Unlock: %v", err)
+		t.Fatalf("weightCheck before register should deny via readyWhen: %v", err)
 	}
 	after, err := domains.Get(t.Context(), "feragame")
 	if err != nil {

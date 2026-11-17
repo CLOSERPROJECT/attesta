@@ -6,7 +6,7 @@ import (
 )
 
 // readyWhenGateAuthorizer mirrors Cerbos living-commit gates without an HTTP PDP:
-// deny when Unlock sequence or Task readyWhen is false.
+// deny when sequenceOk or Task readyWhen is false.
 type readyWhenGateAuthorizer struct{}
 
 func (readyWhenGateAuthorizer) AllowCommit(_ context.Context, q AuthorizeCommit) (bool, error) {

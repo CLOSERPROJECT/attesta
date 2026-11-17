@@ -76,8 +76,6 @@ export function formatSubmissionCount(count: number): string {
 
 export function taskStatusLabel(status: TaskStatus): string {
 	switch (status) {
-		case 'locked':
-			return m.status_locked();
 		case 'unavailable':
 			return m.status_unavailable();
 		case 'available':
@@ -117,7 +115,7 @@ export function jobInstanceOverview(
 	for (const taskId of jobConfigTaskIds(job)) {
 		const chrome = taskChrome(job, taskId);
 		const roles = chrome?.roles ?? [];
-		const status = (inst.tasks[taskId] ?? 'locked') as TaskStatus;
+		const status = (inst.tasks[taskId] ?? 'unavailable') as TaskStatus;
 		const linkable = status === 'actionable';
 		const row: OverviewTaskRow = {
 			taskId,
@@ -133,7 +131,7 @@ export function jobInstanceOverview(
 		}
 	}
 
-	// "Next" = first unlocked leaf in Config order; handoff when that Task is not ours.
+	// "Next" = first available/actionable leaf in Config order; handoff when not ours.
 	const handoffRoles =
 		firstOpen && !firstOpen.linkable && firstOpen.roles.length > 0
 			? [...firstOpen.roles]

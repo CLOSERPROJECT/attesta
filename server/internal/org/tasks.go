@@ -15,7 +15,7 @@ func (t TaskConfig) ID() string {
 	return id
 }
 
-// OrderedTaskIDs returns Task ids in authored (Unlock) order.
+// OrderedTaskIDs returns Task ids in authored order.
 func OrderedTaskIDs(tasks []TaskConfig) []string {
 	out := make([]string, 0, len(tasks))
 	for _, t := range tasks {
@@ -54,7 +54,7 @@ func validateTaskConfigsAt(tasks []TaskConfig, path string) error {
 		if err := rejectGroupAuthoring(t, prefix); err != nil {
 			return err
 		}
-		if err := validateUnlockFrom(tasks, i, t, prefix); err != nil {
+		if err := rejectUnlockFrom(t, prefix); err != nil {
 			return err
 		}
 		if err := validateTaskSubmit(t, prefix); err != nil {
@@ -139,38 +139,15 @@ func validateTaskSubmit(t TaskConfig, prefix string) error {
 	}
 }
 
-// validateUnlockFrom: optional unlockFrom must name a strictly earlier sibling
-// in the same list (no first-task, empty, non-string, self, forward, or unknown).
-func validateUnlockFrom(tasks []TaskConfig, index int, t TaskConfig, prefix string) error {
-	raw, present := t["unlockFrom"]
-	if !present {
+// rejectUnlockFrom fails closed on authored unlockFrom (Unlock removed; use readyWhen).
+func rejectUnlockFrom(t TaskConfig, prefix string) error {
+	if t == nil {
 		return nil
 	}
-	id := t.ID()
-	if index == 0 {
-		return fmt.Errorf("%s %q: first task must not declare unlockFrom", prefix, id)
+	if _, ok := t["unlockFrom"]; ok {
+		return fmt.Errorf("%s %q: unlockFrom is not supported", prefix, t.ID())
 	}
-	from, ok := raw.(string)
-	if !ok {
-		return fmt.Errorf("%s %q: unlockFrom must be a string task id", prefix, id)
-	}
-	if from == "" {
-		return fmt.Errorf("%s %q: unlockFrom must be a non-empty task id", prefix, id)
-	}
-	if from == id {
-		return fmt.Errorf("%s %q: unlockFrom must not reference self", prefix, id)
-	}
-	for j := 0; j < index; j++ {
-		if tasks[j].ID() == from {
-			return nil
-		}
-	}
-	for j := index + 1; j < len(tasks); j++ {
-		if tasks[j].ID() == from {
-			return fmt.Errorf("%s %q: unlockFrom %q must name an earlier sibling", prefix, id, from)
-		}
-	}
-	return fmt.Errorf("%s %q: unlockFrom %q is not a sibling task id", prefix, id, from)
+	return nil
 }
 
 const (

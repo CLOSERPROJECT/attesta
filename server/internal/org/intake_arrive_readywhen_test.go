@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// readyWhenOnlyAuthorizer proves Domain readyWhen alone (Unlock / SequenceOk ignored).
+// readyWhenOnlyAuthorizer proves Domain readyWhen alone (SequenceOk ignored).
 type readyWhenOnlyAuthorizer struct{}
 
 func (readyWhenOnlyAuthorizer) AllowCommit(_ context.Context, q AuthorizeCommit) (bool, error) {
@@ -167,7 +167,7 @@ func TestPassportLockReadyWhenRequiresSelectSubmission(t *testing.T) {
 	}
 	rw, _ := lock["readyWhen"].(string)
 	if !strings.Contains(rw, `taskId = "select"`) {
-		t.Fatalf("lock readyWhen = %q, want select Submission gate (Unlock is otherwise the only select→lock gate)", rw)
+		t.Fatalf("lock readyWhen = %q, want select Submission gate", rw)
 	}
 	if !strings.Contains(rw, "fullyProcessed") || !strings.Contains(rw, "locked") {
 		t.Fatalf("lock readyWhen must keep Domain eligibility: %q", rw)

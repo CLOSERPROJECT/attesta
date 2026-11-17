@@ -3,13 +3,12 @@ package org
 import "strings"
 
 // TaskStatus is the Worklist chrome vocabulary for one Task on a Job instance.
-// Unlock + submit: once Submission yields locked / unlocked / done; submit: many
-// never done. Unlocked-not-done folds Task readyWhen (false ⇒ unavailable); else
-// role eligibility splits into available (not for this viewer) vs actionable.
+// Path Done (submit: once Submission) yields done; otherwise available then
+// readyWhen (false ⇒ unavailable) and role eligibility (available vs actionable).
+// submit: many never done from one Commit.
 type TaskStatus string
 
 const (
-	TaskStatusLocked      TaskStatus = "locked"
 	TaskStatusUnavailable TaskStatus = "unavailable"
 	TaskStatusAvailable   TaskStatus = "available"
 	TaskStatusActionable  TaskStatus = "actionable"
@@ -44,7 +43,7 @@ type WorklistJob struct {
 }
 
 // WorklistInstance is one Job instance's viewer-scoped Task status map.
-// Leaf statuses are locked | unavailable | available | actionable | done.
+// Leaf statuses are unavailable | available | actionable | done.
 // SubmissionCounts is Domain Submission N per flat leaf taskId;
 // omitted when empty. Overview uses this for many-submit chrome without recap.
 type WorklistInstance struct {
@@ -54,13 +53,13 @@ type WorklistInstance struct {
 	SubmissionCounts map[string]int        `json:"submissionCounts,omitempty"`
 }
 
-// ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
-// statuses, then scopes canStart to first-Task readyWhen (omit ⇒ true; same
-// Domain grammar as Commit) and OperatorIdentity Config-role intersection with
-// the Job's first Task (board chrome; not Cerbos). submit: once (default) is
-// done after Submission on the instance; submit: many never becomes done from
-// one Commit (ADR-0008). Unlocked leaves fold readyWhen (false ⇒ unavailable),
-// else split by role eligibility into available vs actionable (ADR-0005).
+// ProjectWorklist evaluates startsWhen into canStart + Task statuses, then scopes
+// canStart to first-Task readyWhen (omit ⇒ true; same Domain grammar as Commit)
+// and OperatorIdentity Config-role intersection with the Job's first Task
+// (board chrome; not Cerbos). submit: once (default) is done after Submission on
+// the instance; submit: many never becomes done from one Commit (ADR-0008).
+// Not-done leaves fold readyWhen (false ⇒ unavailable), else split by role
+// eligibility into available vs actionable (ADR-0005).
 func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
 	out := Worklist{Jobs: make([]WorklistJob, 0, cfg.Jobs.Len())}
 	for _, jobID := range cfg.Jobs.Keys {
@@ -102,10 +101,10 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 		tasks := make(map[string]TaskStatus, len(ordered))
 		for i, taskID := range ordered {
 			tc, ok := TaskByID(job.Tasks, taskID)
-			unlock := projectTaskStatus(cfg, domain, jobID, taskID, inst.ID)
-			status := unlock
+			path := projectTaskStatus(cfg, domain, jobID, taskID, inst.ID)
+			status := path
 			if ok {
-				status = foldReadyWhen(domain, unlock, tc, inst.ID, cfg.Catalogs)
+				status = foldReadyWhen(domain, path, tc, inst.ID, cfg.Catalogs)
 			}
 			eligible := i < len(chrome) && rolesIntersect(op.Roles, chrome[i].Roles)
 			tasks[taskID] = viewerScopedStatus(status, eligible)
@@ -156,35 +155,32 @@ func projectWorklistTasks(tasks []TaskConfig, ordered []string) []WorklistTask {
 	return out
 }
 
-func pathUnlockStatus(ev PathUnlock) TaskStatus {
+func pathAvailabilityStatus(ev PathAvailability) TaskStatus {
 	if ev.Done {
 		return TaskStatusDone
 	}
-	if ev.Unlocked {
-		return TaskStatusAvailable
-	}
-	return TaskStatusLocked
+	return TaskStatusAvailable
 }
 
-// foldReadyWhen applies Task readyWhen after path Unlock says unlocked-not-done.
+// foldReadyWhen applies Task readyWhen after path says available-not-done.
 // Same semantics as Commit (readyWhenOkForCommit): omit/blank ⇒ true; fail ⇒ false.
 // False ⇒ unavailable (caller must not role-split).
-func foldReadyWhen(domain Domain, unlock TaskStatus, task TaskConfig, jobInstanceID string, catalogs map[string]any) TaskStatus {
-	if unlock != TaskStatusAvailable {
-		return unlock
+func foldReadyWhen(domain Domain, path TaskStatus, task TaskConfig, jobInstanceID string, catalogs map[string]any) TaskStatus {
+	if path != TaskStatusAvailable {
+		return path
 	}
 	if !readyWhenOkForCommit(domain, taskPayload(task), jobInstanceID, catalogs) {
 		return TaskStatusUnavailable
 	}
-	return unlock
+	return path
 }
 
-// viewerScopedStatus maps unlock Available into actionable when the viewer
+// viewerScopedStatus maps path Available into actionable when the viewer
 // intersects Config roles; otherwise leaves available for handoff.
-// unavailable / locked / done pass through (no role split).
-func viewerScopedStatus(unlock TaskStatus, eligible bool) TaskStatus {
-	if unlock != TaskStatusAvailable {
-		return unlock
+// unavailable / done pass through (no role split).
+func viewerScopedStatus(path TaskStatus, eligible bool) TaskStatus {
+	if path != TaskStatusAvailable {
+		return path
 	}
 	if eligible {
 		return TaskStatusActionable
@@ -193,7 +189,7 @@ func viewerScopedStatus(unlock TaskStatus, eligible bool) TaskStatus {
 }
 
 func projectTaskStatus(cfg OrgConfig, domain Domain, jobID, taskID, jobInstanceID string) TaskStatus {
-	return pathUnlockStatus(EvaluatePathUnlock(cfg, domain, TaskPathRef{JobID: jobID, TaskID: taskID}, jobInstanceID))
+	return pathAvailabilityStatus(EvaluatePathAvailability(cfg, domain, TaskPathRef{JobID: jobID, TaskID: taskID}, jobInstanceID))
 }
 
 func countFlatLeafSubmissions(subs []Submission, jobID, jobInstanceID string) map[string]int {

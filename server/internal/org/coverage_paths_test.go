@@ -1212,7 +1212,7 @@ type errDomainStore struct{ err error }
 func (e *errDomainStore) Get(context.Context, string) (Domain, error) { return Domain{}, e.err }
 func (e *errDomainStore) Put(context.Context, string, Domain) error   { return e.err }
 
-func TestChromeCompileHelpersAndUnlockEdges(t *testing.T) {
+func TestChromeCompileHelpersAndSequenceEdges(t *testing.T) {
 	rules := readChromeRules(map[string]any{
 		"chrome": map[string]any{
 			"a": map[string]any{"kind": "readonly"},

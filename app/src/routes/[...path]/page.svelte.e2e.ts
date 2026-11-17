@@ -28,7 +28,7 @@ const homeLoad = {
 					{
 						id: 'NIR-2',
 						label: 'Camion B',
-						tasks: { register: 'actionable', palletWeight: 'locked' }
+						tasks: { register: 'actionable', palletWeight: 'unavailable' }
 					},
 					{
 						id: 'NIR-done',

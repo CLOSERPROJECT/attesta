@@ -11,7 +11,7 @@ type AuthorizeCommit struct {
 	TaskID        string
 	JobInstanceID string
 	RolesAllowed  []string
-	// SequenceOk is Unlock order evaluated in Go (compact boolean; no Domain dump).
+	// SequenceOk is !Done ∧ startsWhen evaluated in Go (compact boolean; no Domain dump).
 	SequenceOk bool
 	// ReadyWhenOk is Task readyWhen (JSONata) evaluated in Go → compact boolean attr.
 	ReadyWhenOk bool

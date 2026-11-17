@@ -43,7 +43,6 @@
 	"fallback_home": "Home",
 	"fallback_job_instance": "Istanza lavoro",
 	"fallback_start": "Avvia",
-	"status_locked": "Bloccato",
 	"status_unavailable": "Non disponibile",
 	"status_available": "Disponibile",
 	"status_actionable": "Per te",

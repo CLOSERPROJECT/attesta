@@ -65,7 +65,7 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLotProcessingBlocked(t *testing.T) {
 	}
 }
 
-func TestLoadJSONWorklistIntakeUnlockOrder(t *testing.T) {
+func TestLoadJSONWorklistIntakeStatuses(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 
@@ -660,14 +660,14 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 		}
 	})
 
-	t.Run("locked_skips_readyWhen", func(t *testing.T) {
+	t.Run("not_done_folds_readyWhen", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "false"))
 		empty := EmptyDomain()
 		empty.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
 		wl := ProjectWorklist(cfg, empty, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
-		if inst.Tasks["gated"] != TaskStatusLocked {
-			t.Fatalf("locked before unlock = %q, want locked (not unavailable)", inst.Tasks["gated"])
+		if inst.Tasks["gated"] != TaskStatusUnavailable {
+			t.Fatalf("readyWhen false = %q, want unavailable (no locked)", inst.Tasks["gated"])
 		}
 	})
 

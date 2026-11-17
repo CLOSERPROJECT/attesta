@@ -40,14 +40,11 @@ _Avoid_: Step instance (legacy experiment name); whole-config execution instance
 **Task path**: Stable address of a Task under a Job (Job key + Task key).\
 _Avoid_: Hard one-level child index as the only public address; bare substep id without Job context when paths matter
 
-**Unlock order**: In-Job rule for which Tasks become completable after prior Submissions on the same Job instance (optional predecessor). Distinct from **startsWhen** and **readyWhen**.\
-_Avoid_: Calling unlock “startsWhen”; encoding entity open/close law in Unlock when Domain status exists
+**startsWhen**: Job-level start gate over Submissions of a named Task. Distinct from Domain readiness (**readyWhen**).\
+_Avoid_: Locked (as the gate state word); encoding entity open/closed law; availableWhen; calling startsWhen “unlock”
 
-**startsWhen**: Job-level start gate over Submissions of a named Task. Distinct from Unlock order and from Domain readiness (**readyWhen**).\
-_Avoid_: Locked (as the gate state word); encoding entity open/closed law; availableWhen
-
-**readyWhen**: Task-level Domain readiness (boolean expression over Domain), combined with the Task’s role gate. Distinct from Unlock order and **startsWhen**.\
-_Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression; overloading startsWhen or Unlock for Domain facts
+**readyWhen**: Task-level Domain readiness (boolean expression over Domain), combined with the Task’s role gate. Distinct from **startsWhen**. Primary gate for Domain entity state and sibling/Submission prerequisites.\
+_Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression; overloading startsWhen for Domain facts; calling readyWhen “unlock”
 
 **Submission**: Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path.\
 _Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts
@@ -74,8 +71,8 @@ _Avoid_: Naming the Worklist “Chrome”
 **Passport**: The issued Digital Product Passport for one Domain subject. Public credential and human page are projections of a **Passport snapshot**, not a live Domain walk. See [ADR-0007](../adr/0007-org-dpp-production.md).\
 _Avoid_: Stream Process DPP as the Org `/app` issue path; SPA-assembled passport payloads; treating one plant’s YAML as the feature itself
 
-**Passport lock**: The operator Task that approves a subject’s gathered facts and issues its **Passport**. Distinct from Worklist status `locked` and from form seal. See [ADR-0007](../adr/0007-org-dpp-production.md).\
-_Avoid_: Auto-issue on Domain predicate alone; conflating with Unlock-order `locked`
+**Passport lock**: The operator Task that approves a subject’s gathered facts and issues its **Passport**. Distinct from form seal and from any historical Worklist Unlock status word. See [ADR-0007](../adr/0007-org-dpp-production.md).\
+_Avoid_: Auto-issue on Domain predicate alone; conflating Passport Domain `locked` with removed Worklist Unlock status
 
 **Passport snapshot**: Immutable projection of related Domain facts frozen into the Passport record on Commit. Later Domain edits do not rewrite what the Passport claims. See [ADR-0007](../adr/0007-org-dpp-production.md).\
 _Avoid_: Live Domain as the passport body; mutable “current view” credentials; “passport” as just another Domain entity row
@@ -111,7 +108,10 @@ _Avoid_: Treating overview as the operator board
 
 ## Historical / rejected
 
-Do not revive as Org nouns. Living multi-pass work is **submit cardinality** `many` + **readyWhen** (see [ADR-0008](../adr/0008-org-task-submit-cardinality.md)).
+Do not revive as Org nouns. Living multi-pass work is **submit cardinality** `many` + **readyWhen** (see [ADR-0008](../adr/0008-org-task-submit-cardinality.md)). Sibling / Domain prerequisites live in **readyWhen** (and Job **startsWhen** for start)—not Unlock.
+
+**Unlock order**: Former in-Job sibling-order gate (optional `unlockFrom` predecessor) and Worklist status `locked`. Removed from the platform; Config rejects authored `unlockFrom`.\
+_Avoid_: Reintroducing Unlock as platform law; calling readyWhen “unlock”
 
 **child Task**: Former name for a Task under a Task group; replaced by **submit cardinality** `many` + **readyWhen**.\
 _Avoid_: Reviving child Tasks or group nesting; Subtask; task instance

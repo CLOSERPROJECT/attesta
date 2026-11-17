@@ -298,14 +298,14 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	}
 }
 
-// Fail closed: Unlock / readyWhen / Worklist engines must stay generic — no plant Task id branches.
+// Fail closed: path / readyWhen / Worklist engines must stay generic — no plant Task id branches.
 func TestEngineSourcesOmitPlantTaskIDBranches(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
 	dir := filepath.Dir(thisFile)
-	for _, name := range []string{"unlock.go", "ready_when.go", "worklist.go", "tasks.go"} {
+	for _, name := range []string{"path_availability.go", "ready_when.go", "worklist.go", "tasks.go"} {
 		body, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			t.Fatal(err)

@@ -130,7 +130,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	}
 	switch mintKind {
 	case MintKindStartingNew:
-		// Client id is ignored; authorize/Unlock with empty instance (first Task only).
+		// Client id is ignored; authorize with empty instance (first Task only).
 		jobInstanceID = ""
 	case MintKindNone:
 		if jobInstanceID == "" {
