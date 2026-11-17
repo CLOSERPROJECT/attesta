@@ -82,7 +82,7 @@
 		'rounded border border-border bg-card px-3 py-3 transition-colors';
 
 	function rowHoverBorder(status: TaskStatus) {
-		return status === 'locked' ? '' : 'hover:border-primary';
+		return status === 'unavailable' || status === 'done' ? '' : 'hover:border-primary';
 	}
 
 	function rowShellClass(status: TaskStatus) {
@@ -109,7 +109,7 @@
 			'w-full',
 			padding,
 			'items-center hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden',
-			status !== 'locked' && 'cursor-pointer'
+			status !== 'unavailable' && status !== 'done' && 'cursor-pointer'
 		]
 			.filter(Boolean)
 			.join(' ');

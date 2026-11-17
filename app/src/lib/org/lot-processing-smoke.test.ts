@@ -19,7 +19,7 @@ const lotProcessingTaskIds = [
 	'closeLot'
 ];
 
-type TaskStatus = 'locked' | 'unavailable' | 'available' | 'actionable' | 'done';
+type TaskStatus = 'unavailable' | 'available' | 'actionable' | 'done';
 
 function sub(
 	jobId: string,
@@ -70,10 +70,10 @@ function worklistFor(domain: Domain, canStartLotProcessing: boolean): Worklist {
 	}
 	const tasks: Record<string, TaskStatus> = {
 		startLot: 'done',
-		weigh: 'locked',
-		markProgress: 'locked',
-		containerReg: 'locked',
-		closeLot: 'locked'
+		weigh: 'unavailable',
+		markProgress: 'unavailable',
+		containerReg: 'unavailable',
+		closeLot: 'unavailable'
 	};
 	const openLot = Object.values(domain.lot ?? {}).some((lot) => lot?.status === 'open');
 	const openLotIds = new Set(

@@ -41,7 +41,7 @@ const chrome = {
 	]
 } as const;
 
-/** Viewer-scoped Worklists (unlocked leaf is actionable vs available). */
+/** Viewer-scoped Worklists (not-done leaf is actionable vs available). */
 const adminWorklist: Worklist = {
 	jobs: [
 		{
@@ -61,7 +61,7 @@ const adminWorklist: Worklist = {
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'actionable', palletWeight: 'locked' }
+					tasks: { register: 'actionable', palletWeight: 'unavailable' }
 				}
 			]
 		},
@@ -103,7 +103,7 @@ const logisticWorklist: Worklist = {
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' }
+					tasks: { register: 'available', palletWeight: 'unavailable' }
 				}
 			]
 		},
@@ -145,7 +145,7 @@ const lineWorklist: Worklist = {
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' }
+					tasks: { register: 'available', palletWeight: 'unavailable' }
 				}
 			]
 		},
@@ -187,7 +187,7 @@ const allRolesWorklist: Worklist = {
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'actionable', palletWeight: 'locked' }
+					tasks: { register: 'actionable', palletWeight: 'unavailable' }
 				}
 			]
 		},
@@ -354,7 +354,7 @@ describe('worklist-home bands', () => {
 						{
 							id: 'NIR-2',
 							label: 'Camion B',
-							tasks: { register: 'actionable', palletWeight: 'locked' }
+							tasks: { register: 'actionable', palletWeight: 'unavailable' }
 						}
 					]
 				},
@@ -431,7 +431,7 @@ describe('worklist-home bands', () => {
 						{
 							id: 'NIR-open',
 							label: 'Open',
-							tasks: { register: 'actionable', palletWeight: 'locked' }
+							tasks: { register: 'actionable', palletWeight: 'unavailable' }
 						},
 						{
 							id: 'NIR-done',

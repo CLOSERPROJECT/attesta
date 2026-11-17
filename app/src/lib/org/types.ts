@@ -16,7 +16,7 @@ export type LoadResult = {
 	taskFormBundles: TaskFormBundle[];
 };
 
-/** Server-projected operator board (Unlock / startsWhen; done after Submission only). */
+/** Server-projected operator board (startsWhen / readyWhen; done after once Submission). */
 export type Worklist = {
 	jobs: WorklistJob[];
 };
@@ -54,7 +54,7 @@ export type WorklistJob = {
 export type WorklistInstance = {
 	id: string;
 	label: string;
-	/** Viewer-scoped Unlock/Submission status. */
+	/** Viewer-scoped path / readyWhen / role status. */
 	tasks: Record<string, TaskStatus>;
 	/**
 	 * Domain Submission N per flat leaf taskId. Omitted when empty.
@@ -63,7 +63,7 @@ export type WorklistInstance = {
 	submissionCounts?: Record<string, number>;
 };
 
-export type TaskStatus = 'locked' | 'unavailable' | 'available' | 'actionable' | 'done';
+export type TaskStatus = 'unavailable' | 'available' | 'actionable' | 'done';
 
 /** URL / wire sentinel for provisional Job start (empty jobInstanceId). */
 export const PROVISIONAL_JOB_INSTANCE_ID = 'new';

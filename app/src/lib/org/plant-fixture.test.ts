@@ -53,4 +53,16 @@ describe('feragame plant fixture ($org-fixtures)', () => {
 		expect(taskRoles('passport', 'select')).toEqual(['administration']);
 		expect(taskRoles('passport', 'lock')).toEqual(['administration']);
 	});
+
+	test('intake and passport readyWhen fold sibling gates into Domain', () => {
+		const register = taskConfig(config.jobs.intake, 'register')!;
+		const weightCheck = taskConfig(config.jobs.intake, 'weightCheck')!;
+		const lock = taskConfig(config.jobs.passport, 'lock')!;
+		expect(String(register.readyWhen)).toContain('truckArrive');
+		expect(String(register.readyWhen)).toContain('weightCheck');
+		expect(String(weightCheck.readyWhen)).toContain('truckArrive');
+		expect(String(weightCheck.readyWhen)).toContain('lot');
+		expect(String(lock.readyWhen)).toContain('select');
+		expect(String(lock.readyWhen)).toContain('fullyProcessed');
+	});
 });

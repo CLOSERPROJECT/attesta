@@ -51,7 +51,7 @@
 			class={[
 				'inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-transform duration-[180ms] ease-out',
 				status !== 'actionable' && 'group-aria-expanded/accordion-trigger:rotate-180',
-				status === 'locked' && 'invisible'
+				(status === 'unavailable' || status === 'done') && 'invisible'
 			]}
 			aria-hidden="true"
 		>

@@ -151,34 +151,30 @@ func TestCommitWeightCheckAfterRegister(t *testing.T) {
 	}
 }
 
-func TestCommitRegisterUnlocksAfterArrive(t *testing.T) {
+func TestCommitRegisterReadyWhenAfterArrive(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
-	intake := cfg.Jobs.Values["intake"].(Job)
 	domain, err := c.Domains.Get(t.Context(), "feragame")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "register",
-		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
-	}) {
-		t.Fatal("truckArrive should unlock register")
+	if !sequenceOkForCommit(cfg, domain, "intake", "register", truckID) {
+		t.Fatal("register sequenceOk after arrive (Done/startsWhen only)")
 	}
-	if !IsTaskUnlocked(UnlockQuery{
-		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
-		JobInstanceID: truckID, Submissions: domain.Submissions, Tasks: intake.Tasks,
-	}) {
-		t.Fatal("weightCheck must unlock after truckArrive (many-skip over register)")
+	if !sequenceOkForCommit(cfg, domain, "intake", "weightCheck", truckID) {
+		t.Fatal("weightCheck sequenceOk after arrive (Unlock removed; readyWhen separate)")
 	}
 	wl := ProjectWorklist(cfg, domain, OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}})
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), truckID)
 	if !ok {
 		t.Fatal("missing intake instance")
+	}
+	if inst.Tasks["register"] != TaskStatusActionable {
+		t.Fatalf("register = %q, want actionable after arrive readyWhen", inst.Tasks["register"])
 	}
 	if inst.Tasks["weightCheck"] != TaskStatusUnavailable {
 		t.Fatalf("weightCheck = %q, want unavailable until ≥1 lot (readyWhen)", inst.Tasks["weightCheck"])

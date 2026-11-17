@@ -45,7 +45,7 @@ function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
 						tasks: {
 							register: 'done',
 							codiceFir: codice,
-							palletWeight: 'locked'
+							palletWeight: 'unavailable'
 						}
 					}
 				]
@@ -109,7 +109,7 @@ describe('post-Commit navigation adapter', () => {
 });
 
 describe('Task deep link + exit', () => {
-	test('unauthorized / locked Task URL → home; unknown → home', () => {
+	test('unauthorized / unavailable Task URL → home; unknown → home', () => {
 		expect(
 			resolveTaskDeepLink('intake', 'NIR-1', 'palletWeight', false, adminWorklist)
 		).toEqual({ kind: 'home' });

@@ -177,7 +177,10 @@ steps:
               onCommit:
                   navigation: stay
               readyWhen: >-
-                $count($domain.submissions[jobId = "intake" and taskId = "weightCheck" and jobInstanceId = $instance.id]) = 0
+                (
+                  $count($domain.submissions[jobId = "intake" and taskId = "truckArrive" and jobInstanceId = $instance.id]) >= 1
+                  and $count($domain.submissions[jobId = "intake" and taskId = "weightCheck" and jobInstanceId = $instance.id]) = 0
+                )
               schema:
                 type: object
                 required: [client, numeroFir, palletCount, truckWeightAfter]
@@ -306,7 +309,10 @@ steps:
             - id: weightCheck
               roles: [administration]
               readyWhen: >-
-                $count($domain.lot.*[truckId = $instance.id]) >= 1
+                (
+                  $count($domain.submissions[jobId = "intake" and taskId = "truckArrive" and jobInstanceId = $instance.id]) >= 1
+                  and $count($domain.lot.*[truckId = $instance.id]) >= 1
+                )
               schema:
                 type: object
                 title: Controllo camion vs lotti
@@ -764,8 +770,11 @@ steps:
             - id: lock
               roles: [administration]
               readyWhen: >-
-                $lookup($domain.lot, $instance.id).status = "fullyProcessed"
-                and $not($lookup($domain.lot, $instance.id).locked = true)
+                (
+                  $count($domain.submissions[jobId = "passport" and taskId = "select" and jobInstanceId = $instance.id]) >= 1
+                  and $lookup($domain.lot, $instance.id).status = "fullyProcessed"
+                  and $not($lookup($domain.lot, $instance.id).locked = true)
+                )
               schema:
                 type: object
                 title: Emetti DPP

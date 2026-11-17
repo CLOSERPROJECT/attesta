@@ -54,7 +54,7 @@ function worklistFor(viewer: 'admin' | 'logistic'): Worklist {
 						label: 'Split available',
 						tasks: {
 							register: registerMine,
-							codiceFir: 'locked',
+							codiceFir: 'unavailable',
 							palletWeight: palletMine
 						}
 					}
@@ -68,8 +68,7 @@ const adminWorklist = worklistFor('admin');
 const logisticWorklist = worklistFor('logistic');
 
 describe('job instance overview model', () => {
-	test('taskStatusLabel maps five-value status via Paraglide', () => {
-		expect(taskStatusLabel('locked')).toBe(m.status_locked());
+	test('taskStatusLabel maps four-value status via Paraglide', () => {
 		expect(taskStatusLabel('unavailable')).toBe(m.status_unavailable());
 		expect(taskStatusLabel('available')).toBe(m.status_available());
 		expect(taskStatusLabel('actionable')).toBe(m.status_actionable());
@@ -106,7 +105,7 @@ describe('job instance overview model', () => {
 		const admin = jobInstanceOverview(adminWorklist, 'intake', 'NIR-both-available');
 		expect(admin?.tasks.map((t) => [t.taskId, t.status, t.linkable])).toEqual([
 			['register', 'actionable', true],
-			['codiceFir', 'locked', false],
+			['codiceFir', 'unavailable', false],
 			['palletWeight', 'available', false]
 		]);
 		expect(admin?.handoffRoles).toBeNull();

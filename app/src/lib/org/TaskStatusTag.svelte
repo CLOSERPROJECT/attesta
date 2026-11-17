@@ -11,7 +11,7 @@
 
 	let { status, class: className }: Props = $props();
 
-	/** Experiment step-chrome `.status` tones (locked/done gray, available primary, Per te active). */
+	/** Experiment step-chrome `.status` tones (unavailable/done gray, available primary, Per te active). */
 	const tone = $derived(
 		status === 'actionable'
 			? 'border-[#5385d1] text-[#5385d1] bg-[color-mix(in_srgb,#5385d1_5%,transparent)]'
