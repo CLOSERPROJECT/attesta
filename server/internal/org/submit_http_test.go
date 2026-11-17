@@ -39,12 +39,12 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{
-			Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Stampa etichette"`, Action: "link",
+			Method: `"POST"`, URL: `"/effects/labels"`, Label: `"Stampa etichette"`, Action: "link",
 			Body:    `{ "lotId": $lot.id, "labels": [$keys($sift($domain.pallet, function($v){$v.lotId = $lot.id}))] }`,
 			HasBody: true,
 		},
 		{
-			Method: `"POST"`, URL: `"/fake/register-csv"`, Label: `"Scarica CSV registrazione"`, Action: "download",
+			Method: `"POST"`, URL: `"/effects/register-csv"`, Label: `"Scarica CSV registrazione"`, Action: "download",
 			Body:    `{ "client": $.client, "lotId": $lot.id }`,
 			HasBody: true,
 		},
@@ -56,7 +56,7 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 	if len(port.calls) != 2 {
 		t.Fatalf("calls = %#v", port.calls)
 	}
-	if port.calls[0].Method != "POST" || port.calls[0].URL != "/fake/labels" || port.calls[0].Org != "feragame" {
+	if port.calls[0].Method != "POST" || port.calls[0].URL != "/effects/labels" || port.calls[0].Org != "feragame" {
 		t.Fatalf("call0 = %#v", port.calls[0])
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)
@@ -81,8 +81,8 @@ func TestRunSubmitHTTPEffectsContinuesAfterPortFailure(t *testing.T) {
 		errs:      []error{errors.New("printer down"), nil},
 	}
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
-		{Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Labels"`, Action: "link"},
-		{Method: `"POST"`, URL: `"/fake/register-csv"`, Label: `"CSV"`, Action: "download"},
+		{Method: `"POST"`, URL: `"/effects/labels"`, Label: `"Labels"`, Action: "link"},
+		{Method: `"POST"`, URL: `"/effects/register-csv"`, Label: `"CSV"`, Action: "download"},
 	}, map[string]any{}, nil, EmptyDomain(), "", nil, "feragame")
 
 	if len(result.Errors) != 1 || result.Errors[0] != "printer down" {
@@ -112,7 +112,7 @@ func TestRunSubmitHTTPEffectsUsesQrEndpointBinding(t *testing.T) {
 
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{
-			Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Stampa etichette"`, Action: "link",
+			Method: `"POST"`, URL: `"/effects/labels"`, Label: `"Stampa etichette"`, Action: "link",
 			Body: `{"labels": [$each(
 				$sift($domain.pallet, function($v){$v.lotId = "acme-1"}),
 				function($v, $id){{ "id": $id, "qr": $qrEndpoint & "?entityId=" & $id }}

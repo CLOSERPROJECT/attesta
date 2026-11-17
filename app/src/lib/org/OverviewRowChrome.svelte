@@ -12,7 +12,7 @@
 	type Props = {
 		title: string;
 		status: TaskStatus;
-		/** 1-based Config order; omit for group occurrences and child Tasks. */
+		/** 1-based Config task order. */
 		orderNumber?: number;
 		/** Client overlay: dirty Draft beside status (not a Worklist TaskStatus). */
 		showDraft?: boolean;

@@ -1,6 +1,6 @@
-# jsonata-go gotchas (Living Config expr)
+# jsonata-go gotchas (Org Config expr)
 
-Living Org Config runs chrome / transform / QR / HttpPort bodies through
+Org Config runs chrome / transform / QR / HttpPort bodies through
 [`jsonata-go`](https://github.com/blues/jsonata-go). Same surface as JSONata in
 spirit; these footguns are engine-specific. Prefer fixing exprs in Config over
 special-casing Go/SPA.
@@ -19,5 +19,5 @@ special-casing Go/SPA.
 - **Safe sums** — null/empty arrays need an explicit `$reduce` (or equivalent)
   helper; do not assume `$sum` alone is enough.
 
-When an expr “works in a playground” but fails in Living, check this list before
+When an expr “works in a playground” but fails in Org, check this list before
 changing executor code.

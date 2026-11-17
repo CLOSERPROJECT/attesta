@@ -114,9 +114,9 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("living memberships: %v", err)
 	}
-	// platform admin + living all-roles + administration / logistic / line
+	// platform admin + org all-roles + administration / logistic / line
 	if len(livingMemberships) < 5 {
-		t.Fatalf("living memberships = %d, want platform admin + 4 living operators", len(livingMemberships))
+		t.Fatalf("org memberships = %d, want platform admin + 4 org operators", len(livingMemberships))
 	}
 }
 

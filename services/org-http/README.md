@@ -1,7 +1,7 @@
 # org-http
 
 Plant HttpPort peer for Attesta Compose. Speaks the fixture paths
-`/fake/labels` and `/fake/register-csv`; stores artifacts on disk.
+`/effects/labels` and `/effects/register-csv`; stores artifacts on disk.
 
 ## Response body shape (POST)
 

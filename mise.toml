@@ -2,6 +2,7 @@
 go = "1.25.5"
 node = "24.13.0"
 npm = "11.6.2"
+bun = "1.4.2"
 ripgrep = "latest"
 task = "latest"
 "pipx:djlint" = "1.46.2"

@@ -23,8 +23,8 @@ type server struct {
 
 func (s *server) routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /fake/labels", s.handleLabels)
-	mux.HandleFunc("POST /fake/register-csv", s.handleRegisterCSV)
+	mux.HandleFunc("POST /effects/labels", s.handleLabels)
+	mux.HandleFunc("POST /effects/register-csv", s.handleRegisterCSV)
 	mux.HandleFunc("GET /artifacts/{id}", s.handleGetArtifact)
 	return s.withAuth(s.withAccessLog(mux))
 }
