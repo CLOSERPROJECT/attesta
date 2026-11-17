@@ -95,92 +95,37 @@ cd attesta
 cp .env.example .env
 ```
 
-Start local infrastructure:
+Start local infrastructure, then run the app in development mode:
 
 ```bash
 task start
-```
-
-Bootstrap Appwrite:
-
-1. Open `http://localhost/console/register`.
-2. Create the first Appwrite console account.
-3. Create an Appwrite project.
-4. Copy the project ID into `.env` as `APPWRITE_PROJECT_ID`.
-5. Create an API key with Auth permissions and Storage file read/write permissions.
-6. Copy the API key into `.env` as `APPWRITE_API_KEY`.
-7. Create a storage bucket with bucket ID `org-assets`.
-
-Run the app in development mode:
-
-```bash
 task dev
 ```
 
-To run the complete stack in Docker instead, use `task start:docker` (or
-`task start:docker:build` after changing the image). The containerized app is
-published on `DOCKER_APP_PORT`; normal `task start` remains infrastructure-only.
+`task start` brings up Compose infrastructure for this checkout. With
+`ATTESTA_SEED=true` (worktree-env default), it runs prepare so Appwrite can
+bootstrap and the demo seed can apply when credentials exist. Full prepare,
+seed, and Feragame scope details live in [QUICKSTART.md](QUICKSTART.md).
 
-Open:
+For the complete stack in Docker instead, use `task start:docker` (see
+[DOCKER.md](DOCKER.md) and [QUICKSTART.md](QUICKSTART.md)).
 
-- Attesta: `http://localhost:3000`
-- API docs: `http://localhost:3000/docs`
-- Appwrite Console: `http://localhost`
-- Mailpit: `http://localhost:8025`
-
-To run the backend on another port:
+Resolved URLs and ports for this checkout:
 
 ```bash
-PORT=3001 VITE_PORT=5174 task dev
+bash scripts/worktree-env.sh print
 ```
+
+Primary defaults (when `.env.worktree` is absent) follow `.env.example` /
+`scripts/dev-ports.env` — typically app on `PORT` (default `3000`), Appwrite on
+`APPWRITE_HTTP_PORT`, and Mailpit on `MAILPIT_UI_PORT`.
 
 ### Git worktrees
 
-Attesta follows the same Worktrunk bootstrap shape as Credimi.
-The primary checkout keeps the classic ports from `scripts/dev-ports.env`.
-Every parallel checkout receives deterministic, available application and infrastructure ports in a gitignored `.env.worktree`; bootstrap never overwrites that file.
-
-```bash
-mise install
-wt config shell install
-wt config approvals add  # review and approve the shared bootstrap/cleanup hooks once
-wt switch -c my-feature
-task dev
-```
-
-Codex-managed worktrees use the checked-in local environment to run the same bootstrap automatically.
-Codex also copies the ignored paths allowlisted in `.worktreeinclude`.
-Cursor Agents Window / `/worktree` / CLI worktrees run the same script from `.cursor/worktrees.json` (`setup-worktree-unix`).
-Cursor does not honor `.worktreeinclude` itself; during setup it sets `$ROOT_WORKTREE_PATH` to the primary checkout, and bootstrap copies allowlisted paths from there.
-For a plain Git worktree, run bootstrap explicitly:
-
-```bash
-bash scripts/worktree-bootstrap.sh
-task dev
-```
-
-Bootstrap copies the allowlisted ignored development files when needed, trusts the checkout's `mise.toml`, initializes submodules, and writes `.env.worktree` only when it is missing.
-After bootstrap, `task dev` reruns the same setup idempotently.
-
-Each checkout owns a separate Compose project derived from its canonical path, so
-containers, networks, MongoDB, and Appwrite volumes stay isolated across linked
-worktrees and independent clones—even when two checkouts share a directory name.
-`task start`, `task stop`, `task reset`, `task status`, and `task logs` are all scoped to the current worktree.
-
-As in Credimi, Worktrunk's `hash_port` derives the initial value for each service.
-Bootstrap checks live TCP listeners and the ports reserved in sibling worktrees, then walks forward on collisions before writing `PORT`, `VITE_PORT`, `MONGODB_PORT`, `CERBOS_PORT`, `MONGO_EXPRESS_PORT`, `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT`, `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT`, and `DOCKER_APP_PORT`.
-Edit the generated `.env.worktree` for any manual override.
-Later bootstraps preserve it, and duplicate manual values are rejected before Docker starts.
-
-Parallel worktrees start with empty durable volumes. Demo data comes only from the Go seed (`task seed` / `ATTESTA_SEED=true` after Appwrite credentials exist); there is no copy of the primary's MongoDB or Appwrite volumes.
-
-`task stop` preserves the current worktree's volumes.
-`task reset` and `task purge` delete the volumes; the next start initializes empty Appwrite MariaDB, then applies the Go demo seed when `ATTESTA_SEED=true` and credentials exist.
-Worktrunk removal runs a non-interactive `pre-remove` hook that deletes the worktree's Compose volumes.
-Codex and Cursor can remove managed worktrees without that hook (Cursor also auto-prunes under `~/.cursor/worktrees` by `cursor.worktreeMaxCount`).
-Before deleting a checkout that ran Docker, run `task reset` / `task purge`, or from an active checkout use `task worktree:gc` then `task worktree:gc:apply` for orphaned Attesta Docker resources.
-Garbage collection is scoped to this repository clone and ignores foreign or unlabeled resources.
-Reset and purge enumerate every volume in the current Compose project and refuse deletion unless all ownership labels match the current checkout.
+Parallel checkouts get a gitignored `.env.worktree` with isolated ports and a
+path-qualified Compose project. Day-1 worktree bootstrap →
+[QUICKSTART.md](QUICKSTART.md). Stop/reset/purge and orphan GC →
+[DOCKER.md](DOCKER.md).
 
 **[🔝 back to top](#toc)**
 
@@ -188,24 +133,22 @@ Reset and purge enumerate every volume in the current Compose project and refuse
 
 ## ⚙️ Configuration
 
-Common environment variables:
+Common environment variables (see `.env.example` for local defaults):
 
 - `PORT` or `ADDR` - backend listen address, default `:3000`
 - `VITE_PORT` - Vite dev-server port, default `5173`
-- `MONGODB_PORT`, `CERBOS_PORT` - host ports for this checkout's infrastructure
-- `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT` - this checkout's Appwrite entrypoints
-- `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT` - this checkout's local mail service
-- `MONGODB_URI`, `CERBOS_URL`, `APPWRITE_ENDPOINT`, `SMTP_HOST`, `SMTP_PORT` - explicit `.env` or shell values are preserved for host development in the primary checkout; linked worktrees always resolve these to their isolated local ports
-- `APPWRITE_PROJECT_ID`
-- `APPWRITE_API_KEY` - leave empty for prepare; runtime creds live in checkout-scoped `.env.appwrite`
-- `PUBLIC_BASE_URL` - public origin for invite/reset/verify and notification links (no trailing slash)
+- `MONGODB_PORT`, `CERBOS_PORT`, `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT`,
+  `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT` - host ports for this checkout
+- `MONGODB_URI`, `CERBOS_URL`, `APPWRITE_ENDPOINT`, `SMTP_HOST`, `SMTP_PORT` -
+  preserved for primary host development; linked worktrees resolve to isolated
+  local ports
+- `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY` - prepare writes runtime creds to
+  checkout-scoped `.env.appwrite`
+- `PUBLIC_BASE_URL` - public origin for invite/reset/verify links (no trailing slash)
 - `APPWRITE_ORG_ASSETS_BUCKET` - default `org-assets`
 - `ATTACHMENT_MAX_BYTES` - default 25 MiB
-- `ANYONE_CAN_CREATE_ACCOUNT` - default `true` (open registration); set `false` as an emergency kill switch for signup
-- `SESSION_TTL_DAYS`
-- `COOKIE_SECURE`
-
-See `.env.example` for local defaults.
+- `ANYONE_CAN_CREATE_ACCOUNT` - default `true`; set `false` as an emergency kill switch
+- `SESSION_TTL_DAYS`, `COOKIE_SECURE`
 
 **[🔝 back to top](#toc)**
 
@@ -213,26 +156,13 @@ See `.env.example` for local defaults.
 
 ## 🪪 Digital Product Passport
 
-DPP generation is configured per stream:
+When DPP is enabled on a stream and a process first reaches `done`, Attesta
+stores stable identifiers and exposes a public Digital Link page at
+`/01/{GTIN}/10/{LOT}/21/{SERIAL}` (JSON via `Accept: application/json` or
+`?format=json`).
 
-```yaml
-dpp:
-  enabled: true
-  gtin: "09506000134352"
-  lotInputKey: "batchId"
-  lotDefault: ""
-  serialInputKey: ""
-  serialStrategy: "process_id_hex"
-```
-
-When a process first reaches `done`, Attesta stores stable DPP identifiers on
-the process and exposes a public Digital Link page:
-
-```text
-/01/{GTIN}/10/{LOT}/21/{SERIAL}
-```
-
-Use `Accept: application/json` or `?format=json` to retrieve the JSON export.
+Stream YAML shape, serial strategies, and UNTP mapping live in
+[docs/untp.md](docs/untp.md).
 
 **[🔝 back to top](#toc)**
 
@@ -319,10 +249,10 @@ European Union nor the granting authority can be held responsible for them.
 ## 📖 More Documentation
 
 - [AGENTS.md](AGENTS.md) - agent behavior, title conventions, and guidance pointers.
-- [CONTEXT.md](CONTEXT.md) - product domain vocabulary.
-- [QUICKSTART.md](QUICKSTART.md) - step-by-step local setup.
-- [DOCKER.md](DOCKER.md) - Docker Compose, Coolify, and preview deployment notes.
-- [docs/architecture.md](docs/architecture.md) - system boundaries, ADRs, and source navigation.
+- [GLOSSARY-MAP.md](GLOSSARY-MAP.md) - which glossary applies (shared membership, Org `/app`, Stream `/my`, Feragame).
+- [QUICKSTART.md](QUICKSTART.md) - prepare-first local setup, seed, and worktrees.
+- [DOCKER.md](DOCKER.md) - Compose services, Coolify, stop/reset/purge, and containerized app.
+- [docs/architecture.md](docs/architecture.md) - how Stream, Org, and shared seams connect.
 - [docs/untp.md](docs/untp.md) - Digital Product Passport and UNTP implementation.
 - [Taskfile.yml](Taskfile.yml) - available local commands.
 - GitHub issues - active and deferred work (see [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)).

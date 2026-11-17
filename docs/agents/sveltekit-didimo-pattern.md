@@ -41,7 +41,7 @@ flowchart LR
 ### Key files (DIDimo)
 
 | Concern | Path |
-|---|---|
+| --- | --- |
 | SvelteKit app | `webapp/` |
 | Adapter | `webapp/svelte.config.js` → `svelte-adapter-bun` |
 | Vite proxy | `webapp/vite.config.ts` (`VITE_API` → `/api/`, `/_/`, `/temporal-ui`) |
@@ -77,7 +77,7 @@ flowchart LR
 ### Env checklist (DIDimo UI)
 
 | Variable | Role |
-|---|---|
+| --- | --- |
 | `ADDRESS_UI` | API reverse-proxy target (default `http://localhost:5100`) |
 | `PORT` / `HOST` | adapter-bun listen (prod UI process; default port 3000 if unset) |
 | `VITE_API` | Vite (and SSR `handleFetch`) upstream for `/api/` |
@@ -96,7 +96,7 @@ flowchart LR
 ## Attesta today
 
 | Concern | Behavior | Path |
-|---|---|---|
+| --- | --- | --- |
 | Frontend | Vite library/app build → `web/dist` | `web/` |
 | Serving | Go `FileServer` under `/static/` | `server/cmd/server/main.go` |
 | Templates | Go HTML templates | `server/templates/` |
@@ -111,7 +111,7 @@ There is **no** `ADDRESS_UI`, no Overmind/Procfile dual process, and **no Svelte
 ## Integration options for Attesta
 
 | Option | Shape | When |
-|---|---|---|
+| --- | --- | --- |
 | **A. Formata-shaped** | `adapter-static` (or SPA) + `paths.base` + `go:embed` + mux prefix | No Kit SSR; stays one Alpine/`./attesta` process; closest to Attesta today |
 | **B. DIDimo-shaped** | `adapter-node` or `svelte-adapter-bun` + Go `httputil.ReverseProxy` to `ADDRESS_UI` | Need SSR/`+server`; same public origin; new UI process |
 | **C. Sidecar / Coolify path** | Separate Node service; Coolify or Compose path/host split | Clear process boundary; more cookie/`PUBLIC_BASE_URL` care |
