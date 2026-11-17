@@ -62,6 +62,13 @@ func TestFeragamePassportFixtureShape(t *testing.T) {
 		t.Fatalf("select eligibility where = %q", where)
 	}
 	lock, _ := TaskByID(job.Tasks, "lock")
+	lockRW, _ := lock["readyWhen"].(string)
+	if !strings.Contains(lockRW, `taskId = "select"`) {
+		t.Fatalf("lock readyWhen = %q, want select Submission gate", lockRW)
+	}
+	if !strings.Contains(lockRW, "fullyProcessed") || !strings.Contains(lockRW, "locked") {
+		t.Fatalf("lock readyWhen = %q, want Domain eligibility", lockRW)
+	}
 	onSubmit, _ := lock["onSubmit"].(map[string]any)
 	if _, ok := onSubmit["passport"]; !ok {
 		t.Fatal("lock missing onSubmit.passport")

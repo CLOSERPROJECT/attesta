@@ -157,8 +157,14 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if rw, _ := weightCheck["readyWhen"].(string); !strings.Contains(rw, "lot") {
 		t.Fatalf("weightCheck.readyWhen = %#v, want ≥1 lot gate", weightCheck["readyWhen"])
 	}
+	if rw, _ := weightCheck["readyWhen"].(string); !strings.Contains(rw, `taskId = "truckArrive"`) {
+		t.Fatalf("weightCheck.readyWhen = %#v, want truckArrive Submission gate", weightCheck["readyWhen"])
+	}
 	if rw, _ := register["readyWhen"].(string); !strings.Contains(rw, "weightCheck") {
 		t.Fatalf("register.readyWhen = %#v, want weightCheck Submission gate", register["readyWhen"])
+	}
+	if rw, _ := register["readyWhen"].(string); !strings.Contains(rw, `taskId = "truckArrive"`) {
+		t.Fatalf("register.readyWhen = %#v, want truckArrive Submission gate", register["readyWhen"])
 	}
 	for _, id := range wantIntakeTasks {
 		task, _ := TaskByID(intake.Tasks, id)
