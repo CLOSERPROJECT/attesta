@@ -116,6 +116,14 @@ export class ConfigForm<T extends Record<string, unknown> = Record<string, unkno
 		this.#overrideEpoch += 1;
 	};
 
+	/** Plan/projection swap — replace derived map; clear overrides; re-apply. */
+	replaceDerived = (derived: Record<string, ConfigFormDerivedEntry>): void => {
+		this.#derived = normalizeDerived(derived);
+		this.#overrides = new Set();
+		this.#overrideEpoch += 1;
+		this.#scheduleApply();
+	};
+
 	/**
 	 * Sole operator write for derivedLeaf override paths (ADR-0016).
 	 * Overridable derived → override set; non-overridable → ignored (effect keeps expr).

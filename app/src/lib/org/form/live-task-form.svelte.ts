@@ -18,11 +18,14 @@ export type LiveTaskFormOptions = {
 /**
  * Live substep apply: ConfigForm when derived present + chrome (readonly / dataReport) settlement.
  * Override policy stays on ConfigForm — not reimplemented here.
+ * Plan/schema swaps use reactive getters (sjsf); prefer updatePlan over dispose+recreate.
  */
 export class LiveTaskForm {
-	readonly plan: TaskFormPlan;
+	#plan = $state.raw<TaskFormPlan>(null!);
 	#form: CreateConfigFormResult<Record<string, unknown>> | undefined;
-	readonly #chrome: LiveTaskChromeHandle;
+	#chrome: LiveTaskChromeHandle;
+	#ports: LiveTaskFormPorts;
+	#options: LiveTaskFormOptions;
 	#formInit: Promise<void> | undefined;
 
 	constructor(
@@ -30,12 +33,18 @@ export class LiveTaskForm {
 		ports: LiveTaskFormPorts,
 		options: LiveTaskFormOptions = {}
 	) {
-		this.plan = plan;
-		this.#chrome = startLiveTaskChrome(plan, ports);
+		this.#plan = plan;
+		this.#ports = ports;
+		this.#options = options;
+		this.#chrome = startLiveTaskChrome(() => this.#plan, ports);
 
 		if (plan.surface === 'live' && !options.deferForm) {
-			this.#mountForm(plan, ports);
+			this.#mountForm();
 		}
+	}
+
+	get plan(): TaskFormPlan {
+		return this.#plan;
 	}
 
 	get form(): CreateConfigFormResult<Record<string, unknown>> | undefined {
@@ -44,21 +53,63 @@ export class LiveTaskForm {
 
 	whenFormReady = (): Promise<void> => this.#formInit ?? Promise.resolve();
 
-	#mountForm = (plan: TaskFormPlan, ports: LiveTaskFormPorts): void => {
-		const form = createConfigForm(plan.schemas, ports.getValue, ports.setValue, {
-			...(plan.derived !== undefined ? { derived: plan.derived } : {}),
-			getDomain: ports.getDomain,
-			getCatalogs: ports.getCatalogs,
-			onSubmit: ports.onSubmit
-				? (value) => {
-						void ports.onSubmit?.(plan.sealSubmission(value as Record<string, unknown>));
-					}
-				: undefined,
-			onSubmitError: ports.onSubmitError
-		});
+	/**
+	 * Swap plan/schemas/chrome in place. Recreates the sjsf form only when the
+	 * derived vs non-derived createConfigForm branch must change.
+	 */
+	updatePlan = (next: TaskFormPlan): void => {
+		const prevHadDerived = this.#plan.derived !== undefined;
+		const nextHasDerived = next.derived !== undefined;
+		this.#plan = next;
+
+		if (!this.#form) {
+			if (next.surface === 'live' && !this.#options.deferForm) {
+				this.#mountForm();
+			}
+			return;
+		}
+
+		if (prevHadDerived !== nextHasDerived) {
+			this.#disposeFormOnly();
+			if (next.surface === 'live' && !this.#options.deferForm) {
+				this.#mountForm();
+			}
+			return;
+		}
+
+		if (this.#form.configForm && next.derived !== undefined) {
+			this.#form.configForm.replaceDerived(next.derived);
+		}
+	};
+
+	#mountForm = (): void => {
+		const ports = this.#ports;
+		const form = createConfigForm(
+			() => this.#plan.schemas,
+			ports.getValue,
+			ports.setValue,
+			{
+				...(this.#plan.derived !== undefined ? { derived: this.#plan.derived } : {}),
+				getDomain: ports.getDomain,
+				getCatalogs: ports.getCatalogs,
+				onSubmit: ports.onSubmit
+					? (value) => {
+							void ports.onSubmit?.(
+								this.#plan.sealSubmission(value as Record<string, unknown>)
+							);
+						}
+					: undefined,
+				onSubmitError: ports.onSubmitError
+			}
+		);
 		(form as FormState<Record<string, unknown>> & { liveTaskForm?: LiveTaskForm }).liveTaskForm =
 			this;
 		this.#form = form;
+	};
+
+	#disposeFormOnly = (): void => {
+		this.#form?.disposeLocalDraftSync?.();
+		this.#form = undefined;
 	};
 
 	chromeContext = (): ChromeContext => ({
@@ -75,7 +126,6 @@ export class LiveTaskForm {
 
 	dispose = (): void => {
 		this.#chrome.dispose();
-		this.#form?.disposeLocalDraftSync?.();
-		this.#form = undefined;
+		this.#disposeFormOnly();
 	};
 }
