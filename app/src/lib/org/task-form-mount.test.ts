@@ -157,4 +157,40 @@ describe('TaskFormMount', () => {
 		expect(mount.status).toBe('ready');
 		expect(fetch).toHaveBeenCalledTimes(2);
 	});
+
+	test('reload re-fetches last address and accepts fresh worklist', async () => {
+		const actionable = {
+			...sample,
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-advance',
+			title: 'Codice FIR'
+		};
+		const fetch = vi
+			.fn<TaskFormPort['fetch']>()
+			.mockResolvedValueOnce(actionable)
+			.mockResolvedValueOnce({ ...actionable, title: 'Codice FIR again' });
+		const mount = createTaskFormMount({ taskForm: { fetch } });
+
+		await mount.load(
+			{
+				jobId: 'intake',
+				taskId: 'codiceFir',
+				jobInstanceId: 'NIR-advance',
+				provisionalJob: false
+			},
+			adminWorklist()
+		);
+
+		const result = await mount.reload(adminWorklist());
+
+		expect(result).toEqual({ kind: 'ready' });
+		expect(mount.bundle?.title).toBe('Codice FIR again');
+		expect(mount.addressKey).toBe('intake|NIR-advance|codiceFir');
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(fetch).toHaveBeenLastCalledWith({
+			jobId: 'intake',
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-advance'
+		});
+	});
 });

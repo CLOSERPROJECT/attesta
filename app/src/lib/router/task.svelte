@@ -53,18 +53,26 @@
 		navigateOrgTarget(followUp);
 	}
 
-	function onContinue() {
+	async function onContinue() {
 		const outcome = stayedOutcome;
 		if (!outcome) return;
-		endLinksStay();
-		navigateOrgTarget(
-			resolveContinueNavigation(
-				outcome.continueNavigation,
-				jobId,
-				outcome.jobInstanceId,
-				outcome.nextTaskFormBundle
-			)
+		const target = resolveContinueNavigation(
+			outcome.continueNavigation,
+			jobId,
+			outcome.jobInstanceId,
+			outcome.nextTaskFormBundle
 		);
+		endLinksStay();
+		const normInstance = (id: string) => (id === '' || id === 'new' ? '' : id);
+		const sameTaskAddress =
+			target.kind === 'task' &&
+			`${target.jobId}|${normInstance(target.jobInstanceId)}|${target.taskId}` ===
+				`${jobId}|${normInstance(routeInstance)}|${taskId}`;
+		if (sameTaskAddress) {
+			await taskFormMount.reload(orgSession.result?.worklist);
+			return;
+		}
+		navigateOrgTarget(target);
 	}
 
 	// Clear stay if the route changes while stay was still active (e.g. sidebar nav).

@@ -110,8 +110,10 @@ export class TaskFormMount {
 		}
 	};
 
-	/** Same-address re-fetch (Continue fallback / T5). */
-	reload = (): Promise<TaskFormLoadResult> => {
+	/** Same-address re-fetch (Continue); pass worklist after Commit so the gate sees the snapshot. */
+	reload = (
+		worklist?: Worklist | null
+	): Promise<TaskFormLoadResult> => {
 		const addr = this.#lastAddr;
 		if (!addr) {
 			return Promise.resolve({
@@ -119,7 +121,10 @@ export class TaskFormMount {
 				message: 'no address to reload'
 			});
 		}
-		return this.load(addr, this.#lastWorklist);
+		return this.load(
+			addr,
+			worklist !== undefined ? worklist : this.#lastWorklist
+		);
 	};
 }
 
