@@ -73,6 +73,9 @@
 	}
 
 	onMount(() => {
+		if (!orgSession.result && !orgSession.loading) {
+			void orgSession.hydrate();
+		}
 		const { raw, strippedHref } = takeColdEntityIdRaw(window.location.href);
 		if (!raw) return;
 		window.history.replaceState(window.history.state, '', strippedHref);

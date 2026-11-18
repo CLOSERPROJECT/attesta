@@ -110,9 +110,6 @@
 			bundle = null;
 			error = null;
 			loading = true;
-			if (!orgSession.loading) {
-				void orgSession.hydrate();
-			}
 			return;
 		}
 
