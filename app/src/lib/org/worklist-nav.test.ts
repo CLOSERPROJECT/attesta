@@ -127,6 +127,28 @@ describe('Task deep link + exit', () => {
 		).toEqual({ kind: 'task' });
 	});
 
+	test('provisional Start mounts only when canStart and first Task (server ViewerMayMountTask)', () => {
+		const blocked: Worklist = {
+			jobs: [
+				{
+					...adminWorklist.jobs[0]!,
+					canStart: false
+				}
+			]
+		};
+		// After truckArrive Commit: worklist updates before navigate; must not fetch /new.
+		expect(
+			resolveTaskDeepLink('intake', 'new', 'register', true, blocked)
+		).toEqual({ kind: 'home' });
+		expect(
+			resolveTaskDeepLink('intake', '', 'register', true, blocked)
+		).toEqual({ kind: 'home' });
+		// Wrong leaf on a startable Job (CollectActionableTaskRefs is first Task only).
+		expect(
+			resolveTaskDeepLink('intake', 'new', 'codiceFir', true, adminWorklist)
+		).toEqual({ kind: 'home' });
+	});
+
 	test('task-form deny shares unmountable redirect with deep-link → home', () => {
 		expect(
 			resolveUnmountableTaskTarget('intake', 'NIR-1', false, adminWorklist)
