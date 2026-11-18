@@ -73,11 +73,6 @@ export class OrgSession {
 	/** Last Commit HttpPort links (FormPlan strip can wait for ticket 14). */
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
-	/**
-	 * Set when Commit `navigation` is stay so Task deep-link $effect
-	 * does not redirect before the route can enter stay UI.
-	 */
-	linksStayActive = $state(false);
 	drafts = $state.raw<Record<string, DraftEntry>>({});
 
 	constructor(options: OrgSessionOptions = {}) {
@@ -264,7 +259,6 @@ export class OrgSession {
 			}
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
-			this.linksStayActive = committed.navigation === 'stay';
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
@@ -277,7 +271,6 @@ export class OrgSession {
 			this.commitError = err instanceof Error ? err.message : String(err);
 			this.lastHttpLinks = [];
 			this.lastHttpErrors = [];
-			this.linksStayActive = false;
 			await this.refreshKeepDrafts();
 			return null;
 		} finally {
@@ -287,7 +280,6 @@ export class OrgSession {
 
 	/** Clear session HttpLinkStrip state (stay exit or non-stay post-Commit navigate). */
 	clearLinksStay = (): void => {
-		this.linksStayActive = false;
 		this.lastHttpLinks = [];
 		this.lastHttpErrors = [];
 	};

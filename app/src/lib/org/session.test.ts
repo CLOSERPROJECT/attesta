@@ -280,10 +280,9 @@ describe('OrgSession', () => {
 		});
 		expect(outcome?.navigation).toBe('task');
 		expect(outcome?.nextTaskFormBundle).toEqual(next);
-		expect(session.linksStayActive).toBe(false);
 	});
 
-	test('navigation stay sets linksStayActive; clearLinksStay resets', async () => {
+	test('navigation stay keeps HttpLinkStrip; clearLinksStay clears it', async () => {
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'T1',
@@ -314,10 +313,8 @@ describe('OrgSession', () => {
 		});
 		expect(outcome?.navigation).toBe('stay');
 		expect(outcome?.continueNavigation).toBe('overview');
-		expect(session.linksStayActive).toBe(true);
 		expect(session.lastHttpLinks).toHaveLength(1);
 		session.clearLinksStay();
-		expect(session.linksStayActive).toBe(false);
 		expect(session.lastHttpLinks).toEqual([]);
 	});
 
@@ -349,7 +346,6 @@ describe('OrgSession', () => {
 			value: { ack: true },
 			mint: { kind: 'none' }
 		});
-		expect(session.linksStayActive).toBe(false);
 		expect(session.lastHttpLinks).toHaveLength(1);
 		expect(session.lastHttpErrors).toEqual(['warn']);
 
@@ -383,11 +379,10 @@ describe('OrgSession', () => {
 		});
 		expect(outcome?.navigation).toBe('stay');
 		expect(outcome?.continueNavigation).toBe('overview');
-		expect(staySession.linksStayActive).toBe(true);
+		expect(staySession.lastHttpLinks).toHaveLength(1);
 		staySession.clearLinksStay();
 		expect(staySession.lastHttpLinks).toEqual([]);
 		expect(staySession.lastHttpErrors).toEqual([]);
-		expect(staySession.linksStayActive).toBe(false);
 	});
 
 	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
@@ -715,7 +710,7 @@ describe('OrgSession', () => {
 			mint: { kind: 'none' }
 		});
 		expect(outcome?.navigation).toBe('stay');
-		expect(session.linksStayActive).toBe(true);
+		expect(session).not.toHaveProperty('linksStayActive');
 		for (const key of absent) {
 			expect(session).not.toHaveProperty(key);
 		}
