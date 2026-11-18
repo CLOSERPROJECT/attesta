@@ -128,3 +128,6 @@ export function createTaskFormMount(
 ): TaskFormMount {
 	return new TaskFormMount(options);
 }
+
+/** Process-wide slot for Task beforeLoad + page bind (not OrgSession). */
+export const taskFormMount = createTaskFormMount();

@@ -26,30 +26,32 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 	});
 }
 
-/** Apply ADR-0006 post-Commit / exit / deep-link target. */
-export function navigateOrgTarget(target: PostCommitTarget): void {
+/** Programmatic navigate; return value is for `throw` inside sv-router hooks. */
+export function navigateOrgTargetAsync(target: PostCommitTarget): Promise<unknown> {
 	if (target.kind === 'home') {
-		void navigate('/');
-		return;
+		return navigate('/');
 	}
 	if (target.kind === 'archive') {
-		void navigate('/archive');
-		return;
+		return navigate('/archive');
 	}
 	if (target.kind === 'overview') {
-		void navigate('/:jobId/:jobInstanceId', {
+		return navigate('/:jobId/:jobInstanceId', {
 			params: {
 				jobId: target.jobId,
 				jobInstanceId: target.jobInstanceId
 			}
 		});
-		return;
 	}
-	void navigate('/:jobId/:jobInstanceId/:taskId', {
+	return navigate('/:jobId/:jobInstanceId/:taskId', {
 		params: {
 			jobId: target.jobId,
 			jobInstanceId: target.jobInstanceId,
 			taskId: target.taskId
 		}
 	});
+}
+
+/** Apply ADR-0006 post-Commit / exit / deep-link target. */
+export function navigateOrgTarget(target: PostCommitTarget): void {
+	void navigateOrgTargetAsync(target);
 }
