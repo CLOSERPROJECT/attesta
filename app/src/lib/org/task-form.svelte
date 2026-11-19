@@ -144,7 +144,9 @@
 	}
 
 	$effect(() => {
-		void drafts;
+		// Do not track `drafts` here — seed/write updates the bag and would re-enter
+		// ensureLive/updatePlan forever (effect_update_depth_exceeded). Form value
+		// still tracks drafts via LiveTaskForm ports / syncDeepLocalToDraft.
 		void draftSeedKey;
 		void bundle;
 
@@ -155,7 +157,10 @@
 		}
 
 		seedBundleDraft(bundle);
-		ensureLive(planFromTaskFormBundle(bundle));
+		const compiled = planFromTaskFormBundle(bundle);
+		if (live === null || live.plan.projectionKey !== compiled.projectionKey) {
+			ensureLive(compiled);
+		}
 	});
 
 	onDestroy(() => disposeLive());

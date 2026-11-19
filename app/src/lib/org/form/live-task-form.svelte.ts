@@ -58,6 +58,9 @@ export class LiveTaskForm {
 	 * derived vs non-derived createConfigForm branch must change.
 	 */
 	updatePlan = (next: TaskFormPlan): void => {
+		// Same projection: no-op. Reassigning #plan every effect tick loops with draft sync.
+		if (this.#plan.projectionKey === next.projectionKey) return;
+
 		const prevHadDerived = this.#plan.derived !== undefined;
 		const nextHasDerived = next.derived !== undefined;
 		this.#plan = next;

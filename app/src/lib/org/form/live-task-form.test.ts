@@ -51,6 +51,22 @@ describe('LiveTaskForm.updatePlan', () => {
 		live.dispose();
 	});
 
+	test('same projectionKey is a no-op (avoids effect↔draft sync loop)', () => {
+		const first = planOf({
+			projectionKey: 'same',
+			schema: { type: 'object', properties: { a: { type: 'string' } } } as Schema
+		});
+		const live = new LiveTaskForm(first, ports, { deferForm: true });
+		live.updatePlan(
+			planOf({
+				projectionKey: 'same',
+				schema: { type: 'object', properties: { b: { type: 'number' } } } as Schema
+			})
+		);
+		expect(live.plan).toBe(first);
+		live.dispose();
+	});
+
 	test('replaceDerived path keeps same LiveTaskForm instance', () => {
 		const live = new LiveTaskForm(
 			planOf({
