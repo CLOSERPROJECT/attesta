@@ -1,9 +1,9 @@
 # Attesta
 
-**Org** and **Stream** are the two words we use for different parts of the product. Do not mix their nouns.
+**Org** and **Stream** are different product nouns—do not mix them. `/my` hosts Formata Streams and may host **Org-backed streams**; `/app` is the instance-scoped Org operator surface.
 
-- **Org** (`/app`): [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md)
-- **Stream** (`/my`): [`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md)
+- **Org** (`/app`, Org-backed `/my`): [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md)
+- **Stream** (Formata `/my`): [`docs/stream/GLOSSARY.md`](docs/stream/GLOSSARY.md)
 
 Plant Config payloads (demo fixture nouns): [`docs/feragame/GLOSSARY.md`](docs/feragame/GLOSSARY.md). Which file to open: [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
 
@@ -11,7 +11,7 @@ Below: vocabulary shared by both Org and Stream — people, membership, and stan
 
 ## Language
 
-**Organization**: A party a user may affiliate with. Legacy Streams list Organizations as step owners; Org gives each Organization one **Org Config** and **Domain**.\
+**Organization**: A party a user may affiliate with. Formata Streams list Organizations as step owners; Org gives each Organization one or more **Org streams**, each with its own **Org Config** and **Domain**.\
 _Avoid_: Department, company, team (infra wording)
 
 **Registration**: Open self-serve account creation. A registered user may have zero organizations.\
@@ -35,7 +35,7 @@ _Avoid_: Org signup, self-serve org (when meaning live create without approval)
 **Affiliation**: A user’s membership in at most one organization at a time. Unaffiliated means zero organizations. Within an Affiliation, standing (Org admin vs Member) is independent of which Organization roles the user holds.\
 _Avoid_: Multi-org membership, active org switcher, workspace
 
-**Onboarding**: The unaffiliated-user surface to obtain an Affiliation. Only for verified users. Distinct from Legacy Operator home and from the Org Worklist.\
+**Onboarding**: The unaffiliated-user surface to obtain an Affiliation. Only for verified users. Distinct from Operator home (`/my`) and from the Org Worklist.\
 _Avoid_: Signup (account creation), registration wizard, folding Onboarding into Operator home, Email verification waiting path
 
 **Waiting**: The user’s own pending Join request or Organization creation request while another party decides. Visible to the requester; not an Attention item.\

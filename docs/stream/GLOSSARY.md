@@ -1,13 +1,13 @@
 # Legacy Stream
 
-Multi-party **Stream** blueprints and instances on Legacy `/my` (Formata, discovery, notarized substeps, optional Stream DPP). Historical product surface; still accurate for that runtime. Not Org Config / `/app`.
+Multi-party **Stream** blueprints and instances on `/my` (Formata, discovery, notarized substeps, optional Stream DPP). Historical Formata runtime; still accurate for that path. `/my` can also host **Org-backed streams** (Org Config + Domain)—those nouns live in [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) ([ADR-0014](../adr/0014-org-config-as-stream.md)).
 
-Shared membership: [`GLOSSARY.md`](../../GLOSSARY.md). Org (`/app`): [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
+Shared membership: [`GLOSSARY.md`](../../GLOSSARY.md). Org (`/app` and Org-backed `/my`): [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
 
 ## Language
 
-**Stream**: A configured blueprint of steps, substeps, roles, and forms. Starting a stream creates a new **Stream instance**.\
-_Avoid_: Workflow, stream type, template; Org Config
+**Stream**: A configured Formata blueprint of steps, substeps, roles, and forms. Starting a stream creates a new **Stream instance**. Distinct from an **Org stream**.\
+_Avoid_: Workflow, stream type, template; Org Config; Org stream
 
 **Import-blocking issue**: A Stream document problem that prevents loading a draft in Composer.\
 _Avoid_: Critical error (vague), validation error (when meaning only this tier)
@@ -15,8 +15,8 @@ _Avoid_: Critical error (vague), validation error (when meaning only this tier)
 **Composer-fixable issue**: A Stream document problem that can load into Composer and be corrected there before Save.\
 _Avoid_: Warning (alone), soft error, non-critical
 
-**Stream instance**: A single running occurrence of a Stream — one tracked batch or case from start through completion or early termination.\
-_Avoid_: Process, stream (when meaning an instance in domain docs); Domain; Job instance
+**Stream instance**: A single running occurrence of a Formata Stream — one tracked batch or case from start through completion or early termination. Distinct from an **Org stream instance**.\
+_Avoid_: Process, stream (when meaning an instance in domain docs); Domain; Job instance; Org stream instance
 
 **Step**: An organization-scoped phase in a stream blueprint. Groups one or more substeps.\
 _Avoid_: Using "step" when meaning substep completion state; Job
@@ -27,8 +27,8 @@ _Avoid_: Action; Task
 **Stream instance detail**: The full page for one stream instance.\
 _Avoid_: Process page, action list
 
-**Operator home**: The authenticated Legacy `/my` landing for an affiliated user. Surfaces Attention items, Upcoming stream instances, and Stream discovery; Org admin and Onboarding meanings live in [`GLOSSARY.md`](../../GLOSSARY.md).\
-_Avoid_: Home (alone), Dashboard (vague), Stream picker (as the name of Operator home), `/app` Worklist home
+**Operator home**: The authenticated `/my` landing for an affiliated user. Surfaces Attention items, Upcoming stream instances, and Stream discovery (Formata and Org-backed); Org admin and Onboarding meanings live in [`GLOSSARY.md`](../../GLOSSARY.md). Everyone lands here ([ADR-0014](../adr/0014-org-config-as-stream.md)).\
+_Avoid_: Home (alone), Dashboard (vague), Stream picker (as the name of Operator home), `/app` Worklist home as the affiliated landing
 
 **Stream discovery**: The Operator-home region listing Streams the user’s Organization can take part in, with Category and Sub-category browsing.\
 _Avoid_: Stream picker (when meaning the entire Operator home), Home
@@ -83,7 +83,7 @@ _Avoid_: Action detail, action content
 
 - A **Stream** blueprint is started as many **Stream instances**.
 - A **Step** belongs to one **Organization**; **Substeps** are gated by **Stream roles** (see Organization roles in [`GLOSSARY.md`](../../GLOSSARY.md)).
-- Org Config / Domain / Job / Task are the other product surface—see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md).
+- Org Config / Domain / **Org stream** / Job / Task are the Org product nouns—see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md). `/my` may list Org-backed streams beside Formata Streams.
 
 ## Historical / rejected
 
