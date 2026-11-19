@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// Scope identifies one stream of one org for Config and Domain persistence.
+// Scope identifies one stream of one org for Config, Domain, DPP, and link persistence.
 type Scope struct {
 	Org    string
 	Stream string

@@ -93,14 +93,14 @@ func TestValidatePassportConfigRejectsIncompleteBlock(t *testing.T) {
 func TestMemoryPassportStoreCreateOnce(t *testing.T) {
 	store := NewMemoryDPPStore()
 	rec := DPPRecord{
-		Org: "synth", SubjectID: "W1", GTIN: "09506000134352",
+		Org: "synth", Stream: "synth", SubjectID: "W1", GTIN: "09506000134352",
 		Lot: "L1", Serial: "W1", Snapshot: map[string]any{"n": 1}, IssuedAt: "t",
 		DigitalLink: untp.URL("09506000134352", "L1", "W1"),
 	}
 	if err := store.Create(t.Context(), rec); err != nil {
 		t.Fatal(err)
 	}
-	got, err := store.Get(t.Context(), "synth", "W1")
+	got, err := store.Get(t.Context(), Scope{Org: "synth", Stream: "synth"}, "W1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 		t.Fatalf("link = %#v, want %q", result.Links[0], wantLink)
 	}
 
-	rec, err := passports.Get(t.Context(), "synth", "W-9")
+	rec, err := passports.Get(t.Context(), Scope{Org: "synth", Stream: "synth"}, "W-9")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestCommitWithoutPassportOptInSkipsStore(t *testing.T) {
 	if len(result.Links) != 0 {
 		t.Fatalf("links = %#v", result.Links)
 	}
-	if _, err := passports.Get(t.Context(), "synth", "W-2"); !errors.Is(err, ErrNotFound) {
+	if _, err := passports.Get(t.Context(), Scope{Org: "synth", Stream: "synth"}, "W-2"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("store get = %v", err)
 	}
 }

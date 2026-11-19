@@ -242,7 +242,7 @@ func TestPassportValidateAndOptInErrorEdges(t *testing.T) {
 
 type createErrDPPStore struct{ err error }
 
-func (s *createErrDPPStore) Get(context.Context, string, string) (DPPRecord, error) {
+func (s *createErrDPPStore) Get(context.Context, Scope, string) (DPPRecord, error) {
 	return DPPRecord{}, ErrNotFound
 }
 func (s *createErrDPPStore) GetByIdentity(context.Context, string, string, string) (DPPRecord, error) {

@@ -80,7 +80,7 @@ func (l *DomainLoader) LoadTaskRecap(
 			Titles:        titles,
 		}
 		if l.LinkStore != nil {
-			links, err := l.LinkStore.Get(ctx, scope.Org, addr, sub.Timestamp)
+			links, err := l.LinkStore.Get(ctx, scope, addr, sub.Timestamp)
 			if err != nil && !errors.Is(err, ErrNotFound) {
 				return TaskRecapList{}, err
 			}

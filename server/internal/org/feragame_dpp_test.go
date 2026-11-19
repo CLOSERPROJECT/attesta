@@ -174,7 +174,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("link = %#v, want %q", locked.Links[0], wantLink)
 	}
 
-	rec, err := passports.Get(t.Context(), "feragame", loadID)
+	rec, err := passports.Get(t.Context(), FeragameScope(), loadID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -133,7 +133,7 @@ func TestSeedOrgStoresWipeDomainOnReplace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), org.DPPRecord{
-		Org: "feragame", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestSeedOrgStoresWipeDomainOnReplace(t *testing.T) {
 	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
 		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))
 	}
-	if _, err := passports.Get(t.Context(), "feragame", org.SeedLoadCOID); !errors.Is(err, org.ErrNotFound) {
+	if _, err := passports.Get(t.Context(), org.FeragameScope(), org.SeedLoadCOID); !errors.Is(err, org.ErrNotFound) {
 		t.Fatalf("passport after replace = %v, want ErrNotFound", err)
 	}
 	version, err := configs.ActiveVersion(t.Context(), org.FeragameScope())
@@ -352,7 +352,7 @@ func TestSeedFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), org.DPPRecord{
-		Org: "feragame", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -381,7 +381,7 @@ func TestSeedFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 	if got.Kind("lot")["L1"] == nil || len(got.Submissions) != 1 {
 		t.Fatalf("Domain must be kept: %#v", got)
 	}
-	if _, err := passports.Get(t.Context(), "feragame", org.SeedLoadCOID); err != nil {
+	if _, err := passports.Get(t.Context(), org.FeragameScope(), org.SeedLoadCOID); err != nil {
 		t.Fatalf("passport must be kept: %v", err)
 	}
 }
@@ -502,7 +502,7 @@ func TestSeedFeragameIdentityHardResetsIdentityWipesDomainSkipsFormata(t *testin
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), org.DPPRecord{
-		Org: "feragame", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -564,7 +564,7 @@ func TestSeedFeragameIdentityHardResetsIdentityWipesDomainSkipsFormata(t *testin
 	if _, ok := got.Kind("truck")[org.SeedTruckID]; ok {
 		t.Fatal("feragame-identity must not stage Domain")
 	}
-	if _, err := passports.Get(t.Context(), "feragame", org.SeedLoadCOID); !errors.Is(err, org.ErrNotFound) {
+	if _, err := passports.Get(t.Context(), org.FeragameScope(), org.SeedLoadCOID); !errors.Is(err, org.ErrNotFound) {
 		t.Fatalf("passport after feragame-identity = %v, want ErrNotFound", err)
 	}
 	for _, email := range []string{

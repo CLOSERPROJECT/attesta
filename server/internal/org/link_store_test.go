@@ -17,10 +17,11 @@ func TestMemoryLinkStorePutGetByAddressAndTimestamp(t *testing.T) {
 		{Label: "Stampa", URL: "blob:labels", Action: HttpActionLink},
 		{Label: "CSV", URL: "blob:csv", Action: HttpActionDownload, Filename: "reg.csv"},
 	}
-	if err := store.Put(t.Context(), "feragame", addr, ts, links); err != nil {
+	scope := FeragameScope()
+	if err := store.Put(t.Context(), scope, addr, ts, links); err != nil {
 		t.Fatal(err)
 	}
-	got, err := store.Get(t.Context(), "feragame", addr, ts)
+	got, err := store.Get(t.Context(), scope, addr, ts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,17 +29,17 @@ func TestMemoryLinkStorePutGetByAddressAndTimestamp(t *testing.T) {
 		t.Fatalf("got = %#v", got)
 	}
 	got[0].URL = "mutated"
-	again, err := store.Get(t.Context(), "feragame", addr, ts)
+	again, err := store.Get(t.Context(), scope, addr, ts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if again[0].URL != "blob:labels" {
 		t.Fatalf("store leaked mutation: %#v", again)
 	}
-	if _, err := store.Get(t.Context(), "feragame", addr, "2026-11-13T12:00:01Z"); !errors.Is(err, ErrNotFound) {
+	if _, err := store.Get(t.Context(), scope, addr, "2026-11-13T12:00:01Z"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("wrong timestamp should miss: %v", err)
 	}
-	if err := store.Put(t.Context(), "feragame", addr, "", links); err == nil {
+	if err := store.Put(t.Context(), scope, addr, "", links); err == nil {
 		t.Fatal("empty timestamp must fail Put")
 	}
 }
@@ -81,7 +82,7 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 		t.Fatal("register submission missing timestamp")
 	}
 
-	stored, err := links.Get(t.Context(), "feragame", addr, ts)
+	stored, err := links.Get(t.Context(), FeragameScope(), addr, ts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +146,11 @@ func TestCommitManySubmitPreservesLinksPerTimestamp(t *testing.T) {
 		t.Fatalf("want two distinct register timestamps, got %q %q (subs=%#v)", ts1, ts2, second.Domain.Submissions)
 	}
 
-	got1, err := store.Get(t.Context(), "feragame", addr, ts1)
+	got1, err := store.Get(t.Context(), FeragameScope(), addr, ts1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got2, err := store.Get(t.Context(), "feragame", addr, ts2)
+	got2, err := store.Get(t.Context(), FeragameScope(), addr, ts2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,10 +214,10 @@ func TestCommitSkipsLinkStoreWhenLinksEmpty(t *testing.T) {
 
 type errLinkStore struct{ err error }
 
-func (e *errLinkStore) Put(context.Context, string, SubmissionAddress, string, []HttpLinkItem) error {
+func (e *errLinkStore) Put(context.Context, Scope, SubmissionAddress, string, []HttpLinkItem) error {
 	return e.err
 }
-func (e *errLinkStore) Get(context.Context, string, SubmissionAddress, string) ([]HttpLinkItem, error) {
+func (e *errLinkStore) Get(context.Context, Scope, SubmissionAddress, string) ([]HttpLinkItem, error) {
 	return nil, e.err
 }
 
@@ -225,10 +226,10 @@ type countingLinkStore struct {
 	puts  int
 }
 
-func (c *countingLinkStore) Put(ctx context.Context, org string, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
+func (c *countingLinkStore) Put(ctx context.Context, scope Scope, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
 	c.puts++
-	return c.inner.Put(ctx, org, addr, timestamp, links)
+	return c.inner.Put(ctx, scope, addr, timestamp, links)
 }
-func (c *countingLinkStore) Get(ctx context.Context, org string, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
-	return c.inner.Get(ctx, org, addr, timestamp)
+func (c *countingLinkStore) Get(ctx context.Context, scope Scope, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
+	return c.inner.Get(ctx, scope, addr, timestamp)
 }

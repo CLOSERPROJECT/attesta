@@ -210,7 +210,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 				return Domain{}, &CommitError{Kind: "prep", Message: "passport store not configured"}
 			}
 			// Fail closed before the Domain write so a second lock does not rewrite Domain then error.
-			if _, err := c.DPPs.Get(ctx, org, applied.JobInstanceID); err == nil {
+			if _, err := c.DPPs.Get(ctx, scope, applied.JobInstanceID); err == nil {
 				return Domain{}, &CommitError{Kind: "passport-exists", Message: "passport already issued for subject"}
 			} else if !errors.Is(err, ErrNotFound) {
 				return Domain{}, err
@@ -256,7 +256,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 	}
 	if c.LinkStore != nil && len(result.Links) > 0 {
 		// Side record only — never roll back Domain or fail Commit on store error.
-		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), ts, result.Links)
+		_ = c.LinkStore.Put(ctx, scope, applied.submissionAddress(), ts, result.Links)
 	}
 	return result, nil
 }
