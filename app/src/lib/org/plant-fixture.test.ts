@@ -63,4 +63,16 @@ describe('feragame plant fixture ($org-fixtures)', () => {
 		expect(String(lock.readyWhen)).toContain('locked');
 		expect(lock.title).toBe('Verifica dati e DPP');
 	});
+
+	test('parallel trucks: truckArrive open; startLot scopes lots + Linea occupata', () => {
+		const arrive = taskConfig(config.jobs.intake, 'truckArrive')!;
+		expect(arrive.readyWhen).toBeUndefined();
+		const startLot = taskConfig(config.jobs.lot_processing, 'startLot')!;
+		const lotsWhere = String((startLot.reads as { lots?: { where?: string } })?.lots?.where ?? '');
+		expect(lotsWhere).toContain('truckId = $stream.id');
+		expect(String(startLot.blockedReason)).toContain('Linea occupata');
+		const register = taskConfig(config.jobs.intake, 'register')!;
+		const http = (register.onSubmit as { http?: { body?: string }[] })?.http ?? [];
+		expect(http.some((op) => String(op.body).includes('$qrEndpoint'))).toBe(true);
+	});
 });

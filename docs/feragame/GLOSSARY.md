@@ -33,8 +33,8 @@ _Avoid_: Treating incomplete as operator-board status or progress
 
 ### Jobs and roles
 
-**intake** (Job): Truck arrival chapter.\
-_Avoid_: Treating intake as the Passport path
+**intake** (Job): Truck arrival chapter. Several trucks may be in intake at once; the line still allows only one **lot** with **lot session status** `open`.\
+_Avoid_: Treating intake as the Passport path; serialising trucks behind another truck's weightCheck
 
 **lot_processing** (Job): Lot session chapter. Ends with once-only `lock`, which issues a Passport whose subject is that **lot** after **fullyProcessed** — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
 _Avoid_: A separate passport Job; treating closeLot as DPP issue

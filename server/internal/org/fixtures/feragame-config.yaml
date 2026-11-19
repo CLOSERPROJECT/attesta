@@ -163,8 +163,6 @@ steps:
         substeps:
             - id: truckArrive
               roles: [administration]
-              readyWhen: >-
-                $count($sift($domain.truck, function($v){$not($exists($v.checkedTruckWeight))})) = 0
               schema:
                 type: object
                 title: Registrazione camion
@@ -391,12 +389,19 @@ steps:
                   $count($domain.lot.*[status = "open"]) = 0
                   and $count($domain.lot.*[$not(status = "fullyProcessed") and $not(status = "open")]) >= 1
                 )
+              blockedReason: >-
+                (
+                  $openId := $keys($sift($domain.lot, function($v){$v.status = "open"}))[0];
+                  $exists($openId)
+                    ? 'Linea occupata: lotto ' & $openId & ' (camion ' & $lookup($domain.lot, $openId).truckId & ')'
+                    : ''
+                )
               enumReads:
                 lotId: lots
               reads:
                 lots:
                     entity: lot
-                    where: $not(status = "fullyProcessed") and $not(status = "open")
+                    where: $not(status = "fullyProcessed") and $not(status = "open") and truckId = $stream.id
                     key: id
               schema:
                 type: object

@@ -143,9 +143,9 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 	if err != nil || provisional == nil {
 		t.Fatalf("addressed register: %v %#v", err, provisional)
 	}
-	// Prior truck still incomplete → Nuovo camion / provisional truckArrive off.
-	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "truckArrive", ""); err == nil {
-		t.Fatal("provisional truckArrive must deny while prior truck incomplete")
+	// Parallel trucks: Nuovo camion / provisional truckArrive stays available.
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "truckArrive", ""); err != nil {
+		t.Fatalf("provisional truckArrive while prior incomplete: %v", err)
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "truckArrive", truckID); err == nil {
 		t.Fatal("done truckArrive must be forbidden on addressed fetch")
