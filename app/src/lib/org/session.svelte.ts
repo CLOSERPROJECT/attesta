@@ -15,10 +15,7 @@ import {
 	type StorageLike
 } from './draft-storage.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
-import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
-import type { TaskFormPort, TaskFormRequest } from './task-form-port.js';
-import type { TaskFormBundle } from './form/task-form-bundle.js';
 import {
 	operatorFromLoad,
 	type OperatorIdentity
@@ -41,7 +38,6 @@ const defaultClock: DraftPersistClock = {
 export type OrgSessionOptions = {
 	load?: LoadDomainPort;
 	commit?: CommitDomainPort;
-	taskForm?: TaskFormPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
 	/** Injected storage (browser localStorage + memory fake). Default browser. */
@@ -57,7 +53,6 @@ type DraftIdentity = { org: string; userId: string };
 export class OrgSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
-	readonly taskFormPort: TaskFormPort;
 	readonly #storage: StorageLike | null;
 	readonly #debounceMs: number;
 	readonly #clock: DraftPersistClock;
@@ -78,7 +73,6 @@ export class OrgSession {
 	constructor(options: OrgSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
-		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 		this.#storage =
 			options.storage !== undefined ? options.storage : browserStorage();
 		this.#debounceMs = options.debounceMs ?? DEFAULT_DRAFT_DEBOUNCE_MS;
@@ -201,11 +195,6 @@ export class OrgSession {
 		} finally {
 			this.loading = false;
 		}
-	};
-
-	/** Addressed Task form hydrate; does not mutate home LoadResult bundles. */
-	fetchTaskForm = (req: TaskFormRequest): Promise<TaskFormBundle> => {
-		return this.taskFormPort.fetch(req);
 	};
 
 	/**
