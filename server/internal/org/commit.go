@@ -202,22 +202,6 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 
 	applied, err := applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, today, mintKind)
 	if err != nil {
-		var ce *CommitError
-		if errors.As(err, &ce) {
-			return CommitResult{}, ce
-		}
-		var te TransformError
-		if errors.As(err, &te) {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: te.Error()}
-		}
-		var ie InstanceExprError
-		if errors.As(err, &ie) {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: ie.Error()}
-		}
-		var me MutateError
-		if errors.As(err, &me) {
-			return CommitResult{}, &CommitError{Kind: "mutate", Message: me.Error()}
-		}
 		return CommitResult{}, err
 	}
 
@@ -324,109 +308,6 @@ func resolveDefaultCommitDestination(
 		return CommitNextTask, b, nil
 	}
 	return CommitNextHome, nil, nil
-}
-
-type appliedCommit struct {
-	Domain        Domain
-	JobInstanceID string
-	JobID         string
-	TaskID        string
-	Facts         map[string]any
-	Bindings      ExprBindings
-}
-
-func (a appliedCommit) submissionAddress() SubmissionAddress {
-	return SubmissionAddress{
-		JobID:         a.JobID,
-		JobInstanceID: a.JobInstanceID,
-		TaskID:        a.TaskID,
-	}
-}
-
-func applyConfigCommit(
-	domain Domain,
-	cfg OrgConfig,
-	job Job,
-	task map[string]any,
-	ref TaskPathRef,
-	jobInstanceID, userID string,
-	value map[string]any,
-	transform any,
-	ts, today string,
-	mintKind MintKind,
-) (appliedCommit, error) {
-	jobID := ref.JobID
-	taskID := ref.TaskID
-
-	var rowIDs []string
-	if needsRowProjection(task) {
-		ids, err := rowIDsForTask(domain, jobID, task, jobInstanceID, cfg.Catalogs)
-		if err != nil {
-			return appliedCommit{}, &CommitError{Kind: "prep", Message: err.Error()}
-		}
-		rowIDs = ids
-	}
-
-	prep, err := prepTaskSubmission(task, value, rowIDs)
-	if err != nil {
-		return appliedCommit{}, &CommitError{Kind: "prep", Message: err.Error()}
-	}
-
-	run, err := RunTransform(domain, RunTransformInput{
-		JobID:         jobID,
-		TaskID:        taskID,
-		JobInstanceID: jobInstanceID,
-		UserID:        userID,
-		Facts:         prep.Facts,
-		Transform:     transform,
-		Allowed:       EntityKindsFromConfig(cfg),
-		Catalogs:      cfg.Catalogs,
-		Today:         today,
-	})
-	if err != nil {
-		return appliedCommit{}, err
-	}
-
-	req := run.Request
-	req.Timestamp = ts
-	req.UserID = userID
-
-	resultInstanceID := jobInstanceID
-	if mintKind == MintKindStartingNew {
-		ids := OrderedTaskIDs(job.Tasks)
-		if len(ids) == 0 || ids[0] != taskID {
-			return appliedCommit{}, &CommitError{
-				Kind:    "prep",
-				Message: "mint.startingNew requires the first Task in Job order",
-			}
-		}
-		id, label, err := EvaluateJobInstanceExprs(job, prep.Facts, run.Bindings)
-		if err != nil {
-			return appliedCommit{}, err
-		}
-		if hasJobInstance(domain, jobID, id) {
-			return appliedCommit{}, &CommitError{
-				Kind:    "prep",
-				Message: fmt.Sprintf("job instance %s/%s already exists", jobID, id),
-			}
-		}
-		req.NewJobInstance = &JobInstance{JobID: jobID, ID: id, Label: label}
-		req.JobInstanceID = id
-		resultInstanceID = id
-	}
-
-	next, err := Mutate(domain, req)
-	if err != nil {
-		return appliedCommit{}, err
-	}
-	return appliedCommit{
-		Domain:        next,
-		JobInstanceID: resultInstanceID,
-		JobID:         jobID,
-		TaskID:        taskID,
-		Facts:         prep.Facts,
-		Bindings:      run.Bindings,
-	}, nil
 }
 
 func lookupLeafTask(cfg OrgConfig, ref TaskPathRef) (Job, map[string]any, error) {
