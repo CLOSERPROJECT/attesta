@@ -283,18 +283,45 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatal("lineLoad group must not remain on lot_processing")
 	}
 
+	if cfg.Stream == nil || cfg.Stream.Key != "recycling" || cfg.Stream.Instance.Job != "intake" {
+		t.Fatalf("stream = %#v, want recycling/intake", cfg.Stream)
+	}
+	if cfg.Stream.CategorySlug != "recycling-and-recovery" || cfg.Stream.SubCategorySlug != "flat-screen-displays" {
+		t.Fatalf("stream category = %#v", cfg.Stream)
+	}
+	if len(cfg.Stream.Steps) != 2 || cfg.Stream.Steps[1].Each == nil || cfg.Stream.Steps[1].Each.Entity != "lot" {
+		t.Fatalf("stream.steps = %#v", cfg.Stream.Steps)
+	}
+
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	body := string(raw)
-	for _, rejected := range []string{`"steps"`, `"substeps"`, `"stepId"`, `"substepId"`, `/api/runs`, `RunStore`, `LoadRunPort`} {
+	// stream.steps is authored; Job tree must speak jobs/tasks (not substeps).
+	for _, rejected := range []string{`"substeps"`, `"stepId"`, `"substepId"`, `/api/runs`, `RunStore`, `LoadRunPort`} {
 		if strings.Contains(body, rejected) {
 			t.Fatalf("serialized config still contains rejected token %q", rejected)
 		}
 	}
 	if !strings.Contains(body, `"jobs"`) || !strings.Contains(body, `"tasks"`) {
 		t.Fatalf("serialized config missing jobs/tasks: %s", body[:min(200, len(body))])
+	}
+}
+
+func TestLoadSecondStreamConfigFixture(t *testing.T) {
+	cfg, err := LoadSecondStreamConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Stream == nil || cfg.Stream.Key != "other" {
+		t.Fatalf("stream = %#v, want key other", cfg.Stream)
+	}
+	if cfg.Org != "second-org" {
+		t.Fatalf("org = %q", cfg.Org)
+	}
+	if _, ok := cfg.Jobs.Get("work"); !ok {
+		t.Fatal("missing work job")
 	}
 }
 

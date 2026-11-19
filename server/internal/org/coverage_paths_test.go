@@ -484,7 +484,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 
 	missingCfg := &API{
 		DomainLoader: &DomainLoader{Domains: NewMemoryDomainStore(), Configs: NewMemoryConfigStore()},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
 	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain", nil))
@@ -1041,6 +1041,13 @@ org: acme
 domain:
   entities:
     lot: {}
+stream:
+  key: mini
+  title: Mini
+  instance:
+    job: intake
+  steps:
+    - job: intake
 steps:
   intake:
     repeatable: true
@@ -1061,6 +1068,13 @@ steps:
 	// SeedFixtureConfigStore with missing org
 	noOrg, err := ParseFeragameConfigFixture([]byte(`
 id: mini
+stream:
+  key: mini
+  title: Mini
+  instance:
+    job: intake
+  steps:
+    - job: intake
 steps:
   intake:
     repeatable: true
@@ -1751,7 +1765,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	}
 	boomLoad := &API{
 		DomainLoader: &DomainLoader{Domains: &errDomainStore{err: errors.New("boom")}, Configs: configs},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec := httptest.NewRecorder()
 	boomLoad.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain", nil))

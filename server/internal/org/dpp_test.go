@@ -36,6 +36,7 @@ func syntheticDPPConfig() OrgConfig {
 		ID:      "passport-synth",
 		Org:     "synth",
 		Version: "v1",
+		Stream:  streamForAnchor("synth", "Synth", "issue"),
 		DPP: &DPPConfig{
 			Subject: DPPSubjectConfig{Entity: "widget"},
 			Identity: DPPIdentityConfig{
@@ -134,7 +135,7 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 	c := &TaskCommitter{
 		Domains:    domains,
 		Configs:    configs,
-		DPPs:  passports,
+		DPPs:       passports,
 		Authorizer: AllowAllAuthorizer{},
 		Now:        func() time.Time { return time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC) },
 	}

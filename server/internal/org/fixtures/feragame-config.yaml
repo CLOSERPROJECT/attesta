@@ -9,6 +9,20 @@
 
 id: feragame-config
 org: feragame
+stream:
+    key: recycling
+    title: Lavorazione rifiuti
+    description: Ingresso camion e lavorazione lotti
+    categorySlug: recycling-and-recovery
+    subCategorySlug: flat-screen-displays
+    instance:
+        job: intake
+    steps:
+        - job: intake
+        - job: lot_processing
+          each:
+              entity: lot
+              where: truckId = $stream.id
 domain:
     entities:
         truck:

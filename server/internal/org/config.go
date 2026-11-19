@@ -8,15 +8,16 @@ import (
 
 // OrgConfig is one Config version of the org's authored operating picture.
 type OrgConfig struct {
-	ID       string          `json:"id"`
-	Org      string          `json:"org,omitempty"`
-	Version  string          `json:"version"`
-	Domain   map[string]any  `json:"domain,omitempty"`
-	Catalogs map[string]any  `json:"catalogs,omitempty"`
-	QR       *QrConfig       `json:"qr,omitempty"`
-	DPP      *DPPConfig `json:"dpp,omitempty"`
-	Roles    []string        `json:"roles,omitempty"`
-	Jobs     OrderedObject   `json:"jobs"`
+	ID       string         `json:"id"`
+	Org      string         `json:"org,omitempty"`
+	Version  string         `json:"version"`
+	Domain   map[string]any `json:"domain,omitempty"`
+	Catalogs map[string]any `json:"catalogs,omitempty"`
+	QR       *QrConfig      `json:"qr,omitempty"`
+	DPP      *DPPConfig     `json:"dpp,omitempty"`
+	Stream   *StreamConfig  `json:"stream,omitempty"`
+	Roles    []string       `json:"roles,omitempty"`
+	Jobs     OrderedObject  `json:"jobs"`
 }
 
 // UnmarshalJSON decodes each Job from raw JSON so Jobs OrderedObject keeps
@@ -29,7 +30,8 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 		Domain   map[string]any  `json:"domain,omitempty"`
 		Catalogs map[string]any  `json:"catalogs,omitempty"`
 		QR       *QrConfig       `json:"qr,omitempty"`
-		DPP      *DPPConfig `json:"dpp,omitempty"`
+		DPP      *DPPConfig      `json:"dpp,omitempty"`
+		Stream   *StreamConfig   `json:"stream,omitempty"`
 		Roles    []string        `json:"roles,omitempty"`
 		Jobs     json.RawMessage `json:"jobs"`
 	}
@@ -47,6 +49,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 	c.Catalogs = wire.Catalogs
 	c.QR = wire.QR
 	c.DPP = wire.DPP
+	c.Stream = wire.Stream
 	c.Roles = wire.Roles
 	c.Jobs = jobs
 	return nil
@@ -136,11 +139,11 @@ func normalizeOrgConfigJobs(cfg *OrgConfig) {
 
 // Job is a top-level authored chapter (intake, line, …).
 type Job struct {
-	Repeatable bool         `json:"repeatable"`
-	InstanceID string       `json:"instanceId"`
-	Label      string       `json:"label"`
-	Title      string       `json:"title,omitempty"`
-	StartLabel string       `json:"startLabel,omitempty"`
+	Repeatable bool   `json:"repeatable"`
+	InstanceID string `json:"instanceId"`
+	Label      string `json:"label"`
+	Title      string `json:"title,omitempty"`
+	StartLabel string `json:"startLabel,omitempty"`
 	// Color is optional board chrome (CSS color) for Job card left border.
 	Color      string       `json:"color,omitempty"`
 	StartsWhen *StartsWhen  `json:"startsWhen,omitempty"`
