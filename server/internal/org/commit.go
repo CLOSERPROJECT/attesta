@@ -87,7 +87,7 @@ type TaskCommitter struct {
 	Domains    DomainStore
 	Configs    ConfigStore
 	Authorizer Authorizer
-	// HttpPort runs onSubmit.http after DomainStore.Put. Nil is always a no-op
+	// HttpPort runs onSubmit.http after the Domain write. Nil is always a no-op
 	// (no links/errors) even when the Task declares effects; product uses SidecarHttpPort or soft-fail.
 	HttpPort HttpPort
 	// SubmitBindings are ops/runtime JSONata vars merged into onSubmit.http evaluation
@@ -166,32 +166,6 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	}
 	wantsPassport := taskOnSubmitDPP(task)
 
-	domain, err := c.Domains.Get(ctx, org)
-	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			return CommitResult{}, err
-		}
-		domain = EmptyDomain()
-	}
-
-	allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
-		Operator:      op,
-		Org:           org,
-		TaskPath:      taskPath,
-		JobID:         ref.JobID,
-		TaskID:        ref.TaskID,
-		JobInstanceID: jobInstanceID,
-		RolesAllowed:  rolesAllowedForPath(cfg, ref),
-		SequenceOk:    sequenceOkForPath(cfg, domain, ref, jobInstanceID),
-		ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID, cfg.Catalogs),
-	})
-	if err != nil {
-		return CommitResult{}, err
-	}
-	if !allowed {
-		return CommitResult{}, &CommitError{Kind: "unauthorized"}
-	}
-
 	now := c.Now
 	if now == nil {
 		now = time.Now
@@ -200,24 +174,47 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	ts := clock.Format(time.RFC3339Nano)
 	today := clock.Format("2006-01-02")
 
-	applied, err := applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, today, mintKind)
+	// Gates are re-evaluated on each retry so a concurrent Commit cannot slip past readyWhen.
+	var applied appliedCommit
+	_, err = c.Domains.Update(ctx, org, func(domain Domain) (Domain, error) {
+		allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
+			Operator:      op,
+			Org:           org,
+			TaskPath:      taskPath,
+			JobID:         ref.JobID,
+			TaskID:        ref.TaskID,
+			JobInstanceID: jobInstanceID,
+			RolesAllowed:  rolesAllowedForPath(cfg, ref),
+			SequenceOk:    sequenceOkForPath(cfg, domain, ref, jobInstanceID),
+			ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID, cfg.Catalogs),
+		})
+		if err != nil {
+			return Domain{}, err
+		}
+		if !allowed {
+			return Domain{}, &CommitError{Kind: "unauthorized"}
+		}
+		applied, err = applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, today, mintKind)
+		if err != nil {
+			return Domain{}, err
+		}
+		if wantsPassport {
+			if c.DPPs == nil {
+				return Domain{}, &CommitError{Kind: "prep", Message: "passport store not configured"}
+			}
+			// Fail closed before the Domain write so a second lock does not rewrite Domain then error.
+			if _, err := c.DPPs.Get(ctx, org, applied.JobInstanceID); err == nil {
+				return Domain{}, &CommitError{Kind: "passport-exists", Message: "passport already issued for subject"}
+			} else if !errors.Is(err, ErrNotFound) {
+				return Domain{}, err
+			}
+		}
+		return applied.Domain, nil
+	})
+	if errors.Is(err, ErrDomainConflict) {
+		return CommitResult{}, &CommitError{Kind: "conflict", Message: "the data changed while saving; please retry"}
+	}
 	if err != nil {
-		return CommitResult{}, err
-	}
-
-	if wantsPassport {
-		if c.DPPs == nil {
-			return CommitResult{}, &CommitError{Kind: "prep", Message: "passport store not configured"}
-		}
-		// Fail closed before Domain Put so a second lock does not rewrite Domain then error.
-		if _, err := c.DPPs.Get(ctx, org, applied.JobInstanceID); err == nil {
-			return CommitResult{}, &CommitError{Kind: "passport-exists", Message: "passport already issued for subject"}
-		} else if !errors.Is(err, ErrNotFound) {
-			return CommitResult{}, err
-		}
-	}
-
-	if err := c.Domains.Put(ctx, org, applied.Domain); err != nil {
 		return CommitResult{}, err
 	}
 

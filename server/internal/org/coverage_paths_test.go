@@ -1211,6 +1211,9 @@ type errDomainStore struct{ err error }
 
 func (e *errDomainStore) Get(context.Context, string) (Domain, error) { return Domain{}, e.err }
 func (e *errDomainStore) Put(context.Context, string, Domain) error   { return e.err }
+func (e *errDomainStore) Update(context.Context, string, func(Domain) (Domain, error)) (Domain, error) {
+	return Domain{}, e.err
+}
 
 func TestChromeCompileHelpersAndSequenceEdges(t *testing.T) {
 	rules := readChromeRules(map[string]any{

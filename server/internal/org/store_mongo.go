@@ -18,6 +18,8 @@ const (
 	collectionOrgActiveConfig = "org_active_config"
 )
 
+const maxDomainUpdateAttempts = 5
+
 var (
 	_ DomainStore = (*MongoDomainStore)(nil)
 	_ ConfigStore = (*MongoConfigStore)(nil)
@@ -37,6 +39,8 @@ type mongoDomainDoc struct {
 	Entities     map[string]map[string]map[string]any `bson:"entities"`
 	Submissions  []mongoSubmissionDoc                 `bson:"submissions"`
 	JobInstances []JobInstance                        `bson:"jobInstances"`
+	// Bumped on every write; Update compares it to detect concurrent writers.
+	Revision int64 `bson:"revision"`
 }
 
 type mongoSubmissionDoc struct {
@@ -58,15 +62,23 @@ func (s *MongoDomainStore) Get(ctx context.Context, org string) (Domain, error) 
 	if org == "" {
 		return EmptyDomain(), ErrNotFound
 	}
+	doc, err := s.find(ctx, org)
+	if err != nil {
+		return EmptyDomain(), err
+	}
+	return domainFromMongoDoc(doc), nil
+}
+
+func (s *MongoDomainStore) find(ctx context.Context, org string) (mongoDomainDoc, error) {
 	var doc mongoDomainDoc
 	err := s.coll().FindOne(ctx, bson.M{"_id": org}).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return EmptyDomain(), ErrNotFound
+		return mongoDomainDoc{}, ErrNotFound
 	}
 	if err != nil {
-		return EmptyDomain(), fmt.Errorf("org mongo domain get: %w", err)
+		return mongoDomainDoc{}, fmt.Errorf("org mongo domain get: %w", err)
 	}
-	return domainFromMongoDoc(doc), nil
+	return doc, nil
 }
 
 func (s *MongoDomainStore) Put(ctx context.Context, org string, domain Domain) error {
@@ -74,12 +86,67 @@ func (s *MongoDomainStore) Put(ctx context.Context, org string, domain Domain) e
 	if org == "" {
 		return fmt.Errorf("org mongo domain put: org required")
 	}
-	doc := domainToMongoDoc(org, domain)
-	_, err := s.coll().ReplaceOne(ctx, bson.M{"_id": org}, doc, options.Replace().SetUpsert(true))
+	_, err := s.coll().UpdateOne(ctx, bson.M{"_id": org}, domainWriteUpdate(org, domain), options.Update().SetUpsert(true))
 	if err != nil {
 		return fmt.Errorf("org mongo domain put: %w", err)
 	}
 	return nil
+}
+
+func (s *MongoDomainStore) Update(ctx context.Context, org string, fn func(Domain) (Domain, error)) (Domain, error) {
+	org = strings.TrimSpace(org)
+	if org == "" {
+		return Domain{}, fmt.Errorf("org mongo domain update: org required")
+	}
+	for range maxDomainUpdateAttempts {
+		doc, err := s.find(ctx, org)
+		missing := errors.Is(err, ErrNotFound)
+		if err != nil && !missing {
+			return Domain{}, err
+		}
+		current := EmptyDomain()
+		if !missing {
+			current = domainFromMongoDoc(doc)
+		}
+		next, err := fn(current)
+		if err != nil {
+			return Domain{}, err
+		}
+		// Upsert only when the doc was missing: a concurrent insert then trips the _id unique index.
+		res, err := s.coll().UpdateOne(ctx, domainRevisionFilter(org, doc.Revision), domainWriteUpdate(org, next), options.Update().SetUpsert(missing))
+		if mongo.IsDuplicateKeyError(err) {
+			continue
+		}
+		if err != nil {
+			return Domain{}, fmt.Errorf("org mongo domain update: %w", err)
+		}
+		if res.MatchedCount == 0 && res.UpsertedCount == 0 {
+			continue
+		}
+		return next, nil
+	}
+	return Domain{}, ErrDomainConflict
+}
+
+// domainRevisionFilter treats a missing revision field (docs written before
+// revisions existed) as revision 0.
+func domainRevisionFilter(org string, revision int64) bson.M {
+	if revision == 0 {
+		return bson.M{"_id": org, "revision": bson.M{"$in": bson.A{int64(0), nil}}}
+	}
+	return bson.M{"_id": org, "revision": revision}
+}
+
+func domainWriteUpdate(org string, domain Domain) bson.M {
+	doc := domainToMongoDoc(org, domain)
+	return bson.M{
+		"$set": bson.M{
+			"entities":     doc.Entities,
+			"submissions":  doc.Submissions,
+			"jobInstances": doc.JobInstances,
+		},
+		"$inc": bson.M{"revision": int64(1)},
+	}
 }
 
 // MongoConfigStore persists versioned Org Config documents and Active Config pointers.

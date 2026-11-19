@@ -20,7 +20,7 @@ _Avoid_: Implied “latest file on disk” without an org pointer
 **Domain**: The Organization’s accumulating facts: entities with stable ids plus append-only submission history. One Domain per org.\
 _Avoid_: One Domain per whole-config execution; Stream instance; Process progress bag
 
-**Domain store**: The persistence of Domain (entities + submit entries).\
+**Domain store**: The persistence of Domain (entities + submit entries). Commit writes are optimistic: a `revision` on the Domain document makes a concurrent write retry the Commit's gates instead of overwriting it.\
 _Avoid_: Forms writing entities directly
 
 ### Jobs and tasks

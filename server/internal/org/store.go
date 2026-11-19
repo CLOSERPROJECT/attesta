@@ -9,7 +9,13 @@ import (
 // DomainStore persists the org Domain document.
 type DomainStore interface {
 	Get(ctx context.Context, org string) (Domain, error)
+	// Put overwrites unconditionally (seeds, wipes). Commit-path writes use Update.
 	Put(ctx context.Context, org string, domain Domain) error
+	// Update runs fn on the current Domain (EmptyDomain when missing) and writes
+	// its result only if no other write landed in between. fn may run more than
+	// once and must not have side effects; its error is returned unchanged.
+	// Returns ErrDomainConflict when retries are exhausted.
+	Update(ctx context.Context, org string, fn func(Domain) (Domain, error)) (Domain, error)
 }
 
 // ConfigStore persists versioned Org Config documents and the Active Config version pointer.
@@ -22,6 +28,8 @@ type ConfigStore interface {
 
 // ErrNotFound is returned when a Domain or Org Config document is missing.
 var ErrNotFound = fmt.Errorf("org: not found")
+
+var ErrDomainConflict = fmt.Errorf("org: domain changed concurrently")
 
 // MemoryDomainStore is an in-memory DomainStore.
 type MemoryDomainStore struct {
@@ -48,6 +56,21 @@ func (s *MemoryDomainStore) Put(_ context.Context, org string, domain Domain) er
 	defer s.mu.Unlock()
 	s.byOrg[org] = cloneDomain(domain)
 	return nil
+}
+
+func (s *MemoryDomainStore) Update(_ context.Context, org string, fn func(Domain) (Domain, error)) (Domain, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.byOrg[org]
+	if !ok {
+		current = EmptyDomain()
+	}
+	next, err := fn(cloneDomain(current))
+	if err != nil {
+		return Domain{}, err
+	}
+	s.byOrg[org] = cloneDomain(next)
+	return next, nil
 }
 
 // MemoryConfigStore is an in-memory ConfigStore.

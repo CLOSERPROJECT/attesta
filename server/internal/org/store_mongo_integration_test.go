@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -193,6 +195,135 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	}
 	if active != DefaultFixtureVersion {
 		t.Fatalf("active = %q", active)
+	}
+}
+
+func appendSubmission(id string) func(Domain) (Domain, error) {
+	return func(d Domain) (Domain, error) {
+		d.Submissions = append(d.Submissions, Submission{JobID: "j", TaskID: "t", JobInstanceID: id})
+		return d, nil
+	}
+}
+
+func TestMongoDomainUpdateConcurrentAppendsAllLand(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	domains := NewMongoDomainStore(db)
+	org := "mongo-update-concurrent"
+
+	// Fewer writers than maxDomainUpdateAttempts so a fair retry loop cannot exhaust.
+	const n = maxDomainUpdateAttempts
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := domains.Update(ctx, org, appendSubmission(string(rune('a'+i)))); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	got, err := domains.Get(ctx, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Submissions) != n {
+		t.Fatalf("submissions = %d, want %d", len(got.Submissions), n)
+	}
+}
+
+func TestMongoDomainUpdateLegacyDocWithoutRevision(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	domains := NewMongoDomainStore(db)
+	org := "mongo-update-legacy"
+
+	_, err := db.Collection(collectionOrgDomains).InsertOne(ctx, bson.M{
+		"_id":          org,
+		"entities":     bson.M{"lot": bson.M{"L1": bson.M{"client": "NO"}}},
+		"submissions":  bson.A{},
+		"jobInstances": bson.A{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"a", "b"} {
+		if _, err := domains.Update(ctx, org, appendSubmission(id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := domains.Get(ctx, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Submissions) != 2 || got.Kind("lot")["L1"]["client"] != "NO" {
+		t.Fatalf("domain = %#v", got)
+	}
+	var raw struct {
+		Revision int64 `bson:"revision"`
+	}
+	if err := db.Collection(collectionOrgDomains).FindOne(ctx, bson.M{"_id": org}).Decode(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw.Revision != 2 {
+		t.Fatalf("revision = %d, want 2", raw.Revision)
+	}
+}
+
+func TestMongoDomainPutBumpsRevisionSoStaleUpdateRetries(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	domains := NewMongoDomainStore(db)
+	org := "mongo-update-stale"
+
+	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	_, err := domains.Update(ctx, org, func(d Domain) (Domain, error) {
+		calls++
+		if calls == 1 {
+			// Lands between this Update's read and its conditional write.
+			if err := domains.Put(ctx, org, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return appendSubmission("a")(d)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("fn calls = %d, want 2 (stale attempt retried)", calls)
+	}
+	got, err := domains.Get(ctx, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("lot")["L1"]["client"] != "NO" || len(got.Submissions) != 1 {
+		t.Fatalf("retry must build on the Put: %#v", got)
+	}
+}
+
+func TestMongoDomainUpdateConflictWhenRetriesExhausted(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	domains := NewMongoDomainStore(db)
+	org := "mongo-update-exhausted"
+
+	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+		t.Fatal(err)
+	}
+	_, err := domains.Update(ctx, org, func(d Domain) (Domain, error) {
+		if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+			t.Fatal(err)
+		}
+		return d, nil
+	})
+	if !errors.Is(err, ErrDomainConflict) {
+		t.Fatalf("err = %v, want ErrDomainConflict", err)
 	}
 }
 

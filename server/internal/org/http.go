@@ -363,7 +363,7 @@ func writeCommitError(w http.ResponseWriter, err error) {
 			http.Error(w, ce.Message, http.StatusBadRequest)
 		case "forbidden":
 			http.Error(w, ce.Message, http.StatusForbidden)
-		case "mutate", "passport-exists":
+		case "mutate", "passport-exists", "conflict":
 			http.Error(w, ce.Message, http.StatusConflict)
 		default:
 			http.Error(w, "commit failed", http.StatusInternalServerError)
