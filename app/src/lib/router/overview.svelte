@@ -9,8 +9,8 @@
 	import OverviewRowChrome from '../org/overview-row-chrome.svelte';
 	import TaskRecapPanel from '../org/task-recap-panel.svelte';
 	import { orgSession } from '../org/org-app.svelte.js';
+	import { isProvisionalJobInstance } from '../org/task-address.js';
 	import type { TaskStatus, TaskSubmit } from '../org/types.js';
-	import { PROVISIONAL_JOB_INSTANCE_ID } from '../org/types.js';
 	import {
 		formatHandoffCopy,
 		jobInstanceOverview
@@ -51,7 +51,7 @@
 
 	$effect(() => {
 		const id = jobInstanceId;
-		if (id === PROVISIONAL_JOB_INSTANCE_ID || id === '') {
+		if (isProvisionalJobInstance(id)) {
 			navigate('/');
 			return;
 		}

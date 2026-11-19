@@ -6,18 +6,21 @@
 	import TaskForm from '../org/task-form.svelte';
 	import { orgSession } from '../org/org-app.svelte.js';
 	import { orgRouteCoordsFromPath } from '../org/nav-place.js';
+	import {
+		normalizeTaskAddress,
+		taskAddressKey
+	} from '../org/task-address.js';
 	import { taskFormMount } from '../org/task-form-mount.svelte.js';
 	import { resolveCommitFollowUp, resolveContinueNavigation } from '../org/worklist-nav.js';
 	import { route } from './index.js';
 	import { navigateOrgTarget } from './navigate-target.js';
 
 	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
-	const jobId = $derived(coords.jobId);
-	const taskId = $derived(coords.taskId);
-	const routeInstance = $derived(coords.jobInstanceId);
-	const provisionalJob = $derived(routeInstance === '' || routeInstance === 'new');
-	const jobInstanceId = $derived(provisionalJob ? '' : routeInstance);
-	const routeKey = $derived(`${jobId}|${routeInstance}|${taskId}`);
+	const addr = $derived(normalizeTaskAddress(coords));
+	const jobId = $derived(addr.jobId);
+	const taskId = $derived(addr.taskId);
+	const jobInstanceId = $derived(addr.jobInstanceId);
+	const routeKey = $derived(taskAddressKey(addr));
 
 	const status = $derived(taskFormMount.status);
 	const bundle = $derived(taskFormMount.bundle);
@@ -63,11 +66,9 @@
 			outcome.nextTaskFormBundle
 		);
 		endLinksStay();
-		const normInstance = (id: string) => (id === '' || id === 'new' ? '' : id);
 		const sameTaskAddress =
 			target.kind === 'task' &&
-			`${target.jobId}|${normInstance(target.jobInstanceId)}|${target.taskId}` ===
-				`${jobId}|${normInstance(routeInstance)}|${taskId}`;
+			taskAddressKey(normalizeTaskAddress(target)) === routeKey;
 		if (sameTaskAddress) {
 			await taskFormMount.reload(orgSession.result?.worklist);
 			return;

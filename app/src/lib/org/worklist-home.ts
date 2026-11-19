@@ -235,10 +235,7 @@ export function completedRowsFromWorklist(
 	return out;
 }
 
-/** SPA Task path segment: provisional Start uses `new`. */
-export function taskRouteInstanceSegment(jobInstanceId: string): string {
-	return jobInstanceId === '' ? 'new' : jobInstanceId;
-}
+export { taskRouteInstanceSegment } from './task-address.js';
 
 export function availableRowKey(row: AvailableRow): string {
 	return `${row.jobId}/${row.jobInstanceId}/${row.taskId}`;

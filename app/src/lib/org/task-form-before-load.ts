@@ -1,4 +1,5 @@
 import { orgRouteCoordsFromPath } from './nav-place.js';
+import { normalizeTaskAddress } from './task-address.js';
 import type { TaskFormMount } from './task-form-mount.svelte.js';
 import type { Worklist } from './types.js';
 import type { TaskDeepLinkTarget } from './worklist-nav.js';
@@ -65,24 +66,12 @@ export async function runTaskFormBeforeLoad(
 	deps: TaskFormBeforeLoadDeps
 ): Promise<void> {
 	const coords = orgRouteCoordsFromPath({ pathname });
-	const jobId = coords.jobId;
-	const taskId = coords.taskId;
-	const routeInstance = coords.jobInstanceId;
-	const provisionalJob = routeInstance === '' || routeInstance === 'new';
-	const jobInstanceId = provisionalJob ? '' : routeInstance;
+	const addr = normalizeTaskAddress(coords);
 
 	const awaitWorklist = deps.awaitWorklist ?? awaitOrgSessionWorklist;
 	const worklist = await awaitWorklist(deps.session);
 
-	const result = await deps.mount.load(
-		{
-			jobId,
-			taskId,
-			jobInstanceId,
-			provisionalJob
-		},
-		worklist
-	);
+	const result = await deps.mount.load(addr, worklist);
 
 	if (result.kind === 'denied') {
 		throw deps.navigateRedirect(result.redirect);

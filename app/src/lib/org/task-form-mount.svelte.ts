@@ -1,5 +1,10 @@
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { createHttpTaskFormPort } from './http-task-form-port.js';
+import {
+	taskAddressKey,
+	wireJobInstanceId,
+	type TaskAddress
+} from './task-address.js';
 import type { TaskFormPort } from './task-form-port.js';
 import type { Worklist } from './types.js';
 import {
@@ -7,14 +12,7 @@ import {
 	type TaskDeepLinkTarget
 } from './worklist-nav.js';
 
-/** Address for Task form hydrate (aligns with task.svelte route coords). */
-export type TaskFormAddress = {
-	jobId: string;
-	taskId: string;
-	/** Empty when provisionalJob; URL segment `new` is normalized before load. */
-	jobInstanceId: string;
-	provisionalJob: boolean;
-};
+export type TaskFormAddress = TaskAddress;
 
 export type TaskFormMountStatus = 'idle' | 'loading' | 'ready' | 'denied' | 'error';
 
@@ -28,10 +26,7 @@ export type TaskFormMountOptions = {
 	taskForm?: TaskFormPort;
 };
 
-export function taskFormAddressKey(addr: TaskFormAddress): string {
-	const instance = addr.provisionalJob ? 'new' : addr.jobInstanceId;
-	return `${addr.jobId}|${instance}|${addr.taskId}`;
-}
+export const taskFormAddressKey = taskAddressKey;
 
 /**
  * Address-owned Task form slot. Gates via resolveTaskDeepLink, fetches via
@@ -93,7 +88,7 @@ export class TaskFormMount {
 			const next = await this.taskFormPort.fetch({
 				jobId: addr.jobId,
 				taskId: addr.taskId,
-				jobInstanceId: addr.provisionalJob ? 'new' : addr.jobInstanceId
+				jobInstanceId: wireJobInstanceId(addr)
 			});
 			if (gen !== this.#gen || ac.signal.aborted) return { kind: 'aborted' };
 			this.bundle = next;
