@@ -20,14 +20,16 @@
             {{ end }}
           </div>
           <div class="page-header-actions">
-            <button
-              class="btn btn-secondary"
-              type="button"
-              onclick="document.getElementById('stream-preview-dialog').showModal()"
-            >
-              {{ template "icon-eye" . }}
-              View preview
-            </button>
+            {{ if .ShowPreview }}
+              <button
+                class="btn btn-secondary"
+                type="button"
+                onclick="document.getElementById('stream-preview-dialog').showModal()"
+              >
+                {{ template "icon-eye" . }}
+                View preview
+              </button>
+            {{ end }}
             {{ if .Start }}
               {{ template "start_stream_instance" .Start }}
             {{ end }}
@@ -45,28 +47,30 @@
         <div class="error-detail">{{ .Error }}</div>
       </div>
     {{ else }}
-      <dialog id="stream-preview-dialog" class="dialog">
-        <div class="dialog-card">
-          <header class="dialog-head">
-            <div>
-              <h3 class="dialog-title">Stream preview</h3>
-              <p class="dialog-subtitle">
-                Inspect the stream timeline and form structure in read-only mode
-              </p>
+      {{ if .ShowPreview }}
+        <dialog id="stream-preview-dialog" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
+              <div>
+                <h3 class="dialog-title">Stream preview</h3>
+                <p class="dialog-subtitle">
+                  Inspect the stream timeline and form structure in read-only mode
+                </p>
+              </div>
+              <button
+                type="button"
+                class="btn btn-ghost btn-icon dialog-close"
+                onclick="document.getElementById('stream-preview-dialog').close()"
+              >
+                {{ template "icon-close" . }}
+              </button>
+            </header>
+            <div class="stream-preview-body">
+              {{ template "stream_timeline" .Preview.StreamTimeline }}
             </div>
-            <button
-              type="button"
-              class="btn btn-ghost btn-icon dialog-close"
-              onclick="document.getElementById('stream-preview-dialog').close()"
-            >
-              {{ template "icon-close" . }}
-            </button>
-          </header>
-          <div class="stream-preview-body">
-            {{ template "stream_timeline" .Preview.StreamTimeline }}
           </div>
-        </div>
-      </dialog>
+        </dialog>
+      {{ end }}
 
       {{ template "stream_dashboard_results" . }}
     {{ end }}

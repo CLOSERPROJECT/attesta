@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"strings"
 )
 
@@ -231,8 +232,10 @@ func (s *Server) buildDiscoveryManagedCards(ctx context.Context, user *AccountUs
 	if len(items) == 0 {
 		return nil, nil
 	}
-	catalog, err := s.workflowCatalog()
-	if err != nil {
+	catalog := map[string]RuntimeConfig{}
+	if loaded, err := s.workflowCatalog(); err == nil {
+		catalog = loaded
+	} else if !errors.Is(err, errFormataWorkflowCatalogEmpty) {
 		return nil, err
 	}
 	logoURLs := organizationLogoURLMap(ctx, s.identity)
@@ -260,6 +263,32 @@ func (s *Server) buildDiscoveryManagedCards(ctx context.Context, user *AccountUs
 
 	cards := make([]ManagedPublicStreamCardView, 0, len(items))
 	for _, item := range items {
+		if streamKey, isOrg := parseOrgCatalogKey(item.WorkflowKey); isOrg {
+			orgCfg, resolveErr := s.orgRuntimeConfigForUser(ctx, user, streamKey)
+			if resolveErr != nil {
+				continue
+			}
+			card, buildErr := s.buildOrgPublicStreamCardView(ctx, user, item.WorkflowKey, orgCfg)
+			if buildErr != nil {
+				return nil, buildErr
+			}
+			href := strings.TrimSpace(item.Href)
+			if href == "" {
+				href = streamPath(item.WorkflowKey) + "/"
+			}
+			card.Href = href
+			managed := ManagedPublicStreamCardView{
+				Key:         item.WorkflowKey,
+				Card:        card,
+				Startable:   item.Startable,
+				StartAction: item.StartAction,
+				ReturnPath:  returnPath,
+				StartDirect: true,
+			}
+			cards = append(cards, managed)
+			continue
+		}
+
 		cfg, ok := catalog[item.WorkflowKey]
 		if !ok {
 			continue

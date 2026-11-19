@@ -34,6 +34,8 @@ type StartStreamInstanceView struct {
 	StartAction string
 	ReturnPath  string
 	CardTrigger bool
+	// Direct skips the name dialog (Org Play → POST then redirect to /app/{stream}/new).
+	Direct bool
 }
 
 // ManagedPublicStreamCardView wraps a public stream card with optional /my management actions.
@@ -50,6 +52,7 @@ type ManagedPublicStreamCardView struct {
 	Startable         bool
 	StartAction       string
 	ReturnPath        string
+	StartDirect       bool
 }
 
 // StreamTaxonomyOptionView is one option in a taxonomy filter select.
