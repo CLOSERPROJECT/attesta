@@ -181,7 +181,7 @@ describe('Task deep link + exit', () => {
 			jobInstanceId: 'NIR-advance',
 			taskId: 'codiceFir'
 		});
-		expect(resolveCommitFollowUp('home', 'passport', 'L1', null)).toEqual({
+		expect(resolveCommitFollowUp('home', 'lot_processing', 'L1', null)).toEqual({
 			kind: 'home'
 		});
 	});

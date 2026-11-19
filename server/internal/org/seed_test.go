@@ -417,17 +417,19 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 		t.Fatalf("logistic must not see weightCheck: %#v", logRefs)
 	}
 
-	adminPassport, _ := worklistJobByID(admin.Worklist, "passport")
-	if !adminPassport.CanStart || adminPassport.StartLabel != "Emetti DPP" {
-		t.Fatalf("administration passport CanStart = %#v, want true + Emetti DPP", adminPassport)
+	for _, lotID := range []string{SeedLoadCOID, SeedLoadDAID} {
+		if !hasActionableRef(adminRefs, "lot_processing", "lock", lotID) {
+			t.Fatalf("administration must see lot_processing/lock on %s: %#v", lotID, adminRefs)
+		}
+		if hasActionableRef(logRefs, "lot_processing", "lock", lotID) {
+			t.Fatalf("logistic must not see lock: %#v", logRefs)
+		}
+		if hasActionableRef(lineRefs, "lot_processing", "lock", lotID) {
+			t.Fatalf("line must not see lock: %#v", lineRefs)
+		}
 	}
-	logPassport, _ := worklistJobByID(logistic.Worklist, "passport")
-	linePassport, _ := worklistJobByID(line.Worklist, "passport")
-	if logPassport.CanStart {
-		t.Fatal("logistic canStart passport want false")
-	}
-	if linePassport.CanStart {
-		t.Fatal("line canStart passport want false")
+	if _, ok := worklistJobByID(admin.Worklist, "passport"); ok {
+		t.Fatal("passport Job must not appear on Worklist")
 	}
 
 	adminIntake, _ := worklistJobByID(admin.Worklist, "intake")
@@ -581,8 +583,13 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 			t.Fatalf("lot %s must not be passport-locked", loadID)
 		}
 	}
-	passport, ok := worklistJobByID(wl, "passport")
-	if !ok || !passport.CanStart {
-		t.Fatalf("passport CanStart = %#v, want true with two eligible loads", passport)
+	if _, ok := worklistJobByID(wl, "passport"); ok {
+		t.Fatal("passport Job must not appear on Worklist")
+	}
+	refs := CollectActionableTaskRefs(cfg, wl)
+	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
+		if !hasActionableRef(refs, "lot_processing", "lock", loadID) {
+			t.Fatalf("lot_processing/lock must be actionable on %s: %#v", loadID, refs)
+		}
 	}
 }

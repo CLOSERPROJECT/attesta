@@ -10,13 +10,14 @@ import {
 	type Worklist
 } from './types.js';
 
-/** Live lot_processing Task ids — flattened peer many-submit + lot session. */
+/** Live lot_processing Task ids — flattened peer many-submit + lot session + DPP lock. */
 const lotProcessingTaskIds = [
 	'startLot',
 	'weigh',
 	'markProgress',
 	'containerReg',
-	'closeLot'
+	'closeLot',
+	'lock'
 ];
 
 type TaskStatus = 'unavailable' | 'available' | 'actionable' | 'done';
@@ -73,7 +74,8 @@ function worklistFor(domain: Domain, canStartLotProcessing: boolean): Worklist {
 		weigh: 'unavailable',
 		markProgress: 'unavailable',
 		containerReg: 'unavailable',
-		closeLot: 'unavailable'
+		closeLot: 'unavailable',
+		lock: 'unavailable'
 	};
 	const openLot = Object.values(domain.lot ?? {}).some((lot) => lot?.status === 'open');
 	const openLotIds = new Set(
@@ -93,6 +95,11 @@ function worklistFor(domain: Domain, canStartLotProcessing: boolean): Worklist {
 		openLot && hasWeightedUnfinishedPallet ? 'actionable' : 'unavailable';
 	tasks.containerReg = openLot ? 'actionable' : 'unavailable';
 	tasks.closeLot = 'unavailable';
+	const lotFacts = domain.lot?.[lotInst.id] as Record<string, unknown> | undefined;
+	tasks.lock =
+		lotFacts?.status === 'fullyProcessed' && lotFacts?.locked !== true
+			? 'actionable'
+			: 'unavailable';
 
 	return {
 		jobs: [

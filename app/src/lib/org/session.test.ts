@@ -341,7 +341,7 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		await session.commit({
-			taskPath: 'passport/lock',
+			taskPath: 'lot_processing/lock',
 			jobInstanceId: 'L1',
 			value: { ack: true },
 			mint: { kind: 'none' }
@@ -372,7 +372,7 @@ describe('OrgSession', () => {
 		});
 		staySession.result = structuredClone(sample);
 		const outcome = await staySession.commit({
-			taskPath: 'passport/lock',
+			taskPath: 'lot_processing/lock',
 			jobInstanceId: 'L1',
 			value: { ack: true },
 			mint: { kind: 'none' }

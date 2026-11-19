@@ -139,19 +139,27 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	}
 	wl, _ := wire["worklist"].(map[string]any)
 	jobs, _ := wl["jobs"].([]any)
-	if len(jobs) != 3 {
-		t.Fatalf("worklist jobs = %#v, want 3 (intake lot_processing passport)", wl)
+	if len(jobs) != 2 {
+		t.Fatalf("worklist jobs = %#v, want 2 (intake lot_processing)", wl)
 	}
-	wantIDs := []string{"intake", "lot_processing", "passport"}
+	wantIDs := []string{"intake", "lot_processing"}
 	for i, raw := range jobs {
 		job, _ := raw.(map[string]any)
 		if job["jobId"] != wantIDs[i] {
 			t.Fatalf("jobs[%d].jobId = %#v, want %q; worklist=%#v", i, job["jobId"], wantIDs[i], wl)
 		}
 	}
-	passportJob, _ := jobs[2].(map[string]any)
-	if passportJob["startLabel"] != "Emetti DPP" {
-		t.Fatalf("passport job = %#v", passportJob)
+	lpJob, _ := jobs[1].(map[string]any)
+	taskIDs, _ := lpJob["taskIds"].([]any)
+	var hasLock bool
+	for _, id := range taskIDs {
+		if id == "lock" {
+			hasLock = true
+			break
+		}
+	}
+	if !hasLock {
+		t.Fatalf("lot_processing taskIds = %#v, want lock", taskIDs)
 	}
 }
 

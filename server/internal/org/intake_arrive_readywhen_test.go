@@ -155,33 +155,38 @@ func TestLotProcessingChildrenReadyWhenCoverStartLot(t *testing.T) {
 	}
 }
 
-func TestPassportLockReadyWhenRequiresSelectSubmission(t *testing.T) {
+func TestLotProcessingLockReadyWhenGatesOnFullyProcessedUnlocked(t *testing.T) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := cfg.Jobs.Values["passport"].(Job)
+	job := cfg.Jobs.Values["lot_processing"].(Job)
 	lock, ok := TaskByID(job.Tasks, "lock")
 	if !ok {
 		t.Fatal("lock missing")
 	}
 	rw, _ := lock["readyWhen"].(string)
-	if !strings.Contains(rw, `taskId = "select"`) {
-		t.Fatalf("lock readyWhen = %q, want select Submission gate", rw)
+	if strings.Contains(rw, "select") || strings.Contains(rw, "submissions") {
+		t.Fatalf("lock readyWhen = %q, must not gate on select Submission", rw)
 	}
 	if !strings.Contains(rw, "fullyProcessed") || !strings.Contains(rw, "locked") {
 		t.Fatalf("lock readyWhen must keep Domain eligibility: %q", rw)
 	}
 
 	eligible := EmptyDomain()
-	eligible.JobInstances = []JobInstance{{JobID: "passport", ID: "L1", Label: "L1"}}
+	eligible.JobInstances = []JobInstance{{JobID: "lot_processing", ID: "L1", Label: "L1"}}
 	putKind(&eligible, "lot", EntityMap{"L1": {"status": "fullyProcessed"}})
-	if readyWhenOkForCommit(eligible, taskPayload(lock), "L1", cfg.Catalogs) {
-		t.Fatal("lock readyWhen must fail closed without select Submission")
+	if !readyWhenOkForCommit(eligible, taskPayload(lock), "L1", cfg.Catalogs) {
+		t.Fatal("lock readyWhen must hold on fullyProcessed unlocked lot")
 	}
-	afterSelect := eligible
-	afterSelect.Submissions = []Submission{sub("passport", "select", "L1")}
-	if !readyWhenOkForCommit(afterSelect, taskPayload(lock), "L1", cfg.Catalogs) {
-		t.Fatal("lock readyWhen must hold after select on eligible lot")
+	locked := eligible
+	putKind(&locked, "lot", EntityMap{"L1": {"status": "fullyProcessed", "locked": true}})
+	if readyWhenOkForCommit(locked, taskPayload(lock), "L1", cfg.Catalogs) {
+		t.Fatal("lock readyWhen must fail when lot is locked")
+	}
+	open := eligible
+	putKind(&open, "lot", EntityMap{"L1": {"status": "open"}})
+	if readyWhenOkForCommit(open, taskPayload(lock), "L1", cfg.Catalogs) {
+		t.Fatal("lock readyWhen must fail while lot is still open")
 	}
 }

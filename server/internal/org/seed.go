@@ -159,8 +159,9 @@ func domainSeedEmpty(d Domain) bool {
 // seedStagedDemoDomain wipes then Commits one coherent plant story:
 // intake (truck + two lots CO/DA) → per-lot lot_processing
 // startLot→weigh→markProgress→containerReg→closeLot (closeLot sole fullyProcessed
-// writer) → Passport Can-start. No workingDay/openTurno/closeTurno Commits.
-// Leaves weightCheck open; Passport Can start is ready for both lots.
+// writer). Leaves weightCheck open; lots stay fullyProcessed unlocked so
+// lot_processing/lock is actionable for administration. No workingDay /
+// openTurno/closeTurno Commits. No lot_processing/lock Commit (demo leaves DPP open).
 // When passports is set, org rows are deleted before Domain Put so deterministic
 // seed subject ids can Lock again after --replace / --feragame-domain / --feragame-full.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports DPPStore, org string) error {
