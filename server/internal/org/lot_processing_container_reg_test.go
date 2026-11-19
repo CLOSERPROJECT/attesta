@@ -56,7 +56,7 @@ func TestContainerRegActionableOnOpenLotWithoutMarkProgress(t *testing.T) {
 	domain := mustDomain(t, c)
 
 	cfg := mustActiveConfig(t, c)
-	wl := ProjectWorklist(cfg, domain, OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}})
+	wl := projectWorklistUnfiltered(cfg, domain, OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}})
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "lot_processing"), lotID)
 	if !ok {
 		t.Fatal("missing lot_processing")

@@ -243,7 +243,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 		t.Fatal(err)
 	}
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	want := ProjectWorklist(mustActiveConfig(t, c), domain, admin)
+	want := projectWorklistUnfiltered(mustActiveConfig(t, c), domain, admin)
 	if len(got.Worklist.Jobs) != len(want.Jobs) {
 		t.Fatalf("worklist jobs = %#v, want %#v", got.Worklist.Jobs, want.Jobs)
 	}
@@ -301,11 +301,11 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg = %q, want available for line viewer (open lot)", inst.Tasks["containerReg"])
 	}
-	want := ProjectWorklist(mustActiveConfig(t, c), result.Domain, lineOp)
+	want := projectWorklistUnfiltered(mustActiveConfig(t, c), result.Domain, lineOp)
 	rawGot, _ := json.Marshal(result.Worklist)
 	rawWant, _ := json.Marshal(want)
 	if string(rawGot) != string(rawWant) {
-		t.Fatalf("Commit worklist != ProjectWorklist(domain)\ngot  %s\nwant %s", rawGot, rawWant)
+		t.Fatalf("Commit worklist != projectWorklistUnfiltered(domain)\ngot  %s\nwant %s", rawGot, rawWant)
 	}
 }
 
@@ -319,8 +319,8 @@ func TestProjectWorklistViewerRoleSplitCanStartAndChrome(t *testing.T) {
 	admin := OperatorIdentity{UserID: "admin", Org: "feragame", Roles: []string{"administration"}}
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
-	adminWL := ProjectWorklist(cfg, domain, admin)
-	logWL := ProjectWorklist(cfg, domain, logistic)
+	adminWL := projectWorklistUnfiltered(cfg, domain, admin)
+	logWL := projectWorklistUnfiltered(cfg, domain, logistic)
 
 	adminIntake, ok := worklistJobByID(adminWL, "intake")
 	if !ok {
@@ -391,9 +391,9 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	lineOp := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
-	adminWL := ProjectWorklist(cfg, domain, admin)
-	lineWL := ProjectWorklist(cfg, domain, lineOp)
-	logWL := ProjectWorklist(cfg, domain, logistic)
+	adminWL := projectWorklistUnfiltered(cfg, domain, admin)
+	lineWL := projectWorklistUnfiltered(cfg, domain, lineOp)
+	logWL := projectWorklistUnfiltered(cfg, domain, logistic)
 
 	adminLP, _ := worklistJobByID(adminWL, "lot_processing")
 	lineLP, _ := worklistJobByID(lineWL, "lot_processing")
@@ -491,7 +491,7 @@ func TestProjectWorklistFlatRegisterMintsLotWithoutGroup(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	wl := ProjectWorklist(mustActiveConfig(t, c), result.Domain, op)
+	wl := projectWorklistUnfiltered(mustActiveConfig(t, c), result.Domain, op)
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), truckID)
 	if !ok {
 		t.Fatal("missing truck instance")
@@ -516,7 +516,7 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 	palletID := loadID + ".1"
 	result := commitWeigh(t, c, loadID, palletID, 400)
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic", "line", "administration"}}
-	wl := ProjectWorklist(mustActiveConfig(t, c), result.Domain, op)
+	wl := projectWorklistUnfiltered(mustActiveConfig(t, c), result.Domain, op)
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "lot_processing"), loadID)
 	if !ok {
 		t.Fatal("missing lot_processing instance")
@@ -580,12 +580,12 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("omit_readyWhen_role_split", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", nil))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("omit + eligible = %q, want actionable", inst.Tasks["gated"])
 		}
-		wlOther := ProjectWorklist(cfg, domainUnlocked, other)
+		wlOther := projectWorklistUnfiltered(cfg, domainUnlocked, other)
 		instOther, _ := worklistInstance(worklistMustJob(t, wlOther, "gateJob"), "I1")
 		if instOther.Tasks["gated"] != TaskStatusAvailable {
 			t.Fatalf("omit + ineligible = %q, want available", instOther.Tasks["gated"])
@@ -594,7 +594,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("literal_true", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "true"))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("true = %q, want actionable", inst.Tasks["gated"])
@@ -603,12 +603,12 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("literal_false_skips_role_split", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "false"))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("false + eligible = %q, want unavailable", inst.Tasks["gated"])
 		}
-		wlOther := ProjectWorklist(cfg, domainUnlocked, other)
+		wlOther := projectWorklistUnfiltered(cfg, domainUnlocked, other)
 		instOther, _ := worklistInstance(worklistMustJob(t, wlOther, "gateJob"), "I1")
 		if instOther.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("false + ineligible = %q, want unavailable (not available)", instOther.Tasks["gated"])
@@ -623,7 +623,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("blank_string_omit_semantics", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "   "))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("blank = %q, want actionable", inst.Tasks["gated"])
@@ -632,7 +632,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("invalid_fail_closed", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", 1))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("invalid = %q, want unavailable", inst.Tasks["gated"])
@@ -641,14 +641,14 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("domain_expr", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "$count($domain.widget.*) >= 1"))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("no widget = %q, want unavailable", inst.Tasks["gated"])
 		}
 		withWidget := domainUnlocked
 		putKind(&withWidget, "widget", EntityMap{"W1": {"n": 1}})
-		wl = ProjectWorklist(cfg, withWidget, op)
+		wl = projectWorklistUnfiltered(cfg, withWidget, op)
 		inst, _ = worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("with widget = %q, want actionable", inst.Tasks["gated"])
@@ -659,7 +659,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "false"))
 		empty := EmptyDomain()
 		empty.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
-		wl := ProjectWorklist(cfg, empty, op)
+		wl := projectWorklistUnfiltered(cfg, empty, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("readyWhen false = %q, want unavailable (no locked)", inst.Tasks["gated"])
@@ -681,14 +681,14 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 				},
 			},
 		}
-		wl := ProjectWorklist(cfg, EmptyDomain(), op)
+		wl := projectWorklistUnfiltered(cfg, EmptyDomain(), op)
 		job := worklistMustJob(t, wl, "startJob")
 		if job.CanStart {
 			t.Fatal("canStart want false when first-Task readyWhen fails")
 		}
 		withWidget := EmptyDomain()
 		putKind(&withWidget, "widget", EntityMap{"W1": {"n": 1}})
-		wl = ProjectWorklist(cfg, withWidget, op)
+		wl = projectWorklistUnfiltered(cfg, withWidget, op)
 		job = worklistMustJob(t, wl, "startJob")
 		if !job.CanStart {
 			t.Fatal("canStart want true when first-Task readyWhen holds")
@@ -704,7 +704,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 				},
 			},
 		}
-		wl = ProjectWorklist(omitCfg, EmptyDomain(), op)
+		wl = projectWorklistUnfiltered(omitCfg, EmptyDomain(), op)
 		if !worklistMustJob(t, wl, "startJob").CanStart {
 			t.Fatal("omit readyWhen ⇒ canStart true")
 		}

@@ -538,7 +538,7 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wl := ProjectWorklist(cfg, got, FixtureAllRolesOp())
+	wl := projectWorklistUnfiltered(cfg, got, FixtureAllRolesOp())
 	intake, ok := worklistJobByID(wl, "intake")
 	if !ok {
 		t.Fatal("missing intake worklist")

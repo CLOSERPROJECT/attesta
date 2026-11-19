@@ -84,7 +84,7 @@ func ResolveQR(cfg OrgConfig, domain Domain, op OperatorIdentity, raw string) Qr
 	entityID := DecodeScanEntityID(raw)
 	bindings := domainBindings(domain, "", cfg.Catalogs)
 	bindings["scan"] = map[string]any{"entityId": entityID}
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 
 	for _, rule := range cfg.QR.Rules {
 		if strings.TrimSpace(rule.When) != "" {

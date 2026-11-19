@@ -315,7 +315,7 @@ func additionalPropertiesSchema(task map[string]any, primary string) map[string]
 }
 
 // rowIDsForTask resolves row eligibility from Task reads.where (config-driven).
-func rowIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string, catalogs map[string]any) ([]string, error) {
+func rowIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string, catalogs map[string]any, stream ...*streamBinding) ([]string, error) {
 	read, ok, err := rowReadFromTask(task)
 	if err != nil {
 		return nil, err
@@ -324,5 +324,9 @@ func rowIDsForTask(domain Domain, jobID string, task map[string]any, jobInstance
 		return nil, nil
 	}
 	label := jobInstanceLabel(domain, jobID, jobInstanceID)
-	return ResolveRead(domain, read, jobInstanceID, label, catalogs)
+	var streamRef *streamBinding
+	if len(stream) > 0 {
+		streamRef = stream[0]
+	}
+	return ResolveRead(domain, read, jobInstanceID, label, catalogs, streamRef)
 }
