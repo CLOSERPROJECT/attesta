@@ -15,10 +15,7 @@ import {
 	type StorageLike
 } from './draft-storage.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
-import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
-import type { TaskFormPort, TaskFormRequest } from './task-form-port.js';
-import type { TaskFormBundle } from './form/task-form-bundle.js';
 import {
 	operatorFromLoad,
 	type OperatorIdentity
@@ -41,7 +38,6 @@ const defaultClock: DraftPersistClock = {
 export type OrgSessionOptions = {
 	load?: LoadDomainPort;
 	commit?: CommitDomainPort;
-	taskForm?: TaskFormPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
 	/** Injected storage (browser localStorage + memory fake). Default browser. */
@@ -57,7 +53,6 @@ type DraftIdentity = { org: string; userId: string };
 export class OrgSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
-	readonly taskFormPort: TaskFormPort;
 	readonly #storage: StorageLike | null;
 	readonly #debounceMs: number;
 	readonly #clock: DraftPersistClock;
@@ -73,17 +68,11 @@ export class OrgSession {
 	/** Last Commit HttpPort links (FormPlan strip can wait for ticket 14). */
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
-	/**
-	 * Set when Commit `navigation` is stay so Task deep-link $effect
-	 * does not redirect before the route can enter stay UI.
-	 */
-	linksStayActive = $state(false);
 	drafts = $state.raw<Record<string, DraftEntry>>({});
 
 	constructor(options: OrgSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
-		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 		this.#storage =
 			options.storage !== undefined ? options.storage : browserStorage();
 		this.#debounceMs = options.debounceMs ?? DEFAULT_DRAFT_DEBOUNCE_MS;
@@ -208,11 +197,6 @@ export class OrgSession {
 		}
 	};
 
-	/** Addressed Task form hydrate; does not mutate home LoadResult bundles. */
-	fetchTaskForm = (req: TaskFormRequest): Promise<TaskFormBundle> => {
-		return this.taskFormPort.fetch(req);
-	};
-
 	/**
 	 * Re-Load Worklist without wiping client Drafts.
 	 * Used after Commit denial so chrome matches server truth.
@@ -264,7 +248,6 @@ export class OrgSession {
 			}
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
-			this.linksStayActive = committed.navigation === 'stay';
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
@@ -277,7 +260,6 @@ export class OrgSession {
 			this.commitError = err instanceof Error ? err.message : String(err);
 			this.lastHttpLinks = [];
 			this.lastHttpErrors = [];
-			this.linksStayActive = false;
 			await this.refreshKeepDrafts();
 			return null;
 		} finally {
@@ -287,7 +269,6 @@ export class OrgSession {
 
 	/** Clear session HttpLinkStrip state (stay exit or non-stay post-Commit navigate). */
 	clearLinksStay = (): void => {
-		this.linksStayActive = false;
 		this.lastHttpLinks = [];
 		this.lastHttpErrors = [];
 	};

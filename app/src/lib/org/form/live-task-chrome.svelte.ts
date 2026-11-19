@@ -155,7 +155,7 @@ export type LiveTaskChromeHandle = {
 };
 
 export function startLiveTaskChrome(
-	plan: TaskFormPlan,
+	getPlan: () => TaskFormPlan,
 	ports: LiveTaskFormPorts
 ): LiveTaskChromeHandle {
 	let displays = $state<Record<string, ChromeDisplay>>({});
@@ -165,13 +165,15 @@ export function startLiveTaskChrome(
 
 	const schedule = (): void => {
 		const gen = ++generation;
-		pending = applyChrome(plan, ports, () => gen === generation, (next) => {
+		pending = applyChrome(getPlan(), ports, () => gen === generation, (next) => {
 			displays = next;
 		});
 	};
 
 	const stop = $effect.root(() => {
 		$effect(() => {
+			void getPlan().projectionKey;
+			void getPlan().chrome;
 			void JSON.stringify(ports.getValue());
 			void ports.getDomain();
 			void ports.getCatalogs?.();

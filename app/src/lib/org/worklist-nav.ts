@@ -115,8 +115,9 @@ export function resolvePostCommitNavigation(
 }
 
 /**
- * Deep-link gate: provisional Start always mounts; existing instance must
- * be projected actionable or redirect Home.
+ * Deep-link gate: provisional Start only when Worklist canStart + first Task
+ * (same CollectActionableTaskRefs / ViewerMayMountTask law as task-form).
+ * Existing instance must be projected actionable or redirect Home.
  */
 export function resolveTaskDeepLink(
 	jobId: string,
@@ -126,9 +127,15 @@ export function resolveTaskDeepLink(
 	worklist: Worklist | null | undefined
 ): TaskDeepLinkTarget {
 	if (!jobId || !taskId) return { kind: 'home' };
-	if (provisionalJob) return { kind: 'task' };
 
 	const job = worklistJobFor(worklist, jobId);
+	if (provisionalJob) {
+		if (!job?.canStart || job.taskIds[0] !== taskId) {
+			return resolveUnmountableTaskTarget(jobId, jobInstanceId, true, worklist);
+		}
+		return { kind: 'task' };
+	}
+
 	const inst = job ? instanceFor(job, jobInstanceId) : null;
 	if (!job || !inst) {
 		return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);

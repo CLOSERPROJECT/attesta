@@ -7,10 +7,10 @@
 	import type { CommitOutcome } from './commit-port.js';
 	import { orgSession } from './org-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
+	import { isProvisionalJobInstance, normalizeJobInstanceId } from './task-address.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/config-form.svelte';
 	import HttpLinkStrip from './form/http-link-strip.svelte';
-	import type { TaskFormPlan } from './form/task-form-plan.js';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {
 		catalogsFromBundleBindings,
@@ -44,11 +44,13 @@
 	const path = $derived(taskPath(jobId, taskId));
 	const draftInstanceKey = $derived(draftBagInstanceKey({ jobInstanceId }));
 	const drafts = $derived(orgSession.drafts);
+	/** Reset draft seed when task address / draft bag key changes (not on every projection). */
+	const draftSeedKey = $derived(`${path}|${draftInstanceKey}`);
 
 	let submitError = $state.raw<string | null>(null);
 	let live: LiveTaskForm | null = $state(null);
-	let plan = $state.raw<TaskFormPlan | null>(null);
 	let seededFromBundle = $state(false);
+	let lastSeedKey = $state.raw('');
 
 	function readDraft(): Record<string, unknown> {
 		void drafts;
@@ -88,13 +90,12 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		if (orgSession.committing) return;
 		submitError = null;
-		const provisionalJob = jobInstanceId === '';
-		const mint = provisionalJob
+		const mint = isProvisionalJobInstance(jobInstanceId)
 			? ({ kind: 'startingNew' } as const)
 			: ({ kind: 'none' } as const);
 		const outcome = await orgSession.commit({
 			taskPath: path,
-			jobInstanceId: provisionalJob ? '' : jobInstanceId,
+			jobInstanceId: normalizeJobInstanceId(jobInstanceId),
 			value,
 			mint,
 			draftBagInstanceKey: draftInstanceKey
@@ -103,28 +104,29 @@
 		onCommitted?.(outcome);
 	}
 
+	function ensureLive(compiled: ReturnType<typeof planFromTaskFormBundle>) {
+		if (live === null) {
+			live = new LiveTaskForm(compiled, {
+				getValue: () => readDraft(),
+				setValue: (next) => writeDraft(next),
+				getDomain: () => liveDomain(),
+				getCatalogs: () => liveCatalogs(),
+				getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
+				getInstance: () => bundleInstance(),
+				getOperator: () => orgSession.operator(),
+				onSubmit: (value) => {
+					void submitSealed(value);
+				},
+				onSubmitError: onFormSubmitError
+			});
+			return;
+		}
+		live.updatePlan(compiled);
+	}
+
 	function disposeLive() {
 		live?.dispose();
 		live = null;
-		plan = null;
-	}
-
-	function remountLive(nextPlan: TaskFormPlan) {
-		disposeLive();
-		plan = nextPlan;
-		live = new LiveTaskForm(nextPlan, {
-			getValue: () => readDraft(),
-			setValue: (next) => writeDraft(next),
-			getDomain: () => liveDomain(),
-			getCatalogs: () => liveCatalogs(),
-			getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
-			getInstance: () => bundleInstance(),
-			getOperator: () => orgSession.operator(),
-			onSubmit: (value) => {
-				void submitSealed(value);
-			},
-			onSubmitError: onFormSubmitError
-		});
 	}
 
 	function seedBundleDraft(next: TaskFormBundle) {
@@ -142,14 +144,22 @@
 	}
 
 	$effect(() => {
-		void drafts;
-		void draftInstanceKey;
+		// Do not track `drafts` here — seed/write updates the bag and would re-enter
+		// ensureLive/updatePlan forever (effect_update_depth_exceeded). Form value
+		// still tracks drafts via LiveTaskForm ports / syncDeepLocalToDraft.
+		void draftSeedKey;
 		void bundle;
+
+		if (draftSeedKey !== lastSeedKey) {
+			lastSeedKey = draftSeedKey;
+			seededFromBundle = false;
+			submitError = null;
+		}
 
 		seedBundleDraft(bundle);
 		const compiled = planFromTaskFormBundle(bundle);
-		if (plan?.projectionKey !== compiled.projectionKey || live === null) {
-			remountLive(compiled);
+		if (live === null || live.plan.projectionKey !== compiled.projectionKey) {
+			ensureLive(compiled);
 		}
 	});
 
@@ -168,14 +178,12 @@
 	data-from-bundle="1"
 >
 	{#if live?.form}
-		{#key live.plan.projectionKey}
-			<fieldset disabled={disabled || orgSession.committing} class="space-y-4">
-				<ConfigForm
-					form={live.form}
-					class="flex flex-col gap-4 [&_button[type=submit]]:mt-6 [&_button[type=submit]]:self-end"
-				/>
-			</fieldset>
-		{/key}
+		<fieldset disabled={disabled || orgSession.committing} class="space-y-4">
+			<ConfigForm
+				form={live.form}
+				class="flex flex-col gap-4 [&_button[type=submit]]:mt-6 [&_button[type=submit]]:self-end"
+			/>
+		</fieldset>
 	{:else}
 		<p class="text-sm text-zinc-500" data-testid="live-form-missing">{m.form_unavailable()}</p>
 	{/if}

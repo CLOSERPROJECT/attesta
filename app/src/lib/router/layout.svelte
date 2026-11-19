@@ -17,6 +17,7 @@
 		navPlaceKindFromRoute,
 		resolveNavPlace
 	} from '#lib/org/nav-place.js';
+	import { normalizeTaskAddress } from '#lib/org/task-address.js';
 	import { takeColdEntityIdRaw } from '#lib/org/qr-resolve-apply.js';
 	import { runQrScan } from '#lib/org/qr-scan-flow.js';
 	import { orgToast } from '#lib/org/toast.svelte.js';
@@ -29,13 +30,12 @@
 
 	// Pathname segments only — avoid sv-router param leakage across matches.
 	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
-	const jobId = $derived(coords.jobId);
-	const routeInstance = $derived(coords.jobInstanceId);
-	const provisionalJob = $derived(routeInstance === '' || routeInstance === 'new');
-	const jobInstanceId = $derived(provisionalJob ? '' : routeInstance);
+	const addr = $derived(normalizeTaskAddress(coords));
+	const jobId = $derived(addr.jobId);
+	const jobInstanceId = $derived(addr.jobInstanceId);
 
 	const placeKind = $derived(navPlaceKindFromRoute({ pathname: route.pathname }));
-	const taskId = $derived(placeKind === 'task' ? coords.taskId : '');
+	const taskId = $derived(placeKind === 'task' ? addr.taskId : '');
 
 	const place = $derived(
 		resolveNavPlace({
@@ -43,7 +43,7 @@
 			jobId,
 			jobInstanceId,
 			taskId,
-			provisionalJob: placeKind === 'task' ? provisionalJob : false,
+			provisionalJob: placeKind === 'task' ? addr.provisionalJob : false,
 			worklist: orgSession.result?.worklist
 		})
 	);
@@ -73,6 +73,9 @@
 	}
 
 	onMount(() => {
+		if (!orgSession.result && !orgSession.loading) {
+			void orgSession.hydrate();
+		}
 		const { raw, strippedHref } = takeColdEntityIdRaw(window.location.href);
 		if (!raw) return;
 		window.history.replaceState(window.history.state, '', strippedHref);

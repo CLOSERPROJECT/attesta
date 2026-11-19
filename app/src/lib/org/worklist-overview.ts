@@ -1,5 +1,6 @@
 import * as m from '#lib/paraglide/messages.js';
 
+import { isProvisionalJobInstance } from './task-address.js';
 import type {
 	TaskStatus,
 	TaskSubmit,
@@ -103,7 +104,7 @@ export function jobInstanceOverview(
 	jobId: string,
 	jobInstanceId: string
 ): JobInstanceOverviewModel | null {
-	if (!jobId || !jobInstanceId || jobInstanceId === 'new') return null;
+	if (!jobId || !jobInstanceId || isProvisionalJobInstance(jobInstanceId)) return null;
 	const job = worklistJobFor(worklist, jobId);
 	if (!job) return null;
 	const inst = instanceFor(job, jobInstanceId);

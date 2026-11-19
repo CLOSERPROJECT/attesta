@@ -62,18 +62,34 @@ export type CreateConfigFormResult<T extends Record<string, unknown>> = FormStat
 	disposeLocalDraftSync?: () => void;
 };
 
+/**
+ * sjsf createForm reads `schema` / `uiSchema` reactively — pass a getter (or
+ * object with getters) so plan/projection swaps update in place. Do not recreate
+ * the form or `{#key}` remount (x0k anti-pattern: recreating form).
+ */
 export function createConfigForm<T extends Record<string, unknown>>(
-	schemas: ConfigFormSchemas,
+	schemas: ConfigFormSchemas | (() => ConfigFormSchemas),
 	getValue: () => T,
 	setValue: (next: T) => void,
 	options: CreateConfigFormOptions<T> = {}
 ): CreateConfigFormResult<T> {
-	const uiSchema = options.uiSchema ?? schemas.uiSchema;
-	// Resolve `$today` once so sjsf re-merge/reset never injects the sentinel.
+	const getSchemas = typeof schemas === 'function' ? schemas : () => schemas;
+	// Cache resolved schema by raw identity so getters stay stable across reads.
+	let cachedRaw: Schema | undefined;
+	let cachedResolved: Schema | undefined;
+	const readSchema = (): Schema => {
+		const raw = getSchemas().schema;
+		if (raw !== cachedRaw) {
+			cachedRaw = raw;
+			// Resolve `$today` so sjsf re-merge/reset never injects the sentinel.
+			cachedResolved = resolveSchemaDateDefaultSentinels(raw);
+		}
+		return cachedResolved!;
+	};
+	const readUiSchema = (): UiSchemaRoot => options.uiSchema ?? getSchemas().uiSchema;
 	// createForm skips merge when `value` is bound — seed defaults here (NIR +
 	// resolved date). Merger preserves operator / partial drafts in formData.
-	const schema = resolveSchemaDateDefaultSentinels(schemas.schema);
-	const seededValue = mergeSchemaDefaultsIntoFormData(schema, getValue());
+	const seededValue = mergeSchemaDefaultsIntoFormData(readSchema(), getValue());
 	const locale = getLocale();
 	const translation = getSjsfTranslation(locale);
 	const extraUiOptions = fromRecord({
@@ -85,8 +101,8 @@ export function createConfigForm<T extends Record<string, unknown>>(
 
 	if (options.derived !== undefined) {
 		const engine = new ConfigForm<T>({
-			schema,
-			uiSchema,
+			schema: readSchema(),
+			uiSchema: readUiSchema(),
 			initialValue: seededValue,
 			derived: options.derived,
 			getDomain: options.getDomain,
@@ -99,8 +115,12 @@ export function createConfigForm<T extends Record<string, unknown>>(
 		);
 		const form = createForm<T>({
 			theme,
-			schema,
-			uiSchema,
+			get schema() {
+				return readSchema();
+			},
+			get uiSchema() {
+				return readUiSchema();
+			},
 			resolver,
 			translation,
 			extraUiOptions,
@@ -129,8 +149,12 @@ export function createConfigForm<T extends Record<string, unknown>>(
 	);
 	const form = createForm<T>({
 		theme,
-		schema,
-		uiSchema,
+		get schema() {
+			return readSchema();
+		},
+		get uiSchema() {
+			return readUiSchema();
+		},
 		resolver,
 		translation,
 		extraUiOptions,
