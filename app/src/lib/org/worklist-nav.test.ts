@@ -136,7 +136,7 @@ describe('post-Commit navigation adapter', () => {
 });
 
 describe('Task deep link + exit', () => {
-	test('unauthorized / unavailable Task URL → instance home', () => {
+	test('unauthorized Task URL → instance home; unavailable stays for blockedReason', () => {
 		expect(
 			resolveTaskDeepLink(
 				stream,
@@ -148,6 +148,33 @@ describe('Task deep link + exit', () => {
 				adminWorklist
 			)
 		).toEqual({ kind: 'home', stream, instance });
+
+		const withBlocked: typeof adminWorklist = {
+			jobs: [
+				{
+					...adminWorklist.jobs[0]!,
+					instances: [
+						{
+							id: 'NIR-1',
+							label: 'NIR-1',
+							tasks: { register: 'done', palletWeight: 'unavailable' },
+							blockedReasons: { palletWeight: 'Linea occupata' }
+						}
+					]
+				}
+			]
+		};
+		expect(
+			resolveTaskDeepLink(
+				stream,
+				instance,
+				'intake',
+				'NIR-1',
+				'palletWeight',
+				false,
+				withBlocked
+			)
+		).toEqual({ kind: 'task' });
 
 		expect(
 			resolveTaskDeepLink(

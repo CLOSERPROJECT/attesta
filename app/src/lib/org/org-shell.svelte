@@ -6,8 +6,13 @@
 	import { p } from '../router/index.js';
 	import { hrefOrgTarget } from '../router/navigate-target.js';
 	import { draftAddressForTask } from './drafts.js';
+	import {
+		orgMyInstancePath,
+		streamInstanceLabel
+	} from './nav-place.js';
 	import { orgSession } from './org-app.svelte.js';
 	import ManySubmitHistory from './many-submit-history.svelte';
+	import { fetchStreamTitle } from './stream-meta.js';
 	import WorklistJobLine from './worklist-job-line.svelte';
 	import WorklistRow from './worklist-row.svelte';
 	import {
@@ -15,7 +20,7 @@
 		actNowRowsFromWorklist,
 		availableRowTarget,
 		taskRouteInstanceSegment,
-		type ActNowProps
+		type ActNowRow
 	} from './worklist-home.js';
 
 	type Props = {
@@ -25,8 +30,13 @@
 
 	let { stream, instance }: Props = $props();
 
+	let streamTitle = $state('');
+
 	onMount(() => {
 		void orgSession.hydrate({ stream, instance });
+		void fetchStreamTitle(stream).then((title) => {
+			streamTitle = title;
+		});
 	});
 
 	$effect(() => {
@@ -36,8 +46,13 @@
 	const actNow = $derived(actNowRowsFromWorklist(orgSession.result?.worklist));
 	const drafts = $derived(orgSession.drafts);
 	const scope = $derived({ stream, instance });
+	const instanceLabel = $derived(
+		streamInstanceLabel(orgSession.result?.worklist, instance) || instance
+	);
+	const timelineHref = $derived(orgMyInstancePath(stream, instance));
+	const titleText = $derived(streamTitle || stream);
 
-	function rowHasDirtyDraft(row: Extract<ActNowProps, { kind: 'task' }>): boolean {
+	function rowHasDirtyDraft(row: Extract<ActNowRow, { kind: 'task' }>): boolean {
 		void drafts;
 		const addr = draftAddressForTask({
 			jobId: row.jobId,
@@ -49,6 +64,20 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="org-shell">
+	<header class="space-y-1" data-testid="instance-chrome">
+		<p class="text-xs text-zinc-500" data-testid="instance-chrome-stream">{titleText}</p>
+		<p class="text-lg font-semibold text-zinc-900" data-testid="instance-chrome-label">
+			{instanceLabel}
+		</p>
+		<a
+			href={timelineHref}
+			class="inline-block text-sm text-zinc-600 underline-offset-2 hover:underline"
+			data-testid="instance-chrome-timeline"
+		>
+			{m.back_to_timeline()}
+		</a>
+	</header>
+
 	{#if !orgSession.result && orgSession.loading}
 		<p class="text-sm text-zinc-500" data-testid="org-load-status">{m.loading()}</p>
 	{:else if !orgSession.result && orgSession.error}

@@ -5,6 +5,7 @@ import {
 	wireJobInstanceId,
 	type TaskAddress
 } from './task-address.js';
+import { taskBlockedReason, taskIsUnavailable } from './task-blocked.js';
 import type { TaskFormPort } from './task-form-port.js';
 import type { Worklist } from './types.js';
 import {
@@ -14,15 +15,23 @@ import {
 
 export type TaskFormAddress = TaskAddress;
 
-export type TaskFormMountStatus = 'idle' | 'loading' | 'ready' | 'denied' | 'error';
+export type TaskFormMountStatus =
+	| 'idle'
+	| 'loading'
+	| 'ready'
+	| 'blocked'
+	| 'denied'
+	| 'error';
 
 export type TaskFormLoadResult =
 	| { kind: 'ready' }
+	| { kind: 'blocked'; reason: string | null }
 	| { kind: 'error'; message: string }
 	| { kind: 'aborted' };
 
 export type TaskFormGateResult =
 	| { kind: 'allow' }
+	| { kind: 'blocked'; reason: string | null }
 	| { kind: 'denied'; redirect: Exclude<TaskDeepLinkTarget, { kind: 'task' }> };
 
 export type TaskFormMountOptions = {
@@ -42,6 +51,8 @@ export class TaskFormMount {
 	status = $state<TaskFormMountStatus>('idle');
 	addressKey = $state.raw<string | null>(null);
 	error = $state.raw<string | null>(null);
+	/** Authored blockedReason when status is blocked; null → show status_unavailable. */
+	blockedReason = $state.raw<string | null>(null);
 	redirect = $state.raw<Exclude<TaskDeepLinkTarget, { kind: 'task' }> | null>(null);
 
 	#gen = 0;
@@ -79,12 +90,38 @@ export class TaskFormMount {
 			current.provisionalJob,
 			worklist
 		);
-		if (gate.kind === 'task') return { kind: 'allow' };
+		if (gate.kind === 'task') {
+			if (
+				!current.provisionalJob &&
+				taskIsUnavailable(
+					worklist,
+					current.jobId,
+					current.jobInstanceId,
+					current.taskId
+				)
+			) {
+				this.#abort?.abort();
+				this.#gen += 1;
+				this.bundle = null;
+				this.status = 'blocked';
+				this.blockedReason = taskBlockedReason(
+					worklist,
+					current.jobId,
+					current.jobInstanceId,
+					current.taskId
+				);
+				this.redirect = null;
+				this.error = null;
+				return { kind: 'blocked', reason: this.blockedReason };
+			}
+			return { kind: 'allow' };
+		}
 
 		this.#abort?.abort();
 		this.#gen += 1;
 		this.bundle = null;
 		this.status = 'denied';
+		this.blockedReason = null;
 		this.redirect = gate;
 		this.error = null;
 		return { kind: 'denied', redirect: gate };
@@ -101,6 +138,7 @@ export class TaskFormMount {
 
 		this.redirect = null;
 		this.error = null;
+		this.blockedReason = null;
 		this.status = 'loading';
 		this.bundle = null;
 

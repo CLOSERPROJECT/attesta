@@ -61,6 +61,14 @@ export async function runQrScan(
 		...prior,
 		...outcome.seed
 	});
+	const fromInstance = (deps.instance ?? '').trim();
+	const toInstance =
+		outcome.target.kind === 'task' ? outcome.target.instance.trim() : '';
+	const switched =
+		Boolean(fromInstance) && Boolean(toInstance) && fromInstance !== toInstance;
+	if (switched) {
+		deps.toast(m.scan_switched_instance());
+	}
 	deps.navigate(outcome.target);
 	return 'navigated';
 }

@@ -11,10 +11,11 @@
 	import { createHttpTaskFormPort } from '../org/http-task-form-port.js';
 	import { orgRouteCoordsFromPath } from '../org/nav-place.js';
 	import { orgSession } from '../org/org-app.svelte.js';
+	import { applySeedQueryParams } from '../org/seed-query.js';
 	import TaskForm from '../org/task-form.svelte';
 	import { normalizeTaskAddress, taskAddressKey } from '../org/task-address.js';
 	import type { TaskFormBundle } from '../org/types.js';
-	import { navigateOrgTarget } from './navigate-target.js';
+	import { navigateOrgTarget, orgMyStreamDashboardPath } from './navigate-target.js';
 	import { route } from './index.js';
 
 	type StreamListItem = {
@@ -28,6 +29,7 @@
 
 	let bundle = $state.raw<TaskFormBundle | null>(null);
 	let playJob = $state.raw<{ jobId: string; taskId: string } | null>(null);
+	let streamTitle = $state('');
 	let error = $state.raw<string | null>(null);
 	let loading = $state(true);
 
@@ -43,6 +45,8 @@
 			: null
 	);
 	const routeKey = $derived(addr ? taskAddressKey(addr) : '');
+	const dashboardHref = $derived(orgMyStreamDashboardPath(stream));
+	const titleText = $derived(streamTitle || stream);
 
 	onMount(() => {
 		let cancelled = false;
@@ -75,6 +79,17 @@
 					throw new Error('play start not found');
 				}
 				if (cancelled) return;
+
+				streamTitle = row?.title?.trim() || stream;
+
+				const stripped = applySeedQueryParams(window.location.href, orgSession, {
+					jobId: anchor.jobId,
+					taskId: anchor.taskId,
+					jobInstanceId: ''
+				});
+				if (stripped) {
+					window.history.replaceState(window.history.state, '', stripped);
+				}
 
 				const port = createHttpTaskFormPort();
 				const fetched = await port.fetch({
@@ -111,6 +126,17 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="play-route" data-route-key={routeKey}>
+	<header class="space-y-1" data-testid="play-chrome">
+		<p class="text-lg font-semibold text-zinc-900" data-testid="play-chrome-stream">{titleText}</p>
+		<a
+			href={dashboardHref}
+			class="inline-block text-sm text-zinc-600 underline-offset-2 hover:underline"
+			data-testid="play-chrome-dashboard"
+		>
+			{m.back_to_stream_dashboard()}
+		</a>
+	</header>
+
 	{#if orgSession.commitError}
 		<p class="text-sm text-red-700" data-testid="org-commit-error" role="alert">
 			{m.commit_denied()}: {orgSession.commitError}

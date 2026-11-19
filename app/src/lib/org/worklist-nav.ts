@@ -1,5 +1,6 @@
 import type { CommitNavigation, ContinueNavigation } from './commit-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
+import { taskIsUnavailable } from './task-blocked.js';
 import type { Worklist, WorklistInstance, WorklistJob } from './types.js';
 import { worklistJobFor } from './types.js';
 
@@ -223,6 +224,10 @@ export function resolveTaskDeepLink(
 	}
 
 	if (viewerMayAct(inst, taskId)) {
+		return { kind: 'task' };
+	}
+	// Unavailable leaves stay mounted so blockedReason can surface (§6).
+	if (taskIsUnavailable(worklist, jobId, jobInstanceId, taskId)) {
 		return { kind: 'task' };
 	}
 	return resolveUnmountableTaskTarget(

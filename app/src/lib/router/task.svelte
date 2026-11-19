@@ -30,6 +30,7 @@
 	const status = $derived(taskFormMount.status);
 	const bundle = $derived(taskFormMount.bundle);
 	const formError = $derived(taskFormMount.error);
+	const blockedReason = $derived(taskFormMount.blockedReason);
 	const mountAddressKey = $derived(taskFormMount.addressKey);
 
 	/** Held while stay so Continue can apply server continueNavigation. */
@@ -107,6 +108,15 @@
 
 	{#if status === 'denied'}
 		<p class="text-sm text-zinc-500" data-testid="task-redirecting">{m.redirecting()}</p>
+	{:else if status === 'blocked'}
+		<div class="space-y-2" data-testid="task-blocked">
+			<p class="text-sm font-medium text-zinc-700">{m.status_unavailable()}</p>
+			{#if blockedReason}
+				<p class="text-sm text-zinc-600 whitespace-pre-line" data-testid="task-blocked-reason">
+					{blockedReason}
+				</p>
+			{/if}
+		</div>
 	{:else if status === 'loading' || status === 'idle'}
 		<p class="text-sm text-zinc-500" data-testid="task-load-status">{m.loading()}</p>
 	{:else if status === 'error'}
