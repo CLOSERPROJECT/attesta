@@ -73,6 +73,9 @@
 			href={timelineHref}
 			class="inline-block text-sm text-zinc-600 underline-offset-2 hover:underline"
 			data-testid="instance-chrome-timeline"
+			data-sveltekit-reload
+			rel="external"
+			target="_self"
 		>
 			{m.back_to_timeline()}
 		</a>

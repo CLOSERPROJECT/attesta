@@ -134,10 +134,13 @@ test('instance home renders act-now Worklist + chrome (Italian default)', async 
 	await expect(page.getByTestId('instance-chrome-timeline')).toHaveText(
 		'Torna alla timeline'
 	);
-	await expect(page.getByTestId('instance-chrome-timeline')).toHaveAttribute(
+	const timeline = page.getByTestId('instance-chrome-timeline');
+	await expect(timeline).toHaveAttribute(
 		'href',
 		`/my/streams/org-${stream}/instance/${instance}`
 	);
+	await expect(timeline).toHaveAttribute('rel', 'external');
+	await expect(timeline).toHaveAttribute('target', '_self');
 	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
 	await expect(page.getByTestId('nav-back')).toHaveCount(0);
 	await expect(page.getByTestId('nav-role-chip')).toHaveText('administration');
@@ -150,6 +153,15 @@ test('instance home renders act-now Worklist + chrome (Italian default)', async 
 		(c) => c.name === 'PARAGLIDE_LOCALE'
 	);
 	expect(localeCookie?.value ?? 'it').toBe('it');
+});
+
+test('Torna alla timeline leaves /app for /my instance URL', async ({ page }) => {
+	await stubOrgApis(page);
+	await page.goto(homePath);
+	await page.getByTestId('instance-chrome-timeline').click();
+	await expect(page).toHaveURL(
+		`/my/streams/org-${stream}/instance/${instance}`
+	);
 });
 
 test('Home → Can start (each Job) → nav-back → Home', async ({ page }) => {
@@ -238,10 +250,13 @@ test('Play route shows stream chrome', async ({ page }) => {
 	await expect(page.getByTestId('play-chrome-dashboard')).toHaveText(
 		'Torna alla dashboard'
 	);
-	await expect(page.getByTestId('play-chrome-dashboard')).toHaveAttribute(
+	const dashboard = page.getByTestId('play-chrome-dashboard');
+	await expect(dashboard).toHaveAttribute(
 		'href',
 		`/my/streams/org-${stream}/`
 	);
+	await expect(dashboard).toHaveAttribute('rel', 'external');
+	await expect(dashboard).toHaveAttribute('target', '_self');
 	await expect(page.getByTestId('task-register')).toBeVisible();
 });
 
