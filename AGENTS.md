@@ -59,6 +59,7 @@ The [Invariants](#invariants) section states both rules in full.
 
 - Commit messages and pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<optional scope>): <description>`, with type one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore` or `revert`; `!` and a `BREAKING CHANGE:` footer mark a breaking change. The squash merge uses the pull request title as the commit subject.
 - One pull request per issue. Its description says `Closes #<n>` for the issue it completes, and `Refs #<n>` for an issue it only advances.
+- Never create a pull request as a draft; open it ready for review.
 
 ## Merging
 
