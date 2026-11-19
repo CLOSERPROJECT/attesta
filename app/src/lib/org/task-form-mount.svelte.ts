@@ -18,9 +18,12 @@ export type TaskFormMountStatus = 'idle' | 'loading' | 'ready' | 'denied' | 'err
 
 export type TaskFormLoadResult =
 	| { kind: 'ready' }
-	| { kind: 'denied'; redirect: Exclude<TaskDeepLinkTarget, { kind: 'task' }> }
 	| { kind: 'error'; message: string }
 	| { kind: 'aborted' };
+
+export type TaskFormGateResult =
+	| { kind: 'allow' }
+	| { kind: 'denied'; redirect: Exclude<TaskDeepLinkTarget, { kind: 'task' }> };
 
 export type TaskFormMountOptions = {
 	taskForm?: TaskFormPort;
@@ -29,8 +32,8 @@ export type TaskFormMountOptions = {
 export const taskFormAddressKey = taskAddressKey;
 
 /**
- * Address-owned Task form slot. Gates via resolveTaskDeepLink, fetches via
- * TaskFormPort. Does not hydrate Worklist or touch OrgSession.
+ * Address-owned Task form slot. Fetch via TaskFormPort; deep-link gate via
+ * applyGate when Worklist is available. Does not hydrate or touch OrgSession.
  */
 export class TaskFormMount {
 	readonly taskFormPort: TaskFormPort;
@@ -44,43 +47,58 @@ export class TaskFormMount {
 	#gen = 0;
 	#abort: AbortController | null = null;
 	#lastAddr: TaskFormAddress | null = null;
-	#lastWorklist: Worklist | null | undefined = undefined;
 
 	constructor(options: TaskFormMountOptions = {}) {
 		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 	}
 
-	load = async (
-		addr: TaskFormAddress,
-		worklist: Worklist | null | undefined
-	): Promise<TaskFormLoadResult> => {
+	#bindAddress(addr: TaskFormAddress): void {
 		this.#lastAddr = addr;
-		this.#lastWorklist = worklist;
+		this.addressKey = taskFormAddressKey(addr);
+	}
+
+	/**
+	 * Deep-link gate for the bound address (or `addr` if provided).
+	 * Allow = no-op; deny = abort in-flight fetch, denied + redirect.
+	 * Worklist updates must call this only — never load/reload.
+	 */
+	applyGate = (
+		worklist: Worklist | null | undefined,
+		addr?: TaskFormAddress
+	): TaskFormGateResult => {
+		if (addr) this.#bindAddress(addr);
+		const current = this.#lastAddr;
+		if (!current) return { kind: 'allow' };
+
+		const gate = resolveTaskDeepLink(
+			current.jobId,
+			current.jobInstanceId,
+			current.taskId,
+			current.provisionalJob,
+			worklist
+		);
+		if (gate.kind === 'task') return { kind: 'allow' };
+
+		this.#abort?.abort();
+		this.#gen += 1;
+		this.bundle = null;
+		this.status = 'denied';
+		this.redirect = gate;
+		this.error = null;
+		return { kind: 'denied', redirect: gate };
+	};
+
+	/** Address → TaskFormPort.fetch only. Does not gate. */
+	load = async (addr: TaskFormAddress): Promise<TaskFormLoadResult> => {
+		this.#bindAddress(addr);
 
 		const gen = ++this.#gen;
 		this.#abort?.abort();
 		const ac = new AbortController();
 		this.#abort = ac;
 
-		this.addressKey = taskFormAddressKey(addr);
 		this.redirect = null;
 		this.error = null;
-
-		const gate = resolveTaskDeepLink(
-			addr.jobId,
-			addr.jobInstanceId,
-			addr.taskId,
-			addr.provisionalJob,
-			worklist
-		);
-		if (gate.kind !== 'task') {
-			if (gen !== this.#gen) return { kind: 'aborted' };
-			this.bundle = null;
-			this.status = 'denied';
-			this.redirect = gate;
-			return { kind: 'denied', redirect: gate };
-		}
-
 		this.status = 'loading';
 		this.bundle = null;
 
@@ -105,10 +123,8 @@ export class TaskFormMount {
 		}
 	};
 
-	/** Same-address re-fetch (Continue); pass worklist after Commit so the gate sees the snapshot. */
-	reload = (
-		worklist?: Worklist | null
-	): Promise<TaskFormLoadResult> => {
+	/** Same-address re-fetch (Continue). Pass post-Commit worklist to applyGate, not here. */
+	reload = (): Promise<TaskFormLoadResult> => {
 		const addr = this.#lastAddr;
 		if (!addr) {
 			return Promise.resolve({
@@ -116,10 +132,7 @@ export class TaskFormMount {
 				message: 'no address to reload'
 			});
 		}
-		return this.load(
-			addr,
-			worklist !== undefined ? worklist : this.#lastWorklist
-		);
+		return this.load(addr);
 	};
 }
 

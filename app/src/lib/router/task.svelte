@@ -30,6 +30,7 @@
 	const status = $derived(taskFormMount.status);
 	const bundle = $derived(taskFormMount.bundle);
 	const formError = $derived(taskFormMount.error);
+	const mountAddressKey = $derived(taskFormMount.addressKey);
 
 	/** Held while stay so Continue can apply server continueNavigation. */
 	let stayedOutcome = $state.raw<CommitOutcome | null>(null);
@@ -60,15 +61,19 @@
 		if (!outcome) return;
 		const decision = decideContinueFollowThrough(outcome, addr);
 		clearStayUi();
-		await applyContinueFollowThrough(
-			decision,
-			{
-				clearLinksStay: () => orgSession.clearLinksStay(),
-				navigate: navigateOrgTarget,
-				reload: (worklist) => taskFormMount.reload(worklist)
-			},
-			orgSession.result?.worklist
-		);
+		await applyContinueFollowThrough(decision, {
+			clearLinksStay: () => orgSession.clearLinksStay(),
+			navigate: navigateOrgTarget,
+			reload: async () => {
+				await taskFormMount.reload();
+				const worklist = orgSession.result?.worklist;
+				if (!worklist) return;
+				const gate = taskFormMount.applyGate(worklist);
+				if (gate.kind === 'denied') {
+					navigateOrgTarget(gate.redirect);
+				}
+			}
+		});
 	}
 
 	// Clear stay if the route changes while stay was still active (e.g. sidebar nav).
@@ -77,6 +82,18 @@
 		if (stayRouteKey !== null && stayRouteKey !== key) {
 			orgSession.clearLinksStay();
 			clearStayUi();
+		}
+	});
+
+	// Gate when Worklist is available for the bound address — never re-fetch.
+	$effect(() => {
+		const worklist = orgSession.result?.worklist;
+		if (!worklist) return;
+		if (mountAddressKey !== routeKey) return;
+
+		const gate = taskFormMount.applyGate(worklist);
+		if (gate.kind === 'denied') {
+			navigateOrgTarget(gate.redirect);
 		}
 	});
 </script>

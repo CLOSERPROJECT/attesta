@@ -155,18 +155,16 @@ describe('apply follow-through', () => {
 		expect(navigate).toHaveBeenCalledWith({ kind: 'home' });
 	});
 
-	test('Continue reload clears links then reloads worklist', async () => {
+	test('Continue reload clears links then reloads', async () => {
 		const clearLinksStay = vi.fn();
 		const navigate = vi.fn();
 		const reload = vi.fn(async () => undefined);
-		const worklist = { jobs: [] };
 		await applyContinueFollowThrough(
 			{ kind: 'reload' },
-			{ clearLinksStay, navigate, reload },
-			worklist
+			{ clearLinksStay, navigate, reload }
 		);
 		expect(clearLinksStay).toHaveBeenCalledOnce();
-		expect(reload).toHaveBeenCalledWith(worklist);
+		expect(reload).toHaveBeenCalledOnce();
 		expect(navigate).not.toHaveBeenCalled();
 	});
 

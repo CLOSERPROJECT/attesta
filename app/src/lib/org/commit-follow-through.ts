@@ -4,7 +4,6 @@ import {
 	taskAddressKey,
 	type TaskAddress
 } from './task-address.js';
-import type { Worklist } from './types.js';
 import {
 	resolveCommitFollowUp,
 	resolveContinueNavigation,
@@ -24,7 +23,7 @@ export type ContinueFollowThrough =
 export type CommitFollowThroughDeps = {
 	clearLinksStay: () => void;
 	navigate: (target: PostCommitTarget) => void;
-	reload: (worklist?: Worklist | null) => Promise<unknown>;
+	reload: () => Promise<unknown>;
 };
 
 /**
@@ -84,12 +83,11 @@ export function applyCommitFollowThrough(
 /** Continue after stay UI cleared: drop links then reload or navigate. */
 export async function applyContinueFollowThrough(
 	decision: ContinueFollowThrough,
-	deps: CommitFollowThroughDeps,
-	worklist?: Worklist | null
+	deps: CommitFollowThroughDeps
 ): Promise<void> {
 	deps.clearLinksStay();
 	if (decision.kind === 'reload') {
-		await deps.reload(worklist);
+		await deps.reload();
 		return;
 	}
 	deps.navigate(decision.target);

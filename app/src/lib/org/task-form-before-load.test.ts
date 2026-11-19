@@ -1,9 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import {
-	awaitOrgSessionWorklist,
-	runTaskFormBeforeLoad
-} from './task-form-before-load.js';
+import { runTaskFormBeforeLoad } from './task-form-before-load.js';
 import { createTaskFormMount } from './task-form-mount.svelte.js';
 import type { TaskFormPort } from './task-form-port.js';
 import type { Worklist } from './types.js';
@@ -44,49 +41,16 @@ function adminWorklist(): Worklist {
 	};
 }
 
-describe('awaitOrgSessionWorklist', () => {
-	test('returns existing worklist without waiting', async () => {
-		const worklist = adminWorklist();
-		const session = { result: { worklist }, loading: false };
-		await expect(awaitOrgSessionWorklist(session, { settleMs: 0 })).resolves.toBe(
-			worklist
-		);
-	});
-
-	test('awaits until loading flips false', async () => {
-		const worklist = adminWorklist();
-		const session = {
-			result: null as { worklist: Worklist } | null,
-			loading: true
-		};
-
-		const pending = awaitOrgSessionWorklist(session, { pollMs: 5, maxMs: 1000, settleMs: 0 });
-		await new Promise((r) => setTimeout(r, 15));
-		session.result = { worklist };
-		session.loading = false;
-
-		await expect(pending).resolves.toBe(worklist);
-	});
-
-	test('settles briefly then proceeds with null when hydrate never starts', async () => {
-		const session = { result: null, loading: false };
-		await expect(
-			awaitOrgSessionWorklist(session, { settleMs: 20, pollMs: 5, maxMs: 50 })
-		).resolves.toBeUndefined();
-	});
-});
-
 describe('runTaskFormBeforeLoad', () => {
-	test('loads mount for allowed provisional address', async () => {
+	test('loads mount for allowed provisional address when Worklist present', async () => {
 		const fetch = vi.fn(async () => sample);
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 		const navigateRedirect = vi.fn();
 
 		await runTaskFormBeforeLoad('/intake/new/register', {
 			mount,
-			session: { result: { worklist: adminWorklist() }, loading: false },
-			navigateRedirect,
-			awaitWorklist: async () => adminWorklist()
+			session: { result: { worklist: adminWorklist() } },
+			navigateRedirect
 		});
 
 		expect(mount.status).toBe('ready');
@@ -95,7 +59,7 @@ describe('runTaskFormBeforeLoad', () => {
 		expect(fetch).toHaveBeenCalledOnce();
 	});
 
-	test('throws navigateRedirect on gate deny', async () => {
+	test('throws navigateRedirect on gate deny without fetching', async () => {
 		const fetch = vi.fn(async () => sample);
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 		const deniedNav = Promise.resolve('nav');
@@ -107,9 +71,8 @@ describe('runTaskFormBeforeLoad', () => {
 		await expect(
 			runTaskFormBeforeLoad('/intake/new/register', {
 				mount,
-				session: { result: { worklist: blocked }, loading: false },
-				navigateRedirect,
-				awaitWorklist: async () => blocked
+				session: { result: { worklist: blocked } },
+				navigateRedirect
 			})
 		).rejects.toBe(deniedNav);
 
@@ -117,5 +80,29 @@ describe('runTaskFormBeforeLoad', () => {
 		expect(mount.redirect).toEqual({ kind: 'home' });
 		expect(navigateRedirect).toHaveBeenCalledWith({ kind: 'home' });
 		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	test('starts fetch and returns when Worklist is not ready yet', async () => {
+		let release: (bundle: TaskFormBundle) => void = () => {};
+		const pendingFetch = new Promise<TaskFormBundle>((resolve) => {
+			release = resolve;
+		});
+		const fetch = vi.fn(() => pendingFetch);
+		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
+		const navigateRedirect = vi.fn();
+
+		await runTaskFormBeforeLoad('/intake/new/register', {
+			mount,
+			session: { result: null },
+			navigateRedirect
+		});
+
+		expect(fetch).toHaveBeenCalledOnce();
+		expect(mount.status).toBe('loading');
+		expect(navigateRedirect).not.toHaveBeenCalled();
+
+		release(sample);
+		await vi.waitFor(() => expect(mount.status).toBe('ready'));
+		expect(mount.bundle).toEqual(sample);
 	});
 });

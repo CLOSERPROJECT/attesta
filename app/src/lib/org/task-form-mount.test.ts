@@ -20,6 +20,13 @@ const sample: TaskFormBundle = {
 	bindings: { domain: {} }
 };
 
+const provisionalAddr = {
+	jobId: 'intake',
+	taskId: 'register',
+	jobInstanceId: '',
+	provisionalJob: true
+} as const;
+
 function adminWorklist(): Worklist {
 	return {
 		jobs: [
@@ -51,22 +58,14 @@ function adminWorklist(): Worklist {
 }
 
 describe('TaskFormMount', () => {
-	test('gate deny exposes redirect and skips fetch', async () => {
+	test('applyGate deny binds address, exposes redirect, and skips fetch', () => {
 		const fetch = vi.fn(async () => sample);
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 		const blocked: Worklist = {
 			jobs: [{ ...adminWorklist().jobs[0]!, canStart: false }]
 		};
 
-		const result = await mount.load(
-			{
-				jobId: 'intake',
-				taskId: 'register',
-				jobInstanceId: '',
-				provisionalJob: true
-			},
-			blocked
-		);
+		const result = mount.applyGate(blocked, provisionalAddr);
 
 		expect(result).toEqual({ kind: 'denied', redirect: { kind: 'home' } });
 		expect(mount.status).toBe('denied');
@@ -76,7 +75,7 @@ describe('TaskFormMount', () => {
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
-	test('allow fetches via TaskFormPort and sets ready bundle', async () => {
+	test('load fetches via TaskFormPort without worklist and sets ready bundle', async () => {
 		const fetch = vi.fn(async (req) => {
 			expect(req).toEqual({
 				jobId: 'intake',
@@ -87,15 +86,7 @@ describe('TaskFormMount', () => {
 		});
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 
-		const result = await mount.load(
-			{
-				jobId: 'intake',
-				taskId: 'register',
-				jobInstanceId: '',
-				provisionalJob: true
-			},
-			adminWorklist()
-		);
+		const result = await mount.load(provisionalAddr);
 
 		expect(result).toEqual({ kind: 'ready' });
 		expect(mount.status).toBe('ready');
@@ -103,6 +94,18 @@ describe('TaskFormMount', () => {
 		expect(mount.error).toBeNull();
 		expect(mount.redirect).toBeNull();
 		expect(mount.addressKey).toBe('intake|new|register');
+		expect(fetch).toHaveBeenCalledOnce();
+	});
+
+	test('applyGate allow after load does not re-fetch', async () => {
+		const fetch = vi.fn(async () => sample);
+		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
+
+		await mount.load(provisionalAddr);
+		expect(fetch).toHaveBeenCalledOnce();
+
+		expect(mount.applyGate(adminWorklist())).toEqual({ kind: 'allow' });
+		expect(mount.status).toBe('ready');
 		expect(fetch).toHaveBeenCalledOnce();
 	});
 
@@ -124,25 +127,14 @@ describe('TaskFormMount', () => {
 
 		const mount = createTaskFormMount({ taskForm: { fetch } });
 
-		const first = mount.load(
-			{
-				jobId: 'intake',
-				taskId: 'register',
-				jobInstanceId: '',
-				provisionalJob: true
-			},
-			adminWorklist()
-		);
+		const first = mount.load(provisionalAddr);
 
-		const second = await mount.load(
-			{
-				jobId: 'intake',
-				taskId: 'codiceFir',
-				jobInstanceId: 'NIR-advance',
-				provisionalJob: false
-			},
-			adminWorklist()
-		);
+		const second = await mount.load({
+			jobId: 'intake',
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-advance',
+			provisionalJob: false
+		});
 
 		expect(second).toEqual({ kind: 'ready' });
 		expect(mount.bundle?.taskId).toBe('codiceFir');
@@ -158,7 +150,32 @@ describe('TaskFormMount', () => {
 		expect(fetch).toHaveBeenCalledTimes(2);
 	});
 
-	test('reload re-fetches last address and accepts fresh worklist', async () => {
+	test('applyGate deny aborts in-flight fetch without a second fetch', async () => {
+		let releaseSlow: (bundle: TaskFormBundle) => void = () => {};
+		const slow = new Promise<TaskFormBundle>((resolve) => {
+			releaseSlow = resolve;
+		});
+		const fetch = vi.fn<TaskFormPort['fetch']>().mockImplementationOnce(() => slow);
+		const mount = createTaskFormMount({ taskForm: { fetch } });
+		const blocked: Worklist = {
+			jobs: [{ ...adminWorklist().jobs[0]!, canStart: false }]
+		};
+
+		const pending = mount.load(provisionalAddr);
+		const gate = mount.applyGate(blocked);
+
+		expect(gate).toEqual({ kind: 'denied', redirect: { kind: 'home' } });
+		expect(mount.status).toBe('denied');
+		expect(fetch).toHaveBeenCalledOnce();
+
+		releaseSlow(sample);
+		await expect(pending).resolves.toEqual({ kind: 'aborted' });
+		expect(mount.status).toBe('denied');
+		expect(mount.bundle).toBeNull();
+		expect(fetch).toHaveBeenCalledOnce();
+	});
+
+	test('reload re-fetches last address without worklist', async () => {
 		const actionable = {
 			...sample,
 			taskId: 'codiceFir',
@@ -171,17 +188,14 @@ describe('TaskFormMount', () => {
 			.mockResolvedValueOnce({ ...actionable, title: 'Codice FIR again' });
 		const mount = createTaskFormMount({ taskForm: { fetch } });
 
-		await mount.load(
-			{
-				jobId: 'intake',
-				taskId: 'codiceFir',
-				jobInstanceId: 'NIR-advance',
-				provisionalJob: false
-			},
-			adminWorklist()
-		);
+		await mount.load({
+			jobId: 'intake',
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-advance',
+			provisionalJob: false
+		});
 
-		const result = await mount.reload(adminWorklist());
+		const result = await mount.reload();
 
 		expect(result).toEqual({ kind: 'ready' });
 		expect(mount.bundle?.title).toBe('Codice FIR again');
