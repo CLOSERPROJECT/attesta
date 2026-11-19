@@ -12,6 +12,9 @@ import (
 //go:embed fixtures/feragame-config.yaml
 var feragameConfigYAML []byte
 
+//go:embed fixtures/second-stream-config.yaml
+var secondStreamConfigYAML []byte
+
 // DefaultFixtureVersion is the Config version assigned when seeding the Feragame fixture.
 const DefaultFixtureVersion = "1"
 
@@ -19,6 +22,12 @@ const DefaultFixtureVersion = "1"
 // steps/substeps → jobs/tasks so Load speaks living nouns only.
 func LoadFeragameConfigFixture() (OrgConfig, error) {
 	return ParseFeragameConfigFixture(feragameConfigYAML)
+}
+
+// LoadSecondStreamConfigFixture parses the embedded minimal second-stream YAML
+// used by isolation tests (not seeded for demo).
+func LoadSecondStreamConfigFixture() (OrgConfig, error) {
+	return ParseFeragameConfigFixture(secondStreamConfigYAML)
 }
 
 // ParseFeragameConfigFixture parses Feragame YAML bytes into an OrgConfig with Job/Task keys.
@@ -106,6 +115,16 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 			return OrgConfig{}, fmt.Errorf("decode dpp: %w", err)
 		}
 		cfg.DPP = &dpp
+	}
+	if streamNode := child(doc, "stream"); streamNode != nil {
+		var stream StreamConfig
+		if err := streamNode.Decode(&stream); err != nil {
+			return OrgConfig{}, fmt.Errorf("decode stream: %w", err)
+		}
+		cfg.Stream = &stream
+	}
+	if err := ValidateStreamConfig(cfg); err != nil {
+		return OrgConfig{}, err
 	}
 	if err := ValidateDPPConfig(cfg); err != nil {
 		return OrgConfig{}, err

@@ -60,6 +60,27 @@ func validateTaskConfigsAt(tasks []TaskConfig, path string) error {
 		if err := validateTaskSubmit(t, prefix); err != nil {
 			return err
 		}
+		if err := validateTaskBlockedReason(t, prefix); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateTaskBlockedReason(t TaskConfig, prefix string) error {
+	if t == nil {
+		return nil
+	}
+	raw, ok := t["blockedReason"]
+	if !ok || raw == nil {
+		return nil
+	}
+	expr, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("%s %q: blockedReason must be a string expression", prefix, t.ID())
+	}
+	if err := compileCheckExpr(fmt.Sprintf("%s %q: blockedReason", prefix, t.ID()), expr); err != nil {
+		return err
 	}
 	return nil
 }

@@ -781,6 +781,7 @@ func authoredInitialDataProbeConfig(initialData any) OrgConfig {
 		ID:      "seed-probe",
 		Org:     "seedorg",
 		Version: "1",
+		Stream:  streamForAnchor("probe", "Probe", "probe"),
 		Domain: map[string]any{
 			"entities": map[string]any{
 				"item": map[string]any{},

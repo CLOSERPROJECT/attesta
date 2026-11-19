@@ -98,7 +98,7 @@ type TaskCommitter struct {
 	LinkStore LinkStore
 	// DPPs persists Passport records when onSubmit.passport is set. Required for that hook.
 	DPPs DPPStore
-	Now       func() time.Time
+	Now  func() time.Time
 }
 
 func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
@@ -148,6 +148,9 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	cfg, err := c.Configs.Get(ctx, org, version)
 	if err != nil {
 		return CommitResult{}, err
+	}
+	if err := ValidateStreamConfig(cfg); err != nil {
+		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}
 	}
 	if err := ValidateDPPConfig(cfg); err != nil {
 		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}

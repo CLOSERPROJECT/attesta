@@ -38,8 +38,9 @@ func submitCardinalityConfig() OrgConfig {
 		"onSubmit": map[string]any{"transform": []any{}},
 	}
 	return OrgConfig{
-		ID:  "submit-cardinality",
-		Org: "cardorg",
+		ID:     "submit-cardinality",
+		Org:    "cardorg",
+		Stream: streamForAnchor("card", "Cardinality", "session"),
 		Jobs: OrderedObject{
 			Keys: []string{"session"},
 			Values: map[string]any{
