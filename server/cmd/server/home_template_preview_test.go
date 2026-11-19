@@ -35,6 +35,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			WorkflowName: "Demo workflow",
 		},
 		WorkflowDescription: "Previewable workflow",
+		ShowPreview:         true,
 		Start: &StartStreamInstanceView{
 			DialogID:    "new-instance-dialog",
 			StartAction: "/my/streams/workflow/instance/start",
