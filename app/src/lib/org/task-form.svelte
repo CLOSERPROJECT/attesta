@@ -7,6 +7,7 @@
 	import type { CommitOutcome } from './commit-port.js';
 	import { orgSession } from './org-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
+	import { isProvisionalJobInstance, normalizeJobInstanceId } from './task-address.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/config-form.svelte';
 	import HttpLinkStrip from './form/http-link-strip.svelte';
@@ -89,13 +90,12 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		if (orgSession.committing) return;
 		submitError = null;
-		const provisionalJob = jobInstanceId === '';
-		const mint = provisionalJob
+		const mint = isProvisionalJobInstance(jobInstanceId)
 			? ({ kind: 'startingNew' } as const)
 			: ({ kind: 'none' } as const);
 		const outcome = await orgSession.commit({
 			taskPath: path,
-			jobInstanceId: provisionalJob ? '' : jobInstanceId,
+			jobInstanceId: normalizeJobInstanceId(jobInstanceId),
 			value,
 			mint,
 			draftBagInstanceKey: draftInstanceKey
