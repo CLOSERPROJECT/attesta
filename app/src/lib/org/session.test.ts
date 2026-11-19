@@ -36,6 +36,8 @@ function manualClock(): DraftPersistClock & { flush: () => void } {
 	};
 }
 
+const hydrateScope = { stream: 'recycling', instance: '261102-1' };
+
 const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
@@ -79,8 +81,9 @@ describe('OrgSession', () => {
 			hydrate: false
 		});
 		expect(session.result).toBeNull();
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		expect(load).toHaveBeenCalledOnce();
+		expect(load).toHaveBeenCalledWith(hydrateScope);
 		expect(session.error).toBeNull();
 		expect(session.result?.org).toBe('feragame');
 		expect(session.operator()).toEqual({
@@ -109,7 +112,7 @@ describe('OrgSession', () => {
 			hydrate: false
 		});
 		session.result = sample;
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		expect(session.result).toBeNull();
 		expect(session.error).toBe('boom');
 	});
@@ -156,6 +159,8 @@ describe('OrgSession', () => {
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
 		const outcome = await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO', palletCount: 1 },
@@ -228,6 +233,7 @@ describe('OrgSession', () => {
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '', { client: 'NO' });
 		const outcome = await session.commit({
+			stream: 'recycling',
 			taskPath: 'intake/register',
 			jobInstanceId: '',
 			value: { client: 'NO' },
@@ -235,6 +241,7 @@ describe('OrgSession', () => {
 		});
 		expect(outcome?.jobInstanceId).toBe('NIR-1');
 		expect(commit).toHaveBeenCalledWith({
+			stream: 'recycling',
 			taskPath: 'intake/register',
 			jobInstanceId: '',
 			value: { client: 'NO' },
@@ -273,6 +280,8 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		const outcome = await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
@@ -306,6 +315,8 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		const outcome = await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/lots/lots-1/register',
 			jobInstanceId: 'T1',
 			value: { lotId: 'L1' },
@@ -341,6 +352,8 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'lot_processing/lock',
 			jobInstanceId: 'L1',
 			value: { ack: true },
@@ -372,6 +385,8 @@ describe('OrgSession', () => {
 		});
 		staySession.result = structuredClone(sample);
 		const outcome = await staySession.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'lot_processing/lock',
 			jobInstanceId: 'L1',
 			value: { ack: true },
@@ -409,9 +424,12 @@ describe('OrgSession', () => {
 			hydrate: false
 		});
 		session.result = structuredClone(sample);
+		session.setScope(hydrateScope);
 		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
 
 		const outcome = await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
@@ -461,6 +479,7 @@ describe('OrgSession', () => {
 			hydrate: false
 		});
 		session.result = structuredClone(sample);
+		session.setScope(hydrateScope);
 		session.seedDraft('intake/register', 'NIR-1', { client: 'seed' });
 		session.setDraft('intake/register', '_new', { client: 'dirty' });
 
@@ -491,6 +510,8 @@ describe('OrgSession', () => {
 		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
 
 		await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
@@ -512,11 +533,11 @@ describe('OrgSession', () => {
 			debounceMs: DEFAULT_DRAFT_DEBOUNCE_MS,
 			flushOnHide: false
 		});
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		const path = 'intake/register';
 		const bagKey = 'NIR-1';
 		const key = draftKey(path, bagKey);
-		const storageKey = orgDraftStorageKey('feragame', 'u1', key);
+		const storageKey = orgDraftStorageKey('feragame', 'recycling', 'u1', key);
 
 		session.seedDraft(path, bagKey, { client: 'seed' });
 		clock.flush();
@@ -533,7 +554,7 @@ describe('OrgSession', () => {
 	test('rehydrate on identity known; refreshKeepDrafts does not clobber memory', async () => {
 		const bagKey = draftKey('intake/register', 'NIR-1');
 		const storage = memoryStorage({
-			[orgDraftStorageKey('feragame', 'u1', bagKey)]: JSON.stringify({
+			[orgDraftStorageKey('feragame', 'recycling', 'u1', bagKey)]: JSON.stringify({
 				client: 'from-storage'
 			})
 		});
@@ -547,7 +568,7 @@ describe('OrgSession', () => {
 		});
 
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		expect(session.getDraft('intake/register', 'NIR-1')).toEqual({ client: 'from-storage' });
 		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
 
@@ -578,11 +599,12 @@ describe('OrgSession', () => {
 			debounceMs: DEFAULT_DRAFT_DEBOUNCE_MS,
 			flushOnHide: false
 		});
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		const path = 'intake/register';
 		const bagKey = 'NIR-1';
 		const storageKey = orgDraftStorageKey(
 			'feragame',
+			'recycling',
 			'u1',
 			draftKey(path, bagKey)
 		);
@@ -593,6 +615,8 @@ describe('OrgSession', () => {
 		expect(readStoredDraft(storage, storageKey)).toEqual({ client: 'pending' });
 
 		await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: path,
 			jobInstanceId: bagKey,
 			value: { client: 'pending' },
@@ -606,11 +630,13 @@ describe('OrgSession', () => {
 		const storage = memoryStorage();
 		const adaKey = orgDraftStorageKey(
 			'feragame',
+			'recycling',
 			'u1',
 			draftKey('intake/register', 'NIR-1')
 		);
 		const otherKey = orgDraftStorageKey(
 			'other-org',
+			'recycling',
 			'u9',
 			draftKey('intake/register', 'OTHER')
 		);
@@ -624,7 +650,7 @@ describe('OrgSession', () => {
 			debounceMs: 0,
 			flushOnHide: false
 		});
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		session.setDraft('intake/register', 'NIR-1', { client: 'ada' });
 		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
 		expect(readStoredDraft(storage, adaKey)).toEqual({ client: 'ada' });
@@ -635,7 +661,7 @@ describe('OrgSession', () => {
 			userId: 'u2',
 			displayName: 'Bob'
 		};
-		await session.hydrate();
+		await session.hydrate(hydrateScope);
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
 		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(false);
 		// Prior user's dirty key remains in storage; unrelated user key untouched.
@@ -673,6 +699,8 @@ describe('OrgSession', () => {
 			expect(session).not.toHaveProperty(key);
 		}
 		const outcome = await session.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: {},

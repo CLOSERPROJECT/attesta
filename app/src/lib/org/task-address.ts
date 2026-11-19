@@ -1,10 +1,12 @@
 import { PROVISIONAL_JOB_INSTANCE_ID } from './types.js';
 
 /**
- * Normalized Task path address.
+ * Normalized Task path address under a stream instance.
  * `jobInstanceId` is empty when provisional; wire/URL uses `new` via helpers below.
  */
 export type TaskAddress = {
+	stream: string;
+	instance: string;
 	jobId: string;
 	taskId: string;
 	jobInstanceId: string;
@@ -21,14 +23,18 @@ export function normalizeJobInstanceId(routeInstance: string): string {
 	return isProvisionalJobInstance(routeInstance) ? '' : routeInstance;
 }
 
-/** Normalize Job + instance + Task segments into one Task address. */
+/** Normalize stream + Job + instance + Task segments into one Task address. */
 export function normalizeTaskAddress(input: {
+	stream: string;
+	instance: string;
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
 }): TaskAddress {
 	const provisionalJob = isProvisionalJobInstance(input.jobInstanceId);
 	return {
+		stream: input.stream,
+		instance: input.instance,
 		jobId: input.jobId,
 		taskId: input.taskId,
 		jobInstanceId: provisionalJob ? '' : input.jobInstanceId,
@@ -42,11 +48,18 @@ export function taskRouteInstanceSegment(jobInstanceId: string): string {
 }
 
 /** Wire `jobInstanceId` for TaskForm fetch (provisional → `new`). */
-export function wireJobInstanceId(addr: Pick<TaskAddress, 'provisionalJob' | 'jobInstanceId'>): string {
+export function wireJobInstanceId(
+	addr: Pick<TaskAddress, 'provisionalJob' | 'jobInstanceId'>
+): string {
 	return addr.provisionalJob ? PROVISIONAL_JOB_INSTANCE_ID : addr.jobInstanceId;
 }
 
-/** Stable address key (`intake|new|register`); provisional always keyed as `new`. */
-export function taskAddressKey(addr: Pick<TaskAddress, 'jobId' | 'taskId' | 'jobInstanceId' | 'provisionalJob'>): string {
-	return `${addr.jobId}|${wireJobInstanceId(addr)}|${addr.taskId}`;
+/** Stable address key (`recycling|261102-1|intake|new|register`); provisional always keyed as `new`. */
+export function taskAddressKey(
+	addr: Pick<
+		TaskAddress,
+		'stream' | 'instance' | 'jobId' | 'taskId' | 'jobInstanceId' | 'provisionalJob'
+	>
+): string {
+	return `${addr.stream}|${addr.instance}|${addr.jobId}|${wireJobInstanceId(addr)}|${addr.taskId}`;
 }

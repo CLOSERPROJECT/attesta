@@ -1,6 +1,7 @@
 import type { HttpLinkItem } from './commit-port.js';
+import type { StreamScope } from './stream-scope.js';
 
-export type TaskRecapRequest = {
+export type TaskRecapRequest = StreamScope & {
 	jobId: string;
 	taskId: string;
 	jobInstanceId: string;

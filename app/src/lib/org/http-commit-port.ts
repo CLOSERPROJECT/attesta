@@ -9,6 +9,7 @@ import {
 	type HttpLinkItem
 } from './commit-port.js';
 import { parseHttpLinkItem } from './parse-http-link-item.js';
+import { streamScopeQuery } from './stream-scope.js';
 import { emptyWorklist, type TaskFormBundle, type Worklist } from './types.js';
 
 export type HttpCommitDomainPortOptions = {
@@ -125,7 +126,11 @@ export function createHttpCommitDomainPort(
 
 	return {
 		async commit(req) {
-			const res = await fetchFn(`${base}/api/org/commit`, {
+			const qs = streamScopeQuery({
+				stream: req.stream,
+				instance: req.instance
+			});
+			const res = await fetchFn(`${base}/api/org/commit?${qs}`, {
 				method: 'POST',
 				credentials: 'include',
 				headers: {

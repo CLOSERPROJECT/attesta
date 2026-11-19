@@ -2,7 +2,6 @@
 	import type { Snippet } from 'svelte';
 	import { onMount } from 'svelte';
 
-	import Archive from '@lucide/svelte/icons/archive';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import Scan from '@lucide/svelte/icons/scan';
 
@@ -18,32 +17,36 @@
 		resolveNavPlace
 	} from '#lib/org/nav-place.js';
 	import { normalizeTaskAddress } from '#lib/org/task-address.js';
-	import { takeColdEntityIdRaw } from '#lib/org/qr-resolve-apply.js';
 	import { runQrScan } from '#lib/org/qr-scan-flow.js';
 	import { orgToast } from '#lib/org/toast.svelte.js';
 	import { Badge } from '#lib/shadcn/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
-	import { hrefOrgTarget, navigateOrgTarget } from '#lib/router/navigate-target.js';
-	import { isActive, route } from '#lib/router/index.js';
+	import { navigateOrgTarget } from '#lib/router/navigate-target.js';
+	import { route } from '#lib/router/index.js';
 
 	let { children }: { children: Snippet } = $props();
 
-	// Pathname segments only — avoid sv-router param leakage across matches.
 	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
-	const addr = $derived(normalizeTaskAddress(coords));
-	const jobId = $derived(addr.jobId);
-	const jobInstanceId = $derived(addr.jobInstanceId);
-
 	const placeKind = $derived(navPlaceKindFromRoute({ pathname: route.pathname }));
-	const taskId = $derived(placeKind === 'task' ? addr.taskId : '');
+	const addr = $derived(
+		normalizeTaskAddress({
+			stream: coords.stream,
+			instance: coords.instance,
+			jobId: coords.jobId,
+			jobInstanceId: coords.jobInstanceId,
+			taskId: coords.taskId
+		})
+	);
 
 	const place = $derived(
 		resolveNavPlace({
 			kind: placeKind,
-			jobId,
-			jobInstanceId,
-			taskId,
-			provisionalJob: placeKind === 'task' ? addr.provisionalJob : false,
+			stream: coords.stream,
+			instance: coords.instance,
+			jobId: addr.jobId,
+			jobInstanceId: addr.jobInstanceId,
+			taskId: placeKind === 'task' ? addr.taskId : '',
+			provisionalJob: placeKind === 'task' ? addr.provisionalJob : placeKind === 'play',
 			worklist: orgSession.result?.worklist
 		})
 	);
@@ -55,12 +58,14 @@
 	let scanBusy = $state(false);
 
 	async function handleRaw(raw: string) {
-		if (scanBusy) return;
+		if (scanBusy || !coords.stream) return;
 		scanBusy = true;
 		try {
 			await runQrScan(
 				{
 					resolve: qrPort.resolve,
+					stream: coords.stream,
+					instance: coords.instance || undefined,
 					drafts: orgSession,
 					navigate: navigateOrgTarget,
 					toast: (message) => orgToast.show(message)
@@ -73,13 +78,21 @@
 	}
 
 	onMount(() => {
-		if (!orgSession.result && !orgSession.loading) {
-			void orgSession.hydrate();
+		if (
+			coords.stream &&
+			coords.instance &&
+			!orgSession.result &&
+			!orgSession.loading
+		) {
+			void orgSession.hydrate({ stream: coords.stream, instance: coords.instance });
 		}
-		const { raw, strippedHref } = takeColdEntityIdRaw(window.location.href);
-		if (!raw) return;
-		window.history.replaceState(window.history.state, '', strippedHref);
-		void handleRaw(raw);
+	});
+
+	$effect(() => {
+		const { stream, instance } = coords;
+		if (!stream || !instance) return;
+		if (placeKind !== 'home' && placeKind !== 'task') return;
+		orgSession.setScope({ stream, instance });
 	});
 </script>
 
@@ -128,32 +141,22 @@
 				{/each}
 			</div>
 		{/if}
-		{#if placeKind !== 'archive'}
-			<a
-				class={buttonVariants({ variant: 'outline', size: 'sm' })}
-				aria-label={m.nav_archive()}
-				aria-current={isActive('/archive') ? 'page' : undefined}
-				data-testid="nav-archive"
-				href={hrefOrgTarget({ kind: 'archive' })}
+		{#if coords.stream}
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				aria-label={m.nav_scan()}
+				data-testid="nav-scan"
+				disabled={scanBusy}
+				onclick={() => {
+					scanOpen = true;
+				}}
 			>
-				<Archive class="size-4" />
-				{m.nav_archive()}
-			</a>
+				<Scan class="size-4" />
+				{m.nav_scan()}
+			</Button>
 		{/if}
-		<Button
-			type="button"
-			variant="outline"
-			size="sm"
-			aria-label={m.nav_scan()}
-			data-testid="nav-scan"
-			disabled={scanBusy}
-			onclick={() => {
-				scanOpen = true;
-			}}
-		>
-			<Scan class="size-4" />
-			{m.nav_scan()}
-		</Button>
 	</div>
 </nav>
 

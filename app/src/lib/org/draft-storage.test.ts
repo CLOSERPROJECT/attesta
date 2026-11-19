@@ -12,19 +12,21 @@ import {
 } from './draft-storage.js';
 
 describe('draft-storage keys', () => {
-	test('prefix and full key format', () => {
+	test('prefix and full key include stream', () => {
 		expect(DRAFT_STORAGE_PREFIX).toBe('attesta:org-draft:');
-		expect(orgDraftStoragePrefix('feragame', 'u1')).toBe('attesta:org-draft:feragame:u1:');
-		expect(orgDraftStorageKey('feragame', 'u1', 'register::NIR-1')).toBe(
-			'attesta:org-draft:feragame:u1:register::NIR-1'
+		expect(orgDraftStoragePrefix('feragame', 'recycling', 'u1')).toBe(
+			'attesta:org-draft:feragame:recycling:u1:'
 		);
+		expect(
+			orgDraftStorageKey('feragame', 'recycling', 'u1', 'register::NIR-1')
+		).toBe('attesta:org-draft:feragame:recycling:u1:register::NIR-1');
 	});
 });
 
 describe('draft-storage read/write/remove', () => {
 	test('memoryStorage roundtrip persists raw JSON object', () => {
 		const storage = memoryStorage();
-		const key = orgDraftStorageKey('feragame', 'u1', 'task::_new');
+		const key = orgDraftStorageKey('feragame', 'recycling', 'u1', 'task::_new');
 		const value = { plate: 'AB123', weight: 42 };
 
 		writeStoredDraft(storage, key, value);
@@ -50,7 +52,7 @@ describe('draft-storage read/write/remove', () => {
 	});
 
 	test('null storage is a no-op for write/remove and read', () => {
-		const key = orgDraftStorageKey('org', 'user', 'k');
+		const key = orgDraftStorageKey('org', 'recycling', 'user', 'k');
 		expect(readStoredDraft(null, key)).toBeNull();
 		writeStoredDraft(undefined, key, { a: 1 });
 		removeStoredDraft(null, key);
@@ -58,21 +60,38 @@ describe('draft-storage read/write/remove', () => {
 });
 
 describe('loadDirtyDraftsForIdentity', () => {
-	test('loads drafts for org/user prefix and ignores other identities', () => {
+	test('loads drafts for org/stream/user prefix and ignores other streams', () => {
 		const storage = memoryStorage();
-		const ownA = orgDraftStorageKey('feragame', 'u1', 'register::inst-1');
-		const ownB = orgDraftStorageKey('feragame', 'u1', 'palletWeight::inst-1');
-		const otherOrg = orgDraftStorageKey('other', 'u1', 'register::inst-1');
-		const otherUser = orgDraftStorageKey('feragame', 'u2', 'register::inst-1');
+		const ownA = orgDraftStorageKey('feragame', 'recycling', 'u1', 'register::inst-1');
+		const ownB = orgDraftStorageKey(
+			'feragame',
+			'recycling',
+			'u1',
+			'palletWeight::inst-1'
+		);
+		const otherStream = orgDraftStorageKey(
+			'feragame',
+			'other',
+			'u1',
+			'register::inst-1'
+		);
+		const otherOrg = orgDraftStorageKey('other', 'recycling', 'u1', 'register::inst-1');
+		const otherUser = orgDraftStorageKey(
+			'feragame',
+			'recycling',
+			'u2',
+			'register::inst-1'
+		);
 		const unrelated = 'some-other-app-key';
 
 		writeStoredDraft(storage, ownA, { field: 'a' });
 		writeStoredDraft(storage, ownB, { field: 'b' });
+		writeStoredDraft(storage, otherStream, { field: 'leak' });
 		writeStoredDraft(storage, otherOrg, { field: 'x' });
 		writeStoredDraft(storage, otherUser, { field: 'y' });
 		storage.setItem(unrelated, '{"ignored":true}');
 
-		expect(loadDirtyDraftsForIdentity(storage, 'feragame', 'u1')).toEqual({
+		expect(loadDirtyDraftsForIdentity(storage, 'feragame', 'recycling', 'u1')).toEqual({
 			'register::inst-1': { field: 'a' },
 			'palletWeight::inst-1': { field: 'b' }
 		});
@@ -80,17 +99,17 @@ describe('loadDirtyDraftsForIdentity', () => {
 
 	test('skips keys under prefix with invalid JSON', () => {
 		const storage = memoryStorage();
-		const goodKey = orgDraftStorageKey('feragame', 'u1', 'ok');
-		const badKey = orgDraftStorageKey('feragame', 'u1', 'broken');
+		const goodKey = orgDraftStorageKey('feragame', 'recycling', 'u1', 'ok');
+		const badKey = orgDraftStorageKey('feragame', 'recycling', 'u1', 'broken');
 		writeStoredDraft(storage, goodKey, { ok: true });
 		storage.setItem(badKey, 'not-json');
 
-		expect(loadDirtyDraftsForIdentity(storage, 'feragame', 'u1')).toEqual({
+		expect(loadDirtyDraftsForIdentity(storage, 'feragame', 'recycling', 'u1')).toEqual({
 			ok: { ok: true }
 		});
 	});
 
 	test('returns empty map when storage is null', () => {
-		expect(loadDirtyDraftsForIdentity(null, 'feragame', 'u1')).toEqual({});
+		expect(loadDirtyDraftsForIdentity(null, 'feragame', 'recycling', 'u1')).toEqual({});
 	});
 });

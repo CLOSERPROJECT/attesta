@@ -12,18 +12,15 @@ vi.mock('../router/index.js', () => ({
 	navigate: vi.fn()
 }));
 
-import { hrefOrgTarget } from '../router/navigate-target.js';
 import type { Worklist } from './types.js';
 import {
 	actNowRowKey,
 	actNowRowsFromWorklist,
 	availableRowKey,
 	availableRowsFromWorklist,
-	availableRowTarget,
 	canStartRowsFromWorklist,
 	completedRowKey,
 	completedRowsFromWorklist,
-	completedRowTarget,
 	instanceTaskProgress,
 	progressFraction,
 	taskRouteInstanceSegment
@@ -406,18 +403,9 @@ describe('worklist-home bands', () => {
 		for (const key of ['intake/NIR-1', 'intake/NIR-2', 'lot_processing/CO-1']) {
 			expect(rows.map((r) => completedRowKey(r))).not.toContain(key);
 		}
-
-		expect(completedRowTarget(rows[0]!)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-done'
-		});
-		expect(hrefOrgTarget(completedRowTarget(rows[0]!))).toBe(
-			'/app/intake/NIR-done'
-		);
 	});
 
-	test('Archive list uses completedRows (flat; not on act-now home)', () => {
+	test('completedRows stay off act-now home (no Archive place)', () => {
 		const mixed: Worklist = {
 			jobs: [
 				{
@@ -442,16 +430,11 @@ describe('worklist-home bands', () => {
 				}
 			]
 		};
-		const archive = completedRowsFromWorklist(mixed);
-		expect(archive.map((r) => completedRowKey(r))).toEqual(['intake/NIR-done']);
+		const completed = completedRowsFromWorklist(mixed);
+		expect(completed.map((r) => completedRowKey(r))).toEqual(['intake/NIR-done']);
 		expect(actNowRowsFromWorklist(mixed).map((r) => actNowRowKey(r))).toEqual([
 			'task:intake/NIR-open/register',
 			'start:intake'
 		]);
-		expect(completedRowTarget(archive[0]!)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-done'
-		});
 	});
 });

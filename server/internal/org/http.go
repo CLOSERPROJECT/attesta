@@ -30,10 +30,17 @@ type API struct {
 	Artifacts *SidecarHttpPort
 }
 
+// StreamPlayStart is the anchor Job's first Task (Play / mint.startingNew).
+type StreamPlayStart struct {
+	JobID  string `json:"jobId"`
+	TaskID string `json:"taskId"`
+}
+
 // StreamListItem is one row of GET /api/org/streams.
 type StreamListItem struct {
-	Key   string `json:"key"`
-	Title string `json:"title"`
+	Key   string           `json:"key"`
+	Title string           `json:"title"`
+	Play  *StreamPlayStart `json:"play,omitempty"`
 }
 
 func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +103,11 @@ func (h *API) handleStreams(w http.ResponseWriter, r *http.Request) {
 		if title == "" {
 			title = key
 		}
-		out = append(out, StreamListItem{Key: key, Title: title})
+		item := StreamListItem{Key: key, Title: title}
+		if play := streamPlayStart(cfg); play != nil {
+			item.Play = play
+		}
+		out = append(out, item)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -543,6 +554,29 @@ func (h *API) resolveStreamScope(
 		return Scope{}, OrgConfig{}, false
 	}
 	return scope, cfg, true
+}
+
+func streamPlayStart(cfg OrgConfig) *StreamPlayStart {
+	if cfg.Stream == nil {
+		return nil
+	}
+	jobID := strings.TrimSpace(cfg.Stream.Instance.Job)
+	if jobID == "" {
+		return nil
+	}
+	jobVal, ok := cfg.Jobs.Get(jobID)
+	if !ok {
+		return nil
+	}
+	job, ok := AsJob(jobVal)
+	if !ok {
+		return nil
+	}
+	ordered := OrderedTaskIDs(job.Tasks)
+	if len(ordered) == 0 {
+		return nil
+	}
+	return &StreamPlayStart{JobID: jobID, TaskID: ordered[0]}
 }
 
 func (h *API) ensureStreamInstance(
