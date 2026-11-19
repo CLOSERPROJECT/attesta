@@ -35,10 +35,10 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	}
 
 	configs := NewMemoryConfigStore()
-	if err := configs.Put(t.Context(), "feragame", decoded.Version, decoded); err != nil {
+	if err := configs.Put(t.Context(), FeragameScope(), decoded.Version, decoded); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "feragame", decoded.Version); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), FeragameScope(), decoded.Version); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -94,14 +94,14 @@ func TestCommitTruckArriveStartingNewAfterMongoJSONMintsTruckID(t *testing.T) {
 	}
 
 	configs := NewMemoryConfigStore()
-	_ = configs.Put(t.Context(), "feragame", decoded.Version, decoded)
-	_ = configs.SetActiveVersion(t.Context(), "feragame", decoded.Version)
+	_ = configs.Put(t.Context(), FeragameScope(), decoded.Version, decoded)
+	_ = configs.SetActiveVersion(t.Context(), FeragameScope(), decoded.Version)
 	c := &TaskCommitter{
 		Domains: NewMemoryDomainStore(), Configs: configs, Authorizer: AllowAllAuthorizer{},
 		Now: func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err != nil {
@@ -115,7 +115,7 @@ func TestCommitTruckArriveStartingNewAfterMongoJSONMintsTruckID(t *testing.T) {
 func TestCommitRejectsWireNewSentinel(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "intake/truckArrive",
 		JobInstanceID: "_new",
 		Value:         truckArriveValue(),

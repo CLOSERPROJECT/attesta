@@ -117,10 +117,10 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryDPPStore()
 	cfg := syntheticDPPConfig()
-	if err := configs.Put(t.Context(), "synth", "v1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "synth", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
@@ -128,7 +128,7 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 		"W-9": {"lot": "LOT-9", "color": "blue"},
 	})
 	domain.JobInstances = []JobInstance{{JobID: "issue", ID: "W-9", Label: "Widget W-9"}}
-	if err := domains.Put(t.Context(), "synth", domain); err != nil {
+	if err := domains.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, domain); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 		Now:        func() time.Time { return time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC) },
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}
-	result, err := c.Commit(t.Context(), "synth", op, CommitRequest{
+	result, err := c.Commit(t.Context(), Scope{Org: "synth", Stream: "synth"}, op, CommitRequest{
 		TaskPath:      "issue/lock",
 		JobInstanceID: "W-9",
 		Value:         map[string]any{"ack": true},
@@ -179,7 +179,7 @@ func TestCommitPassportProducerIssuesOnce(t *testing.T) {
 		t.Fatalf("digitalLink = %q", rec.DigitalLink)
 	}
 
-	_, err = c.Commit(t.Context(), "synth", op, CommitRequest{
+	_, err = c.Commit(t.Context(), Scope{Org: "synth", Stream: "synth"}, op, CommitRequest{
 		TaskPath:      "issue/lock",
 		JobInstanceID: "W-9",
 		Value:         map[string]any{"ack": true},
@@ -195,23 +195,23 @@ func TestCommitPassportRequiresRootBlock(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	cfg := syntheticDPPConfig()
 	cfg.DPP = nil
-	if err := configs.Put(t.Context(), "synth", "v1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "synth", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
 	putKind(&domain, "widget", EntityMap{"W-1": {"lot": "L"}})
 	domain.JobInstances = []JobInstance{{JobID: "issue", ID: "W-1", Label: "W-1"}}
-	_ = domains.Put(t.Context(), "synth", domain)
+	_ = domains.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, domain)
 
 	c := &TaskCommitter{
 		Domains: domains, Configs: configs, DPPs: NewMemoryDPPStore(),
 		Authorizer: AllowAllAuthorizer{},
 		Now:        func() time.Time { return time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC) },
 	}
-	_, err := c.Commit(t.Context(), "synth", OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}, CommitRequest{
+	_, err := c.Commit(t.Context(), Scope{Org: "synth", Stream: "synth"}, OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}, CommitRequest{
 		TaskPath: "issue/lock", JobInstanceID: "W-1", Value: map[string]any{"ack": true},
 	})
 	var ce *CommitError
@@ -228,23 +228,23 @@ func TestCommitWithoutPassportOptInSkipsStore(t *testing.T) {
 	lock := cfg.Jobs.Values["issue"].(Job).Tasks[0]
 	onSubmit := lock["onSubmit"].(map[string]any)
 	delete(onSubmit, "passport")
-	if err := configs.Put(t.Context(), "synth", "v1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "synth", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
 	putKind(&domain, "widget", EntityMap{"W-2": {"lot": "L2"}})
 	domain.JobInstances = []JobInstance{{JobID: "issue", ID: "W-2", Label: "W-2"}}
-	_ = domains.Put(t.Context(), "synth", domain)
+	_ = domains.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, domain)
 
 	c := &TaskCommitter{
 		Domains: domains, Configs: configs, DPPs: passports,
 		Authorizer: AllowAllAuthorizer{},
 		Now:        func() time.Time { return time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC) },
 	}
-	result, err := c.Commit(t.Context(), "synth", OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}, CommitRequest{
+	result, err := c.Commit(t.Context(), Scope{Org: "synth", Stream: "synth"}, OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}, CommitRequest{
 		TaskPath: "issue/lock", JobInstanceID: "W-2", Value: map[string]any{"ack": true},
 	})
 	if err != nil {

@@ -356,14 +356,14 @@ func TestSeedFixtureConfigStoreSetsActiveVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, err := store.ActiveVersion(t.Context(), cfg.Org)
+	version, err := store.ActiveVersion(t.Context(), mustScope(t, cfg))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if version != DefaultFixtureVersion {
 		t.Fatalf("active = %q", version)
 	}
-	got, err := store.Get(t.Context(), cfg.Org, version)
+	got, err := store.Get(t.Context(), mustScope(t, cfg), version)
 	if err != nil {
 		t.Fatal(err)
 	}

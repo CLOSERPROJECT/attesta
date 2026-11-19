@@ -25,10 +25,10 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	cfg.Version = DefaultFixtureVersion
-	if err := configs.Put(t.Context(), "feragame", cfg.Version, cfg); err != nil {
+	if err := configs.Put(t.Context(), FeragameScope(), cfg.Version, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "feragame", cfg.Version); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), FeragameScope(), cfg.Version); err != nil {
 		t.Fatal(err)
 	}
 	c := &TaskCommitter{
@@ -38,7 +38,7 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 		Now:        func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
 	opID := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	result, err := c.Commit(t.Context(), "feragame", opID, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), opID, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(),
 		Mint: startingNewMint(),
 	})
@@ -57,7 +57,7 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 func TestCommitStartLotLabelFromConfigExpr(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	_, loadID := plantIntakeOneLot(t, c)
-	result, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
+	result, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "ada", Org: "feragame", Roles: []string{"logistic"},
 	}, CommitRequest{
 		TaskPath: "lot_processing/startLot",

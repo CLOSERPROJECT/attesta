@@ -92,7 +92,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFails(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
-	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
 		Value:         map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
@@ -101,7 +101,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFails(t *testing.T) {
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("err = %v", err)
 	}
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestCommitLotRegisterAllowedViaCerbosWhenReadyWhenOk(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestCommitLotRegisterAllowedViaCerbosWhenReadyWhenOk(t *testing.T) {
 		t.Fatalf("submissions before register = %#v", before.Submissions)
 	}
 
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
@@ -150,12 +150,12 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
 	})
@@ -163,7 +163,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("weightCheck before register should deny via readyWhen: %v", err)
 	}
-	after, err := domains.Get(t.Context(), "feragame")
+	after, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestCommitTruckArriveAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 
 	c, _, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -200,7 +200,7 @@ func TestCommitTruckArriveDeniedViaCerbosWhenRoleDisallowed(t *testing.T) {
 	defer pdp.Close()
 
 	c, domains, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
-	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{
+	_, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "gio",
 		Org:    "feragame",
 		Roles:  []string{"logistic"},
@@ -213,7 +213,7 @@ func TestCommitTruckArriveDeniedViaCerbosWhenRoleDisallowed(t *testing.T) {
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("err = %v", err)
 	}
-	if _, getErr := domains.Get(t.Context(), "feragame"); getErr == nil {
+	if _, getErr := domains.Get(t.Context(), FeragameScope()); getErr == nil {
 		t.Fatal("domain should remain unset when Cerbos denies")
 	}
 }

@@ -37,7 +37,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 		t.Fatalf("intake canStart on empty domain = %#v, want true", intake)
 	}
 
-	arrive, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	arrive, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -61,7 +61,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 	if !ok || blocked.CanStart {
 		t.Fatalf("intake canStart with open incomplete truck = %#v, want false", blocked)
 	}
-	_, err = c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -79,7 +79,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 	net, _ := reg.Domain.Kind("lot")[loadID]["netWeight"].(float64)
 	plantCommitWeightCheck(t, c, truckID, 1000.0, net)
 
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 	if !ok || !ready.CanStart {
 		t.Fatalf("intake canStart after weightCheck = %#v, want true", ready)
 	}
-	second, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	second, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -107,7 +107,7 @@ func TestLotExclusivityOneOpenLot(t *testing.T) {
 
 	_, load1, load2 := plantIntakeTwoLots(t, c)
 
-	first, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	first, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": load1},
 		Mint:     startingNewMint(),
@@ -126,7 +126,7 @@ func TestLotExclusivityOneOpenLot(t *testing.T) {
 	if !ok || lp.CanStart {
 		t.Fatalf("lot_processing canStart with one open lot = %#v, want false", lp)
 	}
-	_, err = c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": load2},
 		Mint:     startingNewMint(),
@@ -151,7 +151,7 @@ func TestLotExclusivityOneOpenLot(t *testing.T) {
 	if !ok || !ready.CanStart {
 		t.Fatalf("lot_processing canStart after closeLot = %#v, want true", ready)
 	}
-	second, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	second, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": load2},
 		Mint:     startingNewMint(),
@@ -168,7 +168,7 @@ func TestLineCannotStartLotProcessing(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, readyWhenGateAuthorizer{})
 	_, loadID := plantIntakeOneLot(t, c)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestLineCannotStartLotProcessing(t *testing.T) {
 	if !ok || lp.CanStart {
 		t.Fatalf("line canStart lot_processing = %#v, want false (startLot is logistic)", lp)
 	}
-	_, err = c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), lineOp, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": loadID},
 		Mint:     startingNewMint(),
@@ -190,7 +190,7 @@ func TestLineCannotStartLotProcessing(t *testing.T) {
 
 func plantCommitArrive(t *testing.T, c *TaskCommitter) string {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -206,7 +206,7 @@ func plantCommitArrive(t *testing.T, c *TaskCommitter) string {
 
 func plantCommitRegister(t *testing.T, c *TaskCommitter, truckID string, value map[string]any) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         value,
@@ -219,7 +219,7 @@ func plantCommitRegister(t *testing.T, c *TaskCommitter, truckID string, value m
 
 func plantCommitWeightCheck(t *testing.T, c *TaskCommitter, truckID string, truckWeight, lotSum float64) {
 	t.Helper()
-	if _, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	if _, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
 		Value: map[string]any{
@@ -269,7 +269,7 @@ func plantIntakeTwoLots(t *testing.T, c *TaskCommitter) (truckID, load1, load2 s
 
 func plantCommitStartLot(t *testing.T, c *TaskCommitter, lotID string) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": lotID},
 		Mint:     startingNewMint(),
@@ -285,7 +285,7 @@ func plantCommitStartLot(t *testing.T, c *TaskCommitter, lotID string) CommitRes
 
 func plantCommitWeigh(t *testing.T, c *TaskCommitter, lotID, palletID string, weight float64) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/weigh",
 		JobInstanceID: lotID,
 		Value:         weighValue(palletID, weight),
@@ -298,7 +298,7 @@ func plantCommitWeigh(t *testing.T, c *TaskCommitter, lotID, palletID string, we
 
 func plantCommitMarkProgress(t *testing.T, c *TaskCommitter, lotID string, progress map[string]any) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value:         map[string]any{"progress": progress},
@@ -311,7 +311,7 @@ func plantCommitMarkProgress(t *testing.T, c *TaskCommitter, lotID string, progr
 
 func plantCommitCloseLot(t *testing.T, c *TaskCommitter, lotID string) CommitResult {
 	t.Helper()
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/closeLot",
 		JobInstanceID: lotID,
 		Value:         map[string]any{},

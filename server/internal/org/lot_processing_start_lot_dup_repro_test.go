@@ -11,7 +11,7 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	_, loadID := plantIntakeOneLot(t, c)
 
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
-	first, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	first, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": loadID},
 		Mint:     startingNewMint(),
@@ -23,7 +23,7 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 		t.Fatalf("first mint = %q, want %q", first.JobInstanceID, loadID)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": loadID},
 		Mint:     startingNewMint(),
@@ -33,7 +33,7 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 		t.Fatalf("second startingNew must prep-deny: %v", err)
 	}
 
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}

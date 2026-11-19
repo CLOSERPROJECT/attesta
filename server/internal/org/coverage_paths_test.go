@@ -543,38 +543,38 @@ func TestCommitterValidationBranches(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	_, err := c.Commit(t.Context(), "  ", op, CommitRequest{})
+	_, err := c.Commit(t.Context(), Scope{}, op, CommitRequest{})
 	var ce *CommitError
 	if !asCommitError(err, &ce) || ce.Kind != "forbidden" {
 		t.Fatalf("empty org = %v", err)
 	}
-	_, err = (&TaskCommitter{}).Commit(t.Context(), "feragame", op, CommitRequest{})
+	_, err = (&TaskCommitter{}).Commit(t.Context(), FeragameScope(), op, CommitRequest{})
 	if err == nil {
 		t.Fatal("nil stores")
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{TaskPath: "bad", Value: map[string]any{}})
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{TaskPath: "bad", Value: map[string]any{}})
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("bad path = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", Mint: &CommitMint{Kind: "weird"}, Value: map[string]any{},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("bad mint = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: "_new", Value: map[string]any{},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("_new = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", Mint: &CommitMint{Kind: MintKindNone}, Value: map[string]any{},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("missing instance = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: "x", Mint: &CommitMint{Kind: MintKindNone},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
@@ -1202,10 +1202,10 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 		t.Fatal("missing keys")
 	}
 
-	if _, err := (&DomainLoader{}).Load(t.Context(), "", OperatorIdentity{}); err == nil {
+	if _, err := (&DomainLoader{}).Load(t.Context(), Scope{}, OperatorIdentity{}); err == nil {
 		t.Fatal("empty org")
 	}
-	if _, err := (&DomainLoader{}).Load(t.Context(), "x", OperatorIdentity{}); err == nil {
+	if _, err := (&DomainLoader{}).Load(t.Context(), Scope{Org: "x"}, OperatorIdentity{}); err == nil {
 		t.Fatal("nil stores")
 	}
 	configs := NewMemoryConfigStore()
@@ -1216,16 +1216,16 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 		Domains: &errDomainStore{err: errors.New("boom")},
 		Configs: configs,
 	}
-	if _, err := failing.Load(t.Context(), "feragame", FixtureAllRolesOp()); err == nil {
+	if _, err := failing.Load(t.Context(), FeragameScope(), FixtureAllRolesOp()); err == nil {
 		t.Fatal("domain get error")
 	}
 }
 
 type errDomainStore struct{ err error }
 
-func (e *errDomainStore) Get(context.Context, string) (Domain, error) { return Domain{}, e.err }
-func (e *errDomainStore) Put(context.Context, string, Domain) error   { return e.err }
-func (e *errDomainStore) Update(context.Context, string, func(Domain) (Domain, error)) (Domain, error) {
+func (e *errDomainStore) Get(context.Context, Scope) (Domain, error) { return Domain{}, e.err }
+func (e *errDomainStore) Put(context.Context, Scope, Domain) error   { return e.err }
+func (e *errDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, error) {
 	return Domain{}, e.err
 }
 
@@ -1276,14 +1276,14 @@ func TestChromeCompileHelpersAndSequenceEdges(t *testing.T) {
 		t.Fatal("unknown job sequence")
 	}
 	configs := NewMemoryConfigStore()
-	if err := configs.SetActiveVersion(t.Context(), "nope", "1"); !errors.Is(err, ErrNotFound) {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "nope", Stream: "test"}, "1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("SetActiveVersion = %v", err)
 	}
 	domains := NewMemoryDomainStore()
-	if err := domains.Put(t.Context(), "o", Domain{}); err != nil {
+	if err := domains.Put(t.Context(), Scope{Org: "o", Stream: "test"}, Domain{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := domains.Get(t.Context(), "missing"); !errors.Is(err, ErrNotFound) {
+	if _, err := domains.Get(t.Context(), Scope{Org: "missing", Stream: "test"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Get missing = %v", err)
 	}
 }
@@ -1292,18 +1292,18 @@ func TestCommitErrorWrappingViaApply(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	var ce *CommitError
-	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/nope", JobInstanceID: "x", Value: map[string]any{"a": 1},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("unknown task = %v", err)
 	}
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	if _, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: "", Value: map[string]any{}, Mint: startingNewMint(),
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
@@ -1311,12 +1311,12 @@ func TestCommitErrorWrappingViaApply(t *testing.T) {
 	}
 	_, loadID := plantIntakeOneLot(t, c)
 	logistic := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	if _, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	if _, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot", Value: map[string]any{"lotId": loadID}, Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot", Value: map[string]any{"lotId": loadID}, Mint: startingNewMint(),
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
@@ -1364,18 +1364,18 @@ type errConfigStore struct {
 	setErr error
 }
 
-func (e errConfigStore) Put(ctx context.Context, org, version string, cfg OrgConfig) error {
+func (e errConfigStore) Put(ctx context.Context, scope Scope, version string, cfg OrgConfig) error {
 	if e.putErr != nil {
 		return e.putErr
 	}
-	return e.ConfigStore.Put(ctx, org, version, cfg)
+	return e.ConfigStore.Put(ctx, scope, version, cfg)
 }
 
-func (e errConfigStore) SetActiveVersion(ctx context.Context, org, version string) error {
+func (e errConfigStore) SetActiveVersion(ctx context.Context, scope Scope, version string) error {
 	if e.setErr != nil {
 		return e.setErr
 	}
-	return e.ConfigStore.SetActiveVersion(ctx, org, version)
+	return e.ConfigStore.SetActiveVersion(ctx, scope, version)
 }
 
 func TestSeedFixtureConfigStorePutErrors(t *testing.T) {
@@ -1528,7 +1528,7 @@ func (errAuthorizer) AllowCommit(context.Context, AuthorizeCommit) (bool, error)
 
 func TestCommitAuthorizerErrorAndReadyWhen(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, errAuthorizer{})
-	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err == nil || !strings.Contains(err.Error(), "auth boom") {

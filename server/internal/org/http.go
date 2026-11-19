@@ -22,9 +22,9 @@ type Gate func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool)
 
 // API serves Load, addressed Task form / recap, Commit, QR resolve, and artifact proxy over HTTP seams.
 type API struct {
-	DomainLoader    *DomainLoader
+	DomainLoader  *DomainLoader
 	TaskCommitter *TaskCommitter
-	Gate      Gate
+	Gate          Gate
 	// Artifacts fetches sidecar bytes with the shared secret; nil → artifact route unavailable.
 	Artifacts *SidecarHttpPort
 }
@@ -67,8 +67,13 @@ func (h *API) handleLoad(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "organization required", http.StatusForbidden)
 		return
 	}
+	scope, err := RequireSoleStream(r.Context(), h.DomainLoader.Configs, org)
+	if err != nil {
+		writeSoleStreamError(w, err)
+		return
+	}
 
-	result, err := h.DomainLoader.Load(r.Context(), org, op)
+	result, err := h.DomainLoader.Load(r.Context(), scope, op)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "active config not found", http.StatusNotFound)
@@ -108,6 +113,11 @@ func (h *API) handleTaskForm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "organization required", http.StatusForbidden)
 		return
 	}
+	scope, err := RequireSoleStream(r.Context(), h.DomainLoader.Configs, org)
+	if err != nil {
+		writeSoleStreamError(w, err)
+		return
+	}
 	q := r.URL.Query()
 	jobID := strings.TrimSpace(q.Get("jobId"))
 	taskID := strings.TrimSpace(q.Get("taskId"))
@@ -117,7 +127,7 @@ func (h *API) handleTaskForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bundle, err := h.DomainLoader.LoadTaskBundle(r.Context(), org, op, jobID, taskID, jobInstanceID)
+	bundle, err := h.DomainLoader.LoadTaskBundle(r.Context(), scope, op, jobID, taskID, jobInstanceID)
 	if err != nil {
 		if errors.Is(err, ErrTaskBundleForbidden) {
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -159,6 +169,11 @@ func (h *API) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "organization required", http.StatusForbidden)
 		return
 	}
+	scope, err := RequireSoleStream(r.Context(), h.DomainLoader.Configs, org)
+	if err != nil {
+		writeSoleStreamError(w, err)
+		return
+	}
 	q := r.URL.Query()
 	addr := SubmissionAddress{
 		JobID:         strings.TrimSpace(q.Get("jobId")),
@@ -170,7 +185,7 @@ func (h *API) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list, err := h.DomainLoader.LoadTaskRecap(r.Context(), org, addr)
+	list, err := h.DomainLoader.LoadTaskRecap(r.Context(), scope, addr)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "task recap not found", http.StatusNotFound)
@@ -206,7 +221,12 @@ func (h *API) handleCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.TaskCommitter.Commit(r.Context(), org, op, req)
+	scope, err := RequireSoleStream(r.Context(), h.TaskCommitter.Configs, org)
+	if err != nil {
+		writeSoleStreamError(w, err)
+		return
+	}
+	result, err := h.TaskCommitter.Commit(r.Context(), scope, op, req)
 	if err != nil {
 		writeCommitError(w, err)
 		return
@@ -229,7 +249,12 @@ func (h *API) handleQrResolve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loaded, err := h.DomainLoader.Load(r.Context(), org, op)
+	scope, err := RequireSoleStream(r.Context(), h.DomainLoader.Configs, org)
+	if err != nil {
+		writeSoleStreamError(w, err)
+		return
+	}
+	loaded, err := h.DomainLoader.Load(r.Context(), scope, op)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "active config not found", http.StatusNotFound)
@@ -351,6 +376,18 @@ func (h *API) handleArtifact(w http.ResponseWriter, r *http.Request, id string) 
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(art.Body)
+}
+
+func writeSoleStreamError(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "active config not found", http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, ErrAmbiguousStreams) {
+		http.Error(w, "multiple streams; stream required", http.StatusConflict)
+		return
+	}
+	http.Error(w, "failed to resolve stream", http.StatusInternalServerError)
 }
 
 func writeCommitError(w http.ResponseWriter, err error) {

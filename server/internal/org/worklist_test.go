@@ -10,11 +10,11 @@ import (
 
 func mustActiveConfig(t *testing.T, c *TaskCommitter) OrgConfig {
 	t.Helper()
-	version, err := c.Configs.ActiveVersion(t.Context(), "feragame")
+	version, err := c.Configs.ActiveVersion(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := c.Configs.Get(t.Context(), "feragame", version)
+	cfg, err := c.Configs.Get(t.Context(), FeragameScope(), version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLotProcessingBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
-	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	result, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestLoadJSONWorklistIntakeStatuses(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 
-	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	result, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 
-	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	loaded, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 	}
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value: map[string]any{
@@ -136,7 +136,7 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loaded, err = loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	loaded, err = loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	h := &API{
-		DomainLoader:    loader,
+		DomainLoader:  loader,
 		TaskCommitter: c,
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
 			return OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}, true
@@ -238,7 +238,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 	lineOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	result, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), lineOp, CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value: map[string]any{
@@ -382,7 +382,7 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	truckID, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	_ = commitStartLot(t, c, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,21 +449,21 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 		t.Fatalf("line Available affordances must include weigh: %#v", lineRefs)
 	}
 
-	adminLoaded, err := loader.Load(t.Context(), "feragame", admin)
+	adminLoaded, err := loader.Load(t.Context(), FeragameScope(), admin)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lineLoaded, err := loader.Load(t.Context(), "feragame", lineOp)
+	lineLoaded, err := loader.Load(t.Context(), FeragameScope(), lineOp)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(adminLoaded.TaskFormBundles) != 0 || len(lineLoaded.TaskFormBundles) != 0 {
 		t.Fatal("home Load must omit bulk Task form bundles for all viewers")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "lot_processing", "weigh", loadID); err == nil {
 		t.Fatal("administration addressed fetch must forbid weigh")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), lineOp, "lot_processing", "weigh", loadID); err != nil {
 		t.Fatalf("line addressed fetch must allow weigh: %v", err)
 	}
 }
@@ -532,7 +532,6 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 		t.Fatalf("pallet %q missing under Domain: %#v", palletID, result.Domain.Kind("pallet"))
 	}
 }
-
 
 func worklistMustJob(t *testing.T, wl Worklist, jobID string) WorklistJob {
 	t.Helper()
@@ -665,7 +664,6 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 			t.Fatalf("readyWhen false = %q, want unavailable (no locked)", inst.Tasks["gated"])
 		}
 	})
-
 
 	t.Run("canStart_folds_first_task_readyWhen", func(t *testing.T) {
 		cfg := OrgConfig{

@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -132,24 +131,29 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 	return cfg, nil
 }
 
-// SeedFixtureConfigStore puts the Feragame Org Config as the Active Config version for its org.
+// SeedFixtureConfigStore puts the Feragame Org Config as the Active Config version for its stream.
 func SeedFixtureConfigStore(store ConfigStore) (OrgConfig, error) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		return OrgConfig{}, err
 	}
-	org := strings.TrimSpace(cfg.Org)
-	if org == "" {
-		return OrgConfig{}, fmt.Errorf("feragame-config fixture missing org")
+	scope, err := ScopeFromConfig(cfg)
+	if err != nil {
+		return OrgConfig{}, fmt.Errorf("feragame-config fixture: %w", err)
 	}
 	ctx := context.Background()
-	if err := store.Put(ctx, org, cfg.Version, cfg); err != nil {
+	if err := store.Put(ctx, scope, cfg.Version, cfg); err != nil {
 		return OrgConfig{}, err
 	}
-	if err := store.SetActiveVersion(ctx, org, cfg.Version); err != nil {
+	if err := store.SetActiveVersion(ctx, scope, cfg.Version); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
+}
+
+// FeragameScope is the (org, stream) of the embedded Feragame fixture.
+func FeragameScope() Scope {
+	return Scope{Org: "feragame", Stream: "recycling"}
 }
 
 func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {

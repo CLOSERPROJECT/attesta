@@ -52,7 +52,7 @@ func TestEnsureLivingStoresUsesMongoWhenAvailable(t *testing.T) {
 	if _, ok := server.orgDPPs.(*org.MongoDPPStore); !ok {
 		t.Fatalf("passports = %T, want *org.MongoDPPStore", server.orgDPPs)
 	}
-	_, err = server.orgConfigs.ActiveVersion(t.Context(), "feragame")
+	_, err = server.orgConfigs.ActiveVersion(t.Context(), org.FeragameScope())
 	if !errors.Is(err, org.ErrNotFound) {
 		t.Fatalf("expected no Active Config from ensureOrgStores, got %v", err)
 	}

@@ -33,7 +33,7 @@ func TestCommitTruckArrivePersistsAndLoadReflects(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -57,7 +57,7 @@ func TestCommitTruckArrivePersistsAndLoadReflects(t *testing.T) {
 		t.Fatalf("submission path keys = %#v", sub)
 	}
 
-	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	loaded, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestCommitLotRegisterMintsLoadAndPallets(t *testing.T) {
 
 func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, DenyAllAuthorizer{})
-	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "gio", Org: "feragame"}, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{UserID: "gio", Org: "feragame"}, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -112,7 +112,7 @@ func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("err = %v", err)
 	}
-	_, getErr := domains.Get(t.Context(), "feragame")
+	_, getErr := domains.Get(t.Context(), FeragameScope())
 	if getErr == nil {
 		t.Fatal("domain should remain unset when Authorizer denies")
 	}
@@ -120,7 +120,7 @@ func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 
 func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
 		TaskPath:      "intake/notATask",
 		JobInstanceID: "261029-1",
 		Value:         map[string]any{},
@@ -135,7 +135,7 @@ func TestCommitWeightCheckAfterRegister(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
@@ -158,7 +158,7 @@ func TestCommitRegisterReadyWhenAfterArrive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestCommitRegisterReadyWhenAfterArrive(t *testing.T) {
 func TestHandleCommitHappyPath(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	h := &API{
-		DomainLoader:    loader,
+		DomainLoader:  loader,
 		TaskCommitter: c,
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
 			return OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}, true
@@ -213,7 +213,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 		t.Fatalf("Commit JSON missing worklist: %#v", wire)
 	}
 
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}

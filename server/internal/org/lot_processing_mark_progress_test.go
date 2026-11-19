@@ -62,11 +62,11 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 		t.Fatalf("unweighed rows = %#v, want none", rows)
 	}
 
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: loadID,
 		Value: map[string]any{
@@ -81,7 +81,7 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 		t.Fatalf("unweighed markProgress err = %v", err)
 	}
 
-	domain, err := domains.Get(t.Context(), "feragame")
+	domain, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,12 +117,12 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 func TestCommitMarkProgressRejectsEmptyBatch(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	_, lotID := seedLotReadyAfterWeigh(t, c)
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value:         map[string]any{"progress": map[string]any{}},
@@ -135,7 +135,7 @@ func TestCommitMarkProgressRejectsEmptyBatch(t *testing.T) {
 		t.Fatalf("message = %q", ce.Message)
 	}
 
-	domain, err := domains.Get(t.Context(), "feragame")
+	domain, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}

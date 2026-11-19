@@ -23,7 +23,7 @@ func containerRegValue(loadID string, materials map[string][]any) map[string]any
 func commitContainerReg(t *testing.T, c *TaskCommitter, lotID string, value map[string]any) CommitResult {
 	t.Helper()
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: lotID,
 		Value:         value,
@@ -124,7 +124,7 @@ func TestContainerRegIncompleteContinuationPrefill(t *testing.T) {
 		t.Fatal("expected incomplete container")
 	}
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "lot_processing", "containerReg", lotID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), op, "lot_processing", "containerReg", lotID)
 	if err != nil {
 		t.Fatal(err)
 	}

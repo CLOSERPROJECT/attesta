@@ -13,7 +13,7 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 
-	list, err := loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	list, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "truckArrive",
 	})
 	if err != nil {
@@ -72,7 +72,7 @@ func TestLoadTaskRecapManySubmitOldestFirstWithPerRowLinks(t *testing.T) {
 	_ = commitLotRegister(t, c, truckID, lot2)
 
 	addr := SubmissionAddress{JobID: "intake", JobInstanceID: truckID, TaskID: "register"}
-	list, err := loader.LoadTaskRecap(t.Context(), "feragame", addr)
+	list, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,21 +102,21 @@ func TestLoadTaskRecapRejectsNotDoneAndUnknown(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 
-	_, err := loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	_, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "register",
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("not-done register = %v, want ErrNotFound", err)
 	}
 
-	_, err = loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	_, err = loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: "no-such", TaskID: "truckArrive",
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown instance = %v, want ErrNotFound", err)
 	}
 
-	_, err = loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	_, err = loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "",
 	})
 	if err == nil || errors.Is(err, ErrNotFound) {
