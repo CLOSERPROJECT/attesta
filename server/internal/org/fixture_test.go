@@ -286,6 +286,9 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if cfg.Stream == nil || cfg.Stream.Key != "recycling" || cfg.Stream.Instance.Job != "intake" {
 		t.Fatalf("stream = %#v, want recycling/intake", cfg.Stream)
 	}
+	if cfg.Stream.CategorySlug != "recycling-and-recovery" || cfg.Stream.SubCategorySlug != "flat-screen-displays" {
+		t.Fatalf("stream category = %#v", cfg.Stream)
+	}
 	if len(cfg.Stream.Steps) != 2 || cfg.Stream.Steps[1].Each == nil || cfg.Stream.Steps[1].Each.Entity != "lot" {
 		t.Fatalf("stream.steps = %#v", cfg.Stream.Steps)
 	}
