@@ -13,13 +13,14 @@ COPY app/ ./
 RUN bun run build
 
 FROM golang:1.25-alpine AS go-build
+ARG SOURCE_COMMIT
 WORKDIR /app/server
 COPY server/go.mod server/go.sum ./
 RUN go mod download
 COPY server/ ./
 ENV CGO_ENABLED=0
 RUN go generate ./design
-RUN go build -trimpath -o /app/bin/attesta ./cmd/server
+RUN go build -trimpath -ldflags "-X main.buildCommit=${SOURCE_COMMIT}" -o /app/bin/attesta ./cmd/server
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates

@@ -2535,6 +2535,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/docs", s.handleDocs)
 	mux.HandleFunc("/docs/", s.handleDocs)
 	mux.HandleFunc("/about", s.handleAbout)
+	mux.HandleFunc("/revision", handleRevision)
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
 	orgHTTP := s.orgAPI()
 	mux.Handle("/api/org/domain", orgHTTP)

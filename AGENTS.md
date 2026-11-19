@@ -142,7 +142,7 @@ When the deployment enables them, an independent DeepSeek tester runs an issue's
 
 ### Preview
 
-`Environment: preview` tests the pull request's preview deployment at `https://{pr}.attesta.apps.forkbomb.eu`, where `{pr}` is the pull request number. The preview is seeded with the Feragame demo, including the staged truck `261102-1` with closed lots `CO-261102-1` and `DA-261102-1`.
+`Environment: preview` tests the pull request's preview deployment at `https://{pr}.attesta.apps.forkbomb.eu`, where `{pr}` is the pull request number. The preview is seeded with the Feragame demo, including the staged truck `261102-1` with closed lots `CO-261102-1` and `DA-261102-1`. It serves its deployed commit at `/revision` for the UAT gate's revision check.
 
 Seeded users all have the password equal to their email: `admin@feragame.com` (all roles), `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com`, and `admin@org1.com` (another organization).
 
