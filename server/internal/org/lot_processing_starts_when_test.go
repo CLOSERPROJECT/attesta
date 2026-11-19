@@ -13,7 +13,7 @@ func TestFixtureLotProcessingHasNoStartsWhen(t *testing.T) {
 	if !lp.Repeatable {
 		t.Fatal("lot_processing must stay repeatable")
 	}
-	want := []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot"}
+	want := []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot", "lock"}
 	got := OrderedTaskIDs(lp.Tasks)
 	if len(got) != len(want) {
 		t.Fatalf("lot_processing tasks = %v", got)

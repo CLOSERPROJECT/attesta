@@ -56,12 +56,8 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLotProcessingBlocked(t *testing.T) {
 		t.Fatal("lot_processing canStart want false on empty domain (no eligible lots)")
 	}
 
-	passport, ok := worklistJobByID(result.Worklist, "passport")
-	if !ok {
-		t.Fatal("missing passport worklist job")
-	}
-	if passport.CanStart {
-		t.Fatal("passport canStart want false on empty Domain (select readyWhen)")
+	if _, ok := worklistJobByID(result.Worklist, "passport"); ok {
+		t.Fatal("passport Job must not appear on Worklist")
 	}
 }
 
@@ -196,7 +192,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Worklist.Jobs) != 3 {
+	if len(got.Worklist.Jobs) != 2 {
 		t.Fatalf("worklist jobs = %#v", got.Worklist.Jobs)
 	}
 	intake, _ := worklistJobByID(got.Worklist, "intake")
@@ -207,9 +203,8 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if lp.CanStart {
 		t.Fatal("administration viewer must not canStart lot_processing (startLot is logistic-only)")
 	}
-	passport, _ := worklistJobByID(got.Worklist, "passport")
-	if passport.CanStart || passport.StartLabel != "Emetti DPP" {
-		t.Fatalf("passport Job = %#v, want canStart false on empty Domain", passport)
+	if _, ok := worklistJobByID(got.Worklist, "passport"); ok {
+		t.Fatal("passport Job must not appear on Worklist")
 	}
 }
 

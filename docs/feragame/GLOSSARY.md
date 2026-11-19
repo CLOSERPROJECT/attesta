@@ -23,7 +23,7 @@ _Avoid_: load (former name); conflating with Job instance
 **lot session status**: Lifecycle state of a lot session on a **lot**: `open` | `fullyProcessed`.\
 _Avoid_: `parked`; open/close working day or shift as Domain peers; separate boolean fullyProcessed beside open; parallel open lots
 
-**fullyProcessed**: Terminal **lot session status**: the lot is closed for line processing. Passport still needs Lock on that lot — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
+**fullyProcessed**: Terminal **lot session status**: the lot is closed for line processing. The lot’s DPP still needs the final **lot_processing** `lock` Task — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
 _Avoid_: boolean `processed`; container register as the writer of this status
 
 **progress**: Plant row fact on some entities (e.g. pallet): unset, `partial`, or `done`.
@@ -36,9 +36,8 @@ _Avoid_: Treating incomplete as operator-board status or progress
 **intake** (Job): Truck arrival chapter.\
 _Avoid_: Treating intake as the Passport path
 
-**lot_processing** (Job): Lot session chapter.
-
-**Passport Lock Job**: Issues a Passport whose subject is a **lot**. Still needs Lock after the lot is **fullyProcessed** — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).
+**lot_processing** (Job): Lot session chapter. Ends with once-only `lock`, which issues a Passport whose subject is that **lot** after **fullyProcessed** — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
+_Avoid_: A separate passport Job; treating closeLot as DPP issue
 
 **administration** / **line** / **logistic**: Plant Config role slugs (office, line floor, logistics).\
 _Avoid_: Treating these as platform standing (Org admin / Member)
@@ -61,3 +60,5 @@ Do not revive as Feragame nouns.
 **working day** / **shift** / whole-day Domain peers: Former Domain calendar layer; not plant Domain entities.
 
 **`parked`**: Former lot session status; not in the living enum (`open` | `fullyProcessed`).
+
+**Passport Lock Job**: Former separate Job (`passport` / `select`+`lock`) after close; folded into **lot_processing** as final once-only `lock`.
