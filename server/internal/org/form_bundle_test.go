@@ -1052,3 +1052,72 @@ func TestBuildTaskFormBundleCellMapDoesNotInventCells(t *testing.T) {
 		t.Fatalf("cell seed = %#v, want only existing P2=partial", progress)
 	}
 }
+
+// Provisional startLot has empty JobInstanceID, so ResolveStreamInstanceID is
+// unbound; enumReads that filter on $stream.id need the HTTP stream instance.
+func TestBuildTaskFormBundleProvisionalStartLotBindsStream(t *testing.T) {
+	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
+	truckID, loadID, domain := commitIntakeThroughLotsClosed(t, c)
+	cfg := mustActiveConfig(t, c)
+
+	lotIdEnum := func(b *TaskFormBundle) []string {
+		t.Helper()
+		props, _ := b.Schema["properties"].(map[string]any)
+		lotProp, _ := props["lotId"].(map[string]any)
+		if lotProp == nil {
+			return nil
+		}
+		// enumReads injects []string; schemaStringEnum only accepts []any.
+		switch e := lotProp["enum"].(type) {
+		case []string:
+			return e
+		case []any:
+			return schemaStringList(e)
+		default:
+			return nil
+		}
+	}
+
+	bound, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
+		JobID: "lot_processing", TaskID: "startLot", JobInstanceID: "",
+		StreamInstanceID: truckID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enums := lotIdEnum(bound); !stringInList(loadID, enums) {
+		t.Fatalf("with stream instance lotId enum = %#v, want %q", enums, loadID)
+	}
+
+	unbound, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
+		JobID: "lot_processing", TaskID: "startLot", JobInstanceID: "",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enums := lotIdEnum(unbound); len(enums) != 0 {
+		t.Fatalf("without stream instance lotId enum = %#v, want empty", enums)
+	}
+
+	wrongTruck, err := BuildTaskFormBundle(cfg, domain, ActionableTaskRef{
+		JobID: "lot_processing", TaskID: "startLot", JobInstanceID: "",
+		StreamInstanceID: "other-truck",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enums := lotIdEnum(wrongTruck); len(enums) != 0 {
+		t.Fatalf("wrong truck lotId enum = %#v, want empty", enums)
+	}
+
+	loaded, err := loader.LoadTaskBundleForStreamInstance(
+		t.Context(), FeragameScope(), FixtureAllRolesOp(),
+		"lot_processing", "startLot", "", truckID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enums := lotIdEnum(loaded); !stringInList(loadID, enums) {
+		t.Fatalf("LoadTaskBundleForStreamInstance lotId enum = %#v, want %q", enums, loadID)
+	}
+}

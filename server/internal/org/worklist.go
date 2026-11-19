@@ -373,9 +373,10 @@ func worklistInstanceHasRemainingWork(cfg OrgConfig, wl Worklist, jobID, jobInst
 
 // ActionableTaskRef addresses one Worklist-actionable Task on an instance.
 type ActionableTaskRef struct {
-	JobID         string
-	TaskID        string
-	JobInstanceID string
+	JobID            string
+	TaskID           string
+	JobInstanceID    string
+	StreamInstanceID string // HTTP/instance scope; used when ResolveStreamInstanceID is empty (provisional)
 }
 
 // CollectActionableTaskRefs walks Worklist in Org Config Job order: provisional

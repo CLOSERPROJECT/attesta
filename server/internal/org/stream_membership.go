@@ -1,5 +1,7 @@
 package org
 
+import "strings"
+
 // JobInstanceBelongsToStream reports whether a Job instance is in the filtered
 // view for Org stream instance S (§3 membership): the anchor instance with id S,
 // or an each-step Job whose id is selected by that step's where with $stream.id = S.
@@ -65,6 +67,16 @@ func ResolveStreamInstanceID(cfg OrgConfig, domain Domain, jobID, jobInstanceID 
 		}
 	}
 	return ""
+}
+
+// EffectiveStreamInstanceID prefers ResolveStreamInstanceID; when unbound (e.g.
+// provisional each-step start with empty jobInstanceID), falls back to the
+// explicit stream instance from HTTP / Load.
+func EffectiveStreamInstanceID(cfg OrgConfig, domain Domain, jobID, jobInstanceID, explicitStreamInstanceID string) string {
+	if id := ResolveStreamInstanceID(cfg, domain, jobID, jobInstanceID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(explicitStreamInstanceID)
 }
 
 // StreamInstanceExists reports whether instanceID is an anchor Job instance for the stream.
