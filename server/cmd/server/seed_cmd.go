@@ -15,18 +15,22 @@ Demo fixture seed (identity + taxonomy + catalog + org by default).
 Flags:
   --replace              Rewrite even when the empty-only marker org exists;
                          org Domain (+ passports) is wiped and rebuilt.
-  --feragame-config      Active Config + wipe Domain (+ passports) to empty.
+  --feragame-config      Active Config for the fixture stream + wipe that
+                         stream's Domain (+ passports) to empty.
                          No Appwrite. Skips Formata. Always runs.
-  --feragame-domain      Active Config + wipe and stage demo Domain.
-                         No Appwrite. Skips Formata. Always runs.
+  --feragame-domain      Active Config + wipe and stage parallel-truck demo
+                         Domain on the fixture stream. No Appwrite. Skips
+                         Formata. Always runs.
   --feragame-identity    Feragame Appwrite hard reset + Active Config + wipe
-                         Domain to empty. Skips Formata / orgs 1–3. Always runs.
+                         Domain to empty. Demo users land on /my. Skips
+                         Formata / orgs 1–3. Always runs.
   --feragame-full        Feragame Appwrite hard reset + Active Config + wipe
                          and stage demo Domain. Skips Formata / orgs 1–3.
                          Always runs.
   --keep-domain          With --feragame-config or --feragame-identity only:
-                         put Active Config and leave Domain (+ passports)
-                         untouched. Rejected with domain/full.
+                         put Active Config for the stream and leave that
+                         stream's Domain (+ passports) untouched. Rejected
+                         with domain/full.
   --file PATH            Taxonomy seed file (default: config/categories.yaml).
   --help, -h             Show this help.
 

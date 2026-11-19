@@ -112,15 +112,16 @@ After login, the stream picker is `/my`. Stream routes live under `/my/streams/{
 Demo data comes only from the Go seed (`attesta seed` / `ATTESTA_SEED`). Product boot does not auto-load Feragame or wipe Domain.
 
 - Empty-only (default): `task seed` / prepare seed is a no-op while the marker org exists.
-- Rewrite: `task seed -- --replace` (wipes and rebuilds org Domain + passports).
-- Identity: org `feragame`, all-roles `admin@feragame.com`, plus `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com` (password = email). Existing stacks need `--replace` once to pick up new users.
-- Domain + Active Config: same seed sets feragame-config as Active and, when Domain is missing/empty or `--replace` is used, rebuilds a staged Domain. No harness `/api/runs` snapshot PUT.
-- Feragame scopes (skip Formata; always run):
+- Rewrite: `task seed -- --replace` (wipes and rebuilds org Domain + passports). After Org Config-as-Stream, re-seed — there is no migration of old `org_*` rows.
+- Identity: org `feragame`, all-roles `admin@feragame.com`, plus `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com` (password = email). Existing stacks need `--replace` once to pick up new users. Everyone lands on `/my` (stream dashboard), then opens a truck into `/app`.
+- Domain + Active Config: same seed sets feragame-config as Active on stream key `recycling` (from the fixture) and, when Domain is missing/empty or `--replace` is used, rebuilds a staged Domain for that stream. No harness `/api/runs` snapshot PUT.
+- Staged Domain (parallel-truck demo): two active trucks — truck A with one finished lot (DPP issued) and one open lot mid-weigh; truck B still in intake. Truck B's "Apri lotto" shows line busy while A's lot is open.
+- Feragame scopes (skip Formata; always run; scoped to the fixture stream):
   - `task seed:feragame-config` — Active Config + wipe Domain empty (no Appwrite)
   - `task seed:feragame-domain` — Config + staged Domain
   - `task seed:feragame-identity` — Feragame Appwrite + Config + empty Domain
   - `task seed:feragame-full` — Appwrite + Config + staged Domain
-  - `--keep-domain` on config/identity only: refresh Active Config without touching Domain
+  - `--keep-domain` on config/identity only: refresh Active Config for the stream without touching that stream's Domain
 - If the marker org exists but Feragame Domain is still empty (pre-staging seed), run `task seed -- --replace` or `task seed:feragame-full` once.
 - Memory-backed Domain clears on server restart; re-run `task seed` (or `task seed:feragame-full` / `--replace`) after a Memory-backed restart if you need the fixture again. Normal host-dev with Mongo uses durable Domain stores.
 

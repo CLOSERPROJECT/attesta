@@ -154,7 +154,13 @@ func TestOrgDashboardListsInstancesWithActiveDoneFilter(t *testing.T) {
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, org.SeedTruckID) {
-		t.Fatalf("dashboard must list staged truck %s, got:\n%s", org.SeedTruckID, body)
+		t.Fatalf("dashboard must list staged truck A %s, got:\n%s", org.SeedTruckID, body)
+	}
+	if !strings.Contains(body, org.SeedTruckBID) {
+		t.Fatalf("dashboard must list staged truck B %s, got:\n%s", org.SeedTruckBID, body)
+	}
+	if !strings.Contains(body, `status-active`) {
+		t.Fatalf("dashboard must show active trucks, got:\n%s", body)
 	}
 	if !strings.Contains(body, `name="filter"`) || !strings.Contains(body, `value="done"`) {
 		t.Fatalf("dashboard must expose active/done filter, got:\n%s", body)
