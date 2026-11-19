@@ -1,27 +1,26 @@
 {{/* Used on /my/streams/.WorkflowKey/instance/.ProcessID to render process details page
-*/}} {{ define "process_body" }}
-<div
-  id="process-page"
-  class="process-page stack u-max-w-7xl u-mx-auto"
-  data-process-id="{{ .ProcessID }}"
-  data-workflow-key="{{ .WorkflowKey }}"
-  data-selected-substep="{{ .Detail.SelectedSubstepID }}"
-  data-mine-filter="1"
->
-  <div id="process-page-content">{{ template "process_content.html" . }}</div>
+  */}} {{ define "process_body" }}
+<div id="process-page"
+     class="process-page stack u-max-w-7xl u-mx-auto"
+     data-process-id="{{ .ProcessID }}"
+     data-workflow-key="{{ .WorkflowKey }}"
+     data-selected-substep="{{ .Detail.SelectedSubstepID }}"
+     data-mine-filter="1"
+     data-live-updates="{{ if .LiveUpdates }}1{{ else }}0{{ end }}">
+<div id="process-page-content">{{ template "process_content.html" . }}</div>
 </div>
 {{ end }} {{ define "process_stream_timeline" }}
 {{ if .Detail.ShowMineFilter }}
-<div class="process-stream-block">
-  {{ template "stream_mine_filter" . }}
-  <div class="js-mine-filter-root stream-mine-filter-root is-mine-filter">
-    <div class="empty-state stream-mine-filter-empty" hidden>
-      <p class="empty-state-title">No matching tasks</p>
-      <p class="empty-state-hint">Turn off My tasks to see the full stream timeline.</p>
+  <div class="process-stream-block">
+    {{ template "stream_mine_filter" . }}
+    <div class="js-mine-filter-root stream-mine-filter-root is-mine-filter">
+      <div class="empty-state stream-mine-filter-empty" hidden>
+        <p class="empty-state-title">No matching tasks</p>
+        <p class="empty-state-hint">Turn off My tasks to see the full stream timeline.</p>
+      </div>
+      {{ template "stream_timeline" .Detail.StreamTimeline }}
     </div>
-    {{ template "stream_timeline" .Detail.StreamTimeline }}
   </div>
-</div>
 {{ else }}
   {{ template "stream_timeline" .Detail.StreamTimeline }}
 {{ end }}
@@ -46,93 +45,73 @@
     </div>
   </section>
   {{ if .Detail.ProcessDone }}
-  <div class="process-resources-grid">
-    <div class="process-steps-column stack u-gap-4">
-      {{ if .Detail.Termination }}
-        <div class="process-termination-mobile">
-          {{ template "stream_termination_details" .Detail.Termination }}
-        </div>
-      {{ end }}
-      {{ template "process_stream_timeline" . }}
+    <div class="process-resources-grid">
+      <div class="process-steps-column stack u-gap-4">
+        {{ if .Detail.Termination }}
+          <div class="process-termination-mobile">{{ template "stream_termination_details" .Detail.Termination }}</div>
+        {{ end }}
+        {{ template "process_stream_timeline" . }}
+      </div>
+      <div class="stack layout-stack-separator u-gap-12">
+        {{ if .Detail.Termination }}
+          <div class="process-termination-desktop">{{ template "stream_termination_details" .Detail.Termination }}</div>
+        {{ end }}
+        {{ template "process_dpp" . }}
+        {{ template "process_downloads" . }}
+      </div>
     </div>
-    <div class="stack layout-stack-separator u-gap-12">
-      {{ if .Detail.Termination }}
-        <div class="process-termination-desktop">
-          {{ template "stream_termination_details" .Detail.Termination }}
-        </div>
-      {{ end }}
-      {{ template "process_dpp" . }}
-      {{ template "process_downloads" . }}
-    </div>
-  </div>
   {{ else }} {{ template "process_stream_timeline" . }} {{ if
-  .Detail.CanTerminate }}
-  <div class="dialog-actions">
-    <button
-      type="button"
-      class="btn btn-danger"
-      onclick="document.getElementById('terminate-process-dialog').showModal()"
-    >
-      {{ template "icon-stop" . }} End stream
-    </button>
-  </div>
-  <dialog id="terminate-process-dialog" class="dialog">
-    <div class="dialog-card">
-      <header class="dialog-head">
-        <div>
-          <h3 class="dialog-title u-text-danger">
-            Danger zone - End stream early
-          </h3>
-          <p class="dialog-subtitle">
-            Available substep {{ .Detail.TerminateSubstep }}
-          </p>
-        </div>
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon dialog-close"
-          onclick="document.getElementById('terminate-process-dialog').close()"
-        >
-          {{ template "icon-close" . }}
-        </button>
-      </header>
-      <form
-        method="post"
-        action="{{ .Detail.TerminateAction }}"
-        class="input-form"
-      >
-        {{ if .Detail.TerminateRoles }} {{ if eq (len .Detail.TerminateRoles) 1
-        }}
-        <input
-          type="hidden"
-          name="activeRole"
-          value="{{ (index .Detail.TerminateRoles 0).Slug }}"
-        />
-        {{ else }}
-        <label>
-          <span>End stream as</span>
-          <select name="activeRole" required>
-            <option value="">Select role</option>
-            {{ range .Detail.TerminateRoles }}
-            <option value="{{ .Slug }}">{{ .Label }}</option>
-            {{ end }}
-          </select>
-        </label>
-        {{ end }} {{ end }}
-        <label>
-          <span
-            >This will permanently end this stream instance. Confirm only if you
-            want to continue. Optionally you can enter a reason:</span
-          >
-          <textarea name="reason" rows="5" maxlength="1000"></textarea>
-        </label>
-        <div class="dialog-actions">
-          <button type="submit" class="btn btn-danger">
-            {{ template "icon-stop" . }} End stream
-          </button>
-        </div>
-      </form>
+    .Detail.CanTerminate }}
+    <div class="dialog-actions">
+      <button type="button"
+              class="btn btn-danger"
+              onclick="document.getElementById('terminate-process-dialog').showModal()">
+        {{ template "icon-stop" . }} End stream
+      </button>
     </div>
-  </dialog>
+    <dialog id="terminate-process-dialog" class="dialog">
+      <div class="dialog-card">
+        <header class="dialog-head">
+          <div>
+            <h3 class="dialog-title u-text-danger">Danger zone - End stream early</h3>
+            <p class="dialog-subtitle">Available substep {{ .Detail.TerminateSubstep }}</p>
+          </div>
+          <button type="button"
+                  class="btn btn-ghost btn-icon dialog-close"
+                  onclick="document.getElementById('terminate-process-dialog').close()">
+            {{ template "icon-close" . }}
+          </button>
+        </header>
+        <form method="post"
+              action="{{ .Detail.TerminateAction }}"
+              class="input-form">
+          {{ if .Detail.TerminateRoles }} {{ if eq (len .Detail.TerminateRoles) 1
+          }}
+            <input type="hidden"
+                   name="activeRole"
+                   value="{{ (index .Detail.TerminateRoles 0).Slug }}" />
+          {{ else }}
+            <label>
+              <span>End stream as</span>
+              <select name="activeRole" required>
+                <option value="">Select role</option>
+                {{ range .Detail.TerminateRoles }}
+                  <option value="{{ .Slug }}">{{ .Label }}</option>
+                {{ end }}
+              </select>
+            </label>
+          {{ end }} {{ end }}
+          <label>
+            <span>This will permanently end this stream instance. Confirm only if you
+            want to continue. Optionally you can enter a reason:</span>
+            <textarea name="reason" rows="5" maxlength="1000"></textarea>
+          </label>
+          <div class="dialog-actions">
+            <button type="submit" class="btn btn-danger">{{ template "icon-stop" . }} End stream</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
   {{ end }} {{ end }}
 </div>
 {{ end }} {{ define "process_downloads" }}
@@ -142,11 +121,9 @@
       <h2>Downloads</h2>
       <p>Export attachments and notarized data for this stream</p>
     </div>
-    <button
-      type="button"
-      class="btn btn-secondary js-download-link"
-      data-download-url="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/files.zip"
-    >
+    <button type="button"
+            class="btn btn-secondary js-download-link"
+            data-download-url="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/files.zip">
       {{ template "icon-download" . }} Download all files
     </button>
   </div>
@@ -154,34 +131,27 @@
     <div class="field-block">
       <span class="field-label">Notarized stream data</span>
       <div class="field-row">
-        <a
-          href="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/notarized.json"
-          target="_blank"
-          rel="noopener noreferrer"
-          >notarized.json</a
-        >
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon btn-xs js-download-link"
-          data-download-url="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/notarized.json"
-          aria-label="Download notarized.json"
-        >
-          {{ template "icon-download" . }}
-        </button>
+        <a href="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/notarized.json"
+           target="_blank"
+           rel="noopener noreferrer">notarized.json</a>
+        <button type="button"
+                class="btn btn-ghost btn-icon btn-xs js-download-link"
+                data-download-url="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/notarized.json"
+                aria-label="Download notarized.json">{{ template "icon-download" . }}</button>
       </div>
     </div>
     {{ if .Attachments }}
-    <div class="field-block">
-      <span class="field-label">Attachments</span>
-      <ul class="process-attachments-list">
-        {{ range .Attachments }}
-        <li>
-          <a href="{{ .URL }}">{{ .Filename }}</a>
-          <span class="muted">({{ .SubstepID }})</span>
-        </li>
-        {{ end }}
-      </ul>
-    </div>
+      <div class="field-block">
+        <span class="field-label">Attachments</span>
+        <ul class="process-attachments-list">
+          {{ range .Attachments }}
+            <li>
+              <a href="{{ .URL }}">{{ .Filename }}</a>
+              <span class="muted">({{ .SubstepID }})</span>
+            </li>
+          {{ end }}
+        </ul>
+      </div>
     {{ end }}
   </div>
 </section>
@@ -192,11 +162,9 @@
       <h2>Digital Product Passport</h2>
       <p>GS1 Digital Link and DPP data for this stream</p>
     </div>
-    <button
-      type="button"
-      class="btn btn-primary"
-      onclick="window.open('{{ .DPPURL }}', '_blank')"
-    >
+    <button type="button"
+            class="btn btn-primary"
+            onclick="window.open('{{ .DPPURL }}', '_blank')">
       {{ template "icon-external-link" . }} View DPP data
     </button>
   </div>
@@ -204,40 +172,33 @@
     <div class="field-block">
       <span class="field-label">GS1 Digital Link</span>
       <div class="field-row">
-        <a
-          href="{{ .DPPURL }}"
-          class="process-gs1-code"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ .DPPURL }}</a
-        >
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon btn-xs js-copy-text"
-          data-copy-text="{{ .DPPURL }}"
-          data-copy-label="GS1 Digital Link"
-          aria-label="Copy GS1 Digital Link"
-        >
+        <a href="{{ .DPPURL }}"
+           class="process-gs1-code"
+           target="_blank"
+           rel="noopener noreferrer">{{ .DPPURL }}</a>
+        <button type="button"
+                class="btn btn-ghost btn-icon btn-xs js-copy-text"
+                data-copy-text="{{ .DPPURL }}"
+                data-copy-label="GS1 Digital Link"
+                aria-label="Copy GS1 Digital Link">
           {{ template "icon-copy" . }} {{ template "icon-copy-done" . }}
         </button>
       </div>
     </div>
     {{ if .DPPGS1 }}
-    <div class="field-block">
-      <span class="field-label">GS1 (01/10/21)</span>
-      <div class="field-row">
-        <span class="process-gs1-code">{{ .DPPGS1 }}</span>
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon btn-xs js-copy-text"
-          data-copy-text="{{ .DPPGS1 }}"
-          data-copy-label="GS1 code"
-          aria-label="Copy GS1 (01/10/21) code"
-        >
-          {{ template "icon-copy" . }} {{ template "icon-copy-done" . }}
-        </button>
+      <div class="field-block">
+        <span class="field-label">GS1 (01/10/21)</span>
+        <div class="field-row">
+          <span class="process-gs1-code">{{ .DPPGS1 }}</span>
+          <button type="button"
+                  class="btn btn-ghost btn-icon btn-xs js-copy-text"
+                  data-copy-text="{{ .DPPGS1 }}"
+                  data-copy-label="GS1 code"
+                  aria-label="Copy GS1 (01/10/21) code">
+            {{ template "icon-copy" . }} {{ template "icon-copy-done" . }}
+          </button>
+        </div>
       </div>
-    </div>
     {{ end }}
   </div>
 </section>

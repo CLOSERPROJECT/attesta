@@ -623,6 +623,7 @@ type ProcessPageView struct {
 	DPPURL       string
 	DPPGS1       string
 	Attachments  []ProcessDownloadAttachment
+	LiveUpdates  bool // Formata SSE; Org leaves false so EventSource stays off
 }
 
 type ProcessDownloadAttachment struct {
@@ -5848,6 +5849,15 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	processID := parts[0]
+	_, cfg, _ := s.selectedWorkflowUnvalidated(r)
+	if cfg.isOrgKind() {
+		if len(parts) == 1 && r.Method == http.MethodGet {
+			s.handleProcessPage(w, r, processID)
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
 	if len(parts) == 1 && r.Method == http.MethodGet {
 		s.handleProcessPage(w, r, processID)
 		return
@@ -5907,6 +5917,10 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	if !ok {
 		return
 	}
+	if cfg.isOrgKind() {
+		s.handleOrgProcessPage(w, r, user, workflowKey, cfg, processID)
+		return
+	}
 	ctx := r.Context()
 	process, err := s.loadProcess(ctx, processID)
 	if err != nil {
@@ -5946,6 +5960,74 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 }
 
+func (s *Server) handleOrgProcessPage(w http.ResponseWriter, r *http.Request, user *AccountUser, workflowKey string, cfg RuntimeConfig, instanceID string) {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	scope := org.Scope{Org: strings.TrimSpace(user.OrgSlug), Stream: cfg.OrgStreamKey}
+	orgCfg, err := s.loadOrgActiveConfig(r.Context(), scope)
+	if err != nil {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	domain := org.EmptyDomain()
+	if s.orgDomains != nil {
+		if loaded, domainErr := s.orgDomains.Get(r.Context(), scope); domainErr == nil {
+			domain = loaded
+		} else if !errors.Is(domainErr, org.ErrNotFound) {
+			http.Error(w, "process not found", http.StatusNotFound)
+			return
+		}
+	}
+	op := org.OperatorIdentity{
+		UserID: accountActorID(user),
+		Org:    scope.Org,
+		Roles:  append([]string(nil), user.RoleSlugs...),
+	}
+	summaries := org.ListStreamInstances(orgCfg, domain, op)
+	var summary *org.StreamInstanceSummary
+	for i := range summaries {
+		if summaries[i].ID == instanceID {
+			summary = &summaries[i]
+			break
+		}
+	}
+	if summary == nil {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	timeline := org.ProjectStreamTimeline(orgCfg, domain, op, instanceID)
+	steps := buildOrgTimelineSteps(orgCfg, domain, timeline, cfg.OrgStreamKey, instanceID)
+	status := summary.Status
+	if status == "" {
+		status = processStatusActive
+	}
+	view := ProcessPageView{
+		PageBase:     s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
+		Breadcrumbs:  buildProcessBreadcrumbs(workflowKey, cfg.Workflow.Name, summary.Label, instanceID),
+		ProcessID:    instanceID,
+		InstanceName: strings.TrimSpace(summary.Label),
+		Status:       status,
+		StatusLabel:  processStatusLabel(status),
+		LiveUpdates:  false,
+		Detail: StreamInstanceDetailView{
+			WorkflowKey:    workflowKey,
+			WorkflowPath:   streamPath(workflowKey),
+			ProcessID:      instanceID,
+			CurrentUser:    actorFromAccountUser(user, workflowKey),
+			ProcessDone:    status == org.StreamInstanceDone,
+			Timeline:       steps,
+			ShowMineFilter: false,
+			CanTerminate:   false,
+		},
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string) ProcessPageView {
 	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, streamInstanceDetailOptions{
 		ShowMineFilter: true,
@@ -5969,6 +6051,7 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		DPPURL:       detail.DPPURL,
 		DPPGS1:       detail.DPPGS1,
 		Attachments:  detail.Attachments,
+		LiveUpdates:  true,
 	}
 }
 

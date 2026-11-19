@@ -357,18 +357,20 @@ func substepShellDisplay(sub TimelineSubstep) SubstepShellDisplay {
 // Shell chrome reads from Body via substepShellDisplay; summary Status/Done* fields
 // remain for nil-body fallbacks and legacy builders until fully removed.
 type TimelineSubstep struct {
-	SubstepID   string
-	Title       string
-	Selected    bool
-	ViewerOwned bool
-	Body        *SubstepBodyView
-	Palette     string
-	Status      string
-	StatusLabel string
-	DoneBy      string
-	DoneRole    string
-	DoneAt      string
-	DoneAtISO   string
+	SubstepID     string
+	Title         string
+	Selected      bool
+	ViewerOwned   bool
+	Body          *SubstepBodyView
+	Palette       string
+	Status        string
+	StatusLabel   string
+	DoneBy        string
+	DoneRole      string
+	DoneAt        string
+	DoneAtISO     string
+	BlockedReason string
+	Href          string // Org /app Task link when set; Formata leaves empty
 }
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.
@@ -377,6 +379,7 @@ type TimelineStep struct {
 	OrgSlug  string
 	Expanded bool
 	Substeps []TimelineSubstep
+	Rows     []TimelineRowGroup // Org each-steps; empty for Formata / once steps
 }
 
 // StreamTimelineView is the view model for templates/components/stream_timeline.html.

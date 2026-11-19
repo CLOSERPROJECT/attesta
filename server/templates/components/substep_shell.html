@@ -1,66 +1,71 @@
 {{ define "substep_shell" }}
   {{ $shell := substepShellDisplay .Substep }}
   {{ $substepDomID := replace .Substep.SubstepID "." "-" }}
-  <li
-    class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
+<li class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
     data-role-palette="{{ $shell.Palette }}"
-    data-viewer-owned="{{ if .Substep.ViewerOwned }}true{{ else }}false{{ end }}"
-  >
-    <details
-      class="substep-accordion js-process-substep-panel"
-      data-substep-id="{{ .Substep.SubstepID }}"
-      aria-labelledby="substep-{{ $substepDomID }}-heading"
-      {{ if .Substep.Selected }}open{{ end }}
-    >
-      <summary class="substep-accordion-summary">
-        <div class="substep-summary-main">
-          <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
-          <div class="substep-title">
-            <span class="substep-title-heading" id="substep-{{ $substepDomID }}-heading">{{ .Substep.Title }}</span>
-            {{ if eq $shell.Status "done" }}
-              <div class="substep-meta">
-                {{ if $shell.DoneAt }}
-                  <span class="substep-meta-time">
-                    {{ template "tip" (dict
-                      "Tooltip" "Completed at"
-                      "Class" "substep-meta-icon"
-                      "Icon" "icon-clock"
-                    ) }}
-                    {{ template "local_datetime" (dict "ISO" $shell.DoneAtISO "Human" $shell.DoneAt) }}
-                  </span>
-                {{ end }}
-                {{ if $shell.DoneBy }}
-                  <span class="substep-meta-actor">
-                    {{ template "tip" (dict
-                      "Tooltip" "Operator"
-                      "Class" "substep-meta-icon"
-                      "Icon" "icon-account"
-                    ) }}
-                    {{ $shell.DoneBy }}
-                  </span>
-                {{ end }}
-              </div>
+    data-viewer-owned="{{ if .Substep.ViewerOwned }}true{{ else }}false{{ end }}">
+  <details class="substep-accordion js-process-substep-panel"
+           data-substep-id="{{ .Substep.SubstepID }}"
+           aria-labelledby="substep-{{ $substepDomID }}-heading"
+           {{ if .Substep.Selected }}open{{ end }}>
+    <summary class="substep-accordion-summary">
+      <div class="substep-summary-main">
+        <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+        <div class="substep-title">
+          <span class="substep-title-heading"
+                id="substep-{{ $substepDomID }}-heading">{{ .Substep.Title }}</span>
+          {{ if eq $shell.Status "done" }}
+            <div class="substep-meta">
+              {{ if $shell.DoneAt }}
+                <span class="substep-meta-time">
+                  {{ template "tip" (dict
+                    "Tooltip" "Completed at"
+                    "Class" "substep-meta-icon"
+                    "Icon" "icon-clock"
+                  ) }}
+                  {{ template "local_datetime" (dict "ISO" $shell.DoneAtISO "Human" $shell.DoneAt) }}
+                </span>
+              {{ end }}
+              {{ if $shell.DoneBy }}
+                <span class="substep-meta-actor">
+                  {{ template "tip" (dict
+                    "Tooltip" "Operator"
+                    "Class" "substep-meta-icon"
+                    "Icon" "icon-account"
+                  ) }}
+                  {{ $shell.DoneBy }}
+                </span>
+              {{ end }}
+            </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ if not .HideStatus }}
+        <span class="status"
+              aria-label="Status: {{ if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end }}">{{- if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end -}}</span>
+      {{ end }}
+      <span class="substep-accordion-chevron" aria-hidden="true">{{ template "icon-chevron-down" . }}</span>
+    </summary>
+    <div class="substep-details">
+      {{ with .Substep.Body }}
+        {{ template "substep_body" . }}
+      {{ else }}
+        {{ if or .Substep.Href .Substep.BlockedReason }}
+          <div class="substep-org-body stack u-gap-2">
+            {{ if .Substep.BlockedReason }}
+              <p class="muted u-m-0 u-pre-line">{{ .Substep.BlockedReason }}</p>
+            {{ end }}
+            {{ if .Substep.Href }}
+              <p class="u-m-0">
+                <a class="btn btn-secondary btn-sm" href="{{ .Substep.Href }}">Open in /app</a>
+              </p>
             {{ end }}
           </div>
-        </div>
-        {{ if not .HideStatus }}
-          <span class="status" aria-label="Status: {{ if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end }}">
-            {{- if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end -}}
-          </span>
-        {{ end }}
-        <span class="substep-accordion-chevron" aria-hidden="true">
-          {{ template "icon-chevron-down" . }}
-        </span>
-      </summary>
-      <div class="substep-details">
-        {{ with .Substep.Body }}
-          {{ template "substep_body" . }}
         {{ else }}
-          <p class="muted">
-            No data form configured for this substep
-          </p>
+          <p class="muted">No data form configured for this substep</p>
         {{ end }}
-      </div>
-    </details>
+      {{ end }}
+    </div>
+  </details>
   </li>
 {{ end }}

@@ -45,6 +45,56 @@
   min-width: 0;
 }
 
+.stream-timeline-rows {
+  list-style: none;
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stream-timeline-row {
+  min-width: 0;
+}
+
+.stream-timeline-row-accordion {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  overflow: visible;
+}
+
+.stream-timeline-row-summary {
+  padding: var(--space-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stream-timeline-row-summary::marker,
+.stream-timeline-row-summary::-webkit-details-marker {
+  display: none;
+}
+
+.stream-timeline-row-label {
+  font-weight: 600;
+  min-width: 0;
+}
+
+.stream-timeline-row-accordion[open] .stream-timeline-row-chevron {
+  transform: rotate(180deg);
+  color: var(--foreground);
+}
+
+.stream-timeline-row .stream-timeline-substeps {
+  padding-top: 0;
+}
+
 @media (--sm-down) {
   .stream-timeline-step-summary {
     gap: var(--space-2);
