@@ -31,9 +31,9 @@ func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
 	})
 
 	truckID := arriveIntakeTruck(t, server, sessionID)
-	livingCommit(t, server, sessionID,
+	livingCommit(t, server, sessionID, "stream=recycling&instance="+truckID,
 		`{"taskPath":"intake/register","jobInstanceId":"`+truckID+`","value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-CO","palletCount":1,"truckWeightAfter":900,"notes":""}}`)
-	livingCommit(t, server, sessionID,
+	livingCommit(t, server, sessionID, "stream=recycling&instance="+truckID,
 		`{"taskPath":"intake/register","jobInstanceId":"`+truckID+`","value":{"client":"DA","wasteCode":"160214","numeroFir":"FIR-DA","palletCount":1,"truckWeightAfter":800,"notes":""}}`)
 
 	domain, err := server.orgDomains.Get(t.Context(), org.FeragameScope())
@@ -50,7 +50,7 @@ func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
 		t.Fatalf("want 2 lots on truck, got %#v", lotIDs)
 	}
 	openLot, waitLot := lotIDs[0], lotIDs[1]
-	livingCommit(t, server, sessionID,
+	livingCommit(t, server, sessionID, "stream=recycling&instance="+truckID,
 		`{"taskPath":"lot_processing/startLot","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"lotId":"`+openLot+`"}}`)
 
 	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-recycling/instance/"+truckID, nil)
