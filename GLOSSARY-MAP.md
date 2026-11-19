@@ -15,7 +15,7 @@ Every vocabulary file is named `GLOSSARY.md`. This map is `GLOSSARY-MAP.md`. How
 
 ## Plant payloads (Org Config instances)
 
-- [Feragame](./docs/feragame/GLOSSARY.md): first Org Config demo plant. Lot session, Jobs `intake` / `lot_processing` / passport—**payload**, not platform Decisions. Fixture checklist: [`docs/agents/feragame-fixture-authoring.md`](docs/agents/feragame-fixture-authoring.md).
+- [Feragame](./docs/feragame/GLOSSARY.md): first Org Config demo plant. Lot session, Jobs `intake` / `lot_processing` (Passport via final `lock`)—**payload**, not platform Decisions. Fixture checklist: [`docs/agents/feragame-fixture-authoring.md`](docs/agents/feragame-fixture-authoring.md).
 
 ## Relationships
 

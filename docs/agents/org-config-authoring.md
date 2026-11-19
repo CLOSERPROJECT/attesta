@@ -34,7 +34,7 @@ stream:
         where: truckId = $stream.id
 ```
 
-Validation (load time): `stream` present; `key` is a slug and not `i`/`new`; `instance.job` is a repeatable Job listed in `steps`; every `steps[].job` exists; `each.entity` is in `domain.entities`; `each.where` compiles. `$stream` is accepted in expressions here and bound when evaluating under an Org stream instance.
+Validation (`ValidateStreamConfig` at Config load and Commit prep, mirroring DPP): `stream` present; `key` is a slug and not `i`/`new`; `instance.job` is a repeatable Job listed in `steps`; every `steps[].job` exists; `each.entity` is in `domain.entities`; `each.where` compiles. `$stream` is accepted in expressions here and bound when evaluating under an Org stream instance.
 
 **Membership caveat:** a Job instance belongs to Org stream instance S when it is the anchor instance with id S, or when its Job step has `each` and its id is one of the entity ids that `each` selects with `$stream.id = S`. That only works when the row Job’s `instanceId` equals the selected entity id (Feragame: `instanceId: $.lotId`). Validation cannot check this statically—author it that way.
 
