@@ -71,7 +71,8 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 		return nil, fmt.Errorf("org: empty task payload %s/%s", ref.JobID, ref.TaskID)
 	}
 
-	projected, err := projectTaskForm(domain, payload, ref.JobInstanceID, jobInstanceLabel(domain, ref.JobID, ref.JobInstanceID), cfg.Catalogs)
+	stream := streamBindingFrom(cfg, ResolveStreamInstanceID(cfg, domain, ref.JobID, ref.JobInstanceID))
+	projected, err := projectTaskForm(domain, payload, ref.JobInstanceID, jobInstanceLabel(domain, ref.JobID, ref.JobInstanceID), cfg.Catalogs, stream)
 	if err != nil {
 		return nil, err
 	}
@@ -108,11 +109,11 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 		projectionKey = rowsIdentity(projected.RowIDs)
 	}
 
-	initial, err := seedInitialData(domain, payload, projected, ref.JobInstanceID, cfg.Catalogs)
+	initial, err := seedInitialData(domain, payload, projected, ref.JobInstanceID, cfg.Catalogs, stream)
 	if err != nil {
 		return nil, err
 	}
-	bindings := buildFormBindings(domain, ref, cfg.Catalogs)
+	bindings := buildFormBindings(domain, ref, cfg.Catalogs, stream)
 	if err := evaluateDataReports(chrome, bindings); err != nil {
 		return nil, err
 	}
@@ -164,6 +165,9 @@ func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 	}
 	if inst, ok := bindings["instance"]; ok {
 		vars["instance"] = inst
+	}
+	if stream, ok := bindings["stream"]; ok {
+		vars["stream"] = stream
 	}
 	display := map[string]any{}
 	for _, c := range reports {
@@ -269,7 +273,7 @@ func taskTitle(payload map[string]any, taskID string) string {
 	return taskID
 }
 
-func buildFormBindings(domain Domain, ref ActionableTaskRef, catalogs map[string]any) map[string]any {
+func buildFormBindings(domain Domain, ref ActionableTaskRef, catalogs map[string]any, stream ...*streamBinding) map[string]any {
 	// DomainSnapshot-shaped bag (JSON field names) for Chrome / dataReport JSONata.
 	subs := make([]any, len(domain.Submissions))
 	for i, s := range domain.Submissions {
@@ -292,11 +296,22 @@ func buildFormBindings(domain Domain, ref ActionableTaskRef, catalogs map[string
 		}
 		bindings["instance"] = inst
 	}
+	var streamRef *streamBinding
+	if len(stream) > 0 {
+		streamRef = stream[0]
+	}
+	if streamRef != nil && streamRef.Key != "" {
+		s := map[string]any{"key": streamRef.Key}
+		if streamRef.ID != "" {
+			s["id"] = streamRef.ID
+		}
+		bindings["stream"] = s
+	}
 	return bindings
 }
 
 // Omit/blank Task initialData ⇒ schema-default path only (plus map seeding).
-func seedInitialData(domain Domain, payload map[string]any, projected projectedForm, jobInstanceID string, catalogs map[string]any) (map[string]any, error) {
+func seedInitialData(domain Domain, payload map[string]any, projected projectedForm, jobInstanceID string, catalogs map[string]any, stream ...*streamBinding) (map[string]any, error) {
 	out := map[string]any{}
 	primary, ok := primaryDynamicProperty(payload)
 	if ok && len(projected.RowIDs) > 0 {
@@ -328,7 +343,11 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 			}
 		}
 	}
-	if err := mergeAuthoredInitialData(out, domain, payload, jobInstanceID, catalogs); err != nil {
+	var streamRef *streamBinding
+	if len(stream) > 0 {
+		streamRef = stream[0]
+	}
+	if err := mergeAuthoredInitialData(out, domain, payload, jobInstanceID, catalogs, streamRef); err != nil {
 		return nil, err
 	}
 	seedFormDefaultsFromSchema(out, payload)
@@ -336,7 +355,7 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 }
 
 // Result must be an object; keys overwrite prior seed.
-func mergeAuthoredInitialData(out map[string]any, domain Domain, payload map[string]any, jobInstanceID string, catalogs map[string]any) error {
+func mergeAuthoredInitialData(out map[string]any, domain Domain, payload map[string]any, jobInstanceID string, catalogs map[string]any, stream *streamBinding) error {
 	raw, has := payload["initialData"]
 	if !has || raw == nil {
 		return nil
@@ -348,7 +367,7 @@ func mergeAuthoredInitialData(out map[string]any, domain Domain, payload map[str
 	if strings.TrimSpace(expr) == "" {
 		return nil
 	}
-	value, err := evaluateExpr(expr, map[string]any{}, domainBindings(domain, jobInstanceID, catalogs))
+	value, err := evaluateExpr(expr, map[string]any{}, domainBindingsWith(domain, jobInstanceID, catalogs, "", stream))
 	if err != nil {
 		return fmt.Errorf("org: initialData: %w", err)
 	}

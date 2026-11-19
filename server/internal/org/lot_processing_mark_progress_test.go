@@ -53,7 +53,7 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 	_ = commitStartLot(t, c, loadID)
 
 	cfg := mustActiveConfig(t, c)
-	wl := ProjectWorklist(cfg, mustDomain(t, c), adminOp())
+	wl := projectWorklistUnfiltered(cfg, mustDomain(t, c), adminOp())
 	inst, _ := worklistInstance(worklistMustJob(t, wl, "lot_processing"), loadID)
 	if inst.Tasks["markProgress"] != TaskStatusUnavailable {
 		t.Fatalf("markProgress before weigh = %q, want unavailable", inst.Tasks["markProgress"])
@@ -98,7 +98,7 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 	if len(rows) != 1 || rows[0] != loadID+".1" {
 		t.Fatalf("rows after one weigh = %#v, want only %s.1", rows, loadID)
 	}
-	afterWeigh := ProjectWorklist(cfg, weighted, adminOp())
+	afterWeigh := projectWorklistUnfiltered(cfg, weighted, adminOp())
 	inst, _ = worklistInstance(worklistMustJob(t, afterWeigh, "lot_processing"), loadID)
 	if inst.Tasks["markProgress"] != TaskStatusActionable {
 		t.Fatalf("markProgress after one weigh = %q, want actionable", inst.Tasks["markProgress"])
@@ -165,7 +165,7 @@ func TestCommitMarkProgressAllowsMultiple(t *testing.T) {
 	if marks != 2 {
 		t.Fatalf("markProgress submissions = %d, want 2", marks)
 	}
-	wl := ProjectWorklist(mustActiveConfig(t, c), second.Domain, adminOp())
+	wl := projectWorklistUnfiltered(mustActiveConfig(t, c), second.Domain, adminOp())
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "lot_processing"), lotID)
 	if !ok {
 		t.Fatal("missing lot_processing instance")

@@ -14,8 +14,12 @@ func readyWhenFromTask(task map[string]any) any {
 
 // readyWhenOkForCommit evaluates Task readyWhen over Domain into a compact boolean.
 // Omit / null / blank ⇒ true (experiment parity). Invalid or eval failure ⇒ false (fail closed).
-func readyWhenOkForCommit(domain Domain, task map[string]any, jobInstanceID string, catalogs map[string]any) bool {
-	ok, err := evaluateReadyWhen(domain, readyWhenFromTask(task), jobInstanceID, catalogs)
+func readyWhenOkForCommit(domain Domain, task map[string]any, jobInstanceID string, catalogs map[string]any, stream ...*streamBinding) bool {
+	var streamRef *streamBinding
+	if len(stream) > 0 {
+		streamRef = stream[0]
+	}
+	ok, err := evaluateReadyWhen(domain, readyWhenFromTask(task), jobInstanceID, catalogs, streamRef)
 	if err != nil {
 		return false
 	}
@@ -23,7 +27,7 @@ func readyWhenOkForCommit(domain Domain, task map[string]any, jobInstanceID stri
 }
 
 // evaluateReadyWhen runs an optional readyWhen JSONata boolean over Domain ($domain).
-func evaluateReadyWhen(domain Domain, expression any, jobInstanceID string, catalogs map[string]any) (bool, error) {
+func evaluateReadyWhen(domain Domain, expression any, jobInstanceID string, catalogs map[string]any, stream ...*streamBinding) (bool, error) {
 	if expression == nil {
 		return true, nil
 	}
@@ -34,7 +38,11 @@ func evaluateReadyWhen(domain Domain, expression any, jobInstanceID string, cata
 	if strings.TrimSpace(s) == "" {
 		return true, nil
 	}
-	value, err := evaluateExpr(s, nil, domainBindings(domain, jobInstanceID, catalogs))
+	var streamRef *streamBinding
+	if len(stream) > 0 {
+		streamRef = stream[0]
+	}
+	value, err := evaluateExpr(s, nil, domainBindingsWith(domain, jobInstanceID, catalogs, "", streamRef))
 	if err != nil {
 		return false, err
 	}
