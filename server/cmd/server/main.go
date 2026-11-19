@@ -6021,6 +6021,7 @@ func (s *Server) handleOrgProcessPage(w http.ResponseWriter, r *http.Request, us
 			ProcessDone:    status == org.StreamInstanceDone,
 			Timeline:       steps,
 			ShowMineFilter: false,
+			ShowAllFilter:  true,
 			CanTerminate:   false,
 		},
 	}

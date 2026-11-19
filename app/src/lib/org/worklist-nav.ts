@@ -33,7 +33,8 @@ function asScope(stream: string, instance: string): StreamNavScope {
 
 /**
  * Post-Commit SPA decision from server `navigation` only (ADR-0006).
- * Stay is never inferred from HTTP links. `home` means the instance home.
+ * Stay is never inferred from HTTP links. `home` is remapped to the /my
+ * instance timeline by navigate-target (not instance Worklist).
  */
 export function resolveCommitFollowUp(
 	navigation: CommitNavigation,
@@ -92,7 +93,7 @@ function viewerMayAct(inst: WorklistInstance, taskId: string): boolean {
 
 /**
  * When a Task cannot be mounted (deep-link gate miss, task-form 403/404):
- * instance home when scoped; Play → stream dashboard.
+ * `home` when scoped (timeline via navigate-target); Play → stream dashboard.
  */
 export function resolveUnmountableTaskTarget(
 	stream: string,
@@ -240,7 +241,7 @@ export function resolveTaskDeepLink(
 	);
 }
 
-/** Exit from Task without Commit: instance home (Play → stream dashboard). */
+/** Exit from Task without Commit: `home` when scoped (Play → stream dashboard). */
 export function resolveTaskExit(
 	stream: string,
 	instance: string,

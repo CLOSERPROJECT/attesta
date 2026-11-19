@@ -89,7 +89,7 @@ describe('decideCommitFollowThrough', () => {
 		});
 	});
 
-	test('Play Commit (empty instance) navigates to minted instance home', () => {
+	test('Play Commit (empty instance) navigates to minted home target', () => {
 		expect(
 			decideCommitFollowThrough(
 				{
@@ -143,7 +143,7 @@ describe('decideContinueFollowThrough', () => {
 		});
 	});
 
-	test('home Continue → navigate instance home', () => {
+	test('home Continue → navigate home target', () => {
 		expect(
 			decideContinueFollowThrough(
 				{
@@ -156,7 +156,7 @@ describe('decideContinueFollowThrough', () => {
 		).toEqual({ kind: 'navigate', target: homeTarget });
 	});
 
-	test('null continueNavigation defaults to instance home', () => {
+	test('null continueNavigation defaults to home target', () => {
 		expect(
 			decideContinueFollowThrough(
 				{

@@ -101,6 +101,18 @@ func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
 	if strings.Contains(body, "js-mine-filter") || strings.Contains(body, "My tasks") {
 		t.Fatalf("Org instance must hide mine filter, got:\n%s", body)
 	}
+	if !strings.Contains(body, "js-show-all-filter") || !strings.Contains(body, "Show all") {
+		t.Fatalf("Org instance must show Show all filter, got:\n%s", body)
+	}
+	if !strings.Contains(body, `data-org-actionable="true"`) {
+		t.Fatalf("expected data-org-actionable on act-now substeps, got:\n%s", body)
+	}
+	if !strings.Contains(body, "js-show-all-filter-root") || !strings.Contains(body, "is-actionable-only") {
+		t.Fatalf("expected actionable-only filter root, got:\n%s", body)
+	}
+	if !strings.Contains(body, "Submissions (") {
+		t.Fatalf("expected submissions under accordion when count >= 1, got:\n%s", body)
+	}
 	if strings.Contains(body, "js-open-substep-override") || strings.Contains(body, "/override") {
 		t.Fatalf("Org instance must hide Formata override affordances, got:\n%s", body)
 	}

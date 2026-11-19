@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const stream = 'recycling';
 const instance = 'NIR-1';
 const homePath = `/app/${stream}/i/${instance}`;
+const timelinePath = `/my/streams/org-${stream}/instance/${instance}`;
 
 const homeLoad = {
 	org: 'feragame',
@@ -121,75 +122,30 @@ async function stubOrgApis(page: Page) {
 	});
 }
 
-test('instance home renders act-now Worklist + chrome (Italian default)', async ({
-	page
-}) => {
+test('instance route redirects to /my instance timeline', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(homePath);
-	await expect(page.locator('html')).toHaveAttribute('lang', 'it');
-	await expect(page.getByTestId('org-shell')).toBeVisible();
-	await expect(page.getByTestId('instance-chrome')).toBeVisible();
-	await expect(page.getByTestId('instance-chrome-stream')).toHaveText('Riciclo');
-	await expect(page.getByTestId('instance-chrome-label')).toHaveText('Camion A');
-	await expect(page.getByTestId('instance-chrome-timeline')).toHaveText(
-		'Torna alla timeline'
-	);
-	const timeline = page.getByTestId('instance-chrome-timeline');
-	await expect(timeline).toHaveAttribute(
-		'href',
-		`/my/streams/org-${stream}/instance/${instance}`
-	);
-	await expect(timeline).toHaveAttribute('rel', 'external');
-	await expect(timeline).toHaveAttribute('target', '_self');
-	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
-	await expect(page.getByTestId('nav-back')).toHaveCount(0);
-	await expect(page.getByTestId('nav-role-chip')).toHaveText('administration');
-	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
-	await expect(page.getByTestId('available-row')).toBeVisible();
-	await expect(page.getByTestId('can-start-row')).toBeVisible();
-	await expect(page.getByTestId('can-start-row')).toContainText('Apri lotto');
-	await expect(page.getByTestId('can-start-row')).not.toContainText('Nuovo camion');
-	const localeCookie = (await page.context().cookies()).find(
-		(c) => c.name === 'PARAGLIDE_LOCALE'
-	);
-	expect(localeCookie?.value ?? 'it').toBe('it');
+	await expect(page).toHaveURL(timelinePath);
 });
 
-test('Torna alla timeline leaves /app for /my instance URL', async ({ page }) => {
+test('Can start (each Job) → nav-back → timeline', async ({ page }) => {
 	await stubOrgApis(page);
-	await page.goto(homePath);
-	await page.getByTestId('instance-chrome-timeline').click();
-	await expect(page).toHaveURL(
-		`/my/streams/org-${stream}/instance/${instance}`
-	);
-});
-
-test('Home → Can start (each Job) → nav-back → Home', async ({ page }) => {
-	await stubOrgApis(page);
-	await page.goto(homePath);
-	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
-	await page.getByTestId('can-start-row').click();
+	await page.goto(`${homePath}/lot_processing/new/startLot`);
 	await expect(page.getByTestId('task-route')).toBeVisible();
 	await expect(page.getByTestId('task-startLot')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
-	await expect(page.getByTestId('org-shell')).toBeVisible();
-	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
-	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
+	await expect(page).toHaveURL(timelinePath);
 });
 
-test('Home → act-now task row → nav-back → Home', async ({ page }) => {
+test('act-now task → nav-back → timeline', async ({ page }) => {
 	await stubOrgApis(page);
-	await page.goto(homePath);
-	await expect(page.getByTestId('available-row')).toBeVisible();
-	await page.getByTestId('available-row').click();
+	await page.goto(`${homePath}/intake/${instance}/register`);
 	await expect(page.getByTestId('task-route')).toBeVisible();
 	await expect(page.getByTestId('task-register')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
-	await expect(page.getByTestId('org-shell')).toBeVisible();
-	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
-	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
+	await expect(page).toHaveURL(timelinePath);
 });
 
 test('unavailable Task shows blockedReason', async ({ page }) => {
@@ -201,9 +157,9 @@ test('unavailable Task shows blockedReason', async ({ page }) => {
 	);
 });
 
-test('unauthorized Task URL redirects to instance home', async ({ page }) => {
+test('unauthorized Task URL redirects to instance timeline', async ({ page }) => {
 	await stubOrgApis(page);
-	// available (other role) → not unavailable → redirect home
+	// available (other role) → not unavailable → redirect home → timeline
 	const loadOtherRole = {
 		...homeLoad,
 		worklist: {
@@ -230,15 +186,13 @@ test('unauthorized Task URL redirects to instance home', async ({ page }) => {
 		});
 	});
 	await page.goto(`${homePath}/intake/${instance}/palletWeight`);
-	await expect(page.getByTestId('org-shell')).toBeVisible();
-	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
+	await expect(page).toHaveURL(timelinePath);
 });
 
-test('unknown Task instance redirects to instance home', async ({ page }) => {
+test('unknown Task instance redirects to instance timeline', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`${homePath}/intake/missing/register`);
-	await expect(page.getByTestId('org-shell')).toBeVisible();
-	await expect(page.getByTestId('nav-place-primary')).toHaveText('Home');
+	await expect(page).toHaveURL(timelinePath);
 });
 
 test('Play route shows stream chrome', async ({ page }) => {

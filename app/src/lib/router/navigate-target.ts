@@ -6,6 +6,11 @@ export function orgMyStreamDashboardPath(stream: string): string {
 	return `/my/streams/org-${stream}/`;
 }
 
+/** Org catalog instance timeline — Commit `home` and instance route land here. */
+export function orgMyInstanceTimelinePath(stream: string, instance: string): string {
+	return `/my/streams/org-${stream}/instance/${instance}`;
+}
+
 /** Resolve ADR-0006 / ADR-0014 target to an href for `<a>` / Button `href` navigation. */
 export function hrefOrgTarget(target: PostCommitTarget): string {
 	if (target.kind === 'my') {
@@ -15,12 +20,7 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 		return orgMyStreamDashboardPath(target.stream);
 	}
 	if (target.kind === 'home') {
-		return p('/:stream/i/:instance', {
-			params: {
-				stream: target.stream,
-				instance: target.instance
-			}
-		});
+		return orgMyInstanceTimelinePath(target.stream, target.instance);
 	}
 	return p('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 		params: {
@@ -35,20 +35,12 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 
 /** Programmatic navigate; return value is for `throw` inside sv-router hooks. */
 export function navigateOrgTargetAsync(target: PostCommitTarget): Promise<unknown> {
-	if (target.kind === 'my' || target.kind === 'myStream') {
+	if (target.kind === 'my' || target.kind === 'myStream' || target.kind === 'home') {
 		const href = hrefOrgTarget(target);
 		if (typeof window !== 'undefined') {
 			window.location.assign(href);
 		}
 		return Promise.resolve();
-	}
-	if (target.kind === 'home') {
-		return navigate('/:stream/i/:instance', {
-			params: {
-				stream: target.stream,
-				instance: target.instance
-			}
-		});
 	}
 	return navigate('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 		params: {

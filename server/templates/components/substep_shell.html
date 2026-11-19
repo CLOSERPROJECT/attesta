@@ -5,6 +5,7 @@
     class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
     data-role-palette="{{ $shell.Palette }}"
     data-viewer-owned="{{ if .Substep.ViewerOwned }}true{{ else }}false{{ end }}"
+    {{ if .Substep.OrgActionable }}data-org-actionable="true"{{ end }}
   >
     <details
       class="substep-accordion js-process-substep-panel"
@@ -62,7 +63,7 @@
         {{ with .Substep.Body }}
           {{ template "substep_body" . }}
         {{ else }}
-          {{ if or .Substep.Href .Substep.BlockedReason }}
+          {{ if or .Substep.Href .Substep.BlockedReason .Substep.Submissions }}
             <div class="substep-org-body stack u-gap-2">
               {{ if .Substep.BlockedReason }}
                 <p class="muted u-m-0 u-pre-line">{{ .Substep.BlockedReason }}</p>
@@ -71,6 +72,27 @@
                 <p class="u-m-0">
                   <a class="btn btn-secondary btn-sm" href="{{ .Substep.Href }}">Open in /app</a>
                 </p>
+              {{ end }}
+              {{ if .Substep.Submissions }}
+                <details class="substep-org-submissions">
+                  <summary class="substep-org-submissions-summary">
+                    Submissions ({{ len .Substep.Submissions }})
+                  </summary>
+                  <ul class="substep-org-submissions-list">
+                    {{ range .Substep.Submissions }}
+                    <li class="substep-org-submissions-item">
+                      {{ if .Timestamp }}
+                        {{ template "local_datetime" (dict "ISO" .Timestamp "Human" .TimestampHuman) }}
+                      {{ else }}
+                        <span class="muted">—</span>
+                      {{ end }}
+                      {{ if .UserID }}
+                        <span class="muted">· {{ .UserID }}</span>
+                      {{ end }}
+                    </li>
+                    {{ end }}
+                  </ul>
+                </details>
               {{ end }}
             </div>
           {{ else }}

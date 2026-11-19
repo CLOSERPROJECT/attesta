@@ -7,12 +7,24 @@
   data-workflow-key="{{ .WorkflowKey }}"
   data-selected-substep="{{ .Detail.SelectedSubstepID }}"
   data-mine-filter="{{ if .Detail.ShowMineFilter }}1{{ else }}0{{ end }}"
+  data-show-all="{{ if .Detail.ShowAllFilter }}0{{ end }}"
   data-live-updates="{{ if .LiveUpdates }}1{{ else }}0{{ end }}"
 >
   <div id="process-page-content">{{ template "process_content.html" . }}</div>
 </div>
 {{ end }} {{ define "process_stream_timeline" }}
-{{ if .Detail.ShowMineFilter }}
+{{ if .Detail.ShowAllFilter }}
+<div class="process-stream-block">
+  {{ template "stream_show_all_filter" . }}
+  <div class="js-show-all-filter-root stream-show-all-filter-root is-actionable-only">
+    <div class="empty-state stream-show-all-filter-empty" hidden>
+      <p class="empty-state-title">No matching tasks</p>
+      <p class="empty-state-hint">Turn on Show all to see the full stream timeline.</p>
+    </div>
+    {{ template "stream_timeline" .Detail.StreamTimeline }}
+  </div>
+</div>
+{{ else if .Detail.ShowMineFilter }}
 <div class="process-stream-block">
   {{ template "stream_mine_filter" . }}
   <div class="js-mine-filter-root stream-mine-filter-root is-mine-filter">

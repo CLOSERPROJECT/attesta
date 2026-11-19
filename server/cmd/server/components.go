@@ -353,6 +353,13 @@ func substepShellDisplay(sub TimelineSubstep) SubstepShellDisplay {
 	}
 }
 
+// TimelineSubmissionView is one Domain Submission summary under an Org timeline accordion.
+type TimelineSubmissionView struct {
+	Timestamp      string
+	TimestampHuman string
+	UserID         string
+}
+
 // TimelineSubstep is one row in the stream timeline accordion.
 // Shell chrome reads from Body via substepShellDisplay; summary Status/Done* fields
 // remain for nil-body fallbacks and legacy builders until fully removed.
@@ -361,6 +368,7 @@ type TimelineSubstep struct {
 	Title         string
 	Selected      bool
 	ViewerOwned   bool
+	OrgActionable bool // Org act-now (available); Formata leaves false
 	Body          *SubstepBodyView
 	Palette       string
 	Status        string
@@ -371,6 +379,7 @@ type TimelineSubstep struct {
 	DoneAtISO     string
 	BlockedReason string
 	Href          string // Org /app Task link when set; Formata leaves empty
+	Submissions   []TimelineSubmissionView
 }
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.
@@ -425,6 +434,7 @@ type StreamInstanceDetailView struct {
 	Error             string
 	Timeline          []TimelineStep
 	ShowMineFilter    bool
+	ShowAllFilter     bool // Org: actionable-only default + Show all checkbox
 	HideStatus        bool
 	DPPURL            string
 	DPPGS1            string

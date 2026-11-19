@@ -249,6 +249,65 @@ const applyMineFilterRoot = (scopeRoot = document) => {
   }
 };
 
+const showAllFilterCheckbox = () => {
+  const page = processPageRoot();
+  const toggle = page?.querySelector(".js-show-all-filter");
+  return toggle instanceof HTMLInputElement ? toggle : null;
+};
+
+// Preference on #process-page[data-show-all]: "1" = reveal all, "0"/absent = actionable-only.
+const showAllEnabled = () => {
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    if (page.dataset.showAll === "1") {
+      return true;
+    }
+    if (page.dataset.showAll === "0") {
+      return false;
+    }
+  }
+  const toggle = showAllFilterCheckbox();
+  if (toggle) {
+    return toggle.checked;
+  }
+  return false;
+};
+
+const applyShowAllFilterRoot = (scopeRoot = document) => {
+  const scope =
+    scopeRoot instanceof Element || scopeRoot instanceof Document
+      ? scopeRoot
+      : document;
+  const showAll = showAllEnabled();
+  const page = processPageRoot();
+  if (page instanceof HTMLElement && showAllFilterCheckbox()) {
+    page.dataset.showAll = showAll ? "1" : "0";
+  }
+  const toggle = showAllFilterCheckbox();
+  if (toggle) {
+    toggle.checked = showAll;
+  }
+
+  for (const filterRoot of scope.querySelectorAll(".js-show-all-filter-root")) {
+    if (!(filterRoot instanceof HTMLElement)) {
+      continue;
+    }
+    const actionableOnly = !showAll;
+    filterRoot.classList.toggle("is-actionable-only", actionableOnly);
+    const hasVisible = !!filterRoot.querySelector(
+      '.substep[data-org-actionable="true"]',
+    );
+    filterRoot.classList.toggle(
+      "is-actionable-only-empty",
+      actionableOnly && !hasVisible,
+    );
+    const empty = filterRoot.querySelector(".stream-show-all-filter-empty");
+    if (empty instanceof HTMLElement) {
+      empty.hidden = !actionableOnly || hasVisible;
+    }
+  }
+};
+
 const syncProcessPageURL = (substepId = "") => {
   // Process-page only: do not leak ?substep= onto stream dashboard URLs.
   if (!processId) {
@@ -341,6 +400,7 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     await initializeFormataForms(processPageContent);
     markSelectedSubstep(currentSelectedSubstep());
     applyMineFilterRoot(processPageContent);
+    applyShowAllFilterRoot(processPageContent);
   } catch (_err) {}
 };
 
@@ -1219,14 +1279,20 @@ document.body.addEventListener("change", (event) => {
   if (!(target instanceof HTMLInputElement) || !processId) {
     return;
   }
-  if (!target.classList.contains("js-mine-filter")) {
+  const page = processPageRoot();
+  if (target.classList.contains("js-mine-filter")) {
+    if (page instanceof HTMLElement) {
+      page.dataset.mineFilter = target.checked ? "1" : "0";
+    }
+    applyMineFilterRoot(document);
     return;
   }
-  const page = processPageRoot();
-  if (page instanceof HTMLElement) {
-    page.dataset.mineFilter = target.checked ? "1" : "0";
+  if (target.classList.contains("js-show-all-filter")) {
+    if (page instanceof HTMLElement) {
+      page.dataset.showAll = target.checked ? "1" : "0";
+    }
+    applyShowAllFilterRoot(document);
   }
-  applyMineFilterRoot(document);
 });
 
 const liveUpdatesEnabled =
@@ -1567,6 +1633,7 @@ document.addEventListener("DOMContentLoaded", () => {
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
   applyMineFilterRoot(document);
+  applyShowAllFilterRoot(document);
   // Do not focus into forms on load — focusing a control inside <details>
   // can force the accordion open.
   promoteToasts(document);
@@ -1612,6 +1679,7 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
         : "";
     markSelectedSubstep(openId);
     applyMineFilterRoot(event.target);
+    applyShowAllFilterRoot(event.target);
   }
   if (event.detail?.target?.id === "platform-admin-categories") {
     const form = document.getElementById("categories-editor-form");

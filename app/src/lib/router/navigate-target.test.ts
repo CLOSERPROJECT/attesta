@@ -12,7 +12,11 @@ vi.mock('./index.js', () => ({
 	navigate: vi.fn()
 }));
 
-import { hrefOrgTarget, orgMyStreamDashboardPath } from './navigate-target.js';
+import {
+	hrefOrgTarget,
+	orgMyInstanceTimelinePath,
+	orgMyStreamDashboardPath
+} from './navigate-target.js';
 
 describe('hrefOrgTarget', () => {
 	test('my target is /my', () => {
@@ -26,14 +30,17 @@ describe('hrefOrgTarget', () => {
 		expect(orgMyStreamDashboardPath('recycling')).toBe('/my/streams/org-recycling/');
 	});
 
-	test('home target is instance home under stream', () => {
+	test('home target is /my instance timeline', () => {
 		expect(
 			hrefOrgTarget({
 				kind: 'home',
 				stream: 'recycling',
 				instance: '261102-1'
 			})
-		).toBe('/app/recycling/i/261102-1');
+		).toBe('/my/streams/org-recycling/instance/261102-1');
+		expect(orgMyInstanceTimelinePath('recycling', '261102-1')).toBe(
+			'/my/streams/org-recycling/instance/261102-1'
+		);
 	});
 
 	test('task target keeps stream instance prefix', () => {
