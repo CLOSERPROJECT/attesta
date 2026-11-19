@@ -21,11 +21,9 @@
           </div>
           <div class="page-header-actions">
             {{ if .ShowPreview }}
-              <button
-                class="btn btn-secondary"
-                type="button"
-                onclick="document.getElementById('stream-preview-dialog').showModal()"
-              >
+              <button class="btn btn-secondary"
+                      type="button"
+                      onclick="document.getElementById('stream-preview-dialog').showModal()">
                 {{ template "icon-eye" . }}
                 View preview
               </button>
@@ -53,21 +51,15 @@
             <header class="dialog-head">
               <div>
                 <h3 class="dialog-title">Stream preview</h3>
-                <p class="dialog-subtitle">
-                  Inspect the stream timeline and form structure in read-only mode
-                </p>
+                <p class="dialog-subtitle">Inspect the stream timeline and form structure in read-only mode</p>
               </div>
-              <button
-                type="button"
-                class="btn btn-ghost btn-icon dialog-close"
-                onclick="document.getElementById('stream-preview-dialog').close()"
-              >
+              <button type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('stream-preview-dialog').close()">
                 {{ template "icon-close" . }}
               </button>
             </header>
-            <div class="stream-preview-body">
-              {{ template "stream_timeline" .Preview.StreamTimeline }}
-            </div>
+            <div class="stream-preview-body">{{ template "stream_timeline" .Preview.StreamTimeline }}</div>
           </div>
         </dialog>
       {{ end }}
@@ -85,154 +77,104 @@
           {{ template "icon-filter" . }}
           Filter by status
         </span>
-        <nav
-          class="stream-status-filter-nav"
-          aria-labelledby="stream-status-filter-label"
-        >
+        <nav class="stream-status-filter-nav"
+             aria-labelledby="stream-status-filter-label">
           {{ range .FilterOptions }}
-            <a
-              class="stream-status-filter-option{{ if eq .Status $.StatusFilter }} is-active{{ end }}"
-              href="{{ $.WorkflowPath }}/{{- if or (ne .Status "all") (ne $.Sort "time_desc") -}}
+          <a class="stream-status-filter-option{{ if eq .Status $.StatusFilter }} is-active{{ end }}" href="{{ $.WorkflowPath }}/{{- if or (ne .Status "all") (ne $.Sort "time_desc") -}}
                 ?{{- if ne .Status "all" -}}
                   filter={{ .Status }}{{- if ne $.Sort "time_desc" -}}&{{ end -}}
                 {{- end -}}{{- if ne $.Sort "time_desc" -}}
                   sort={{ $.Sort }}
                 {{- end -}}
-              {{- end -}}"
-              hx-get="{{ $.WorkflowPath }}/{{- if or (ne .Status "all") (ne $.Sort "time_desc") -}}
+              {{- end -}}" hx-get="{{ $.WorkflowPath }}/{{- if or (ne .Status "all") (ne $.Sort "time_desc") -}}
                 ?{{- if ne .Status "all" -}}
                   filter={{ .Status }}{{- if ne $.Sort "time_desc" -}}&{{ end -}}
                 {{- end -}}{{- if ne $.Sort "time_desc" -}}
                   sort={{ $.Sort }}
                 {{- end -}}
-              {{- end -}}"
+              {{- end -}}" hx-target="#stream-dashboard-results" hx-select="#stream-dashboard-results" hx-swap="outerHTML" hx-push-url="true" aria-controls="{{ .PanelID }}" aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}" aria-label="{{ .NavAriaLabel }}" title="{{ .NavTitle }}">
+            {{ template "status_tag" .Status }}
+            </a>
+          {{ end }}
+        </nav>
+        <form method="get"
+              action="{{ .WorkflowPath }}/"
+              hx-get="{{ .WorkflowPath }}/"
               hx-target="#stream-dashboard-results"
               hx-select="#stream-dashboard-results"
               hx-swap="outerHTML"
               hx-push-url="true"
-              aria-controls="{{ .PanelID }}"
-              aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}"
-              aria-label="{{ .NavAriaLabel }}"
-              title="{{ .NavTitle }}"
-            >
-              {{ template "status_tag" .Status }}
-            </a>
-          {{ end }}
-        </nav>
-        <form
-          method="get"
-          action="{{ .WorkflowPath }}/"
-          hx-get="{{ .WorkflowPath }}/"
-          hx-target="#stream-dashboard-results"
-          hx-select="#stream-dashboard-results"
-          hx-swap="outerHTML"
-          hx-push-url="true"
-          hx-trigger="change from:#stream-status-filter-select"
-        >
+              hx-trigger="change from:#stream-status-filter-select">
           {{ if ne .Sort "time_desc" }}
             <input type="hidden" name="sort" value="{{ .Sort }}" />
           {{ end }}
-          <select
-            id="stream-status-filter-select"
-            class="stream-status-filter-select"
-            name="filter"
-            aria-labelledby="stream-status-filter-label"
-          >
+          <select id="stream-status-filter-select"
+                  class="stream-status-filter-select"
+                  name="filter"
+                  aria-labelledby="stream-status-filter-label">
             <button type="button">
               <selectedcontent></selectedcontent>
             </button>
             {{ range .FilterOptions }}
-              <option
-                value="{{ .Status }}"
-                {{ if eq .Status $.StatusFilter }}selected{{ end }}
-              >
-                {{ template "status_tag" .Status }}
-              </option>
+              <option value="{{ .Status }}"
+                      {{ if eq .Status $.StatusFilter }}selected{{ end }}>{{ template "status_tag" .Status }}</option>
             {{ end }}
           </select>
         </form>
       </div>
       {{ range .ProcessGroups }}
-          <form
-            method="get"
-            action="{{ $.WorkflowPath }}/"
-            class="stream-status-sort"
-            hx-get="{{ $.WorkflowPath }}/"
-            hx-target="#stream-dashboard-results"
-            hx-select="#stream-dashboard-results"
-            hx-swap="outerHTML"
-            hx-push-url="true"
-            hx-trigger="change from:select"
-          >
-            {{ range .SortFields }}
-              <input type="hidden" name="{{ .Name }}" value="{{ .Value }}" />
-            {{ end }}
-            <label
-              class="stream-status-sort-control"
-              for="stream-sort-{{ .Status }}"
-            >
-              <span class="stream-status-rail-label">
-                {{ template "icon-sort" . }}
-                Sort by
-              </span>
-              <select id="stream-sort-{{ .Status }}" name="sort">
-                <option
-                  value="time_desc"
-                  {{ if eq .Sort "time_desc" }}selected{{ end }}
-                >
-                  Newest
-                </option>
-                <option
-                  value="time_asc"
-                  {{ if eq .Sort "time_asc" }}selected{{ end }}
-                >
-                  Oldest
-                </option>
-                <option
-                  value="progress_desc"
-                  {{ if eq .Sort "progress_desc" }}selected{{ end }}
-                >
-                  Most advanced
-                </option>
-                <option
-                  value="progress_asc"
-                  {{ if eq .Sort "progress_asc" }}selected{{ end }}
-                >
-                  Least advanced
-                </option>
-                <option
-                  value="status"
-                  {{ if eq .Sort "status" }}selected{{ end }}
-                >
-                  Status
-                </option>
-              </select>
-            </label>
-          </form>
+        <form method="get"
+              action="{{ $.WorkflowPath }}/"
+              class="stream-status-sort"
+              hx-get="{{ $.WorkflowPath }}/"
+              hx-target="#stream-dashboard-results"
+              hx-select="#stream-dashboard-results"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              hx-trigger="change from:select">
+          {{ range .SortFields }}
+            <input type="hidden" name="{{ .Name }}" value="{{ .Value }}" />
+          {{ end }}
+          <label class="stream-status-sort-control" for="stream-sort-{{ .Status }}">
+            <span class="stream-status-rail-label">
+              {{ template "icon-sort" . }}
+              Sort by
+            </span>
+            <select id="stream-sort-{{ .Status }}" name="sort">
+              <option value="time_desc" {{ if eq .Sort "time_desc" }}selected{{ end }}>Newest</option>
+              <option value="time_asc" {{ if eq .Sort "time_asc" }}selected{{ end }}>Oldest</option>
+              <option value="progress_desc"
+                      {{ if eq .Sort "progress_desc" }}selected{{ end }}>Most advanced</option>
+              <option value="progress_asc"
+                      {{ if eq .Sort "progress_asc" }}selected{{ end }}>Least advanced</option>
+              <option value="status" {{ if eq .Sort "status" }}selected{{ end }}>Status</option>
+            </select>
+          </label>
+        </form>
       {{ end }}
     </section>
 
     <div class="rail-layout-main home-workflow-panel-main">
       {{ range .ProcessGroups }}
-          <section class="stream-status-section" id="{{ .PanelID }}">
-            <div class="stream-status-section-head">
-              <h3>{{ .Heading }}</h3>
+        <section class="stream-status-section" id="{{ .PanelID }}">
+          <div class="stream-status-section-head">
+            <h3>{{ .Heading }}</h3>
+          </div>
+          {{ if .Processes }}
+            <ul class="stream-instance-card-list">
+              {{ range .Processes }}
+                {{ template "stream_instance_card" . }}
+              {{ end }}
+            </ul>
+          {{ else }}
+            <div class="empty-state">
+              <p class="empty-state-title">{{ .EmptyMessage }}</p>
             </div>
-            {{ if .Processes }}
-              <ul class="stream-instance-card-list">
-                {{ range .Processes }}
-                  {{ template "stream_instance_card" . }}
-                {{ end }}
-              </ul>
-            {{ else }}
-              <div class="empty-state">
-                <p class="empty-state-title">{{ .EmptyMessage }}</p>
-              </div>
-            {{ end }}
-            {{ if gt .TotalPages 1 }}
-              {{ template "pagination" .Pagination }}
-            {{ end }}
-          </section>
+          {{ end }}
+          {{ if gt .TotalPages 1 }}
+            {{ template "pagination" .Pagination }}
+          {{ end }}
+        </section>
       {{ end }}
     </div>
   </div>
