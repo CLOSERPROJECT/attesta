@@ -1229,7 +1229,9 @@ document.body.addEventListener("change", (event) => {
   applyMineFilterRoot(document);
 });
 
-if (processId && workflowKey && processPageContent) {
+const liveUpdatesEnabled =
+  root instanceof HTMLElement ? root.dataset.liveUpdates !== "0" : true;
+if (processId && workflowKey && processPageContent && liveUpdatesEnabled) {
   const source = new EventSource(
     `/my/streams/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`,
   );

@@ -11,25 +11,46 @@
 {{ define "stream_timeline_step" }}
   {{ $stepDomID := printf "stream-timeline-step-%s" .Step.Summary.StepID }}
   {{ $summaryDomID := printf "%s-summary" $stepDomID }}
-  <details
-    class="stream-timeline-step"
-    id="{{ $stepDomID }}"
-    {{ if .Step.Expanded }}open{{ end }}
-  >
-    <summary
-      class="stream-timeline-step-summary"
-      id="{{ $summaryDomID }}"
-      aria-labelledby="{{ $summaryDomID }}"
-    >
+  <details class="stream-timeline-step"
+           id="{{ $stepDomID }}"
+           {{ if .Step.Expanded }}open{{ end }}>
+    <summary class="stream-timeline-step-summary"
+             id="{{ $summaryDomID }}"
+             aria-labelledby="{{ $summaryDomID }}">
       {{ template "stream_step_summary" .Step.Summary }}
-      <span class="stream-timeline-step-chevron" aria-hidden="true">
-        {{ template "icon-chevron-down" . }}
-      </span>
+      <span class="stream-timeline-step-chevron" aria-hidden="true">{{ template "icon-chevron-down" . }}</span>
     </summary>
-    <ul class="stream-timeline-substeps">
-      {{ range .Step.Substeps }}
-        {{ template "substep_shell" (streamTimelineSubstep . $.HideStatus) }}
-      {{ end }}
-    </ul>
+    {{ if .Step.Rows }}
+      <ul class="stream-timeline-rows">
+        {{ range .Step.Rows }}
+          {{ template "stream_timeline_row" (dict "Row" . "HideStatus" $.HideStatus) }}
+        {{ end }}
+      </ul>
+    {{ else }}
+      <ul class="stream-timeline-substeps">
+        {{ range .Step.Substeps }}
+          {{ template "substep_shell" (streamTimelineSubstep . $.HideStatus) }}
+        {{ end }}
+      </ul>
+    {{ end }}
   </details>
+{{ end }}
+
+{{ define "stream_timeline_row" }}
+  {{ $rowDomID := printf "stream-timeline-row-%s" (replace .Row.ID "." "-") }}
+  <li class="stream-timeline-row">
+    <details class="stream-timeline-row-accordion"
+             id="{{ $rowDomID }}"
+             {{ if .Row.Expanded }}open{{ end }}>
+      <summary class="stream-timeline-row-summary">
+        <span class="stream-timeline-row-label">{{ .Row.Label }}</span>
+        <span class="stream-timeline-row-chevron" aria-hidden="true">{{ template "icon-chevron-down" . }}</span>
+      </summary>
+      <ul class="stream-timeline-substeps">
+        {{ range .Row.Substeps }}
+          {{ template "substep_shell" (streamTimelineSubstep . $.HideStatus) }}
+        {{ end }}
+      </ul>
+    </details>
+  </li>
 {{ end }}

@@ -16,7 +16,13 @@
         <div class="substep-summary-main">
           <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
           <div class="substep-title">
-            <span class="substep-title-heading" id="substep-{{ $substepDomID }}-heading">{{ .Substep.Title }}</span>
+            <span class="substep-title-heading" id="substep-{{ $substepDomID }}-heading">
+            {{ if .Substep.Href }}
+              <a href="{{ .Substep.Href }}" class="substep-title-link">{{ .Substep.Title }}</a>
+            {{ else }}
+              {{ .Substep.Title }}
+            {{ end }}
+          </span>
             {{ if eq $shell.Status "done" }}
               <div class="substep-meta">
                 {{ if $shell.DoneAt }}
@@ -56,9 +62,22 @@
         {{ with .Substep.Body }}
           {{ template "substep_body" . }}
         {{ else }}
-          <p class="muted">
-            No data form configured for this substep
-          </p>
+          {{ if or .Substep.Href .Substep.BlockedReason }}
+            <div class="substep-org-body stack u-gap-2">
+              {{ if .Substep.BlockedReason }}
+                <p class="muted u-m-0 u-pre-line">{{ .Substep.BlockedReason }}</p>
+              {{ end }}
+              {{ if .Substep.Href }}
+                <p class="u-m-0">
+                  <a class="btn btn-secondary btn-sm" href="{{ .Substep.Href }}">Open in /app</a>
+                </p>
+              {{ end }}
+            </div>
+          {{ else }}
+            <p class="muted">
+              No data form configured for this substep
+            </p>
+          {{ end }}
         {{ end }}
       </div>
     </details>
