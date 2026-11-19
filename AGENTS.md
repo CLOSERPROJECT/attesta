@@ -146,4 +146,4 @@ When the deployment enables them, an independent DeepSeek tester runs an issue's
 
 Seeded users all have the password equal to their email: `admin@feragame.com` (all roles), `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com`, and `admin@org1.com` (another organization).
 
-Preview environment variables live in Coolify, outside this repository. If a Turnstile challenge blocks login on the preview, the pull request says so instead of claiming the login scenario passed.
+Preview environment variables live in Coolify, outside this repository. The preview used for UAT disables Turnstile so the seeded users can log in; if a Turnstile challenge is enabled and blocks login, the pull request says so instead of claiming the login scenario passed.
