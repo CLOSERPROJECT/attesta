@@ -68,7 +68,7 @@ func (l *DomainLoader) Load(ctx context.Context, scope Scope, op OperatorIdentit
 		domain = EmptyDomain()
 	}
 
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	displayName := strings.TrimSpace(op.DisplayName)
 	if displayName == "" {
 		displayName = strings.TrimSpace(op.UserID)
@@ -126,7 +126,7 @@ func (l *DomainLoader) LoadTaskBundle(
 		domain = EmptyDomain()
 	}
 
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	ref := ActionableTaskRef{
 		JobID:         jobID,
 		TaskID:        taskID,

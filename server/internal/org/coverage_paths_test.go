@@ -341,7 +341,7 @@ func TestFirstActionableTaskAndCompileDerivedEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
-	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
+	wl := projectWorklistUnfiltered(cfg, domain, FixtureAllRolesOp())
 	ref, ok := FirstActionableTask(cfg, wl)
 	if !ok || ref.JobID != "intake" || ref.TaskID != "truckArrive" || ref.JobInstanceID != "" {
 		t.Fatalf("first = %#v ok=%v", ref, ok)
@@ -1746,12 +1746,12 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		ids = []string{}
 	}
 	_ = markProgressRowIDs(EmptyDomain(), "nope")
-	wl := ProjectWorklist(OrgConfig{Jobs: badJobs}, EmptyDomain(), FixtureAllRolesOp())
+	wl := projectWorklistUnfiltered(OrgConfig{Jobs: badJobs}, EmptyDomain(), FixtureAllRolesOp())
 	if len(wl.Jobs) != 0 {
 		t.Fatalf("skip invalid jobs = %#v", wl)
 	}
 	cfg := OrgConfig{Jobs: goodJobs}
-	wl = ProjectWorklist(cfg, Domain{JobInstances: []JobInstance{{JobID: "other", ID: "x"}}}, FixtureAllRolesOp())
+	wl = projectWorklistUnfiltered(cfg, Domain{JobInstances: []JobInstance{{JobID: "other", ID: "x"}}}, FixtureAllRolesOp())
 	if len(wl.Jobs) != 1 || len(wl.Jobs[0].Instances) != 0 {
 		t.Fatalf("filter instances = %#v", wl)
 	}

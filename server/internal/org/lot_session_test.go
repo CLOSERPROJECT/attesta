@@ -75,7 +75,7 @@ func TestCloseLotDeniedUntilWeighedAndLoaded(t *testing.T) {
 		if err == nil {
 			t.Fatalf("closeLot %s must fail", when)
 		}
-		wl := ProjectWorklist(mustActiveConfig(t, c), mustDomain(t, c), adminOp())
+		wl := projectWorklistUnfiltered(mustActiveConfig(t, c), mustDomain(t, c), adminOp())
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "lot_processing"), loadID)
 		if inst.Tasks["closeLot"] != TaskStatusUnavailable {
 			t.Fatalf("closeLot %s status = %q, want unavailable", when, inst.Tasks["closeLot"])

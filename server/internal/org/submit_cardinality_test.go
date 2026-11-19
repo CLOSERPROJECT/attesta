@@ -191,7 +191,7 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{{JobID: "session", ID: "S1", Label: "Session S1"}}
 
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	inst := wl.Jobs[0].Instances[0]
 	if len(inst.SubmissionCounts) != 0 {
 		t.Fatalf("0 submissions: counts = %#v, want empty/nil", inst.SubmissionCounts)
@@ -200,7 +200,7 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 	domain.Submissions = []Submission{
 		{JobID: "session", TaskID: "start", JobInstanceID: "S1"},
 	}
-	wl = ProjectWorklist(cfg, domain, op)
+	wl = projectWorklistUnfiltered(cfg, domain, op)
 	inst = wl.Jobs[0].Instances[0]
 	if inst.SubmissionCounts["start"] != 1 {
 		t.Fatalf("1 once: start count = %d, want 1 (%#v)", inst.SubmissionCounts["start"], inst.SubmissionCounts)
@@ -214,7 +214,7 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 		Submission{JobID: "session", TaskID: "repeat", JobInstanceID: "S1"},
 		Submission{JobID: "session", TaskID: "repeat", JobInstanceID: "S1"},
 	)
-	wl = ProjectWorklist(cfg, domain, op)
+	wl = projectWorklistUnfiltered(cfg, domain, op)
 	inst = wl.Jobs[0].Instances[0]
 	if inst.SubmissionCounts["start"] != 1 || inst.SubmissionCounts["repeat"] != 3 {
 		t.Fatalf("N many: counts = %#v, want start=1 repeat=3", inst.SubmissionCounts)
@@ -231,7 +231,7 @@ func TestRemainingWorkIgnoresSubmitMany(t *testing.T) {
 		{JobID: "session", TaskID: "repeat", JobInstanceID: "S1"},
 		{JobID: "session", TaskID: "finish", JobInstanceID: "S1"},
 	}
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	inst := wl.Jobs[0].Instances[0]
 	if inst.Tasks["start"] != TaskStatusDone || inst.Tasks["finish"] != TaskStatusDone {
 		t.Fatalf("once statuses = %#v", inst.Tasks)
@@ -244,7 +244,7 @@ func TestRemainingWorkIgnoresSubmitMany(t *testing.T) {
 	}
 
 	domain.Submissions = domain.Submissions[:2] // finish not submitted
-	wl = ProjectWorklist(cfg, domain, op)
+	wl = projectWorklistUnfiltered(cfg, domain, op)
 	if !worklistInstanceHasRemainingWork(cfg, wl, "session", "S1") {
 		t.Fatal("missing once finish must still count as remaining work")
 	}

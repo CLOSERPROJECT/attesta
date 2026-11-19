@@ -92,7 +92,7 @@ func TestProjectWorklistOmitsGroupChrome(t *testing.T) {
 	}
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "truck"}}
-	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
+	wl := projectWorklistUnfiltered(cfg, domain, FixtureAllRolesOp())
 	job := worklistMustJob(t, wl, "intake")
 	inst, ok := worklistInstance(job, "T1")
 	if !ok {

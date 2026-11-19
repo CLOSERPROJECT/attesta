@@ -139,7 +139,7 @@ func main() {
 	cfg, err := configs.Get(ctx, org.FeragameScope(), ver)
 	must(err)
 	domain := res.Domain
-	wl := org.ProjectWorklist(cfg, domain, org.FixtureAllRolesOp())
+	wl := org.ProjectWorklistAll(cfg, domain, org.FixtureAllRolesOp())
 	fmt.Printf("seeded feragame in %s\n", dbName)
 	fmt.Printf("containers=%d submissions=%d\n", len(domain.Kind("container")), len(domain.Submissions))
 	for _, j := range wl.Jobs {

@@ -75,7 +75,7 @@ func TestNextAdvanceTaskRefSkipsAdvanceTargetFalse(t *testing.T) {
 	domain.JobInstances = []JobInstance{{JobID: "demo", ID: "X1", Label: "x"}}
 	domain.Submissions = []Submission{sub("demo", "first", "X1")}
 	op := OperatorIdentity{UserID: "ada", Org: "test", Roles: []string{"administration"}}
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "demo"), "X1")
 	if !ok {
 		t.Fatal("missing demo instance")

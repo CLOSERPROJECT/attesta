@@ -31,7 +31,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	cfg := mustActiveConfig(t, c)
 
-	emptyWL := ProjectWorklist(cfg, EmptyDomain(), admin)
+	emptyWL := projectWorklistUnfiltered(cfg, EmptyDomain(), admin)
 	intake, ok := worklistJobByID(emptyWL, "intake")
 	if !ok || !intake.CanStart {
 		t.Fatalf("intake canStart on empty domain = %#v, want true", intake)
@@ -57,7 +57,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 		t.Fatalf("truck must not stamp turno: %#v", truck)
 	}
 
-	blocked, ok := worklistJobByID(ProjectWorklist(cfg, arrive.Domain, admin), "intake")
+	blocked, ok := worklistJobByID(projectWorklistUnfiltered(cfg, arrive.Domain, admin), "intake")
 	if !ok || blocked.CanStart {
 		t.Fatalf("intake canStart with open incomplete truck = %#v, want false", blocked)
 	}
@@ -83,7 +83,7 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ready, ok := worklistJobByID(ProjectWorklist(cfg, domain, admin), "intake")
+	ready, ok := worklistJobByID(projectWorklistUnfiltered(cfg, domain, admin), "intake")
 	if !ok || !ready.CanStart {
 		t.Fatalf("intake canStart after weightCheck = %#v, want true", ready)
 	}
@@ -122,7 +122,7 @@ func TestLotExclusivityOneOpenLot(t *testing.T) {
 		t.Fatalf("after startLot = %#v, want open", first.Domain.Kind("lot")[load1])
 	}
 
-	lp, ok := worklistJobByID(ProjectWorklist(cfg, first.Domain, logistic), "lot_processing")
+	lp, ok := worklistJobByID(projectWorklistUnfiltered(cfg, first.Domain, logistic), "lot_processing")
 	if !ok || lp.CanStart {
 		t.Fatalf("lot_processing canStart with one open lot = %#v, want false", lp)
 	}
@@ -147,7 +147,7 @@ func TestLotExclusivityOneOpenLot(t *testing.T) {
 		t.Fatalf("closeLot = %#v, want fullyProcessed", closed.Domain.Kind("lot")[load1])
 	}
 
-	ready, ok := worklistJobByID(ProjectWorklist(cfg, closed.Domain, logistic), "lot_processing")
+	ready, ok := worklistJobByID(projectWorklistUnfiltered(cfg, closed.Domain, logistic), "lot_processing")
 	if !ok || !ready.CanStart {
 		t.Fatalf("lot_processing canStart after closeLot = %#v, want true", ready)
 	}
@@ -173,7 +173,7 @@ func TestLineCannotStartLotProcessing(t *testing.T) {
 		t.Fatal(err)
 	}
 	lineOp := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
-	lp, ok := worklistJobByID(ProjectWorklist(cfg, domain, lineOp), "lot_processing")
+	lp, ok := worklistJobByID(projectWorklistUnfiltered(cfg, domain, lineOp), "lot_processing")
 	if !ok || lp.CanStart {
 		t.Fatalf("line canStart lot_processing = %#v, want false (startLot is logistic)", lp)
 	}

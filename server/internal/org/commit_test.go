@@ -168,7 +168,7 @@ func TestCommitRegisterReadyWhenAfterArrive(t *testing.T) {
 	if !sequenceOkForCommit(cfg, domain, "intake", "weightCheck", truckID) {
 		t.Fatal("weightCheck sequenceOk after arrive (Unlock removed; readyWhen separate)")
 	}
-	wl := ProjectWorklist(cfg, domain, OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}})
+	wl := projectWorklistUnfiltered(cfg, domain, OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}})
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), truckID)
 	if !ok {
 		t.Fatal("missing intake instance")

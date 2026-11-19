@@ -190,7 +190,10 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 			JobInstanceID: jobInstanceID,
 			RolesAllowed:  rolesAllowedForPath(cfg, ref),
 			SequenceOk:    sequenceOkForPath(cfg, domain, ref, jobInstanceID),
-			ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID, cfg.Catalogs),
+			ReadyWhenOk: readyWhenOkForCommit(
+				domain, task, jobInstanceID, cfg.Catalogs,
+				streamBindingFrom(cfg, ResolveStreamInstanceID(cfg, domain, ref.JobID, jobInstanceID)),
+			),
 		})
 		if err != nil {
 			return Domain{}, err
@@ -222,7 +225,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 		return CommitResult{}, err
 	}
 
-	wl := ProjectWorklist(cfg, applied.Domain, op)
+	wl := projectWorklistUnfiltered(cfg, applied.Domain, op)
 	nav, continueNav, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
 	if err != nil {
 		return CommitResult{}, err
