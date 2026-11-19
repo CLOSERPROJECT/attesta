@@ -1,0 +1,1419 @@
+dpp:
+  enabled: true
+  gtin: "00000000000000"
+  lotDefault: feragame-pv-pilot
+  lotInputKey: treatmentCampaignId
+  ownerName: Feragame
+  productDescription: Insieme dei lotti prodotto recuperati nella campagna di
+    trattamento di pannelli fotovoltaici
+  productName: Prodotti recuperati da pannelli fotovoltaici
+  serialInputKey: ""
+  serialStrategy: process_id_hex
+organizations:
+  - slug: feragame
+    name: Feragame
+roles:
+  - orgSlug: feragame
+    name: Operatore pesa e accettazione
+    slug: operatorepesaeaccettazione
+    palette: red
+  - orgSlug: feragame
+    name: Operatore logistico
+    slug: operatorelogistico
+    palette: rose
+  - orgSlug: feragame
+    name: Responsabile produzione
+    slug: responsabileproduzione
+    palette: teal
+  - orgSlug: feragame
+    name: Operatore alimentazione
+    slug: operatorealimentazione
+    palette: rose
+  - orgSlug: feragame
+    name: Operatore controllo linea
+    slug: operatorecontrollolinea
+    palette: emerald
+  - orgSlug: feragame
+    name: Responsabile qualita e conformita
+    slug: responsabilequalitaeconformita
+    palette: lime
+workflow:
+  categorySlug: recycling-and-recovery
+  description: Tracciabilita dalla ricezione dei pannelli fotovoltaici alla
+    creazione e qualificazione delle frazioni recuperate, con genealogia
+    molti-a-molti tra carichi, bancali, campagne di lavorazione e UDC,
+    acquisizione manuale dei CSV macchina e bilancio di massa.
+  name: Feragame PVP - v0.2
+  steps:
+    - id: "1"
+      order: 1
+      organization: feragame
+      substeps:
+        - id: "1.1"
+          inputKey: Registrare il carico e generare l'etichetta di ingresso
+          inputType: formata
+          order: 1
+          roles:
+            - operatorepesaeaccettazione
+          schema:
+            properties:
+              arrivalDate:
+                title: Data di ingresso
+                type: string
+              arrivalTime:
+                title: Ora di ingresso
+                type: string
+              carrierName:
+                title: Trasportatore
+                type: string
+              customerName:
+                title: Cliente o produttore del rifiuto
+                type: string
+              dailyCustomerSequence:
+                description: Usare 1 per EC, 2 per EC2, 3 per EC3 e cosi via.
+                minimum: 1
+                title: Progressivo giornaliero dello stesso cliente
+                type: number
+              eerCode:
+                enum:
+                  - 16 02 14
+                  - 16 02 13*
+                  - OTHER
+                title: Codice EER/CER dichiarato
+                type: string
+              firReference:
+                title: Riferimento FIR/xFIR
+                type: string
+              inboundLoadId:
+                description: Identificatore interno stabile del carico e del formulario.
+                title: ID carico in ingresso
+                type: string
+              intakeNotes:
+                title: Note di accettazione
+                type: string
+              netLoadWeightKg:
+                description: Peso lordo del camion meno la tara del camion.
+                minimum: 0
+                title: Peso netto del carico (kg)
+                type: number
+              otherEerCode:
+                title: Altro codice EER/CER
+                type: string
+              palletCount:
+                minimum: 1
+                title: Numero di bancali dichiarati
+                type: number
+              printedLabelId:
+                description: Esempio EC-06102026-160214-9600-16 oppure EC2 per il secondo carico
+                  giornaliero dello stesso cliente.
+                title: ID stampato sull'etichetta
+                type: string
+              truckGrossWeightKg:
+                minimum: 0
+                title: Peso lordo camion carico (kg)
+                type: number
+              truckTareWeightKg:
+                minimum: 0
+                title: Tara camion (kg)
+                type: number
+              vehicleReference:
+                title: Riferimento del mezzo
+                type: string
+              weighingTicketReference:
+                title: Riferimento ticket di pesata
+                type: string
+            required:
+              - inboundLoadId
+              - arrivalDate
+              - customerName
+              - eerCode
+              - firReference
+              - truckGrossWeightKg
+              - truckTareWeightKg
+              - netLoadWeightKg
+              - palletCount
+              - weighingTicketReference
+              - printedLabelId
+            title: Carico di pannelli fotovoltaici in ingresso
+            type: object
+          title: Registrare il carico e generare l'etichetta di ingresso
+          uiSchema:
+            arrivalDate:
+              ui:components:
+                textWidget: datePickerWidget
+            intakeNotes:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "1.2"
+          inputKey: Caricare formulario, pesata ed evidenze di ingresso
+          inputType: formata
+          order: 2
+          roles:
+            - operatorepesaeaccettazione
+          schema:
+            properties:
+              evidenceNotes:
+                title: Note sui documenti
+                type: string
+              firDocuments:
+                items: {}
+                title: FIR/xFIR e documenti di trasporto
+                type: array
+              inboundLoadId:
+                title: ID carico in ingresso
+                type: string
+              intakeLabelPhotos:
+                items: {}
+                title: Fotografie dell'etichetta e del carico
+                type: array
+              weighingTickets:
+                items: {}
+                title: Ticket di pesata camion
+                type: array
+            required:
+              - inboundLoadId
+              - firDocuments
+              - weighingTickets
+            title: Documenti del carico in ingresso
+            type: object
+          title: Caricare formulario, pesata ed evidenze di ingresso
+          uiSchema:
+            evidenceNotes:
+              ui:components:
+                textWidget: textareaWidget
+            firDocuments:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            intakeLabelPhotos:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            weighingTickets:
+              ui:components:
+                arrayField: arrayNativeFilesField
+      title: Ricezione e identificazione del carico
+    - id: "2"
+      order: 2
+      organization: feragame
+      substeps:
+        - id: "2.1"
+          inputKey: Registrare la pesata dei singoli bancali
+          inputType: formata
+          order: 1
+          roles:
+            - operatorelogistico
+          schema:
+            properties:
+              inboundLoadId:
+                title: ID carico in ingresso
+                type: string
+              pallets:
+                items:
+                  properties:
+                    averagePanelWeightKg:
+                      minimum: 0
+                      title: Peso medio calcolato per pannello (kg)
+                      type: number
+                    grossPalletWeightKg:
+                      minimum: 0
+                      title: Peso bancale con pannelli (kg)
+                      type: number
+                    netPanelWeightKg:
+                      description: Peso misurato del bancale con pannelli meno la tara del bancale.
+                      minimum: 0
+                      title: Peso netto dei pannelli (kg)
+                      type: number
+                    notes:
+                      title: Note
+                      type: string
+                    palletId:
+                      title: ID bancale
+                      type: string
+                    palletLabelReference:
+                      title: Riferimento etichetta bancale
+                      type: string
+                    palletTareWeightKg:
+                      minimum: 0
+                      title: Tara del bancale (kg)
+                      type: number
+                    panelCount:
+                      minimum: 1
+                      title: Numero di pannelli
+                      type: number
+                    scaleId:
+                      title: Identificativo bilancia
+                      type: string
+                    storageLocation:
+                      title: Posizione di stoccaggio
+                      type: string
+                    weighingDateTime:
+                      title: Data e ora della pesata
+                      type: string
+                  required:
+                    - palletId
+                    - panelCount
+                    - grossPalletWeightKg
+                    - palletTareWeightKg
+                    - netPanelWeightKg
+                    - weighingDateTime
+                    - scaleId
+                  title: Bancale pesato
+                  type: object
+                title: Bancali del carico
+                type: array
+              paperWorkSheetReference:
+                title: Riferimento scheda di lavorazione cartacea
+                type: string
+            required:
+              - inboundLoadId
+              - paperWorkSheetReference
+              - pallets
+            title: Scheda di lavorazione e pesate dei bancali
+            type: object
+          title: Registrare la pesata dei singoli bancali
+          uiSchema:
+            pallets:
+              items:
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "2.2"
+          inputKey: Riconciliare il peso del camion con i bancali
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileproduzione
+          schema:
+            properties:
+              acceptedTolerancePct:
+                minimum: 0
+                title: Tolleranza accettata (%)
+                type: number
+              approvedBy:
+                title: Responsabile approvazione
+                type: string
+              discrepancyReason:
+                title: Motivazione dello scostamento
+                type: string
+              inboundLoadId:
+                title: ID carico in ingresso
+                type: string
+              netLoadWeightKg:
+                minimum: 0
+                title: Peso netto da pesata camion (kg)
+                type: number
+              reconciliationResult:
+                enum:
+                  - PASS
+                  - REVIEW_REQUIRED
+                  - FAIL
+                title: Esito riconciliazione
+                type: string
+              totalNetPalletWeightKg:
+                minimum: 0
+                title: Somma pesi netti dei bancali (kg)
+                type: number
+              varianceKg:
+                title: Differenza camion meno bancali (kg)
+                type: number
+              variancePct:
+                title: Differenza rispetto al carico netto (%)
+                type: number
+            required:
+              - inboundLoadId
+              - netLoadWeightKg
+              - totalNetPalletWeightKg
+              - varianceKg
+              - variancePct
+              - reconciliationResult
+            title: Riconciliazione delle pesate in ingresso
+            type: object
+          title: Riconciliare il peso del camion con i bancali
+          uiSchema:
+            discrepancyReason:
+              ui:components:
+                textWidget: textareaWidget
+      title: Pesata e identificazione dei bancali
+    - id: "3"
+      order: 3
+      organization: feragame
+      substeps:
+        - id: "3.1"
+          inputKey: Aprire la campagna e assegnare i bancali
+          inputType: formata
+          order: 1
+          roles:
+            - responsabileproduzione
+          schema:
+            properties:
+              authorizationReference:
+                title: Riferimento autorizzazione impianto
+                type: string
+              authorizedOperationCode:
+                description: Copiare il codice esatto dall'autorizzazione dell'impianto.
+                title: Operazione R/D autorizzata
+                type: string
+              campaignNotes:
+                title: Note della campagna
+                type: string
+              campaignStartDateTime:
+                title: Data e ora di inizio
+                type: string
+              feedingOperator:
+                title: Operatore alimentazione
+                type: string
+              inputAllocations:
+                items:
+                  properties:
+                    allocatedNetWeightKg:
+                      minimum: 0
+                      title: Peso netto assegnato alla campagna (kg)
+                      type: number
+                    allocationNotes:
+                      title: Note sull'allocazione
+                      type: string
+                    inboundLoadId:
+                      title: ID carico in ingresso
+                      type: string
+                    inputAllocationId:
+                      title: ID allocazione di input
+                      type: string
+                    palletIds:
+                      items:
+                        type: string
+                      title: ID bancali utilizzati
+                      type: array
+                  required:
+                    - inputAllocationId
+                    - inboundLoadId
+                    - palletIds
+                    - allocatedNetWeightKg
+                  title: Allocazione di input
+                  type: object
+                title: Bancali e carichi assegnati alla campagna
+                type: array
+              lineControlOperator:
+                title: Operatore controllo linea
+                type: string
+              logisticsOperator:
+                title: Operatore logistico
+                type: string
+              productionShift:
+                title: Turno di produzione
+                type: string
+              totalAllocatedInputKg:
+                minimum: 0
+                title: Input netto totale della campagna (kg)
+                type: number
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+              treatmentLine:
+                title: Linea di trattamento
+                type: string
+            required:
+              - treatmentCampaignId
+              - campaignStartDateTime
+              - productionShift
+              - treatmentLine
+              - inputAllocations
+              - totalAllocatedInputKg
+            title: Campagna di lavorazione
+            type: object
+          title: Aprire la campagna e assegnare i bancali
+          uiSchema:
+            campaignNotes:
+              ui:components:
+                textWidget: textareaWidget
+            inputAllocations:
+              items:
+                allocationNotes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "3.2"
+          inputKey: Registrare le sorgenti dati della linea
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileproduzione
+          schema:
+            properties:
+              dataSources:
+                items:
+                  properties:
+                    acquisitionMode:
+                      enum:
+                        - MANUAL_ENTRY
+                        - MANUAL_CSV_UPLOAD
+                        - FTP_CSV_IMPORT
+                      title: Modalita di acquisizione
+                      type: string
+                    csvFiles:
+                      items: {}
+                      title: File CSV caricati manualmente
+                      type: array
+                    dataSourceId:
+                      title: ID sorgente dati
+                      type: string
+                    exportedAt:
+                      title: Data e ora di esportazione
+                      type: string
+                    ftpRemotePath:
+                      description: Registrato nel v0.1 per consentire la futura ingestione automatica.
+                      title: Percorso remoto sul server FTP
+                      type: string
+                    intervalEnd:
+                      title: Fine intervallo dati
+                      type: string
+                    intervalStart:
+                      title: Inizio intervallo dati
+                      type: string
+                    machineOrLine:
+                      enum:
+                        - PCM
+                        - BINDER_ECOTEC
+                        - ECS
+                        - DUST_COLLECTOR
+                        - OTHER
+                      title: Macchina o linea
+                      type: string
+                    notes:
+                      title: Note sulla sorgente
+                      type: string
+                    sourceRecordReference:
+                      title: Riferimento record o export sorgente
+                      type: string
+                    sourceSystem:
+                      enum:
+                        - UBIQUITY
+                        - CMT_VIEWER
+                        - PLC_HMI
+                        - MANUAL
+                        - OTHER
+                      title: Sistema sorgente
+                      type: string
+                  required:
+                    - dataSourceId
+                    - sourceSystem
+                    - machineOrLine
+                    - acquisitionMode
+                    - intervalStart
+                    - intervalEnd
+                  title: Sorgente dati macchina
+                  type: object
+                title: Sorgenti dati disponibili
+                type: array
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - dataSources
+            title: Sorgenti dati e file macchina
+            type: object
+          title: Registrare le sorgenti dati della linea
+          uiSchema:
+            dataSources:
+              items:
+                csvFiles:
+                  ui:components:
+                    arrayField: arrayNativeFilesField
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+      title: Apertura della campagna di lavorazione
+    - id: "4"
+      order: 4
+      organization: feragame
+      substeps:
+        - id: "4.1"
+          inputKey: Registrare gli eventi di alimentazione della linea
+          inputType: formata
+          order: 1
+          roles:
+            - operatorealimentazione
+          schema:
+            properties:
+              feedingEvents:
+                items:
+                  properties:
+                    destinationMachine:
+                      enum:
+                        - PCM_TWIN_SHAFT_SHREDDER
+                        - OTHER
+                      title: Macchina alimentata
+                      type: string
+                    eventDateTime:
+                      title: Data e ora
+                      type: string
+                    eventId:
+                      title: ID evento
+                      type: string
+                    eventNotes:
+                      title: Note
+                      type: string
+                    fedWeightKg:
+                      minimum: 0
+                      title: Peso netto alimentato (kg)
+                      type: number
+                    operatorName:
+                      title: Operatore
+                      type: string
+                    palletIds:
+                      items:
+                        type: string
+                      title: ID bancali alimentati
+                      type: array
+                  required:
+                    - eventId
+                    - eventDateTime
+                    - palletIds
+                    - fedWeightKg
+                    - destinationMachine
+                  title: Alimentazione di uno o piu bancali
+                  type: object
+                title: Eventi di alimentazione della linea
+                type: array
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - feedingEvents
+            title: Eventi di alimentazione
+            type: object
+          title: Registrare gli eventi di alimentazione della linea
+          uiSchema:
+            feedingEvents:
+              items:
+                eventNotes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "4.2"
+          inputKey: Registrare movimentazioni, pesate UDC e cambi contenitore
+          inputType: formata
+          order: 2
+          roles:
+            - operatorelogistico
+          schema:
+            properties:
+              logisticsEvents:
+                items:
+                  properties:
+                    eventDateTime:
+                      title: Data e ora
+                      type: string
+                    eventId:
+                      title: ID evento
+                      type: string
+                    eventNotes:
+                      title: Note
+                      type: string
+                    eventType:
+                      enum:
+                        - PALLET_TO_FEEDING
+                        - UDC_POSITIONED
+                        - UDC_WEIGHED
+                        - UDC_REPLACED
+                        - UDC_MOVED_TO_STORAGE
+                        - OTHER
+                      title: Tipo di evento
+                      type: string
+                    measuredGrossWeightKg:
+                      minimum: 0
+                      title: Peso lordo misurato (kg)
+                      type: number
+                    measuredNetWeightKg:
+                      minimum: 0
+                      title: Peso netto misurato (kg)
+                      type: number
+                    physicalUnitId:
+                      title: ID bancale o UDC
+                      type: string
+                    scaleId:
+                      title: Identificativo bilancia
+                      type: string
+                    station:
+                      enum:
+                        - PCM_PRIMARY_SCREEN
+                        - PCM_HAMMER_MILL
+                        - BINDER_FLIP_FLOP_SCREEN
+                        - ECS_SEPARATOR
+                        - DUST_COLLECTION
+                        - STORAGE
+                        - OTHER
+                      title: Stazione
+                      type: string
+                    storageLocation:
+                      title: Posizione di destinazione
+                      type: string
+                    tareWeightKg:
+                      minimum: 0
+                      title: Tara contenitore (kg)
+                      type: number
+                  required:
+                    - eventId
+                    - eventDateTime
+                    - eventType
+                    - physicalUnitId
+                  title: Movimentazione o pesata
+                  type: object
+                title: Eventi logistici
+                type: array
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - logisticsEvents
+            title: Eventi logistici e pesate UDC
+            type: object
+          title: Registrare movimentazioni, pesate UDC e cambi contenitore
+          uiSchema:
+            logisticsEvents:
+              items:
+                eventNotes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "4.3"
+          inputKey: Registrare controlli, arresti, pulizie e sversamenti
+          inputType: formata
+          order: 3
+          roles:
+            - operatorecontrollolinea
+          schema:
+            properties:
+              lineEvents:
+                items:
+                  properties:
+                    affectedMachine:
+                      enum:
+                        - PCM
+                        - BINDER_ECOTEC
+                        - ECS
+                        - DUST_COLLECTOR
+                        - OTHER
+                      title: Macchina interessata
+                      type: string
+                    correctiveAction:
+                      title: Azione eseguita
+                      type: string
+                    durationMinutes:
+                      minimum: 0
+                      title: Durata (minuti)
+                      type: number
+                    eventDateTime:
+                      title: Data e ora
+                      type: string
+                    eventId:
+                      title: ID evento
+                      type: string
+                    eventNotes:
+                      title: Note
+                      type: string
+                    eventType:
+                      enum:
+                        - ROUTINE_CHECK
+                        - LINE_STOPPAGE
+                        - BLOCKAGE
+                        - UDC_FULL_ALERT
+                        - SPILL
+                        - CLEANING
+                        - MAINTENANCE_REQUEST
+                        - OTHER
+                      title: Tipo di evento
+                      type: string
+                    recoveredMaterialKg:
+                      minimum: 0
+                      title: Materiale recuperato dopo pulizia o sversamento (kg)
+                      type: number
+                    unrecoveredLossKg:
+                      minimum: 0
+                      title: Perdita non recuperata documentata (kg)
+                      type: number
+                  required:
+                    - eventId
+                    - eventDateTime
+                    - eventType
+                  title: Evento di linea
+                  type: object
+                title: Eventi di controllo linea
+                type: array
+              lineEvidence:
+                items: {}
+                title: Foto e rapporti degli eventi di linea
+                type: array
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - lineEvents
+            title: Controllo operativo della linea
+            type: object
+          title: Registrare controlli, arresti, pulizie e sversamenti
+          uiSchema:
+            lineEvents:
+              items:
+                correctiveAction:
+                  ui:components:
+                    textWidget: textareaWidget
+                eventNotes:
+                  ui:components:
+                    textWidget: textareaWidget
+            lineEvidence:
+              ui:components:
+                arrayField: arrayNativeFilesField
+      title: Registrazione operativa della lavorazione
+    - id: "5"
+      order: 5
+      organization: feragame
+      substeps:
+        - id: "5.1"
+          inputKey: Calcolare il contributo della campagna alle UDC
+          inputType: formata
+          order: 1
+          roles:
+            - operatorelogistico
+            - responsabileproduzione
+          schema:
+            properties:
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+              udcAllocations:
+                items:
+                  properties:
+                    calculationVerified:
+                      title: Calcolo del delta verificato
+                      type: boolean
+                    campaignContributionKg:
+                      description: Contenuto netto finale meno contenuto netto iniziale; usare questo
+                        valore nel bilancio di massa della campagna.
+                      minimum: 0
+                      title: Contributo della campagna alla UDC (kg)
+                      type: number
+                    currentSourceLoadIds:
+                      items:
+                        type: string
+                      title: ID carichi aggiunti dalla campagna
+                      type: array
+                    extractionStation:
+                      enum:
+                        - PCM_PRIMARY_SCREEN
+                        - PCM_HAMMER_MILL
+                        - BINDER_FLIP_FLOP_SCREEN
+                        - ECS_SEPARATOR
+                        - DUST_COLLECTION
+                        - OTHER
+                      title: Stazione di estrazione
+                      type: string
+                    finalGrossWeightKg:
+                      minimum: 0
+                      title: Peso lordo finale UDC (kg)
+                      type: number
+                    finalNetContentKg:
+                      minimum: 0
+                      title: Contenuto netto finale UDC (kg)
+                      type: number
+                    initialGrossWeightKg:
+                      minimum: 0
+                      title: Peso lordo iniziale UDC (kg)
+                      type: number
+                    initialNetContentKg:
+                      minimum: 0
+                      title: Contenuto netto iniziale UDC (kg)
+                      type: number
+                    materialFraction:
+                      enum:
+                        - GLASS_FINE_FRACTION
+                        - GLASS_GRANULATE
+                        - SILICON_RICH_FINE_FRACTION
+                        - PLASTIC
+                        - ALUMINIUM
+                        - ASPIRATION_DUST
+                        - OVERSIZE_RESIDUE
+                        - OTHER
+                      title: Frazione materiale
+                      type: string
+                    measurementEndDateTime:
+                      title: Data e ora della pesata finale
+                      type: string
+                    measurementStartDateTime:
+                      title: Data e ora della pesata iniziale
+                      type: string
+                    notes:
+                      title: Note
+                      type: string
+                    otherMaterialFraction:
+                      title: Altra frazione materiale
+                      type: string
+                    outputAllocationId:
+                      title: ID allocazione di output
+                      type: string
+                    outputBatchId:
+                      description: Lo stesso lotto puo contenere contributi provenienti da piu
+                        campagne o carichi.
+                      title: ID lotto fisico contenuto nella UDC
+                      type: string
+                    priorSourceLoadIds:
+                      items:
+                        type: string
+                      title: ID carichi gia presenti nella UDC
+                      type: array
+                    scaleId:
+                      title: Identificativo bilancia
+                      type: string
+                    udcId:
+                      title: ID fisico UDC
+                      type: string
+                    udcNominalVolumeM3:
+                      minimum: 0
+                      title: Volume nominale UDC (m3)
+                      type: number
+                    udcStatusAfterAllocation:
+                      enum:
+                        - OPEN
+                        - FULL
+                        - CLOSED
+                        - MOVED_TO_STORAGE
+                      title: Stato UDC dopo l'allocazione
+                      type: string
+                    udcTareWeightKg:
+                      minimum: 0
+                      title: Tara UDC (kg)
+                      type: number
+                  required:
+                    - outputAllocationId
+                    - udcId
+                    - outputBatchId
+                    - materialFraction
+                    - extractionStation
+                    - initialNetContentKg
+                    - finalNetContentKg
+                    - campaignContributionKg
+                    - scaleId
+                  title: Allocazione in una UDC
+                  type: object
+                title: Contributi della campagna alle UDC
+                type: array
+            required:
+              - treatmentCampaignId
+              - udcAllocations
+            title: Allocazioni di output nelle UDC
+            type: object
+          title: Calcolare il contributo della campagna alle UDC
+          uiSchema:
+            udcAllocations:
+              items:
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "5.2"
+          inputKey: Verificare la genealogia molti-a-molti delle UDC
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileproduzione
+          schema:
+            properties:
+              allContributionsAccountedFor:
+                title: Tutti i contributi sono contabilizzati
+                type: boolean
+              discrepancyNotes:
+                title: Difformita e note
+                type: string
+              genealogyApproved:
+                title: Genealogia approvata
+                type: boolean
+              reviewedOutputBatchIds:
+                items:
+                  type: string
+                title: Lotti fisici UDC verificati
+                type: array
+              reviewer:
+                title: Responsabile della verifica
+                type: string
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - reviewedOutputBatchIds
+              - allContributionsAccountedFor
+              - genealogyApproved
+              - reviewer
+            title: Verifica genealogia delle UDC
+            type: object
+          title: Verificare la genealogia molti-a-molti delle UDC
+          uiSchema:
+            discrepancyNotes:
+              ui:components:
+                textWidget: textareaWidget
+      title: Allocazione delle frazioni nelle UDC
+    - id: "6"
+      order: 6
+      organization: feragame
+      substeps:
+        - id: "6.1"
+          inputKey: Qualificare ogni lotto fisico di output
+          inputType: formata
+          order: 1
+          roles:
+            - responsabilequalitaeconformita
+          schema:
+            properties:
+              outputQualifications:
+                items:
+                  properties:
+                    analysisReferences:
+                      items:
+                        type: string
+                      title: Riferimenti analisi e prove
+                      type: array
+                    confirmedLegalStatus:
+                      enum:
+                        - WASTE
+                        - PRODUCT
+                      title: Stato giuridico confermato
+                      type: string
+                    conformityDeclarationReference:
+                      title: Dichiarazione di conformita o End of Waste
+                      type: string
+                    hazardous:
+                      title: Rifiuto pericoloso
+                      type: boolean
+                    intendedUse:
+                      title: Uso previsto del prodotto
+                      type: string
+                    materialFraction:
+                      enum:
+                        - GLASS_FINE_FRACTION
+                        - GLASS_GRANULATE
+                        - SILICON_RICH_FINE_FRACTION
+                        - PLASTIC
+                        - ALUMINIUM
+                        - ASPIRATION_DUST
+                        - OVERSIZE_RESIDUE
+                        - OTHER
+                      title: Frazione materiale
+                      type: string
+                    notes:
+                      title: Note
+                      type: string
+                    outputBatchId:
+                      title: ID lotto fisico di output
+                      type: string
+                    productBatchId:
+                      title: ID lotto prodotto
+                      type: string
+                    productQualificationBasis:
+                      enum:
+                        - END_OF_WASTE
+                        - AUTHORIZATION_SPECIFIC_CRITERIA
+                        - PRODUCT_STANDARD
+                        - OTHER
+                      title: Base della qualifica come prodotto
+                      type: string
+                    productSpecificationReference:
+                      title: Specifica tecnica del prodotto
+                      type: string
+                    publicDppRequired:
+                      description: Selezionare solo per lotti confermati come PRODUCT.
+                      title: DPP pubblico richiesto
+                      type: boolean
+                    releaseDecision:
+                      enum:
+                        - RELEASED
+                        - ON_HOLD
+                        - REJECTED
+                      title: Decisione di rilascio
+                      type: string
+                    reviewer:
+                      title: Responsabile della decisione
+                      type: string
+                    udcId:
+                      title: ID UDC
+                      type: string
+                    wasteEerCode:
+                      title: Codice EER/CER se rifiuto
+                      type: string
+                  required:
+                    - outputBatchId
+                    - udcId
+                    - materialFraction
+                    - confirmedLegalStatus
+                    - releaseDecision
+                  title: Qualificazione lotto output
+                  type: object
+                title: Qualificazioni per lotto fisico
+                type: array
+              qualificationDate:
+                title: Data di qualificazione
+                type: string
+            required:
+              - qualificationDate
+              - outputQualifications
+            title: Decisioni di qualifica degli output
+            type: object
+          title: Qualificare ogni lotto fisico di output
+          uiSchema:
+            outputQualifications:
+              items:
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+            qualificationDate:
+              ui:components:
+                textWidget: datePickerWidget
+        - id: "6.2"
+          inputKey: Caricare analisi e documenti di conformita
+          inputType: formata
+          order: 2
+          roles:
+            - responsabilequalitaeconformita
+          schema:
+            properties:
+              authorizationExtracts:
+                items: {}
+                title: Estratti autorizzativi applicabili
+                type: array
+              conformityDeclarations:
+                items: {}
+                title: Dichiarazioni di conformita o End of Waste
+                type: array
+              evidenceNotes:
+                title: Note sulle evidenze
+                type: string
+              laboratoryReports:
+                items: {}
+                title: Rapporti di laboratorio
+                type: array
+              productSpecifications:
+                items: {}
+                title: Specifiche tecniche dei prodotti
+                type: array
+              wasteClassificationDocuments:
+                items: {}
+                title: Documenti di classificazione dei rifiuti
+                type: array
+            title: Evidenze di qualifica degli output
+            type: object
+          title: Caricare analisi e documenti di conformita
+          uiSchema:
+            authorizationExtracts:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            conformityDeclarations:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            evidenceNotes:
+              ui:components:
+                textWidget: textareaWidget
+            laboratoryReports:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            productSpecifications:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            wasteClassificationDocuments:
+              ui:components:
+                arrayField: arrayNativeFilesField
+      title: Qualificazione e rilascio degli output
+    - id: "7"
+      order: 7
+      organization: feragame
+      substeps:
+        - id: "7.1"
+          inputKey: Calcolare il bilancio di massa della campagna
+          inputType: formata
+          order: 1
+          roles:
+            - responsabileproduzione
+            - responsabilequalitaeconformita
+          schema:
+            properties:
+              acceptedMassBalanceTolerancePct:
+                minimum: 0
+                title: Tolleranza bilancio di massa (%)
+                type: number
+              aspirationDustProductKg:
+                description: Sottoinsieme informativo del totale prodotto; non sommare
+                  nuovamente nel totale contabilizzato.
+                minimum: 0
+                title: Polvere di aspirazione qualificata come prodotto (kg)
+                type: number
+              aspirationDustWasteKg:
+                description: Sottoinsieme informativo del totale rifiuto; non sommare nuovamente
+                  nel totale contabilizzato.
+                minimum: 0
+                title: Polvere di aspirazione qualificata come rifiuto (kg)
+                type: number
+              balanceResult:
+                enum:
+                  - PASS
+                  - REVIEW_REQUIRED
+                  - FAIL
+                title: Esito bilancio di massa
+                type: string
+              calculationNotes:
+                title: Formule, rettifiche e note
+                type: string
+              documentedProcessLossKg:
+                minimum: 0
+                title: Perdite di processo documentate (kg)
+                type: number
+              expectedProductYieldPct:
+                maximum: 100
+                minimum: 0
+                title: Resa prodotto attesa (%)
+                type: number
+              massBalanceVarianceKg:
+                description: Input netto meno totale contabilizzato.
+                title: Scostamento del bilancio di massa (kg)
+                type: number
+              massBalanceVariancePct:
+                title: Scostamento del bilancio di massa (%)
+                type: number
+              productYieldPct:
+                description: Totale output qualificati come prodotto diviso input netto,
+                  moltiplicato per 100.
+                maximum: 100
+                minimum: 0
+                title: Resa prodotto (%)
+                type: number
+              productYieldTargetMet:
+                title: Obiettivo di resa prodotto raggiunto
+                type: boolean
+              totalAccountedKg:
+                description: Prodotto piu rifiuto piu perdite documentate.
+                minimum: 0
+                title: Totale contabilizzato (kg)
+                type: number
+              totalNetPanelInputKg:
+                minimum: 0
+                title: Peso netto pannelli alimentati (kg)
+                type: number
+              totalProductContributionKg:
+                description: Sommare i delta della campagna, non il peso totale delle UDC che
+                  contengono materiale preesistente.
+                minimum: 0
+                title: Somma contributi UDC qualificati come prodotto (kg)
+                type: number
+              totalWasteContributionKg:
+                minimum: 0
+                title: Somma contributi UDC qualificati come rifiuto (kg)
+                type: number
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - totalNetPanelInputKg
+              - totalProductContributionKg
+              - totalWasteContributionKg
+              - documentedProcessLossKg
+              - totalAccountedKg
+              - massBalanceVarianceKg
+              - massBalanceVariancePct
+              - productYieldPct
+              - balanceResult
+            title: Bilancio di massa della campagna
+            type: object
+          title: Calcolare il bilancio di massa della campagna
+          uiSchema:
+            calculationNotes:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "7.2"
+          inputKey: Approvare il bilancio di massa e la resa prodotto
+          inputType: formata
+          order: 2
+          roles:
+            - responsabilequalitaeconformita
+          schema:
+            properties:
+              correctiveActions:
+                title: Azioni correttive o verifiche richieste
+                type: string
+              massBalanceApproved:
+                title: Bilancio di massa approvato
+                type: boolean
+              productYieldApproved:
+                title: Resa prodotto approvata
+                type: boolean
+              reviewDate:
+                title: Data della revisione
+                type: string
+              reviewer:
+                title: Responsabile della revisione
+                type: string
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - reviewDate
+              - massBalanceApproved
+              - productYieldApproved
+              - reviewer
+            title: Approvazione bilancio e resa
+            type: object
+          title: Approvare il bilancio di massa e la resa prodotto
+          uiSchema:
+            correctiveActions:
+              ui:components:
+                textWidget: textareaWidget
+            reviewDate:
+              ui:components:
+                textWidget: datePickerWidget
+      title: Bilancio di massa e resa prodotto
+    - id: "8"
+      order: 8
+      organization: feragame
+      substeps:
+        - id: "8.1"
+          inputKey: Preparare i lotti prodotto candidati al DPP
+          inputType: formata
+          order: 1
+          roles:
+            - responsabilequalitaeconformita
+          schema:
+            properties:
+              productPassportCandidates:
+                items:
+                  properties:
+                    approvedForPublication:
+                      title: Dati approvati per la pubblicazione
+                      type: boolean
+                    netProductWeightKg:
+                      minimum: 0
+                      title: Peso netto del lotto prodotto (kg)
+                      type: number
+                    outputBatchId:
+                      title: ID lotto fisico di output
+                      type: string
+                    productBatchId:
+                      title: ID lotto prodotto
+                      type: string
+                    productName:
+                      title: Nome del prodotto recuperato
+                      type: string
+                    productSpecificationReference:
+                      title: Specifica tecnica applicabile
+                      type: string
+                    publicSummary:
+                      title: Descrizione pubblica del lotto prodotto
+                      type: string
+                    publicationNotes:
+                      title: Note per il DPP
+                      type: string
+                    sourceContributions:
+                      items:
+                        properties:
+                          contributionKg:
+                            minimum: 0
+                            title: Contributo al lotto prodotto (kg)
+                            type: number
+                          inboundLoadId:
+                            title: ID carico in ingresso
+                            type: string
+                          treatmentCampaignId:
+                            title: ID campagna di lavorazione
+                            type: string
+                        required:
+                          - inboundLoadId
+                          - treatmentCampaignId
+                          - contributionKg
+                        title: Contributo di origine
+                        type: object
+                      title: Contributi dei carichi di origine
+                      type: array
+                    udcId:
+                      title: ID UDC
+                      type: string
+                  required:
+                    - productBatchId
+                    - outputBatchId
+                    - udcId
+                    - productName
+                    - netProductWeightKg
+                    - sourceContributions
+                    - approvedForPublication
+                  title: Candidato DPP
+                  type: object
+                title: Lotti prodotto per cui pubblicare un DPP
+                type: array
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+            required:
+              - treatmentCampaignId
+              - productPassportCandidates
+            title: Lotti prodotto candidati al DPP
+            type: object
+          title: Preparare i lotti prodotto candidati al DPP
+          uiSchema:
+            productPassportCandidates:
+              items:
+                publicSummary:
+                  ui:components:
+                    textWidget: textareaWidget
+                publicationNotes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "8.2"
+          inputKey: Chiudere la campagna di lavorazione
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileproduzione
+            - responsabilequalitaeconformita
+          schema:
+            properties:
+              allInputsAccountedFor:
+                title: Tutti gli input sono contabilizzati
+                type: boolean
+              allUdcContributionsAccountedFor:
+                title: Tutti i contributi UDC sono contabilizzati
+                type: boolean
+              campaignEndDateTime:
+                title: Data e ora di fine campagna
+                type: string
+              closureApproved:
+                title: Chiusura approvata
+                type: boolean
+              closureNotes:
+                title: Note finali
+                type: string
+              machineFilesAttached:
+                title: CSV e log macchina sono allegati
+                type: boolean
+              responsiblePerson:
+                title: Responsabile della chiusura
+                type: string
+              treatmentCampaignId:
+                title: ID campagna di lavorazione
+                type: string
+              unresolvedDeviations:
+                title: Difformita ancora aperte
+                type: string
+            required:
+              - treatmentCampaignId
+              - campaignEndDateTime
+              - allInputsAccountedFor
+              - allUdcContributionsAccountedFor
+              - machineFilesAttached
+              - closureApproved
+              - responsiblePerson
+            title: Chiusura della campagna
+            type: object
+          title: Chiudere la campagna di lavorazione
+          uiSchema:
+            closureNotes:
+              ui:components:
+                textWidget: textareaWidget
+            unresolvedDeviations:
+              ui:components:
+                textWidget: textareaWidget
+      title: Candidati DPP e chiusura della campagna
+  subCategorySlug: photovoltaic-panels

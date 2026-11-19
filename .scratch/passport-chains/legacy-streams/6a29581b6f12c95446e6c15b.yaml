@@ -1,0 +1,105 @@
+workflow:
+  name: TEST CTL
+  description: Workflow description
+  steps:
+    - id: "1"
+      title: Collection
+      order: 1
+      organization: closing-the-loop
+      substeps:
+        - id: "1.1"
+          title: logging collections
+          order: 1
+          roles:
+            - ctloperations
+          inputKey: ""
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              placeholder:
+                type: string
+                title: Placeholder
+          uiSchema: {}
+    - id: "2"
+      title: "Dismantling "
+      order: 2
+      organization: closing-the-loop
+      substeps:
+        - id: "2.1"
+          title: enter different fractions
+          order: 1
+          roles:
+            - operator
+          inputKey: ""
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              placeholder:
+                type: string
+                title: Placeholder
+          uiSchema: {}
+    - id: "3"
+      title: Shipment
+      order: 3
+      organization: closing-the-loop
+      substeps:
+        - id: "3.1"
+          title: "which fractions have been shipped "
+          order: 1
+          roles:
+            - operator
+          inputKey: ""
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              placeholder:
+                type: string
+                title: Placeholder
+          uiSchema: {}
+    - id: "4"
+      title: Recycling
+      order: 4
+      organization: closing-the-loop
+      substeps:
+        - id: "4.1"
+          title: recycling output
+          order: 1
+          roles:
+            - operator
+            - ctloperations
+          inputKey: ""
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              placeholder:
+                type: string
+                title: Placeholder
+          uiSchema: {}
+organizations:
+  - slug: closing-the-loop
+    name: Closing the loop
+roles:
+  - orgSlug: closing-the-loop
+    name: CTL Operations
+    slug: ctloperations
+    color: var(--role-fuchsia-bg)
+    border: var(--role-fuchsia-border)
+  - orgSlug: closing-the-loop
+    name: Operator
+    slug: operator
+    color: var(--role-amber-bg)
+    border: var(--role-amber-border)
+dpp:
+  enabled: false
+  gtin: ""
+  lotInputKey: ""
+  lotDefault: ""
+  serialInputKey: ""
+  serialStrategy: ""
+  productName: ""
+  productDescription: ""
+  ownerName: ""

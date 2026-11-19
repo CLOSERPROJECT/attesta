@@ -1,0 +1,178 @@
+dpp:
+  enabled: false
+  gtin: ""
+  lotDefault: ""
+  lotInputKey: ""
+  ownerName: ""
+  productDescription: ""
+  productName: ""
+  serialInputKey: ""
+  serialStrategy: ""
+organizations:
+  - slug: organization-1
+    name: Organization 1
+roles:
+  - orgSlug: organization-1
+    name: supervisor
+    slug: supervisor
+    palette: cyan
+  - orgSlug: organization-1
+    name: mechanic
+    slug: mechanic
+    palette: blue
+workflow:
+  categorySlug: recycling-and-recovery
+  description: Workflow description
+  name: RAAE temp
+  steps:
+    - description: Register incoming PV modules and create the initial batch record
+      id: "1"
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          title: Raccolta
+          order: 1
+          roles:
+            - supervisor
+          inputKey: descriviamo la Raccolta
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              placeholder:
+                type: string
+                title: placeholder
+              RAEE commenti:
+                type: string
+                title: RAEE commenti
+              Codice rifiuto (EER):
+                type: string
+                title: Codice rifiuto (EER)
+              Choice field:
+                enum:
+                  - 20.01.23* (R1 Frigo)
+                  - 20.01.36 (R2 grandi bianchi)
+                  - 20.01.35* (R3 Monitor)
+                  - 20.01.21* (R5 Neon/Lampade)
+                  - 20.01.36 (R4 tastiere/PC)
+                title: Choice field
+            required:
+              - RAEE commenti
+              - Codice rifiuto (EER)
+              - Choice field
+            title: Form title
+          uiSchema:
+            Choice field:
+              ui:components:
+                stringField: enumField
+                selectWidget: radioWidget
+              ui:options:
+                useLabel: false
+      title: Collection of PV modules
+    - id: "2"
+      order: 2
+      organization: organization-1
+      substeps:
+        - id: "2.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - supervisor
+            - mechanic
+          schema:
+            properties:
+              Date:
+                title: Date
+                type: string
+              Degradation (%) compared to nameplate:
+                title: Degradation (%) compared to nameplate
+                type: string
+              Description of tests:
+                title: Description of tests
+                type: string
+              Final classification of PV module:
+                title: Final classification of PV module
+                type: string
+              Measured Wp (flash test results):
+                title: Measured Wp (flash test results)
+                type: string
+              Safety test result (PASS/FAIL) field:
+                title: Safety test result (PASS/FAIL) field
+                type: string
+              Test report:
+                title: Test report
+              Thermography images / photos:
+                title: Thermography images / photos
+            required:
+              - Description of tests
+              - Test report
+              - Measured Wp (flash test results)
+              - Degradation (%) compared to nameplate
+              - Safety test result (PASS/FAIL) field
+              - Thermography images / photos
+              - Final classification of PV module
+              - Date
+            title: Form title
+            type: object
+          title: Assessment of PV module function
+          uiSchema:
+            Test report:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Thermography images / photos:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Re-use and safety testing
+    - id: "3"
+      order: 3
+      organization: organization-1
+      substeps:
+        - id: "3.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - supervisor
+            - mechanic
+          schema:
+            properties:
+              Observations (e.g., severe breakage, contamination):
+                description: Observations (e.g., severe breakage, contamination)
+                title: Observations (e.g., severe breakage, contamination)
+                type: string
+              Photos before/after dismantling:
+                title: Photos before/after dismantling
+              Weight of aluminium frame:
+                title: Weight of aluminium frame
+                type: string
+              Weight of backsheet:
+                title: Weight of backsheet
+                type: string
+              Weight of cell laminate:
+                title: Weight of cell laminate
+                type: string
+              Weight of glass fraction:
+                title: Weight of glass fraction
+                type: string
+              Weight of junction box & cables:
+                title: Weight of junction box & cables
+                type: string
+            required:
+              - Weight of glass fraction
+              - Weight of aluminium frame
+              - Weight of junction box & cables
+              - Weight of backsheet
+              - Weight of cell laminate
+              - Photos before/after dismantling
+              - Observations (e.g., severe breakage, contamination)
+            title: Form title
+            type: object
+          title: Mechanical dismantling
+          uiSchema:
+            Photos before/after dismantling:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Dismantling of PV modules
+  subCategorySlug: photovoltaic-panels

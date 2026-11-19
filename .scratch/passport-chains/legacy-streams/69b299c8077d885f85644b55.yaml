@@ -1,0 +1,143 @@
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+  lotDefault: ""
+  lotInputKey: shipmentRef
+  ownerName: Attesta Demo Operator
+  productDescription: Shipment intake, inspection, and approval with traceable checkpoints.
+  productName: Gallium shipment audit
+  serialInputKey: ""
+  serialStrategy: process_id_hex
+organizations:
+  - slug: org1
+    name: Org1
+roles:
+  - orgSlug: org1
+    name: dep1
+    slug: dep1
+    palette: emerald
+  - orgSlug: org1
+    name: dep2
+    slug: dep2
+    palette: orange
+  - orgSlug: org1
+    name: dep3
+    slug: dep3
+    palette: fuchsia
+workflow:
+  categorySlug: recycling-and-recovery
+  name: Gallium shipment audit
+  steps:
+    - id: "1"
+      order: 0
+      organization: org1
+      substeps:
+        - id: "1.1"
+          inputKey: shipmentKg
+          inputType: formata
+          order: 1
+          roles:
+            - dep1
+          schema:
+            properties:
+              shipmentKg:
+                title: shipmentKg
+                type: number
+            required:
+              - shipmentKg
+            title: Record shipment weight
+            type: object
+          title: Record shipment weight (kg)
+        - id: "1.2"
+          inputKey: shipmentRef
+          inputType: formata
+          order: 2
+          roles:
+            - dep1
+          schema:
+            properties:
+              shipmentRef:
+                title: shipmentRef
+                type: string
+            required:
+              - shipmentRef
+            title: Shipment reference
+            type: object
+          title: Attach shipment reference
+      title: Shipment intake
+    - id: "2"
+      order: 1
+      organization: org1
+      substeps:
+        - id: "2.1"
+          inputKey: report
+          inputType: formata
+          order: 1
+          roles:
+            - dep2
+          schema:
+            properties:
+              Report:
+                title: Report
+            required:
+              - Report
+            title: Inspection report
+            type: object
+          title: Upload inspection report
+          uiSchema:
+            Report:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "2.2"
+          inputKey: inspectionOutcome
+          inputType: formata
+          order: 2
+          roles:
+            - dep2
+          schema:
+            properties:
+              comments:
+                title: Comments
+                type: string
+              inspector:
+                title: Inspector
+                type: string
+              outcome:
+                enum:
+                  - accepted
+                  - rejected
+                  - needs_review
+                title: Outcome
+                type: string
+            required:
+              - outcome
+              - inspector
+            type: object
+          title: Record inspection outcome
+          uiSchema:
+            comments:
+              ui:components:
+                textWidget: textareaWidget
+      title: Inspection
+    - id: "3"
+      order: 3
+      organization: org1
+      substeps:
+        - id: "3.1"
+          inputKey: approval
+          inputType: formata
+          order: 1
+          roles:
+            - dep3
+          schema:
+            properties:
+              Approval:
+                title: Approval
+                type: string
+            required:
+              - Approval
+            title: Approve shipment
+            type: object
+          title: Approve shipment
+      title: Approval
+  subCategorySlug: e-waste

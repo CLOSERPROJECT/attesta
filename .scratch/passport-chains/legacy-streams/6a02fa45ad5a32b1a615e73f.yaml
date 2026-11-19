@@ -1,0 +1,91 @@
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+  lotDefault: ""
+  lotInputKey: batchId
+  ownerName: Attesta Demo Operator
+  productDescription: Gallium intake and refinement process with notarized checkpoints.
+  productName: Recycled Gallium Batch
+  serialInputKey: ""
+  serialStrategy: ""
+organizations:
+  - slug: organization-1
+    name: Organization 1
+roles:
+  - orgSlug: organization-1
+    name: supervisor
+    slug: supervisor
+    palette: cyan
+workflow:
+  categorySlug: compliance-and-quality
+  description: Procedura di controllo arrivi da mare
+  name: Terminalista Arrivo da Nave
+  steps:
+    - description: Registrazione bolla di arrivo
+      id: "1"
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - supervisor
+          schema:
+            properties:
+              File field:
+                title: File field
+              Multi choice field:
+                items:
+                  enum:
+                    - Trovato
+                    - Firmato
+                    - Intatto
+                title: Multi choice field
+                type: array
+                uniqueItems: true
+              QR code:
+                title: QR code
+                type: string
+              Range field:
+                properties:
+                  end:
+                    type: string
+                  start:
+                    type: string
+                required:
+                  - start
+                  - end
+                title: Range field
+                type: object
+              placeholder:
+                title: placeholder
+                type: string
+            required:
+              - Multi choice field
+              - Range field
+              - File field
+              - QR code
+            title: Form title
+            type: object
+          title: Verifica ordine
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Multi choice field:
+              ui:components:
+                arrayField: multiEnumField
+            QR code:
+              ui:components:
+                stringField: formataQrField
+            Range field:
+              ui:components:
+                aggregatedWidget: dateRangePickerWidget
+                objectField: aggregatedField
+              ui:options:
+                collectErrors: true
+                useLabel: true
+      title: Bolla di arrivo
+  subCategorySlug: inspection

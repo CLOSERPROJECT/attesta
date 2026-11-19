@@ -1,0 +1,200 @@
+dpp:
+  enabled: false
+  gtin: ""
+  lotDefault: ""
+  lotInputKey: ""
+  ownerName: ""
+  productDescription: ""
+  productName: ""
+  serialInputKey: ""
+  serialStrategy: ""
+organizations:
+  - slug: organization-1
+    name: Organization 1
+roles:
+  - orgSlug: organization-1
+    name: Chemical analyst
+    slug: chemicalanalyst
+    color: var(--role-violet-bg)
+    border: var(--role-violet-border)
+  - orgSlug: organization-1
+    name: chemist
+    slug: chemist
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - orgSlug: organization-1
+    name: mechanic
+    slug: mechanic
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+workflow:
+  description: Workflow description
+  name: PV stream (Out Of Use) v3 test
+  steps:
+    - description: Register incoming PV modules and create the initial batch record
+      id: "1"
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - chemicalanalyst
+          schema:
+            properties:
+              Batch ID:
+                title: Batch ID
+                type: number
+              Date of intake:
+                title: Date of intake
+                type: string
+              Number of modules in batch:
+                title: Number of modules in batch
+                type: number
+              Operator identification:
+                title: Operator identification
+                type: string
+              PV module brand & model (if readable):
+                title: PV module brand & model (if readable)
+                type: string
+              Serial numbers (only if present and legible):
+                title: Serial numbers (only if present and legible)
+                type: string
+              Total batch weight in kg:
+                title: Total batch weight in kg
+                type: number
+              Transport documentation / waste documentation:
+                title: Transport documentation / waste documentation
+              Visual condition (photos of damage, breakage, delamination):
+                title: Visual condition (photos of damage, breakage, delamination)
+            title: Group title
+            type: object
+          title: Registration of PV modules
+          uiSchema:
+            Transport documentation / waste documentation:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Visual condition (photos of damage, breakage, delamination):
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Collection of PV modules
+    - id: "2"
+      order: 2
+      organization: organization-1
+      substeps:
+        - id: "2.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - chemist
+          schema:
+            properties:
+              Date:
+                title: Date
+                type: string
+              Description of tests:
+                title: Description of tests
+                type: string
+              "List of PVs  ":
+                description: "of PVs to be recyccled in this "
+                items:
+                  description: Write here all the data related to a single panel
+                  properties:
+                    Degradation (%) compared to nameplate:
+                      title: Degradation (%) compared to nameplate
+                      type: string
+                    Final classification of PV module:
+                      title: Final classification of PV module
+                      type: string
+                    Measured Wp (flash test results):
+                      title: Measured Wp (flash test results)
+                      type: string
+                    Panel ID:
+                      description: Unique ID of a specific PV
+                      title: Panel ID
+                      type: string
+                    Safety test result (PASS/FAIL) field:
+                      title: Safety test result (PASS/FAIL) field
+                      type: string
+                    Test report:
+                      items: {}
+                      title: Test report
+                      type: array
+                    Thermography images / photos:
+                      title: Thermography images / photos
+                  required:
+                    - Panel ID
+                    - Final classification of PV module
+                    - Degradation (%) compared to nameplate
+                    - Test report
+                    - Thermography images / photos
+                    - Measured Wp (flash test results)
+                    - Safety test result (PASS/FAIL) field
+                  title: Individual panel data
+                  type: object
+                title: "List of PVs  "
+                type: array
+            required:
+              - Date
+              - Description of tests
+              - "List of PVs  "
+            title: Form title
+            type: object
+          title: Assessment of PV module function
+          uiSchema:
+            Date:
+              ui:components:
+                textWidget: datePickerWidget
+            "List of PVs  ":
+              items:
+                Test report:
+                  ui:components:
+                    arrayField: arrayNativeFilesField
+                Thermography images / photos:
+                  ui:components:
+                    unknownField: unknownNativeFileField
+      title: Re-use and safety testing
+    - id: "3"
+      order: 3
+      organization: organization-1
+      substeps:
+        - id: "3.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - mechanic
+          schema:
+            properties:
+              Observations (e.g., severe breakage, contamination):
+                description: Observations (e.g., severe breakage, contamination)
+                title: Observations (e.g., severe breakage, contamination)
+                type: string
+              Photos before/after dismantling:
+                title: Photos before/after dismantling
+              Weight of aluminium frame:
+                title: Weight of aluminium frame
+                type: string
+              Weight of backsheet:
+                title: Weight of backsheet
+                type: string
+              Weight of cell laminate:
+                title: Weight of cell laminate
+                type: string
+              Weight of glass fraction:
+                title: Weight of glass fraction
+                type: string
+              Weight of junction box & cables:
+                title: Weight of junction box & cables
+                type: string
+            title: Form title
+            type: object
+          title: Mechanical dismantling
+          uiSchema:
+            Photos before/after dismantling:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Dismantling of PV modules

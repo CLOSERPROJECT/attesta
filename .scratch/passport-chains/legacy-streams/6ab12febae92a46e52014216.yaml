@@ -1,0 +1,1095 @@
+dpp:
+  enabled: false
+  gtin: ""
+  lotDefault: ""
+  lotInputKey: ""
+  ownerName: Ecosistem
+  productDescription: Gate-to-gate traceability of RAEE treatment outputs
+  productName: Ecosistem RAEE treatment output
+  serialInputKey: ""
+  serialStrategy: process_id_hex
+organizations:
+  - slug: ecosistem
+    name: Ecosistem
+roles:
+  - orgSlug: ecosistem
+    name: Operatore pesa e ingresso
+    slug: operatorepesaeingresso
+    palette: fuchsia
+  - orgSlug: ecosistem
+    name: Responsabile accettazione e classificazione
+    slug: responsabileaccettazioneeclassifica
+    palette: red
+  - orgSlug: ecosistem
+    name: Responsabile ambientale e conformita
+    slug: responsabileambientaleeconformita
+    palette: pink
+  - orgSlug: ecosistem
+    name: Operatore trattamento
+    slug: operatoretrattamento
+    palette: sky
+  - orgSlug: ecosistem
+    name: Operatore logistica
+    slug: operatorelogistica
+    palette: green
+workflow:
+  name: Ecosistem - Trattamento RAEE gate-to-gate v0.2
+  description: Tracciabilita dal cancello di ingresso al cancello di uscita per
+    carichi RAEE provenienti da centri comunali di raccolta, con accettazione,
+    smistamento, trattamento, classificazione degli output, bilancio di massa e
+    spedizione.
+  steps:
+    - id: "1"
+      order: 1
+      organization: ecosistem
+      title: Gate-in e accettazione del carico
+      substeps:
+        - id: "1.1"
+          inputKey: Registrare arrivo e pesata
+          inputType: formata
+          order: 1
+          roles:
+            - operatorepesaeingresso
+          schema:
+            type: object
+            title: Registrazione del carico in ingresso
+            required:
+              - inboundLoadId
+              - arrivalDate
+              - collectionCentreName
+              - totalDeclaredWeightKg
+              - weighingTicketReference
+            properties:
+              inboundLoadId:
+                type: string
+                title: ID carico in ingresso
+                description: Identificatore interno univoco del mezzo/accesso, non del lotto
+                  rifiuto.
+              arrivalDate:
+                type: string
+                title: Data di ingresso
+              arrivalTime:
+                type: string
+                title: Ora di ingresso
+              collectionCentreName:
+                type: string
+                title: Centro comunale di raccolta di provenienza
+              collectionCentreMunicipality:
+                type: string
+                title: Comune del centro di raccolta
+              carrierName:
+                type: string
+                title: Trasportatore
+              vehicleReference:
+                type: string
+                title: Riferimento interno del mezzo
+                description: Evitare dati personali nella futura vista pubblica.
+              weighingTicketReference:
+                type: string
+                title: Riferimento ticket di pesata
+              totalDeclaredWeightKg:
+                type: number
+                minimum: 0
+                title: Peso totale dichiarato (kg)
+              transportDocumentReferences:
+                type: array
+                title: Riferimenti documenti di trasporto
+                items:
+                  type: string
+              notes:
+                type: string
+                title: Note di ingresso
+          title: Registrare arrivo e pesata
+          uiSchema:
+            arrivalDate:
+              ui:components:
+                textWidget: datePickerWidget
+            notes:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "1.2"
+          inputKey: Accettare e creare i lotti in ingresso
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileaccettazioneeclassifica
+          schema:
+            type: object
+            title: Accettazione dei lotti rifiuto in ingresso
+            required:
+              - inboundLoadId
+              - acceptanceOutcome
+              - incomingBatches
+            properties:
+              inboundLoadId:
+                type: string
+                title: ID carico in ingresso
+              acceptanceOutcome:
+                type: string
+                title: Esito complessivo dell'accettazione
+                enum:
+                  - ACCEPTED
+                  - PARTIALLY_ACCEPTED
+                  - REJECTED
+              incomingBatches:
+                type: array
+                title: Lotti rifiuto accettati
+                items:
+                  type: object
+                  title: Lotto rifiuto in ingresso
+                  required:
+                    - incomingBatchId
+                    - raeeGroup
+                    - declaredEerCode
+                    - hazardous
+                    - acceptedWeightKg
+                    - physicalUnitId
+                  properties:
+                    incomingBatchId:
+                      type: string
+                      title: ID lotto in ingresso
+                    physicalUnitId:
+                      type: string
+                      title: ID contenitore, scarrabile, cesta o pallet
+                    raeeGroup:
+                      type: string
+                      title: Raggruppamento RAEE
+                      enum:
+                        - R1
+                        - R2
+                        - R3
+                        - R4
+                        - R5
+                    declaredEerCode:
+                      type: string
+                      title: Codice EER dichiarato
+                      enum:
+                        - 20 01 21*
+                        - 20 01 23*
+                        - 20 01 35*
+                        - 20 01 36
+                        - OTHER
+                    otherDeclaredEerCode:
+                      type: string
+                      title: Altro codice EER dichiarato
+                    hazardous:
+                      type: boolean
+                      title: Rifiuto pericoloso
+                    acceptedWeightKg:
+                      type: number
+                      minimum: 0
+                      title: Peso accettato (kg)
+                    transportDocumentReference:
+                      type: string
+                      title: Riferimento FIR/xFIR o altro documento
+                    visibleContents:
+                      type: string
+                      title: Contenuto visibile
+                    discrepancyNotes:
+                      type: string
+                      title: Difformita e note
+              rejectedWeightKg:
+                type: number
+                minimum: 0
+                title: Peso respinto (kg)
+              acceptanceNotes:
+                type: string
+                title: Note di accettazione
+          title: Accettare e creare i lotti in ingresso
+          uiSchema:
+            acceptanceNotes:
+              ui:components:
+                textWidget: textareaWidget
+            incomingBatches:
+              items:
+                discrepancyNotes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "1.3"
+          inputKey: Caricare documenti e fotografie di ingresso
+          inputType: formata
+          order: 3
+          roles:
+            - operatorepesaeingresso
+            - responsabileaccettazioneeclassifica
+          schema:
+            type: object
+            title: Evidenze di ingresso
+            properties:
+              weighingTickets:
+                type: array
+                items: {}
+                title: Ticket di pesata
+              transportDocuments:
+                type: array
+                items: {}
+                title: Documenti di trasporto e FIR/xFIR
+              intakePhotos:
+                type: array
+                items: {}
+                title: Fotografie del carico e dei contenitori
+              evidenceNotes:
+                type: string
+                title: Note sulle evidenze
+          title: Caricare documenti e fotografie di ingresso
+          uiSchema:
+            weighingTickets:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            transportDocuments:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            intakePhotos:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            evidenceNotes:
+              ui:components:
+                textWidget: textareaWidget
+    - id: "2"
+      order: 2
+      organization: ecosistem
+      title: Smistamento e classificazione RAEE
+      substeps:
+        - id: "2.1"
+          inputKey: Registrare split, merge e classificazione dei lotti
+          inputType: formata
+          order: 1
+          roles:
+            - responsabileaccettazioneeclassifica
+          schema:
+            type: object
+            title: Risultati dello smistamento
+            required:
+              - sortedBatches
+            properties:
+              sortedBatches:
+                type: array
+                title: Lotti risultanti dallo smistamento
+                items:
+                  type: object
+                  title: Lotto RAEE smistato
+                  required:
+                    - sortedBatchId
+                    - parentIncomingBatchIds
+                    - raeeGroup
+                    - confirmedEerCode
+                    - hazardous
+                    - weightKg
+                    - storageUnitId
+                  properties:
+                    sortedBatchId:
+                      type: string
+                      title: ID lotto smistato
+                    parentIncomingBatchIds:
+                      type: array
+                      title: ID lotti in ingresso di origine
+                      items:
+                        type: string
+                    raeeGroup:
+                      type: string
+                      title: Raggruppamento RAEE confermato
+                      enum:
+                        - R1
+                        - R2
+                        - R3
+                        - R4
+                        - R5
+                    confirmedEerCode:
+                      type: string
+                      title: Codice EER confermato
+                      enum:
+                        - 20 01 21*
+                        - 20 01 23*
+                        - 20 01 35*
+                        - 20 01 36
+                        - OTHER
+                    otherConfirmedEerCode:
+                      type: string
+                      title: Altro codice EER confermato
+                    hazardous:
+                      type: boolean
+                      title: Rifiuto pericoloso
+                    hpCodes:
+                      type: array
+                      uniqueItems: true
+                      title: Caratteristiche di pericolo HP
+                      items:
+                        enum:
+                          - HP1
+                          - HP2
+                          - HP3
+                          - HP4
+                          - HP5
+                          - HP6
+                          - HP7
+                          - HP8
+                          - HP9
+                          - HP10
+                          - HP11
+                          - HP12
+                          - HP13
+                          - HP14
+                          - HP15
+                    weightKg:
+                      type: number
+                      minimum: 0
+                      title: Peso del lotto (kg)
+                    storageUnitId:
+                      type: string
+                      title: ID unita di stoccaggio
+                    storageArea:
+                      type: string
+                      title: Area di stoccaggio
+                    classificationBasis:
+                      type: string
+                      title: Base della classificazione
+                    notes:
+                      type: string
+                      title: Note
+              sortingDate:
+                type: string
+                title: Data di smistamento
+              sortingNotes:
+                type: string
+                title: Note generali
+          title: Registrare split, merge e classificazione dei lotti
+          uiSchema:
+            sortingDate:
+              ui:components:
+                textWidget: datePickerWidget
+            sortingNotes:
+              ui:components:
+                textWidget: textareaWidget
+            sortedBatches:
+              items:
+                hpCodes:
+                  ui:components:
+                    arrayField: multiEnumField
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "2.2"
+          inputKey: Approvare la classificazione in ingresso
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileambientaleeconformita
+          schema:
+            type: object
+            title: Approvazione della classificazione in ingresso
+            required:
+              - reviewDate
+              - approved
+              - reviewer
+            properties:
+              reviewDate:
+                type: string
+                title: Data della revisione
+              approved:
+                type: boolean
+                title: Classificazione approvata
+              reviewer:
+                type: string
+                title: Responsabile della revisione
+              authorizationReference:
+                type: string
+                title: Riferimento autorizzativo applicabile
+              correctiveActions:
+                type: string
+                title: Azioni correttive o difformita
+          title: Approvare la classificazione in ingresso
+          uiSchema:
+            reviewDate:
+              ui:components:
+                textWidget: datePickerWidget
+            correctiveActions:
+              ui:components:
+                textWidget: textareaWidget
+    - id: "3"
+      order: 3
+      organization: ecosistem
+      title: Trattamento RAEE
+      substeps:
+        - id: "3.1"
+          inputKey: Compilare il verbale di trattamento
+          inputType: formata
+          order: 1
+          roles:
+            - operatoretrattamento
+          schema:
+            type: object
+            title: Verbale della campagna di trattamento
+            required:
+              - treatmentCampaignId
+              - treatmentStartDate
+              - inputBatchIds
+              - authorizedOperationCode
+              - treatmentLine
+              - totalInputWeightKg
+            properties:
+              treatmentCampaignId:
+                type: string
+                title: ID campagna di trattamento
+              treatmentStartDate:
+                type: string
+                title: Data inizio trattamento
+              treatmentEndDate:
+                type: string
+                title: Data fine trattamento
+              inputBatchIds:
+                type: array
+                title: ID lotti trattati
+                items:
+                  type: string
+              authorizedOperationCode:
+                type: string
+                title: Operazione R/D autorizzata
+                description: Copiare il codice esatto dall'autorizzazione Ecosistem; non
+                  inferirlo automaticamente.
+              authorizationReference:
+                type: string
+                title: Riferimento dell'autorizzazione
+              treatmentLine:
+                type: string
+                title: Linea o impianto utilizzato
+              treatmentDescription:
+                type: string
+                title: Descrizione delle operazioni eseguite
+              totalInputWeightKg:
+                type: number
+                minimum: 0
+                title: Peso totale in trattamento (kg)
+              operatorNotes:
+                type: string
+                title: Note dell'operatore
+          title: Compilare il verbale di trattamento
+          uiSchema:
+            treatmentStartDate:
+              ui:components:
+                textWidget: datePickerWidget
+            treatmentEndDate:
+              ui:components:
+                textWidget: datePickerWidget
+            treatmentDescription:
+              ui:components:
+                textWidget: textareaWidget
+            operatorNotes:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "3.2"
+          inputKey: Registrare depurazione e frazioni rimosse
+          inputType: formata
+          order: 2
+          roles:
+            - operatoretrattamento
+          schema:
+            type: object
+            title: Depurazione e componenti rimossi
+            required:
+              - treatmentCampaignId
+              - depollutionPerformed
+              - removedFractions
+            properties:
+              treatmentCampaignId:
+                type: string
+                title: ID campagna di trattamento
+              depollutionPerformed:
+                type: boolean
+                title: Depurazione eseguita
+              removedFractions:
+                type: array
+                title: Componenti e frazioni rimosse
+                items:
+                  type: object
+                  title: Frazione rimossa
+                  required:
+                    - removedFractionId
+                    - componentType
+                    - weightKg
+                    - hazardous
+                  properties:
+                    removedFractionId:
+                      type: string
+                      title: ID frazione rimossa
+                    componentType:
+                      type: string
+                      title: Tipo di componente o sostanza
+                      enum:
+                        - BATTERY_OR_ACCUMULATOR
+                        - REFRIGERANT_OR_GAS
+                        - OIL
+                        - MERCURY_COMPONENT
+                        - PRINTED_CIRCUIT_BOARD
+                        - CABLE
+                        - TONER_OR_INK
+                        - OTHER
+                    componentTypeOther:
+                      type: string
+                      title: Altro tipo di componente
+                    weightKg:
+                      type: number
+                      minimum: 0
+                      title: Peso (kg)
+                    hazardous:
+                      type: boolean
+                      title: Frazione pericolosa
+                    resultingWasteBatchId:
+                      type: string
+                      title: ID lotto rifiuto generato
+                    eerCode:
+                      type: string
+                      title: Codice EER della frazione
+                    storageUnitId:
+                      type: string
+                      title: ID unita di stoccaggio
+              depollutionNotes:
+                type: string
+                title: Note sulla depurazione
+          title: Registrare depurazione e frazioni rimosse
+          uiSchema:
+            depollutionNotes:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "3.3"
+          inputKey: Caricare verbale, fotografie e log
+          inputType: formata
+          order: 3
+          roles:
+            - operatoretrattamento
+          schema:
+            type: object
+            title: Evidenze del trattamento
+            properties:
+              treatmentReport:
+                title: Verbale o rapporto di trattamento
+              treatmentPhotos:
+                type: array
+                items: {}
+                title: Fotografie prima, durante e dopo il trattamento
+              equipmentLogs:
+                type: array
+                items: {}
+                title: Log o registrazioni degli impianti
+              evidenceNotes:
+                type: string
+                title: Note sulle evidenze
+          title: Caricare verbale, fotografie e log
+          uiSchema:
+            treatmentReport:
+              ui:components:
+                unknownField: unknownNativeFileField
+            treatmentPhotos:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            equipmentLogs:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            evidenceNotes:
+              ui:components:
+                textWidget: textareaWidget
+    - id: "4"
+      order: 4
+      organization: ecosistem
+      title: Creazione e classificazione degli output
+      substeps:
+        - id: "4.1"
+          inputKey: Creare i lotti di output
+          inputType: formata
+          order: 1
+          roles:
+            - responsabileaccettazioneeclassifica
+            - operatoretrattamento
+          schema:
+            type: object
+            title: Lotti di output della campagna
+            required:
+              - treatmentCampaignId
+              - outputs
+            properties:
+              treatmentCampaignId:
+                type: string
+                title: ID campagna di trattamento
+              outputs:
+                type: array
+                title: Lotti di output
+                items:
+                  type: object
+                  title: Lotto di output
+                  required:
+                    - outputBatchId
+                    - sourceInputBatchIds
+                    - materialOrFraction
+                    - weightKg
+                    - legalStatus
+                  properties:
+                    outputBatchId:
+                      type: string
+                      title: ID lotto di output
+                    sourceInputBatchIds:
+                      type: array
+                      title: ID lotti di origine
+                      items:
+                        type: string
+                    materialOrFraction:
+                      type: string
+                      title: Materiale, componente o frazione
+                    weightKg:
+                      type: number
+                      minimum: 0
+                      title: Peso del lotto (kg)
+                    legalStatus:
+                      type: string
+                      title: Stato giuridico proposto
+                      enum:
+                        - WASTE
+                        - PRODUCT
+                    productQualificationBasis:
+                      type: string
+                      title: Base della qualifica come prodotto
+                      description: Compilare solo se lo stato giuridico proposto e PRODUCT.
+                      enum:
+                        - END_OF_WASTE
+                        - PREPARATION_FOR_REUSE
+                        - OTHER
+                    outputEerCode:
+                      type: string
+                      title: Codice EER se rifiuto
+                    hazardous:
+                      type: boolean
+                      title: Rifiuto pericoloso
+                    hpCodes:
+                      type: array
+                      uniqueItems: true
+                      title: Caratteristiche di pericolo HP
+                      items:
+                        enum:
+                          - HP1
+                          - HP2
+                          - HP3
+                          - HP4
+                          - HP5
+                          - HP6
+                          - HP7
+                          - HP8
+                          - HP9
+                          - HP10
+                          - HP11
+                          - HP12
+                          - HP13
+                          - HP14
+                          - HP15
+                    endOfWasteBasis:
+                      type: string
+                      title: Base normativa o autorizzativa End of Waste
+                    conformityDeclarationReference:
+                      type: string
+                      title: Riferimento dichiarazione di conformita
+                    intendedUse:
+                      type: string
+                      title: Uso previsto se prodotto
+                    storageUnitId:
+                      type: string
+                      title: ID unita di stoccaggio
+                    notes:
+                      type: string
+                      title: Note
+          title: Creare i lotti di output
+          uiSchema:
+            outputs:
+              items:
+                hpCodes:
+                  ui:components:
+                    arrayField: multiEnumField
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "4.2"
+          inputKey: Verificare il bilancio di massa
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileambientaleeconformita
+          schema:
+            type: object
+            title: Bilancio di massa della campagna
+            required:
+              - treatmentCampaignId
+              - totalInputKg
+              - totalWasteOutputKg
+              - totalProductOutputKg
+              - processLossesKg
+              - balanceVarianceKg
+              - tolerancePct
+              - balanceResult
+            properties:
+              treatmentCampaignId:
+                type: string
+                title: ID campagna di trattamento
+              totalInputKg:
+                type: number
+                minimum: 0
+                title: Input totale (kg)
+              totalWasteOutputKg:
+                type: number
+                minimum: 0
+                title: Output qualificati come rifiuto (kg)
+              totalProductOutputKg:
+                type: number
+                minimum: 0
+                title: Output qualificati come prodotto/EoW (kg)
+              processLossesKg:
+                type: number
+                minimum: 0
+                title: Perdite, emissioni o umidita (kg)
+              balanceVarianceKg:
+                type: number
+                title: Scostamento del bilancio (kg)
+              balanceVariancePct:
+                type: number
+                title: Scostamento del bilancio (%)
+              tolerancePct:
+                type: number
+                minimum: 0
+                title: Tolleranza ammessa (%)
+              balanceResult:
+                type: string
+                title: Esito del bilancio
+                enum:
+                  - PASS
+                  - REVIEW_REQUIRED
+                  - FAIL
+              balanceNotes:
+                type: string
+                title: Motivazione di scostamenti e note
+          title: Verificare il bilancio di massa
+          uiSchema:
+            balanceNotes:
+              ui:components:
+                textWidget: textareaWidget
+    - id: "5"
+      order: 5
+      organization: ecosistem
+      title: Rilascio ambientale e conformita degli output
+      substeps:
+        - id: "5.1"
+          inputKey: Confermare lo stato giuridico e rilasciare gli output
+          inputType: formata
+          order: 1
+          roles:
+            - responsabileambientaleeconformita
+          schema:
+            type: object
+            title: Decisione di rilascio dei lotti di output
+            required:
+              - releaseDate
+              - outputDecisions
+            properties:
+              releaseDate:
+                type: string
+                title: Data della decisione
+              outputDecisions:
+                type: array
+                title: Decisioni per lotto
+                items:
+                  type: object
+                  title: Decisione sul lotto di output
+                  required:
+                    - outputBatchId
+                    - confirmedLegalStatus
+                    - classificationApproved
+                    - releaseDecision
+                    - publicPassportRequired
+                  properties:
+                    outputBatchId:
+                      type: string
+                      title: ID lotto di output
+                    confirmedLegalStatus:
+                      type: string
+                      title: Stato giuridico confermato
+                      enum:
+                        - WASTE
+                        - PRODUCT
+                    productQualificationBasis:
+                      type: string
+                      title: Base confermata della qualifica come prodotto
+                      enum:
+                        - END_OF_WASTE
+                        - PREPARATION_FOR_REUSE
+                        - OTHER
+                    classificationApproved:
+                      type: boolean
+                      title: Classificazione approvata
+                    analysisReferences:
+                      type: array
+                      title: Riferimenti ad analisi e prove
+                      items:
+                        type: string
+                    endOfWasteDeclarationReference:
+                      type: string
+                      title: Riferimento dichiarazione End of Waste
+                    releaseDecision:
+                      type: string
+                      title: Decisione di rilascio
+                      enum:
+                        - RELEASED
+                        - ON_HOLD
+                        - REJECTED
+                    publicPassportRequired:
+                      type: boolean
+                      title: Passaporto pubblico richiesto
+                    reviewer:
+                      type: string
+                      title: Responsabile della decisione
+                    notes:
+                      type: string
+                      title: Note
+          title: Confermare lo stato giuridico e rilasciare gli output
+          uiSchema:
+            releaseDate:
+              ui:components:
+                textWidget: datePickerWidget
+            outputDecisions:
+              items:
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "5.2"
+          inputKey: Caricare analisi e documenti di conformita
+          inputType: formata
+          order: 2
+          roles:
+            - responsabileambientaleeconformita
+          schema:
+            type: object
+            title: Evidenze di conformita
+            properties:
+              laboratoryReports:
+                type: array
+                items: {}
+                title: Rapporti di laboratorio
+              classificationDocuments:
+                type: array
+                items: {}
+                title: Documenti di classificazione dei rifiuti
+              endOfWasteDeclarations:
+                type: array
+                items: {}
+                title: Dichiarazioni End of Waste o conformita prodotto
+              authorizationExtracts:
+                type: array
+                items: {}
+                title: Estratti autorizzativi applicabili
+              evidenceNotes:
+                type: string
+                title: Note sulle evidenze
+          title: Caricare analisi e documenti di conformita
+          uiSchema:
+            laboratoryReports:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            classificationDocuments:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            endOfWasteDeclarations:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            authorizationExtracts:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            evidenceNotes:
+              ui:components:
+                textWidget: textareaWidget
+    - id: "6"
+      order: 6
+      organization: ecosistem
+      title: Gate-out e chiusura della campagna
+      substeps:
+        - id: "6.1"
+          inputKey: Registrare le spedizioni in uscita
+          inputType: formata
+          order: 1
+          roles:
+            - operatorelogistica
+          schema:
+            type: object
+            title: Spedizioni in uscita
+            required:
+              - shipments
+            properties:
+              shipments:
+                type: array
+                title: Spedizioni
+                items:
+                  type: object
+                  title: Spedizione in uscita
+                  required:
+                    - shipmentId
+                    - outputBatchIds
+                    - dispatchDate
+                    - legalStatus
+                    - dispatchedWeightKg
+                    - documentType
+                    - documentReference
+                    - destinationName
+                  properties:
+                    shipmentId:
+                      type: string
+                      title: ID spedizione
+                    outputBatchIds:
+                      type: array
+                      title: ID lotti di output spediti
+                      items:
+                        type: string
+                    dispatchDate:
+                      type: string
+                      title: Data di uscita
+                    legalStatus:
+                      type: string
+                      title: Stato giuridico del materiale spedito
+                      enum:
+                        - WASTE
+                        - PRODUCT
+                    dispatchedWeightKg:
+                      type: number
+                      minimum: 0
+                      title: Peso spedito (kg)
+                    documentType:
+                      type: string
+                      title: Tipo di documento di accompagnamento
+                      enum:
+                        - FIR
+                        - XFIR
+                        - DDT
+                        - OTHER
+                    documentReference:
+                      type: string
+                      title: Numero o riferimento del documento
+                    destinationName:
+                      type: string
+                      title: Destinatario
+                    destinationType:
+                      type: string
+                      title: Tipo di destinazione
+                      enum:
+                        - AUTHORIZED_EXTERNAL_PLANT
+                        - CUSTOMER
+                        - OTHER
+                    destinationAuthorizationReference:
+                      type: string
+                      title: Riferimento autorizzazione del destinatario
+                    destinationOperationCode:
+                      type: string
+                      title: Operazione R/D prevista a destino
+                    carrierName:
+                      type: string
+                      title: Trasportatore
+                    crossBorderShipment:
+                      type: boolean
+                      title: Spedizione transfrontaliera
+                    notes:
+                      type: string
+                      title: Note
+          title: Registrare le spedizioni in uscita
+          uiSchema:
+            shipments:
+              items:
+                dispatchDate:
+                  ui:components:
+                    textWidget: datePickerWidget
+                notes:
+                  ui:components:
+                    textWidget: textareaWidget
+        - id: "6.2"
+          inputKey: Caricare i documenti di uscita
+          inputType: formata
+          order: 2
+          roles:
+            - operatorelogistica
+          schema:
+            type: object
+            title: Documenti ed evidenze di uscita
+            properties:
+              firDocuments:
+                type: array
+                items: {}
+                title: FIR/xFIR
+              deliveryNotes:
+                type: array
+                items: {}
+                title: DDT e documenti commerciali
+              outboundWeighingTickets:
+                type: array
+                items: {}
+                title: Ticket di pesata in uscita
+              otherDocuments:
+                type: array
+                items: {}
+                title: Altri documenti
+          title: Caricare i documenti di uscita
+          uiSchema:
+            firDocuments:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            deliveryNotes:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            outboundWeighingTickets:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            otherDocuments:
+              ui:components:
+                arrayField: arrayNativeFilesField
+        - id: "6.3"
+          inputKey: Approvare la chiusura della campagna
+          inputType: formata
+          order: 3
+          roles:
+            - responsabileambientaleeconformita
+          schema:
+            type: object
+            title: Chiusura della campagna gate-to-gate
+            required:
+              - treatmentCampaignId
+              - closureDate
+              - allOutputsAccountedFor
+              - allShipmentsDocumented
+              - closureApproved
+              - responsiblePerson
+            properties:
+              treatmentCampaignId:
+                type: string
+                title: ID campagna di trattamento
+              closureDate:
+                type: string
+                title: Data di chiusura
+              allOutputsAccountedFor:
+                type: boolean
+                title: Tutti gli output sono contabilizzati
+              allShipmentsDocumented:
+                type: boolean
+                title: Tutte le uscite sono documentate
+              closureApproved:
+                type: boolean
+                title: Chiusura approvata
+              responsiblePerson:
+                type: string
+                title: Responsabile della chiusura
+              unresolvedDeviations:
+                type: string
+                title: Difformita ancora aperte
+              closureNotes:
+                type: string
+                title: Note finali
+          title: Approvare la chiusura della campagna
+          uiSchema:
+            closureDate:
+              ui:components:
+                textWidget: datePickerWidget
+            unresolvedDeviations:
+              ui:components:
+                textWidget: textareaWidget
+            closureNotes:
+              ui:components:
+                textWidget: textareaWidget
+  categorySlug: recycling-and-recovery
+  subCategorySlug: power-electronics

@@ -1,0 +1,264 @@
+dpp:
+  enabled: false
+  gtin: ""
+  lotDefault: ""
+  lotInputKey: ""
+  ownerName: ""
+  productDescription: ""
+  productName: ""
+  serialInputKey: ""
+  serialStrategy: ""
+organizations:
+  - slug: organization-1
+    name: Organization 1
+roles:
+  - orgSlug: organization-1
+    name: mechanic
+    slug: mechanic
+    palette: blue
+  - orgSlug: organization-1
+    name: supervisor
+    slug: supervisor
+    palette: cyan
+workflow:
+  description: |-
+    Indium collection, recovery and
+    repurposing
+  name: Indium stream
+  steps:
+    - id: "1"
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - mechanic
+            - supervisor
+          schema:
+            properties:
+              Batch IDs:
+                title: Batch IDs
+                type: string
+              Device/model type:
+                title: Device/model type
+                type: string
+              Dismantling log:
+                title: Dismantling log
+              Quantities:
+                title: Quantities
+                type: string
+              Time of collection:
+                title: Time of collection
+                type: string
+              Waste code:
+                title: Waste code
+                type: string
+              Waste information record:
+                title: Waste information record
+                type: string
+              Waste shipment documents:
+                title: Waste shipment documents
+              Weight:
+                title: Weight
+                type: string
+            required:
+              - Batch IDs
+              - Device/model type
+              - Quantities
+              - Time of collection
+              - Waste code
+              - Weight
+              - Waste information record
+              - Dismantling log
+              - Waste shipment documents
+            title: Form title
+            type: object
+          title: Waste information recording
+          uiSchema:
+            Dismantling log:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Waste shipment documents:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Collection and dismantling of indium waste
+    - description: Quantification of indium content in waste sample
+      id: "2"
+      order: 2
+      organization: organization-1
+      substeps:
+        - id: "2.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - mechanic
+            - supervisor
+          schema:
+            properties:
+              Indium waste analysis results:
+                title: Indium waste analysis results
+            required:
+              - Indium waste analysis results
+            title: Form title
+            type: object
+          title: "Analysis of indium waste "
+          uiSchema:
+            Indium waste analysis results:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Quantification of indium content in waste sample
+    - description: Indium recovery and refinement
+      id: "3"
+      order: 3
+      organization: organization-1
+      substeps:
+        - id: "3.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - mechanic
+            - supervisor
+          schema:
+            properties:
+              Group title:
+                properties:
+                  File field:
+                    description: Process information and images
+                    title: File field
+                  Indium recovery results report:
+                    title: Indium recovery results report
+                required:
+                  - Indium recovery results report
+                  - File field
+                title: Group title
+                type: object
+            required:
+              - Group title
+            title: Form title
+            type: object
+          title: In recovery processes
+          uiSchema:
+            Group title:
+              File field:
+                ui:components:
+                  unknownField: unknownNativeFileField
+              Indium recovery results report:
+                ui:components:
+                  unknownField: unknownNativeFileField
+      title: Indium recovery and refinement
+    - description: TMIn production
+      id: "4"
+      order: 4
+      organization: organization-1
+      substeps:
+        - id: "4.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - mechanic
+            - supervisor
+          schema:
+            properties:
+              Group title:
+                properties:
+                  Certificate of Analysis:
+                    title: Certificate of Analysis
+                  Safety data sheet:
+                    title: Safety data sheet
+                  Transfilling document:
+                    title: Transfilling document
+                required:
+                  - Certificate of Analysis
+                  - Transfilling document
+                  - Safety data sheet
+                title: Group title
+                type: object
+            required:
+              - Group title
+            title: Form title
+            type: object
+          title: TMIn production
+          uiSchema:
+            Group title:
+              Certificate of Analysis:
+                ui:components:
+                  unknownField: unknownNativeFileField
+              Safety data sheet:
+                ui:components:
+                  unknownField: unknownNativeFileField
+              Transfilling document:
+                ui:components:
+                  unknownField: unknownNativeFileField
+      title: TMIn production
+    - description: Advanced In precursor production
+      id: "5"
+      order: 5
+      organization: organization-1
+      substeps:
+        - id: "5.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - supervisor
+            - mechanic
+          schema:
+            properties:
+              Advanced indium precursor data sheet:
+                title: Advanced indium precursor data sheet
+              Precursor synthesis conditions report:
+                title: Precursor synthesis conditions report
+              Precursor testing report:
+                title: Precursor testing report
+            required:
+              - Precursor synthesis conditions report
+              - Precursor testing report
+              - Advanced indium precursor data sheet
+            title: Group title
+            type: object
+          title: Advanced In precursor production
+          uiSchema:
+            Advanced indium precursor data sheet:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Precursor synthesis conditions report:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Precursor testing report:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Advanced In precursor production
+    - description: DALP In deposition
+      id: "6"
+      order: 6
+      organization: organization-1
+      substeps:
+        - id: "6.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - supervisor
+            - mechanic
+          schema:
+            properties:
+              Quality report of product:
+                title: Quality report of product
+            required:
+              - Quality report of product
+            title: Form title
+            type: object
+          title: DALP In deposition
+          uiSchema:
+            Quality report of product:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: DALP In deposition
+  categorySlug: recycling-and-recovery
+  subCategorySlug: e-waste-indium

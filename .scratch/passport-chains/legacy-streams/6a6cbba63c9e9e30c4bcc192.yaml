@@ -1,0 +1,935 @@
+dpp:
+  enabled: true
+  gtin: "09506000134376"
+  lotDefault: GA-SECONDARY
+  lotInputKey: lotNumber
+  ownerName: Attesta Demo Operator
+  productDescription: Traceable recovery of secondary gallium from foundry scrap
+    and e-waste through purification, wafer production, and MEMS deposition.
+  productName: Gallium circularity trace
+  serialInputKey: waferLotId
+  serialStrategy: process_id_hex
+organizations:
+  - slug: organization-1
+    name: Organization 1
+  - slug: organization-2
+    name: Organization 2
+  - slug: critical
+    name: CRITICAL
+  - slug: dockweiler
+    name: Dockweiler
+  - slug: ifw
+    name: IFW
+  - slug: closing-the-loop
+    name: Closing the loop
+roles:
+  - orgSlug: organization-1
+    name: supervisor
+    slug: supervisor
+    palette: cyan
+  - orgSlug: organization-1
+    name: Chemical analyst
+    slug: chemicalanalyst
+    palette: violet
+  - orgSlug: organization-2
+    name: analyst
+    slug: analyst
+    palette: emerald
+  - orgSlug: critical
+    name: Project manager
+    slug: projectmanager
+    palette: blue
+  - orgSlug: dockweiler
+    name: Head of R&D
+    slug: headofrd
+    palette: emerald
+  - orgSlug: dockweiler
+    name: Head of shipping
+    slug: headofshipping
+    palette: blue
+  - orgSlug: dockweiler
+    name: T&BS operator
+    slug: tbsoperator
+    palette: lime
+  - orgSlug: ifw
+    name: Analytical chemist
+    slug: analyticalchemist
+    palette: teal
+  - orgSlug: ifw
+    name: Chemical process technologist
+    slug: chemicalprocesstechnologist
+    palette: green
+  - orgSlug: ifw
+    name: Project manager
+    slug: projectmanager
+    palette: blue
+  - orgSlug: closing-the-loop
+    name: Operator
+    slug: operator
+    palette: amber
+workflow:
+  description: Traceable recovery of secondary gallium from foundry scrap and
+    e-waste through purification, wafer production, and MEMS deposition.
+  name: Gallium circularity trace
+  steps:
+    - id: "1"
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          inputKey: Register each incoming gallium-bearing scrap batch with source line,
+            scrap class, packaging condition, and gross mass.
+          inputType: formata
+          order: 1
+          roles:
+            - supervisor
+            - chemicalanalyst
+          schema:
+            properties:
+              containerCount:
+                minimum: 1
+                title: Number of containers
+                type: integer
+              grossMassKg:
+                minimum: 0
+                title: Gross mass (kg)
+                type: number
+              intakeDate:
+                title: Intake date
+                type: string
+              intakeNotes:
+                title: Intake notes
+                type: string
+              scrapClass:
+                enum:
+                  - gaas-wafer-breakage
+                  - mbe-consumables
+                  - sputter-target-remnants
+                  - polishing-sludge
+                  - mixed-semiconductor-scrap
+                title: Scrap class
+                type: string
+              sourceFacility:
+                title: Source facility or site
+                type: string
+              sourceLine:
+                title: Source process line
+                type: string
+              suspectedContaminants:
+                items:
+                  enum:
+                    - arsenic
+                    - indium
+                    - germanium
+                    - aluminium
+                    - silicon
+                    - organics
+                    - halides
+                    - unknown
+                title: Suspected contaminants
+                type: array
+                uniqueItems: true
+            required:
+              - intakeDate
+              - sourceFacility
+              - sourceLine
+              - scrapClass
+              - grossMassKg
+            title: Scrap batch intake register
+            type: object
+            uiSchema:
+              intakeNotes:
+                ui:components:
+                  textWidget: textareaWidget
+              suspectedContaminants:
+                ui:components:
+                  arrayField: multiEnumField
+          title: Scrap batch intake register
+        - id: "1.2"
+          inputKey: Record how the incoming scrap was sorted into homogeneous
+            gallium-bearing fractions and identify any rejected material.
+          inputType: formata
+          order: 2
+          roles:
+            - supervisor
+          schema:
+            properties:
+              Sorting Photos:
+                items: {}
+                title: Sorting Photos
+                type: array
+              acceptedFractions:
+                items:
+                  properties:
+                    description:
+                      title: description
+                      type: string
+                    fractionCode:
+                      title: fractionCode
+                      type: string
+                    netMassKg:
+                      minimum: 0
+                      title: netMassKg
+                      type: number
+                  required:
+                    - fractionCode
+                    - netMassKg
+                  title: Fraction
+                  type: object
+                title: acceptedFractions
+                type: array
+              rejectedMassKg:
+                minimum: 0
+                title: rejectedMassKg
+                type: number
+              rejectionReason:
+                title: rejectionReason
+                type: string
+              sortingMethod:
+                enum:
+                  - visual-and-label-review
+                  - xrf-assisted
+                  - supplier-declaration
+                  - combined-method
+                title: sortingMethod
+            required:
+              - sortingMethod
+              - acceptedFractions
+              - Sorting Photos
+            title: Sorting and segregation log
+            type: object
+          title: Sorting and segregation log
+          uiSchema:
+            Sorting Photos:
+              ui:components:
+                arrayField: arrayNativeFilesField
+            sortingMethod:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+        - id: "1.3"
+          inputKey: Provide the batch summary and transfer documents for the sorted
+            material shipped to the sampling partner.
+          inputType: formata
+          order: 3
+          roles:
+            - supervisor
+          schema:
+            properties:
+              batchSummary:
+                title: batchSummary
+                type: string
+              chainOfCustody:
+                title: chainOfCustody
+                type: string
+              destinationOrg:
+                enum:
+                  - erp
+                  - other
+                title: destinationOrg
+              dispatchDate:
+                title: dispatchDate
+                type: string
+              shipmentReference:
+                title: shipmentReference
+                type: string
+              transportDocument:
+                title: transportDocument
+            required:
+              - shipmentReference
+              - destinationOrg
+              - dispatchDate
+              - transportDocument
+            title: Outbound transfer dossier
+            type: object
+          title: Outbound transfer dossier
+          uiSchema:
+            destinationOrg:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+            transportDocument:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Foundry scrap collection and sorting
+    - id: "2"
+      order: 2
+      organization: organization-2
+      substeps:
+        - id: "2.1"
+          inputKey: Define the sampling approach used to create representative
+            gallium-bearing test samples from the received material.
+          inputType: formata
+          order: 1
+          roles:
+            - analyst
+          schema:
+            properties:
+              nominalSampleMassG:
+                minimum: 0
+                title: Nominal sample mass (g)
+                type: number
+              receivedShipmentReference:
+                title: Received shipment reference
+                type: string
+              remarks:
+                title: Sampling remarks
+                type: string
+              sampleCount:
+                minimum: 1
+                title: Number of samples
+                type: integer
+              samplePreparationDate:
+                title: Sample preparation date
+                type: string
+              samplingMethod:
+                enum:
+                  - quartering
+                  - riffle-splitter
+                  - stratified-manual
+                  - process-derived-composite
+                title: Sampling method
+                type: string
+            required:
+              - receivedShipmentReference
+              - samplePreparationDate
+              - samplingMethod
+              - sampleCount
+            title: Sampling plan and composite selection
+            type: object
+            uiSchema:
+              remarks:
+                ui:components:
+                  textWidget: textareaWidget
+          title: Sampling plan and composite selection
+        - id: "2.2"
+          inputKey: Summarize the observed sample matrix and attach analytical evidence
+            relevant to downstream gallium recovery.
+          inputType: formata
+          order: 2
+          roles:
+            - analyst
+          schema:
+            properties:
+              Sample Photo Set:
+                title: Sample Photo Set
+              analysisReport:
+                title: analysisReport
+                type: string
+              estimatedGaContentPct:
+                maximum: 100
+                minimum: 0
+                title: estimatedGaContentPct
+                type: number
+              majorCoElements:
+                items:
+                  enum:
+                    - arsenic
+                    - indium
+                    - germanium
+                    - copper
+                    - silver
+                    - aluminium
+                    - silicon
+                    - iron
+                title: majorCoElements
+                type: array
+                uniqueItems: true
+              matrixType:
+                enum:
+                  - semiconductor-fragments
+                  - metallization-residue
+                  - glass-ceramic-mix
+                  - fine-powder
+                  - mixed-ewaste
+                title: matrixType
+            required:
+              - analysisReport
+              - estimatedGaContentPct
+              - matrixType
+              - Sample Photo Set
+            title: Sample characterization summary
+            type: object
+          title: Sample characterization summary
+          uiSchema:
+            Sample Photo Set:
+              ui:components:
+                unknownField: unknownNativeFileField
+            analysisReport:
+              ui:components:
+                textWidget: textareaWidget
+            majorCoElements:
+              ui:components:
+                arrayField: multiEnumField
+            matrixType:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+        - id: "2.3"
+          inputKey: Confirm which prepared samples were sent to the recovery partner and
+            include the associated traceability documents.
+          inputType: formata
+          order: 3
+          roles:
+            - analyst
+          schema:
+            properties:
+              Sample IDs:
+                items:
+                  title: Sample ID
+                  type: string
+                title: Sample IDs
+                type: array
+              custodySealId:
+                title: custodySealId
+                type: string
+              dispatchDate:
+                title: dispatchDate
+                type: string
+              dispatchNote:
+                title: dispatchNote
+                type: string
+              recipientOrg:
+                enum:
+                  - critical
+                  - other
+                title: recipientOrg
+            required:
+              - dispatchDate
+              - dispatchNote
+              - recipientOrg
+              - Sample IDs
+            title: Recovery sample dispatch
+            type: object
+          title: Recovery sample dispatch
+          uiSchema:
+            dispatchNote:
+              ui:components:
+                textWidget: textareaWidget
+            recipientOrg:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+      title: E-waste sample provision
+    - id: "3"
+      order: 3
+      organization: critical
+      substeps:
+        - id: "3.1"
+          inputKey: Capture the selected recovery route, main unit operations, and planned
+            gallium-containing intermediate streams.
+          inputType: formata
+          order: 1
+          roles:
+            - projectmanager
+          schema:
+            properties:
+              feedSampleIds:
+                items:
+                  title: Feed sample ID
+                  type: string
+                title: Feed sample IDs
+                type: array
+              keyOperations:
+                items:
+                  enum:
+                    - crushing
+                    - sieving
+                    - roasting
+                    - alkaline-leach
+                    - acidic-leach
+                    - solvent-extraction
+                    - cementation
+                    - precipitation
+                    - electrowinning
+                title: Key operations
+                type: array
+                uniqueItems: true
+              processNotes:
+                title: Process notes
+                type: string
+              recoveryRoute:
+                enum:
+                  - mechanical-preconcentration-plus-leach
+                  - thermal-treatment-plus-hydromet
+                  - direct-hydromet
+                  - mixed-route
+                title: Recovery route
+                type: string
+            required:
+              - feedSampleIds
+              - recoveryRoute
+              - keyOperations
+            title: Recovery process route log
+            type: object
+            uiSchema:
+              keyOperations:
+                ui:components:
+                  arrayField: multiEnumField
+              processNotes:
+                ui:components:
+                  textWidget: textareaWidget
+          title: Recovery process route log
+        - id: "3.2"
+          inputKey: Report recovered gallium mass, yield, and main impurity observations
+            for the produced secondary intermediate.
+          inputType: formata
+          order: 2
+          roles:
+            - projectmanager
+          schema:
+            properties:
+              Assay Certificate:
+                title: Assay Certificate
+              Assay Method:
+                enum:
+                  - icp-oes
+                  - icp-ms
+                  - xrf
+                  - titration
+                title: Assay Method
+              Key Impurities (ppm):
+                title: Key Impurities (ppm)
+                type: string
+              Recovered gallium mass (g):
+                minimum: 0
+                title: Recovered gallium mass (g)
+                type: number
+              Recovery Yield (%):
+                maximum: 100
+                minimum: 0
+                title: Recovery Yield (%)
+                type: number
+            required:
+              - Assay Certificate
+              - Assay Method
+              - Recovered gallium mass (g)
+              - Recovery Yield (%)
+            title: Gallium recovery yield report
+            type: object
+          title: Gallium recovery yield report
+          uiSchema:
+            Assay Certificate:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Assay Method:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+        - id: "3.3"
+          inputKey: Release the recovered gallium intermediate for downstream purification
+            together with traceability and safety documentation.
+          inputType: formata
+          order: 3
+          roles:
+            - projectmanager
+          schema:
+            properties:
+              destinationOrg:
+                enum:
+                  - dockweiler-chemicals
+                  - other
+                title: destinationOrg
+              intermediateForm:
+                enum:
+                  - gallium-bearing-solution
+                  - gallium-oxide
+                  - metallic-gallium
+                title: intermediateForm
+              netMassKg:
+                minimum: 0
+                title: netMassKg
+                type: number
+              releaseDocument:
+                title: releaseDocument
+              safetyAttachment:
+                title: safetyAttachment
+            required:
+              - destinationOrg
+              - intermediateForm
+              - netMassKg
+              - releaseDocument
+              - safetyAttachment
+            title: Secondary gallium intermediate release
+            type: object
+          title: Secondary gallium intermediate release
+          uiSchema:
+            destinationOrg:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+            intermediateForm:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+              ui:options:
+                useLabel: false
+            releaseDocument:
+              ui:components:
+                unknownField: unknownNativeFileField
+            safetyAttachment:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Secondary semiconductor recovery
+    - id: "4"
+      order: 4
+      organization: dockweiler
+      substeps:
+        - id: "4.1"
+          inputKey: Document the purification campaign used to convert the recovered
+            gallium intermediate into electronic-grade feedstock.
+          inputType: formata
+          order: 1
+          roles:
+            - headofrd
+          schema:
+            properties:
+              batchIdentifier:
+                title: Batch identifier
+                type: string
+              feedMaterialType:
+                enum:
+                  - gallium-bearing-solution
+                  - gallium-oxide
+                  - metallic-gallium
+                title: Feed material type
+                type: string
+              operatorComments:
+                title: Operator comments
+                type: string
+              purificationMethod:
+                enum:
+                  - vacuum-distillation
+                  - zone-refining
+                  - solvent-extraction-polish
+                  - precipitation-redissolution
+                  - combined-route
+                title: Purification method
+                type: string
+            required:
+              - feedMaterialType
+              - purificationMethod
+              - batchIdentifier
+            title: Purification batch record
+            type: object
+            uiSchema:
+              operatorComments:
+                ui:components:
+                  textWidget: textareaWidget
+          title: Purification batch record
+        - id: "4.2"
+          inputKey: Record purified gallium quality data and attach the corresponding
+            certificate of analysis.
+          inputType: formata
+          order: 2
+          roles:
+            - headofshipping
+          schema:
+            properties:
+              certificateOfAnalysis:
+                title: Certificate of analysis
+              gaPurityPct:
+                maximum: 100
+                minimum: 0
+                title: Gallium purity (%)
+                type: number
+              metallicImpuritiesSummary:
+                title: Metallic impurities summary
+                type: string
+              purityGrade:
+                enum:
+                  - 4n
+                  - 5n
+                  - 6n
+                  - 7n
+                title: Purity grade
+                type: string
+            required:
+              - purityGrade
+              - gaPurityPct
+              - certificateOfAnalysis
+            title: Refined gallium certificate of analysis
+            type: object
+            uiSchema:
+              certificateOfAnalysis:
+                ui:components:
+                  unknownField: unknownNativeFileField
+              metallicImpuritiesSummary:
+                ui:components:
+                  textWidget: textareaWidget
+          title: Refined gallium certificate of analysis
+        - id: "4.3"
+          inputKey: Confirm the lot released to wafer manufacturing and include packaging
+            and handling instructions.
+          inputType: formata
+          order: 3
+          roles:
+            - tbsoperator
+          schema:
+            properties:
+              destinationOrg:
+                enum:
+                  - freiberger
+                title: Destination organization
+                type: string
+              lotNumber:
+                title: Lot number
+                type: string
+              packageType:
+                enum:
+                  - sealed-ampoule
+                  - inert-gas-bottle
+                  - lined-canister
+                title: Package type
+                type: string
+              transferSpecSheet:
+                title: Transfer specification sheet
+            required:
+              - lotNumber
+              - packageType
+              - destinationOrg
+              - transferSpecSheet
+            title: Transfer to wafer production
+            type: object
+            uiSchema:
+              transferSpecSheet:
+                ui:components:
+                  unknownField: unknownNativeFileField
+          title: Transfer to wafer production
+      title: Refinement and chemical processing
+    - id: "5"
+      order: 5
+      organization: ifw
+      substeps:
+        - id: "5.1"
+          inputKey: Declare the production batch in which secondary gallium was used for
+            GaAs crystal growth.
+          inputType: formata
+          order: 1
+          roles:
+            - analyticalchemist
+          schema:
+            properties:
+              batchNotes:
+                title: Batch notes
+                type: string
+              crystalGrowthMethod:
+                enum:
+                  - lec
+                  - vb
+                  - vgf
+                title: Crystal growth method
+                type: string
+              growthBatchId:
+                title: Growth batch ID
+                type: string
+              secondaryGaLot:
+                title: Secondary gallium lot
+                type: string
+              waferGradeTarget:
+                enum:
+                  - epi-ready
+                  - prime
+                  - test-grade
+                title: Wafer grade target
+                type: string
+            required:
+              - growthBatchId
+              - waferGradeTarget
+              - secondaryGaLot
+              - crystalGrowthMethod
+            title: Crystal growth batch declaration
+            type: object
+            uiSchema:
+              batchNotes:
+                ui:components:
+                  textWidget: textareaWidget
+          title: Crystal growth batch declaration
+        - id: "5.2"
+          inputKey: Summarize key wafer quality indicators obtained after slicing,
+            polishing, and inspection.
+          inputType: formata
+          order: 2
+          roles:
+            - chemicalprocesstechnologist
+          schema:
+            properties:
+              acceptDisposition:
+                enum:
+                  - released
+                  - conditional-release
+                  - rework
+                  - reject
+                title: Disposition
+                type: string
+              averageThicknessUm:
+                minimum: 0
+                title: Average thickness (um)
+                type: number
+              averageTtvUm:
+                minimum: 0
+                title: Average TTV (um)
+                type: number
+              dislocationDensityCm2:
+                minimum: 0
+                title: Dislocation density (cm^-2)
+                type: number
+              metrologyReport:
+                title: Metrology report
+              waferCount:
+                minimum: 1
+                title: Wafer count
+                type: integer
+            required:
+              - waferCount
+              - acceptDisposition
+              - metrologyReport
+            title: Wafer metrology and defect summary
+            type: object
+            uiSchema:
+              metrologyReport:
+                ui:components:
+                  unknownField: unknownNativeFileField
+          title: Wafer metrology and defect summary
+        - id: "5.3"
+          inputKey: Release the qualifying secondary wafer lot to the deposition partner
+            with the required lot-level traceability data.
+          inputType: formata
+          order: 3
+          roles:
+            - projectmanager
+            - chemicalprocesstechnologist
+            - analyticalchemist
+          schema:
+            properties:
+              destinationOrg:
+                enum:
+                  - atlant3d
+                title: Destination organization
+                type: string
+              releasePackage:
+                title: Release package
+              releasedWaferCount:
+                minimum: 1
+                title: Released wafer count
+                type: integer
+              waferLotId:
+                title: Wafer lot ID
+                type: string
+            required:
+              - waferLotId
+              - releasedWaferCount
+              - destinationOrg
+              - releasePackage
+            title: Wafer lot release for deposition
+            type: object
+            uiSchema:
+              releasePackage:
+                ui:components:
+                  unknownField: unknownNativeFileField
+          title: Wafer lot release for deposition
+      title: Production of GaAs secondary wafers
+    - id: "6"
+      order: 6
+      organization: closing-the-loop
+      substeps:
+        - id: "6.1"
+          inputKey: Record the deposition recipe, substrate lot, and precursor or
+            source-material settings used for secondary gallium deposition.
+          inputType: formata
+          order: 1
+          roles:
+            - operator
+          schema:
+            properties:
+              depositionPlatform:
+                enum:
+                  - atlant3d-flow
+                  - ald
+                  - plasma-enhanced
+                  - hybrid
+                title: Deposition platform
+                type: string
+              runSheet:
+                title: Run sheet
+              substrateLotId:
+                title: Substrate lot ID
+                type: string
+              targetStructure:
+                title: Target MEMS structure
+                type: string
+              waferLotId:
+                title: Incoming wafer lot ID
+                type: string
+            required:
+              - substrateLotId
+              - waferLotId
+              - depositionPlatform
+              - runSheet
+            title: Deposition recipe setup
+            type: object
+            uiSchema:
+              runSheet:
+                ui:components:
+                  unknownField: unknownNativeFileField
+          title: Deposition recipe setup
+        - id: "6.2"
+          inputKey: Provide the verification data confirming deposited layer thickness,
+            uniformity, and functional acceptability.
+          inputType: formata
+          order: 2
+          roles:
+            - operator
+          schema:
+            properties:
+              electricalCheck:
+                enum:
+                  - pass
+                  - conditional-pass
+                  - fail
+                  - not-applicable
+                title: Electrical check
+                type: string
+              microscopyAttachment:
+                title: Microscopy attachment
+              thicknessNm:
+                minimum: 0
+                title: Thickness (nm)
+                type: number
+              uniformityPct:
+                maximum: 100
+                minimum: 0
+                title: Uniformity (%)
+                type: number
+              verificationSummary:
+                title: Verification summary
+                type: string
+            required:
+              - thicknessNm
+              - electricalCheck
+              - microscopyAttachment
+            title: Deposited layer verification
+            type: object
+            uiSchema:
+              microscopyAttachment:
+                ui:components:
+                  unknownField: unknownNativeFileField
+              verificationSummary:
+                ui:components:
+                  textWidget: textareaWidget
+          title: Deposited layer verification
+      title: Secondary Ga atomic deposition in MEMS
+  categorySlug: recycling-and-recovery
+  subCategorySlug: e-waste

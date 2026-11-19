@@ -1,0 +1,443 @@
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+  lotDefault: ""
+  lotInputKey: shipmentRef
+  ownerName: Attesta Demo Operator
+  productDescription: Shipment intake, inspection, and approval with traceable checkpoints.
+  productName: Indium recycling audit
+  serialInputKey: ""
+  serialStrategy: process_id_hex
+organizations:
+  - slug: organization-1
+    name: Organization 1
+  - slug: due2lab
+    name: Due2Lab
+  - slug: critical
+    name: CRITICAL
+  - slug: dockweiler
+    name: Dockweiler
+  - slug: ifw
+    name: IFW
+  - slug: atlant-3d
+    name: Atlant-3D
+roles:
+  - orgSlug: organization-1
+    name: Chemical analyst
+    slug: chemicalanalyst
+    color: var(--role-violet-bg)
+    border: var(--role-violet-border)
+  - orgSlug: organization-1
+    name: Machine operator
+    slug: machineoperator
+    color: var(--role-yellow-bg)
+    border: var(--role-yellow-border)
+  - orgSlug: due2lab
+    name: Analyst
+    slug: analyst
+    color: var(--role-emerald-bg)
+    border: var(--role-emerald-border)
+  - orgSlug: critical
+    name: Project manager
+    slug: projectmanager
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - orgSlug: dockweiler
+    name: Head of R&D
+    slug: headofrd
+    color: var(--role-emerald-bg)
+    border: var(--role-emerald-border)
+  - orgSlug: dockweiler
+    name: T&BS operator
+    slug: tbsoperator
+    color: var(--role-lime-bg)
+    border: var(--role-lime-border)
+  - orgSlug: dockweiler
+    name: Head of shipping
+    slug: headofshipping
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - orgSlug: dockweiler
+    name: Head of Quality
+    slug: headofquality
+    color: var(--role-orange-bg)
+    border: var(--role-orange-border)
+  - orgSlug: ifw
+    name: Analytical chemist
+    slug: analyticalchemist
+    color: var(--role-teal-bg)
+    border: var(--role-teal-border)
+  - orgSlug: ifw
+    name: Chemical process technologist
+    slug: chemicalprocesstechnologist
+    color: var(--role-green-bg)
+    border: var(--role-green-border)
+  - orgSlug: ifw
+    name: Project manager
+    slug: projectmanager
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - orgSlug: atlant-3d
+    name: Chip designer
+    slug: chipdesigner
+    color: var(--role-rose-bg)
+    border: var(--role-rose-border)
+  - orgSlug: atlant-3d
+    name: Material scientist
+    slug: materialscientist
+    color: var(--role-yellow-bg)
+    border: var(--role-yellow-border)
+  - orgSlug: atlant-3d
+    name: Q&A manager
+    slug: qamanager
+    color: var(--role-pink-bg)
+    border: var(--role-pink-border)
+workflow:
+  description: Shipment intake, inspection, and approval with traceable checkpoints.
+  name: Demo LOOPS
+  steps:
+    - id: "1"
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          inputKey: Waste document that provides information on the waste (e.g. batch IDs,
+            device type/model, quantities, weight, time of collection, waste
+            code).
+          inputType: formata
+          order: 1
+          roles:
+            - chemicalanalyst
+            - machineoperator
+          schema:
+            type: object
+            properties:
+              Group title:
+                type: object
+                properties:
+                  Batch IDs:
+                    type: string
+                    title: Batch IDs
+                  Device model/type:
+                    type: string
+                    title: Device model/type
+                  Quantities:
+                    type: string
+                    title: Quantities
+                  Date of collection:
+                    type: string
+                    title: Date of collection
+                  Waste code:
+                    type: string
+                    title: Waste code
+                  Weight:
+                    type: number
+                    title: Weight
+                    description: (tons)
+                required:
+                  - Batch IDs
+                  - Device model/type
+                  - Quantities
+                  - Date of collection
+                  - Waste code
+                  - Weight
+                title: Group title
+              Waste information record:
+                title: Waste information record
+              "Waste information record ":
+                type: string
+                title: "Waste information record "
+            required:
+              - Group title
+              - Waste information record
+              - "Waste information record "
+            title: Waste information
+          title: Waste information record
+          uiSchema:
+            Group title:
+              Date of collection:
+                ui:components:
+                  textWidget: datePickerWidget
+            Waste information record:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Collection and dismantling of galllium waste
+    - id: "2"
+      order: 2
+      organization: due2lab
+      substeps:
+        - id: "2.1"
+          inputKey: Report containing all test results in terms of Gallium content and
+            presence of other valuable chemical elements
+          inputType: formata
+          order: 1
+          roles:
+            - analyst
+          schema:
+            properties:
+              Additional analysis information:
+                title: Additional analysis information
+                type: string
+              Analysis report (pdf):
+                title: Analysis report (pdf)
+            required:
+              - Analysis report (pdf)
+            title: Form title
+            type: object
+          title: Gallium waste analysis results
+          uiSchema:
+            Analysis report (pdf):
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Quantification of indium content in waste sample
+    - id: "3"
+      order: 3
+      organization: critical
+      substeps:
+        - id: "3.1"
+          inputKey: Consolidated analysis report on gallium recovery outcomes.
+          inputType: formata
+          order: 1
+          roles:
+            - projectmanager
+          schema:
+            properties:
+              Recovery information:
+                title: Recovery information
+                type: string
+              Recovery report:
+                title: Recovery report
+            required:
+              - Recovery report
+              - Recovery information
+            title: Form title
+            type: object
+          title: Gallium recovery results report
+          uiSchema:
+            Recovery information:
+              ui:components:
+                textWidget: textareaWidget
+            Recovery report:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "3.2"
+          inputKey: A report that provides basic information, e.g., steps followed,
+            success or failure of each step, potential advantages and
+            disadvantages, images, etc.
+          inputType: formata
+          order: 2
+          roles:
+            - projectmanager
+          schema:
+            properties:
+              " ":
+                items:
+                  title: Process A
+                  type: string
+                title: " "
+                type: array
+              Process supplementary files:
+                items:
+                  title: Process file
+                title: Process supplementary files
+                type: array
+            required:
+              - Process supplementary files
+            title: Process supplementary details
+            type: object
+          title: Process information and images
+          uiSchema:
+            Process supplementary files:
+              items:
+                ui:components:
+                  unknownField: unknownNativeFileField
+      title: Gallium recovery and refinement
+    - id: "4"
+      order: 4
+      organization: dockweiler
+      substeps:
+        - id: "4.1"
+          inputKey: Document outlining canister preparation and usage
+          inputType: formata
+          order: 1
+          roles:
+            - headofrd
+            - tbsoperator
+          schema:
+            properties:
+              Transfiling document:
+                title: Transfiling document
+            title: Form title
+            type: object
+          title: Transfilling document
+          uiSchema:
+            Transfiling document:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "4.2"
+          inputKey: Information on safe handling, hazards, and regulatory compliance of
+            TMGa
+          inputType: formata
+          order: 2
+          roles:
+            - headofshipping
+          schema:
+            properties:
+              Safety data sheet:
+                title: Safety data sheet
+            title: Form title
+            type: object
+          title: Safety Data Sheet
+          uiSchema:
+            Safety data sheet:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "4.3"
+          inputKey: Document that verifies TMGa quality/purity, composition, and
+            compliance. It may also contain other relevant info such as batch
+            ID, safety info, etc
+          inputType: formata
+          order: 3
+          roles:
+            - headofquality
+          schema:
+            properties:
+              Additional process information:
+                title: Additional process information
+                type: string
+              Certificate of Analysis:
+                title: Certificate of Analysis
+            required:
+              - Certificate of Analysis
+              - Additional process information
+            title: Form title
+            type: object
+          title: Certificate of Analysis
+          uiSchema:
+            Certificate of Analysis:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: TMGa production
+    - id: "5"
+      order: 5
+      organization: ifw
+      substeps:
+        - id: "5.1"
+          inputKey: Detailed record of synthesis conditions, including solvents,
+            temperatures, parameters and ligand information
+          inputType: formata
+          order: 1
+          roles:
+            - analyticalchemist
+          schema:
+            properties:
+              Supplementatry process informationString field:
+                title: Supplementatry process informationString field
+                type: string
+            required:
+              - Supplementatry process informationString field
+            title: Form title
+            type: object
+          title: Precursor synthesis conditions report
+        - id: "5.2"
+          inputKey: Results of precursor initial screening and testing (e.g. thin-film
+            processing and characterization)
+          inputType: formata
+          order: 2
+          roles:
+            - chemicalprocesstechnologist
+          schema:
+            properties:
+              Testing report:
+                title: Testing report
+            title: Form title
+            type: object
+          title: Precursor testing report
+          uiSchema:
+            Testing report:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "5.3"
+          inputKey: Document that summarizes the properties and specifications of the
+            synthesized compound
+          inputType: formata
+          order: 3
+          roles:
+            - projectmanager
+          schema:
+            properties:
+              Precursor additional information:
+                title: Precursor additional information
+                type: string
+              Precursor data sheet:
+                title: Precursor data sheet
+            required:
+              - Precursor data sheet
+              - Precursor additional information
+            title: Form title
+            type: object
+          title: Advanced indium precursor data sheet
+          uiSchema:
+            Precursor data sheet:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Advanced In precursor production
+    - id: "6"
+      order: 6
+      organization: atlant-3d
+      substeps:
+        - id: "6.1"
+          inputKey: ""
+          inputType: formata
+          order: 1
+          roles:
+            - chipdesigner
+          schema:
+            properties:
+              Device design files:
+                title: Device design files
+                type: string
+              Device design information:
+                title: Device design information
+                type: string
+            title: Form title
+            type: object
+          title: Device design
+        - id: "6.2"
+          inputKey: ""
+          inputType: formata
+          order: 2
+          roles:
+            - materialscientist
+          schema:
+            properties:
+              Process information:
+                title: Process information
+                type: string
+            title: Form title
+            type: object
+          title: "Process information "
+        - id: "6.3"
+          inputKey: ""
+          inputType: formata
+          order: 3
+          roles:
+            - qamanager
+          schema:
+            properties:
+              Final product characterization report:
+                title: Final product characterization report
+              Final product information:
+                title: Final product information
+                type: string
+            required:
+              - Final product characterization report
+              - Final product information
+            title: Form title
+            type: object
+          title: Quality and characterization report
+          uiSchema:
+            Final product characterization report:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: "Electronic device created using DALP "

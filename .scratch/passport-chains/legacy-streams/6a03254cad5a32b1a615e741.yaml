@@ -1,0 +1,713 @@
+dpp:
+  enabled: false
+  gtin: ""
+  lotDefault: ""
+  lotInputKey: ""
+  ownerName: Attesta Demo Operator
+  productDescription: Administrative registration, certificate onboarding,
+    notification, and trusted-list publication for PID and attestation
+    providers.
+  productName: PID/EAA provider onboarding
+  serialInputKey: ""
+  serialStrategy: ""
+organizations:
+  - slug: pid-eaa-provider
+    name: PID/EAA Provider
+  - slug: provider-registration-authority
+    name: Provider Registration Authority
+  - slug: access-certificate-authority
+    name: Access Certificate Authority
+  - slug: provider-registration-certificates
+    name: Provider Registration Certificates
+  - slug: trusted-list-provider
+    name: Trusted List Provider
+roles:
+  - orgSlug: pid-eaa-provider
+    name: Provider applicant
+    slug: providerapplicant
+    palette: purple
+  - orgSlug: provider-registration-authority
+    name: Registrar officer
+    slug: registrarofficer
+    palette: cyan
+  - orgSlug: access-certificate-authority
+    name: Access CA officer
+    slug: accesscaofficer
+    palette: orange
+  - orgSlug: provider-registration-certificates
+    name: Registration certificate officer
+    slug: registrationcertificateofficer
+    palette: pink
+  - orgSlug: trusted-list-provider
+    name: Trusted List operator
+    slug: trustedlistoperator
+    palette: green
+workflow:
+  description: Administrative registration, certificate onboarding, notification,
+    and trusted-list publication for PID and attestation providers.
+  name: PID/EAA provider onboarding
+  steps:
+    - id: "1"
+      order: 1
+      organization: pid-eaa-provider
+      substeps:
+        - id: "1.1"
+          inputKey: registrationApplication
+          inputType: formata
+          order: 1
+          roles:
+            - providerapplicant
+          schema:
+            properties:
+              contactEmail:
+                title: Contact email
+                type: string
+              entitlementEvidence:
+                title: Qualification or public-sector evidence
+              intendedUse:
+                title: Intended use of wallet data
+                type: string
+              memberState:
+                title: Member State
+                type: string
+              officialIdentifiers:
+                title: Official identifiers
+                type: string
+              officialName:
+                title: Official provider name
+                type: string
+              providerTypes:
+                items:
+                  enum:
+                    - PID Provider
+                    - QEAA Provider
+                    - PuB-EAA Provider
+                    - Non-qualified EAA Provider
+                title: Provider type(s)
+                type: array
+                uniqueItems: true
+              serviceDescription:
+                title: Services provided
+                type: string
+              websiteUrl:
+                title: Provider URL
+                type: string
+            required:
+              - officialName
+              - officialIdentifiers
+              - memberState
+              - contactEmail
+              - providerTypes
+              - serviceDescription
+              - intendedUse
+            title: Registration application
+            type: object
+          title: Submit registration application
+          uiSchema:
+            entitlementEvidence:
+              ui:components:
+                unknownField: unknownNativeFileField
+            intendedUse:
+              ui:components:
+                textWidget: textareaWidget
+            providerTypes:
+              ui:components:
+                arrayField: multiEnumField
+            serviceDescription:
+              ui:components:
+                textWidget: textareaWidget
+      title: Provider registration submission
+    - id: "2"
+      order: 2
+      organization: provider-registration-authority
+      substeps:
+        - id: "2.1"
+          inputKey: registrationReview
+          inputType: formata
+          order: 1
+          roles:
+            - registrarofficer
+          schema:
+            properties:
+              completeness:
+                enum:
+                  - complete
+                  - clarification_needed
+                  - incomplete
+                title: Completeness check
+                type: string
+              entitlementCheck:
+                enum:
+                  - passed
+                  - failed
+                  - not_applicable
+                title: Provider entitlement check
+                type: string
+              identityCheck:
+                enum:
+                  - passed
+                  - failed
+                title: Identity and identifier check
+                type: string
+              reviewNotes:
+                title: Review notes
+                type: string
+              reviewOutcome:
+                enum:
+                  - recommend_acceptance
+                  - request_clarification
+                  - recommend_rejection
+                title: Review outcome
+                type: string
+            required:
+              - completeness
+              - identityCheck
+              - entitlementCheck
+              - reviewOutcome
+            title: Registration review
+            type: object
+          title: Review registration data
+          uiSchema:
+            completeness:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            entitlementCheck:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            identityCheck:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            reviewNotes:
+              ui:components:
+                textWidget: textareaWidget
+            reviewOutcome:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+        - id: "2.2"
+          inputKey: registrationDecision
+          inputType: formata
+          order: 2
+          roles:
+            - registrarofficer
+          schema:
+            properties:
+              decision:
+                enum:
+                  - accepted
+                  - rejected
+                title: Registration decision
+                type: string
+              decisionDate:
+                title: Decision date
+                type: string
+              decisionRecord:
+                title: Decision record
+              notificationSent:
+                enum:
+                  - yes
+                  - no
+                title: Provider notified
+                type: string
+              rejectionReason:
+                title: Rejection or restriction reason
+                type: string
+            required:
+              - decision
+              - decisionDate
+              - notificationSent
+            title: Registration decision
+            type: object
+          title: Confirm registration decision
+          uiSchema:
+            decision:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            decisionRecord:
+              ui:components:
+                unknownField: unknownNativeFileField
+            notificationSent:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            rejectionReason:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "2.3"
+          inputKey: registerPublication
+          inputType: formata
+          order: 3
+          roles:
+            - registrarofficer
+          schema:
+            properties:
+              apiUrl:
+                title: Machine-readable API URL
+                type: string
+              publishedAt:
+                title: Publication timestamp
+                type: string
+              registryEntryId:
+                title: Registry entry ID
+                type: string
+              registryUrl:
+                title: Human-readable register URL
+                type: string
+              signatureStatus:
+                enum:
+                  - signed
+                  - sealed
+                  - pending
+                title: Signed or sealed JSON status
+                type: string
+            required:
+              - registryEntryId
+              - registryUrl
+              - apiUrl
+              - signatureStatus
+            title: Register publication
+            type: object
+          title: Publish provider in register
+          uiSchema:
+            signatureStatus:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+      title: Registration review and publication
+    - id: "3"
+      order: 3
+      organization: pid-eaa-provider
+      substeps:
+        - id: "3.1"
+          inputKey: accessCertificateRequest
+          inputType: formata
+          order: 1
+          roles:
+            - providerapplicant
+          schema:
+            properties:
+              certificateProfile:
+                enum:
+                  - ETSI TS 119 411-8 Access Certificate
+                  - ETSI EN 319 412-6 PID/EAA Provider Certificate
+                title: Certificate profile
+                type: string
+              certificateSubject:
+                title: Subject distinguished name
+                type: string
+              csrFile:
+                title: CSR or technical request package
+              csrReference:
+                title: CSR reference or digest
+                type: string
+              requestedProviderTypes:
+                items:
+                  enum:
+                    - PID Provider
+                    - QEAA Provider
+                    - PuB-EAA Provider
+                    - Non-qualified EAA Provider
+                title: Provider type(s)
+                type: array
+                uniqueItems: true
+              subjectAltNames:
+                title: Subject alternative names
+                type: string
+            required:
+              - certificateSubject
+              - csrReference
+              - certificateProfile
+              - requestedProviderTypes
+            title: Access certificate request
+            type: object
+          title: Request access certificate
+          uiSchema:
+            certificateProfile:
+              ui:components:
+                stringField: enumField
+            csrFile:
+              ui:components:
+                unknownField: unknownNativeFileField
+            requestedProviderTypes:
+              ui:components:
+                arrayField: multiEnumField
+      title: Access certificate request
+    - id: "4"
+      order: 4
+      organization: access-certificate-authority
+      substeps:
+        - id: "4.1"
+          inputKey: accessCertificateReview
+          inputType: formata
+          order: 1
+          roles:
+            - accesscaofficer
+          schema:
+            properties:
+              policyValidation:
+                enum:
+                  - passed
+                  - failed
+                title: CP/CPS validation
+                type: string
+              registryMatch:
+                enum:
+                  - passed
+                  - failed
+                title: Register data matches request
+                type: string
+              reviewNotes:
+                title: Review notes
+                type: string
+              reviewOutcome:
+                enum:
+                  - approve
+                  - reject
+                  - request_changes
+                title: Review outcome
+                type: string
+              subjectValidation:
+                enum:
+                  - passed
+                  - failed
+                title: Subject and SAN validation
+                type: string
+            required:
+              - registryMatch
+              - subjectValidation
+              - policyValidation
+              - reviewOutcome
+            title: Access certificate review
+            type: object
+          title: Review access certificate request
+          uiSchema:
+            policyValidation:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            registryMatch:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            reviewNotes:
+              ui:components:
+                textWidget: textareaWidget
+            reviewOutcome:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            subjectValidation:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+        - id: "4.2"
+          inputKey: accessCertificateIssuance
+          inputType: formata
+          order: 2
+          roles:
+            - accesscaofficer
+          schema:
+            properties:
+              certificateFile:
+                title: Issued access certificate
+              certificateSerial:
+                title: Certificate serial
+                type: string
+              issuedAt:
+                title: Issued at
+                type: string
+              revocationEndpoint:
+                title: Revocation status endpoint
+                type: string
+              validUntil:
+                title: Valid until
+                type: string
+            required:
+              - certificateSerial
+              - issuedAt
+              - validUntil
+              - revocationEndpoint
+            title: Access certificate issuance
+            type: object
+          title: Issue access certificate
+          uiSchema:
+            certificateFile:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Access certificate review and issuance
+    - id: "5"
+      order: 5
+      organization: pid-eaa-provider
+      substeps:
+        - id: "5.1"
+          inputKey: registrationCertificateRequest
+          inputType: formata
+          order: 1
+          roles:
+            - providerapplicant
+          schema:
+            properties:
+              entitlements:
+                items:
+                  enum:
+                    - QEAA_Provider
+                    - PUB_EAA_Provider
+                    - Non_Q_EAA_Provider
+                    - PID_Provider
+                title: Entitlements
+                type: array
+                uniqueItems: true
+              legalName:
+                title: Legal name
+                type: string
+              providedAttestations:
+                title: Provided attestations and formats
+                type: string
+              registryUri:
+                title: Registry URI
+                type: string
+              requestPackage:
+                title: Registration certificate request package
+              statusEndpoint:
+                title: Status endpoint
+                type: string
+            required:
+              - legalName
+              - registryUri
+              - entitlements
+              - providedAttestations
+            title: Registration certificate request
+            type: object
+          title: Request registration certificate
+          uiSchema:
+            entitlements:
+              ui:components:
+                arrayField: multiEnumField
+            providedAttestations:
+              ui:components:
+                textWidget: textareaWidget
+            requestPackage:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Registration certificate request
+    - id: "6"
+      order: 6
+      organization: provider-registration-certificates
+      substeps:
+        - id: "6.1"
+          inputKey: registrationCertificateReview
+          inputType: formata
+          order: 1
+          roles:
+            - registrationcertificateofficer
+          schema:
+            properties:
+              entitlementVerified:
+                enum:
+                  - passed
+                  - failed
+                title: Entitlements verified
+                type: string
+              jwtPayloadVerified:
+                enum:
+                  - passed
+                  - failed
+                title: rc-wrp+jwt payload verified
+                type: string
+              registryDataVerified:
+                enum:
+                  - passed
+                  - failed
+                title: Registry data verified
+                type: string
+              reviewNotes:
+                title: Review notes
+                type: string
+              reviewOutcome:
+                enum:
+                  - approve
+                  - reject
+                  - request_changes
+                title: Review outcome
+                type: string
+            required:
+              - registryDataVerified
+              - entitlementVerified
+              - jwtPayloadVerified
+              - reviewOutcome
+            title: Registration certificate review
+            type: object
+          title: Review registration certificate request
+          uiSchema:
+            entitlementVerified:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            jwtPayloadVerified:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            registryDataVerified:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            reviewNotes:
+              ui:components:
+                textWidget: textareaWidget
+            reviewOutcome:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+        - id: "6.2"
+          inputKey: registrationCertificateIssuance
+          inputType: formata
+          order: 2
+          roles:
+            - registrationcertificateofficer
+          schema:
+            properties:
+              certificateId:
+                title: Registration certificate ID
+                type: string
+              issuedAt:
+                title: Issued at
+                type: string
+              jwtType:
+                enum:
+                  - rc-wrp+jwt
+                title: JWT type
+                type: string
+              registrationCertificate:
+                title: Issued registration certificate
+              statusEndpoint:
+                title: Status endpoint
+                type: string
+            required:
+              - certificateId
+              - jwtType
+              - issuedAt
+              - statusEndpoint
+            title: Registration certificate issuance
+            type: object
+          title: Issue registration certificate
+          uiSchema:
+            jwtType:
+              ui:components:
+                stringField: enumField
+            registrationCertificate:
+              ui:components:
+                unknownField: unknownNativeFileField
+      title: Registration certificate review and issuance
+    - id: "7"
+      order: 7
+      organization: trusted-list-provider
+      substeps:
+        - id: "7.1"
+          inputKey: mvpPlusNotification
+          inputType: formata
+          order: 1
+          roles:
+            - trustedlistoperator
+          schema:
+            properties:
+              entityType:
+                enum:
+                  - PID Provider
+                  - QEAA Provider
+                  - PuB-EAA Provider
+                  - Non-qualified EAA Provider
+                title: Entity type
+                type: string
+              notificationReference:
+                title: Notification reference
+                type: string
+              notificationScope:
+                enum:
+                  - MVP - not applicable
+                  - MVP+ - Commission notification
+                  - MVP+ - Member State notification
+                  - MVP+ - TL URL submission
+                title: Notification scope
+                type: string
+              notificationStatus:
+                enum:
+                  - not_applicable
+                  - submitted
+                  - acknowledged
+                  - rejected
+                title: Notification status
+                type: string
+            required:
+              - notificationScope
+              - entityType
+              - notificationStatus
+            title: Notification
+            type: object
+          title: Notify Commission or Member States
+          uiSchema:
+            entityType:
+              ui:components:
+                stringField: enumField
+            notificationScope:
+              ui:components:
+                stringField: enumField
+            notificationStatus:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+        - id: "7.2"
+          inputKey: trustedListPublication
+          inputType: formata
+          order: 2
+          roles:
+            - trustedlistoperator
+          schema:
+            properties:
+              publicationStatus:
+                enum:
+                  - published
+                  - pending
+                  - rejected
+                title: Publication status
+                type: string
+              publishedAt:
+                title: Published at
+                type: string
+              trustAnchorReference:
+                title: Trust anchor reference
+                type: string
+              trustedListType:
+                enum:
+                  - WEBUILD pilot TL
+                  - EU PID Provider TL
+                  - EU PuB-EAA Provider TL
+                  - Member State QTSP TL
+                  - National non-qualified EAA Provider TL
+                title: Trusted List type
+                type: string
+              trustedListUrl:
+                title: Trusted List URL
+                type: string
+            required:
+              - trustedListType
+              - trustAnchorReference
+              - publicationStatus
+              - publishedAt
+            title: Trusted List publication
+            type: object
+          title: Publish trust anchors in trusted list
+          uiSchema:
+            publicationStatus:
+              ui:components:
+                selectWidget: radioWidget
+                stringField: enumField
+            trustedListType:
+              ui:components:
+                stringField: enumField
+      title: Notification and Trusted List publication
+  categorySlug: workflow-and-operations
+  subCategorySlug: approval-workflow

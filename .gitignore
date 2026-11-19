@@ -54,5 +54,4 @@ coverage.out
 
 # Agent / local scratch (not product)
 tmp/
-.scratch/
 .cursor/sandbox.json

@@ -1,0 +1,1385 @@
+{
+  "environment": "production",
+  "database": "closer_demo",
+  "serverVersion": "7.0.48",
+  "exportedAt": "2026-11-19T09:25:08.511Z",
+  "counts": {
+    "streamDocuments": 23,
+    "streamsExported": 23,
+    "processesTotal": 55,
+    "processesWithDpp": 7
+  },
+  "streams": [
+    {
+      "id": "69b299c8077d885f85644b55",
+      "name": "Gallium shipment audit",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T13:49:26.614Z",
+        "updatedByUserMongoId": "000000000000000000000000",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 3523,
+      "yamlSha256": "e4666dc3e85769f5b175bf7eff3648e7bde1de2a8ba08cc357b28a82d13b70c7",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Shipment intake",
+          "order": 0,
+          "organization": "org1"
+        },
+        {
+          "id": "2",
+          "title": "Inspection",
+          "order": 1,
+          "organization": "org1"
+        },
+        {
+          "id": "3",
+          "title": "Approval",
+          "order": 3,
+          "organization": "org1"
+        }
+      ],
+      "organizationsDeclared": [
+        "org1"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "69b299c8077d885f85644b56",
+      "name": "Indium recycling audit",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste-indium",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:29:47.847Z",
+        "updatedByUserMongoId": "000000000000000000000000",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 14588,
+      "yamlSha256": "2d02a30c40b7a7131ee8ed5d59fcbf03c7d4b64b5685cd2433b1c7e45be3f0cb",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of indium waste",
+          "order": 1,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Indium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMIn production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        }
+      ],
+      "organizationsDeclared": [
+        "closing-the-loop",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 4,
+        "byStatus": {
+          "active": 4
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "69b299c8077d885f85644b57",
+      "name": "Gallium recycling notarization",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:31:20.671Z",
+        "updatedByUserMongoId": "000000000000000000000000",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 9912,
+      "yamlSha256": "0b701f8cd9d2aa9757e5367e51d6e877c28e44366fe3b75af5ba47c67d088840",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Incoming intake",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Refinement",
+          "order": 2,
+          "organization": "organization-2"
+        },
+        {
+          "id": "3",
+          "title": "QA + Notarize",
+          "order": 3,
+          "organization": "organization-3"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1",
+        "organization-2",
+        "organization-3"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 14,
+        "byStatus": {
+          "active": 9,
+          "done": 4,
+          "terminated": 1
+        },
+        "dpp": 5
+      }
+    },
+    {
+      "id": "69e886a89c9a659739b9f345",
+      "name": "Gallium circularity trace",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:32:29.044Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 29973,
+      "yamlSha256": "75dd3f08d1a8ad0ed305fbee1daeb4e72b336069bf70fe4aec0056c6b0524b40",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Foundry scrap collection and sorting",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "E-waste sample provision",
+          "order": 2,
+          "organization": "organization-2"
+        },
+        {
+          "id": "3",
+          "title": "Secondary semiconductor recovery",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "Refinement and chemical processing",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Production of GaAs secondary wafers",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Secondary Ga atomic deposition in MEMS",
+          "order": 6,
+          "organization": "closing-the-loop"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1",
+        "organization-2",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "closing-the-loop"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "69ee439a0b481595a079d022",
+      "name": "PV stream",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "photovoltaic-panels",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:33:08.745Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 6707,
+      "yamlSha256": "aab3cedcfa7a9155afd23d8e7c928d722c9fe99afa785aeba249e2d43b016c26",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection of PV modules",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Re-use and safety testing",
+          "order": 2,
+          "organization": "organization-1"
+        },
+        {
+          "id": "3",
+          "title": "Dismantling of PV modules",
+          "order": 3,
+          "organization": "organization-1"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 2,
+        "byStatus": {
+          "active": 1,
+          "done": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "69f85193ad5a32b1a615e6fd",
+      "name": "Indium stream",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste-indium",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:33:34.902Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 8041,
+      "yamlSha256": "9da2cf1bf97bd0c48022a42619a0e15b966b259c122efac47018b0b964acee74",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of indium waste",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "organization-1"
+        },
+        {
+          "id": "3",
+          "title": "Indium recovery and refinement",
+          "order": 3,
+          "organization": "organization-1"
+        },
+        {
+          "id": "4",
+          "title": "TMIn production",
+          "order": 4,
+          "organization": "organization-1"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "organization-1"
+        },
+        {
+          "id": "6",
+          "title": "DALP In deposition",
+          "order": 6,
+          "organization": "organization-1"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 7,
+        "byStatus": {
+          "active": 5,
+          "done": 2
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a02fa45ad5a32b1a615e73f",
+      "name": "Terminalista Arrivo da Nave",
+      "categorySlug": "compliance-and-quality",
+      "subCategorySlug": "inspection",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:59:47.735Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 2572,
+      "yamlSha256": "732d60e16d5739a2db7372d0ac771b883dc60a044fc29c366c27055f5ce78d28",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Bolla di arrivo",
+          "order": 1,
+          "organization": "organization-1"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a03254cad5a32b1a615e741",
+      "name": "PID/EAA provider onboarding",
+      "categorySlug": "workflow-and-operations",
+      "subCategorySlug": "approval-workflow",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:35:37.242Z",
+        "createdByUserId": "6a0322e2f3a7eed24d8a",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 22707,
+      "yamlSha256": "097f97d9daf83c16bf503cb6ba36e2a5ffc56c4d8d4e0c9b53e6f5f8ca765c1c",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Provider registration submission",
+          "order": 1,
+          "organization": "pid-eaa-provider"
+        },
+        {
+          "id": "2",
+          "title": "Registration review and publication",
+          "order": 2,
+          "organization": "provider-registration-authority"
+        },
+        {
+          "id": "3",
+          "title": "Access certificate request",
+          "order": 3,
+          "organization": "pid-eaa-provider"
+        },
+        {
+          "id": "4",
+          "title": "Access certificate review and issuance",
+          "order": 4,
+          "organization": "access-certificate-authority"
+        },
+        {
+          "id": "5",
+          "title": "Registration certificate request",
+          "order": 5,
+          "organization": "pid-eaa-provider"
+        },
+        {
+          "id": "6",
+          "title": "Registration certificate review and issuance",
+          "order": 6,
+          "organization": "provider-registration-certificates"
+        },
+        {
+          "id": "7",
+          "title": "Notification and Trusted List publication",
+          "order": 7,
+          "organization": "trusted-list-provider"
+        }
+      ],
+      "organizationsDeclared": [
+        "pid-eaa-provider",
+        "provider-registration-authority",
+        "access-certificate-authority",
+        "provider-registration-certificates",
+        "trusted-list-provider"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a046625ad5a32b1a615e74c",
+      "name": "PV stream (Out Of Use) v3",
+      "categorySlug": null,
+      "subCategorySlug": null,
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-05-13T11:53:09.691Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "69c67e06b3e8e4095839"
+      },
+      "yamlBytes": 7670,
+      "yamlSha256": "6875c51f685d956357983ee765d130de3f188cb3be2abdffe313dd53b2aee162",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection of PV modules",
+          "order": 1,
+          "organization": "out-of-use"
+        },
+        {
+          "id": "2",
+          "title": "Re-use and safety testing",
+          "order": 2,
+          "organization": "out-of-use"
+        },
+        {
+          "id": "3",
+          "title": "Dismantling of PV modules",
+          "order": 3,
+          "organization": "out-of-use"
+        }
+      ],
+      "organizationsDeclared": [
+        "out-of-use"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 3,
+        "byStatus": {
+          "active": 2,
+          "done": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a29581b6f12c95446e6c15b",
+      "name": "TEST CTL",
+      "categorySlug": null,
+      "subCategorySlug": null,
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-06-10T12:27:07.044Z",
+        "createdByUserId": "69faf8b5d4c4e858b1b8",
+        "updatedByUserId": "69faf8b5d4c4e858b1b8"
+      },
+      "yamlBytes": 2479,
+      "yamlSha256": "64966c4820a62cf1a9a01cc577a4817b4a93101b6bdf83ad143db72926060c53",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection",
+          "order": 1,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "2",
+          "title": "Dismantling ",
+          "order": 2,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "3",
+          "title": "Shipment",
+          "order": 3,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "4",
+          "title": "Recycling",
+          "order": 4,
+          "organization": "closing-the-loop"
+        }
+      ],
+      "organizationsDeclared": [
+        "closing-the-loop"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a2ab9bb6f12c95446e6c161",
+      "name": "Indium stream v2",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste-indium",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:34:47.771Z",
+        "createdByUserId": "69de0c2f7b4f773f69f2",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 15940,
+      "yamlSha256": "196b88647ee692173473da7d790fd0922be6c18ee9f68aae89e8542870a99504",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of indium waste",
+          "order": 1,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Indium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMIn production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Electronic device created using DALP ",
+          "order": 6,
+          "organization": "atlant-3d"
+        }
+      ],
+      "organizationsDeclared": [
+        "closing-the-loop",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "atlant-3d"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 3,
+        "byStatus": {
+          "active": 2,
+          "done": 1
+        },
+        "dpp": 1
+      }
+    },
+    {
+      "id": "6a2abda46f12c95446e6c164",
+      "name": "Gallium stream v2",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-07T14:10:26.166Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 13842,
+      "yamlSha256": "af45cd71abf6aeb052781674e3c6ac44eb8fbd5855c004fe1ff4ada996b42171",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of galllium waste",
+          "order": 1,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Gallium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMGa production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Electronic device created using DALP ",
+          "order": 6,
+          "organization": "atlant-3d"
+        }
+      ],
+      "organizationsDeclared": [
+        "closing-the-loop",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "atlant-3d"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a2bf7f36f12c95446e6c174",
+      "name": "Indium stream v2",
+      "categorySlug": null,
+      "subCategorySlug": null,
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-06-12T12:13:39.577Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "69c67e06b3e8e4095839"
+      },
+      "yamlBytes": 17676,
+      "yamlSha256": "87c9b78799c7b6a5a88a672135cda974aeb7b9aef5025e2a52e34e743c0a931c",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of indium waste",
+          "order": 1,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Indium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMIn production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Electronic device created using DALP ",
+          "order": 6,
+          "organization": "atlant-3d"
+        },
+        {
+          "id": "7",
+          "title": "Transport to warehouse",
+          "order": 7,
+          "organization": "critical"
+        }
+      ],
+      "organizationsDeclared": [
+        "closing-the-loop",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "atlant-3d"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a329c87fe7f8941cf040ae5",
+      "name": "PV stream (Out Of Use) v3 test",
+      "categorySlug": null,
+      "subCategorySlug": null,
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-06-17T13:11:16.842Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "69c67e06b3e8e4095839"
+      },
+      "yamlBytes": 7040,
+      "yamlSha256": "9740c9073f183775963d4acc6e2d51539cc576b4e5d1c569b82c26baa72b9855",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection of PV modules",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Re-use and safety testing",
+          "order": 2,
+          "organization": "organization-1"
+        },
+        {
+          "id": "3",
+          "title": "Dismantling of PV modules",
+          "order": 3,
+          "organization": "organization-1"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 3,
+        "byStatus": {
+          "active": 2,
+          "done": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a422714887c4ed15fd6f630",
+      "name": "PV stream (Out Of Use) v4",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "photovoltaic-panels",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-10T15:34:07.090Z",
+        "createdByUserId": "69ef220bae4899299c15",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 7364,
+      "yamlSha256": "8b4f67390610c5b2e9f9bde861b4ce1ecd5d0c5d44d98a70df97c9fad39b9355",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection of PV modules",
+          "order": 1,
+          "organization": "out-of-use"
+        },
+        {
+          "id": "2",
+          "title": "Re-use and safety testing",
+          "order": 2,
+          "organization": "out-of-use"
+        },
+        {
+          "id": "3",
+          "title": "Dismantling of PV modules",
+          "order": 3,
+          "organization": "out-of-use"
+        }
+      ],
+      "organizationsDeclared": [
+        "out-of-use"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 2,
+        "byStatus": {
+          "active": 1,
+          "done": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a4ba9d3887c4ed15fd6f6db",
+      "name": "Demo LOOPS",
+      "categorySlug": null,
+      "subCategorySlug": null,
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-07-06T13:12:51.318Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "69c67e06b3e8e4095839"
+      },
+      "yamlBytes": 14008,
+      "yamlSha256": "96c7f8e17bfdc05acb1b0b5716963ffcd7e4be9dccd29ddf961896290b6d54c0",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of galllium waste",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Gallium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMGa production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Electronic device created using DALP ",
+          "order": 6,
+          "organization": "atlant-3d"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "atlant-3d"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 2,
+        "byStatus": {
+          "active": 2
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a6cbab43c9e9e30c4bcc190",
+      "name": "PV stream (Out Of Use) v4",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "photovoltaic-panels",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-07-31T15:09:40.855Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 7364,
+      "yamlSha256": "8b4f67390610c5b2e9f9bde861b4ce1ecd5d0c5d44d98a70df97c9fad39b9355",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection of PV modules",
+          "order": 1,
+          "organization": "out-of-use"
+        },
+        {
+          "id": "2",
+          "title": "Re-use and safety testing",
+          "order": 2,
+          "organization": "out-of-use"
+        },
+        {
+          "id": "3",
+          "title": "Dismantling of PV modules",
+          "order": 3,
+          "organization": "out-of-use"
+        }
+      ],
+      "organizationsDeclared": [
+        "out-of-use"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a6cbba63c9e9e30c4bcc192",
+      "name": "Gallium circularity trace",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-07-31T15:13:42.040Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 29973,
+      "yamlSha256": "75dd3f08d1a8ad0ed305fbee1daeb4e72b336069bf70fe4aec0056c6b0524b40",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Foundry scrap collection and sorting",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "E-waste sample provision",
+          "order": 2,
+          "organization": "organization-2"
+        },
+        {
+          "id": "3",
+          "title": "Secondary semiconductor recovery",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "Refinement and chemical processing",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Production of GaAs secondary wafers",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Secondary Ga atomic deposition in MEMS",
+          "order": 6,
+          "organization": "closing-the-loop"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1",
+        "organization-2",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "closing-the-loop"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a6cbcb73c9e9e30c4bcc194",
+      "name": "Indium recycling audit",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste-indium",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-07-31T15:18:15.228Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 14588,
+      "yamlSha256": "2d02a30c40b7a7131ee8ed5d59fcbf03c7d4b64b5685cd2433b1c7e45be3f0cb",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of indium waste",
+          "order": 1,
+          "organization": "closing-the-loop"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Indium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMIn production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        }
+      ],
+      "organizationsDeclared": [
+        "closing-the-loop",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6a6cbd573c9e9e30c4bcc195",
+      "name": "Gallium from e-waste, DALP 3D printing ",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "e-waste",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-07-31T15:20:55.639Z",
+        "createdByUserId": "platform-admin:admin@example.org",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 13404,
+      "yamlSha256": "a82def3fe72b742d607abd58c2a1d7636f0790fbcbdc6362a6d9018327d2067e",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection and dismantling of galllium waste",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Quantification of indium content in waste sample",
+          "order": 2,
+          "organization": "due2lab"
+        },
+        {
+          "id": "3",
+          "title": "Gallium recovery and refinement",
+          "order": 3,
+          "organization": "critical"
+        },
+        {
+          "id": "4",
+          "title": "TMGa production",
+          "order": 4,
+          "organization": "dockweiler"
+        },
+        {
+          "id": "5",
+          "title": "Advanced In precursor production",
+          "order": 5,
+          "organization": "ifw"
+        },
+        {
+          "id": "6",
+          "title": "Electronic device created using DALP ",
+          "order": 6,
+          "organization": "atlant-3d"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1",
+        "due2lab",
+        "critical",
+        "dockweiler",
+        "ifw",
+        "atlant-3d"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6aad13650e66a0e43cf27c8f",
+      "name": "RAAE temp",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "photovoltaic-panels",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-18T10:33:09.593Z",
+        "createdByUserId": "69c67e06b3e8e4095839",
+        "updatedByUserId": "69c67e06b3e8e4095839"
+      },
+      "yamlBytes": 5757,
+      "yamlSha256": "8c46b133689b5908d7c8a8a3718135a54331328c2dcc67a9f8c1f14bb0754665",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Collection of PV modules",
+          "order": 1,
+          "organization": "organization-1"
+        },
+        {
+          "id": "2",
+          "title": "Re-use and safety testing",
+          "order": 2,
+          "organization": "organization-1"
+        },
+        {
+          "id": "3",
+          "title": "Dismantling of PV modules",
+          "order": 3,
+          "organization": "organization-1"
+        }
+      ],
+      "organizationsDeclared": [
+        "organization-1"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 0,
+        "byStatus": {},
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6ab12febae92a46e52014216",
+      "name": "Ecosistem - Trattamento RAEE gate-to-gate v0.2",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "power-electronics",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-09-21T13:23:55.917Z",
+        "createdByUserId": "6aad19ef89db7587e174",
+        "updatedByUserId": "6aad19ef89db7587e174"
+      },
+      "yamlBytes": 38365,
+      "yamlSha256": "e3832c78e419b655c2f471ac99e3938f8201ce79d3d77f880f199ad2e1db875c",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Gate-in e accettazione del carico",
+          "order": 1,
+          "organization": "ecosistem"
+        },
+        {
+          "id": "2",
+          "title": "Smistamento e classificazione RAEE",
+          "order": 2,
+          "organization": "ecosistem"
+        },
+        {
+          "id": "3",
+          "title": "Trattamento RAEE",
+          "order": 3,
+          "organization": "ecosistem"
+        },
+        {
+          "id": "4",
+          "title": "Creazione e classificazione degli output",
+          "order": 4,
+          "organization": "ecosistem"
+        },
+        {
+          "id": "5",
+          "title": "Rilascio ambientale e conformita degli output",
+          "order": 5,
+          "organization": "ecosistem"
+        },
+        {
+          "id": "6",
+          "title": "Gate-out e chiusura della campagna",
+          "order": 6,
+          "organization": "ecosistem"
+        }
+      ],
+      "organizationsDeclared": [
+        "ecosistem"
+      ],
+      "dppEnabled": false,
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "id": "6acd01f61102c6b04c6d018a",
+      "name": "Feragame PVP - v0.2",
+      "categorySlug": "recycling-and-recovery",
+      "subCategorySlug": "photovoltaic-panels",
+      "origin": "hand-authored",
+      "fields": {
+        "updatedAt": "2026-10-12T15:53:55.807Z",
+        "createdByUserId": "6ac7675f1b46118a3b56",
+        "updatedByUserId": "platform-admin:admin@example.org"
+      },
+      "yamlBytes": 51880,
+      "yamlSha256": "3035de4f37923d42420a04e6e843bd666230fbd1074c32584d029108b28dcae6",
+      "steps": [
+        {
+          "id": "1",
+          "title": "Ricezione e identificazione del carico",
+          "order": 1,
+          "organization": "feragame"
+        },
+        {
+          "id": "2",
+          "title": "Pesata e identificazione dei bancali",
+          "order": 2,
+          "organization": "feragame"
+        },
+        {
+          "id": "3",
+          "title": "Apertura della campagna di lavorazione",
+          "order": 3,
+          "organization": "feragame"
+        },
+        {
+          "id": "4",
+          "title": "Registrazione operativa della lavorazione",
+          "order": 4,
+          "organization": "feragame"
+        },
+        {
+          "id": "5",
+          "title": "Allocazione delle frazioni nelle UDC",
+          "order": 5,
+          "organization": "feragame"
+        },
+        {
+          "id": "6",
+          "title": "Qualificazione e rilascio degli output",
+          "order": 6,
+          "organization": "feragame"
+        },
+        {
+          "id": "7",
+          "title": "Bilancio di massa e resa prodotto",
+          "order": 7,
+          "organization": "feragame"
+        },
+        {
+          "id": "8",
+          "title": "Candidati DPP e chiusura della campagna",
+          "order": 8,
+          "organization": "feragame"
+        }
+      ],
+      "organizationsDeclared": [
+        "feragame"
+      ],
+      "dppEnabled": true,
+      "instances": {
+        "total": 3,
+        "byStatus": {
+          "active": 3
+        },
+        "dpp": 0
+      }
+    }
+  ],
+  "orphanProcessGroups": [
+    {
+      "workflowKey": "69bbd2a3077d885f85644b6e",
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "workflowKey": "69bbd6cf077d885f85644b72",
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "done": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "workflowKey": "69ca7f678eba39cf0157d22a",
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "active": 1
+        },
+        "dpp": 0
+      }
+    },
+    {
+      "workflowKey": "stream",
+      "instances": {
+        "total": 1,
+        "byStatus": {
+          "done": 1
+        },
+        "dpp": 1
+      }
+    },
+    {
+      "workflowKey": "workflow",
+      "instances": {
+        "total": 3,
+        "byStatus": {
+          "active": 3
+        },
+        "dpp": 0
+      }
+    }
+  ]
+}
