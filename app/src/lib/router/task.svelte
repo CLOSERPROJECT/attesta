@@ -3,6 +3,12 @@
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 
 	import type { CommitOutcome } from '../org/commit-port.js';
+	import {
+		applyCommitFollowThrough,
+		applyContinueFollowThrough,
+		decideCommitFollowThrough,
+		decideContinueFollowThrough
+	} from '../org/commit-follow-through.js';
 	import TaskForm from '../org/task-form.svelte';
 	import { orgSession } from '../org/org-app.svelte.js';
 	import { orgRouteCoordsFromPath } from '../org/nav-place.js';
@@ -11,7 +17,6 @@
 		taskAddressKey
 	} from '../org/task-address.js';
 	import { taskFormMount } from '../org/task-form-mount.svelte.js';
-	import { resolveCommitFollowUp, resolveContinueNavigation } from '../org/worklist-nav.js';
 	import { route } from './index.js';
 	import { navigateOrgTarget } from './navigate-target.js';
 
@@ -31,56 +36,47 @@
 	/** Route key that owns the active stay; null during Commit→onCommitted race. */
 	let stayRouteKey = $state.raw<string | null>(null);
 
-	function endLinksStay() {
-		orgSession.clearLinksStay();
+	function clearStayUi() {
 		stayedOutcome = null;
 		stayRouteKey = null;
 	}
 
 	function onCommitted(outcome: CommitOutcome) {
-		const followUp = resolveCommitFollowUp(
-			outcome.navigation,
-			jobId,
-			outcome.jobInstanceId,
-			outcome.nextTaskFormBundle
-		);
-		if (followUp.kind === 'stay') {
+		const decision = decideCommitFollowThrough(outcome, addr);
+		if (decision.kind === 'stay') {
 			stayedOutcome = outcome;
 			stayRouteKey = routeKey;
 			return;
 		}
-		// Drop Commit links before navigate so the next TaskForm does not inherit them.
-		orgSession.clearLinksStay();
-		stayedOutcome = null;
-		stayRouteKey = null;
-		navigateOrgTarget(followUp);
+		clearStayUi();
+		applyCommitFollowThrough(decision, {
+			clearLinksStay: () => orgSession.clearLinksStay(),
+			navigate: navigateOrgTarget
+		});
 	}
 
 	async function onContinue() {
 		const outcome = stayedOutcome;
 		if (!outcome) return;
-		const target = resolveContinueNavigation(
-			outcome.continueNavigation,
-			jobId,
-			outcome.jobInstanceId,
-			outcome.nextTaskFormBundle
+		const decision = decideContinueFollowThrough(outcome, addr);
+		clearStayUi();
+		await applyContinueFollowThrough(
+			decision,
+			{
+				clearLinksStay: () => orgSession.clearLinksStay(),
+				navigate: navigateOrgTarget,
+				reload: (worklist) => taskFormMount.reload(worklist)
+			},
+			orgSession.result?.worklist
 		);
-		endLinksStay();
-		const sameTaskAddress =
-			target.kind === 'task' &&
-			taskAddressKey(normalizeTaskAddress(target)) === routeKey;
-		if (sameTaskAddress) {
-			await taskFormMount.reload(orgSession.result?.worklist);
-			return;
-		}
-		navigateOrgTarget(target);
 	}
 
 	// Clear stay if the route changes while stay was still active (e.g. sidebar nav).
 	$effect(() => {
 		const key = routeKey;
 		if (stayRouteKey !== null && stayRouteKey !== key) {
-			endLinksStay();
+			orgSession.clearLinksStay();
+			clearStayUi();
 		}
 	});
 </script>
