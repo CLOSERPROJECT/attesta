@@ -15,7 +15,8 @@ const homeLoad = {
 		jobs: [
 			{
 				jobId: 'intake',
-				canStart: true,
+				// Instance-scoped wire suppresses anchor canStart (#361).
+				canStart: false,
 				repeatable: true,
 				title: 'Ingresso',
 				startLabel: 'Nuovo camion',
@@ -34,6 +35,16 @@ const homeLoad = {
 						}
 					}
 				]
+			},
+			{
+				jobId: 'lot_processing',
+				canStart: true,
+				repeatable: true,
+				title: 'Lavorazione',
+				startLabel: 'Apri lotto',
+				taskIds: ['startLot'],
+				tasks: [{ id: 'startLot', title: 'Apri lotto', roles: ['logistic'] }],
+				instances: []
 			}
 		]
 	},
@@ -78,24 +89,33 @@ async function stubOrgApis(page: Page) {
 	});
 	await page.route('**/api/org/task-form**', async (route) => {
 		const url = new URL(route.request().url());
+		const jobId = url.searchParams.get('jobId') ?? 'intake';
 		const taskId = url.searchParams.get('taskId') ?? 'register';
 		const jobInstanceId = url.searchParams.get('jobInstanceId') ?? '';
 		const provisional = jobInstanceId === '' || jobInstanceId === 'new';
 		const rolesOk =
 			taskId === 'register' ||
+			taskId === 'startLot' ||
 			(taskId === 'palletWeight' && homeLoad.roles.includes('logistic'));
 		if (!provisional && !rolesOk && taskId === 'palletWeight') {
 			await route.fulfill({ status: 403, body: 'forbidden' });
 			return;
 		}
+		const title =
+			taskId === 'register'
+				? 'Registrazione'
+				: taskId === 'startLot'
+					? 'Apri lotto'
+					: taskId;
 		await route.fulfill({
 			status: 200,
 			contentType: 'application/json',
 			body: JSON.stringify({
 				...registerBundle,
+				jobId,
 				taskId,
 				jobInstanceId: provisional ? '' : jobInstanceId,
-				title: taskId === 'register' ? 'Registrazione' : taskId
+				title
 			})
 		});
 	});
@@ -124,19 +144,21 @@ test('instance home renders act-now Worklist + chrome (Italian default)', async 
 	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
 	await expect(page.getByTestId('available-row')).toBeVisible();
 	await expect(page.getByTestId('can-start-row')).toBeVisible();
+	await expect(page.getByTestId('can-start-row')).toContainText('Apri lotto');
+	await expect(page.getByTestId('can-start-row')).not.toContainText('Nuovo camion');
 	const localeCookie = (await page.context().cookies()).find(
 		(c) => c.name === 'PARAGLIDE_LOCALE'
 	);
 	expect(localeCookie?.value ?? 'it').toBe('it');
 });
 
-test('Home → Can start → nav-back → Home', async ({ page }) => {
+test('Home → Can start (each Job) → nav-back → Home', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(homePath);
 	await expect(page.getByTestId('worklist-act-now')).toBeVisible();
 	await page.getByTestId('can-start-row').click();
 	await expect(page.getByTestId('task-route')).toBeVisible();
-	await expect(page.getByTestId('task-register')).toBeVisible();
+	await expect(page.getByTestId('task-startLot')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
 	await expect(page.getByTestId('org-shell')).toBeVisible();

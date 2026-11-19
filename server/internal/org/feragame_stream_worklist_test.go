@@ -64,3 +64,48 @@ func TestFeragameProjectWorklistTwoTrucksIsolateLots(t *testing.T) {
 		t.Fatalf("truck B intake = %#v", intakeB.Instances)
 	}
 }
+
+// Instance-scoped Worklist must not offer the stream anchor Job's canStart
+// (sibling truck); non-anchor each Jobs still follow truck-scoped startsWhen.
+func TestFeragameProjectWorklistSuppressesAnchorCanStartOnInstance(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := FixtureAllRolesOp()
+
+	domain := EmptyDomain()
+	domain.Entities = map[string]EntityMap{
+		"truck": {
+			"T-A": {"truckWeight": 1000.0},
+		},
+		"lot": {
+			"L-A1": {"truckId": "T-A", "status": "registered", "client": "A"},
+		},
+	}
+	domain.JobInstances = []JobInstance{
+		{JobID: "intake", ID: "T-A", Label: "T-A"},
+	}
+
+	wl := ProjectWorklist(cfg, domain, op, "T-A")
+	intake := worklistMustJob(t, wl, "intake")
+	if intake.CanStart {
+		t.Fatal("instance-scoped intake canStart want false (anchor starts sibling)")
+	}
+	lp := worklistMustJob(t, wl, "lot_processing")
+	if !lp.CanStart {
+		t.Fatal("lot_processing canStart want true (eligible lot on this truck)")
+	}
+
+	all := ProjectWorklistAll(cfg, domain, op)
+	intakeAll := worklistMustJob(t, all, "intake")
+	if !intakeAll.CanStart {
+		t.Fatal("unfiltered intake canStart want true (Play / plant-wide)")
+	}
+
+	emptyWL := ProjectWorklistAll(cfg, EmptyDomain(), op)
+	emptyIntake := worklistMustJob(t, emptyWL, "intake")
+	if !emptyIntake.CanStart {
+		t.Fatal("empty-domain unfiltered intake canStart want true")
+	}
+}

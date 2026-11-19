@@ -110,6 +110,12 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 	if canStart && (len(chrome) == 0 || !rolesIntersect(op.Roles, chrome[0].Roles)) {
 		canStart = false
 	}
+	// Instance-scoped Worklist: anchor canStart would open a sibling stream
+	// instance; Play owns that affordance (ADR-0014 / #361).
+	if canStart && filterMembers && stream != nil && stream.ID != "" &&
+		cfg.Stream != nil && jobID == cfg.Stream.Instance.Job {
+		canStart = false
+	}
 
 	instances := make([]WorklistInstance, 0)
 	for _, inst := range domain.JobInstances {
