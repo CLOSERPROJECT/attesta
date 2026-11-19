@@ -44,6 +44,30 @@ func TestResolveStreamInstanceID(t *testing.T) {
 	}
 }
 
+func TestEffectiveStreamInstanceID(t *testing.T) {
+	cfg := validStreamCfg()
+	domain := EmptyDomain()
+	domain.Entities = map[string]EntityMap{
+		"lot": {"L-A1": {"truckId": "T-A"}},
+	}
+	domain.JobInstances = []JobInstance{
+		{JobID: "intake", ID: "T-A", Label: "T-A"},
+		{JobID: "lot_processing", ID: "L-A1", Label: "L-A1"},
+	}
+	if got := EffectiveStreamInstanceID(cfg, domain, "lot_processing", "L-A1", "ignored"); got != "T-A" {
+		t.Fatalf("resolved wins = %q, want T-A", got)
+	}
+	if got := EffectiveStreamInstanceID(cfg, domain, "lot_processing", "", "T-A"); got != "T-A" {
+		t.Fatalf("provisional fallback = %q, want T-A", got)
+	}
+	if got := EffectiveStreamInstanceID(cfg, domain, "lot_processing", "", "  T-A  "); got != "T-A" {
+		t.Fatalf("trimmed fallback = %q, want T-A", got)
+	}
+	if got := EffectiveStreamInstanceID(cfg, domain, "lot_processing", "", ""); got != "" {
+		t.Fatalf("unbound = %q, want empty", got)
+	}
+}
+
 func TestResolveReadBindsStream(t *testing.T) {
 	domain := EmptyDomain()
 	domain.Entities = map[string]EntityMap{

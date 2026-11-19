@@ -154,9 +154,10 @@ func (l *DomainLoader) LoadTaskBundleForStreamInstance(
 		wl = ProjectWorklist(cfg, domain, op, streamInstanceID)
 	}
 	ref := ActionableTaskRef{
-		JobID:         jobID,
-		TaskID:        taskID,
-		JobInstanceID: jobInstanceID,
+		JobID:            jobID,
+		TaskID:           taskID,
+		JobInstanceID:    jobInstanceID,
+		StreamInstanceID: strings.TrimSpace(streamInstanceID),
 	}
 	if !ViewerMayMountTask(cfg, wl, ref) {
 		return nil, ErrTaskBundleForbidden

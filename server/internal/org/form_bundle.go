@@ -71,7 +71,8 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 		return nil, fmt.Errorf("org: empty task payload %s/%s", ref.JobID, ref.TaskID)
 	}
 
-	stream := streamBindingFrom(cfg, ResolveStreamInstanceID(cfg, domain, ref.JobID, ref.JobInstanceID))
+	streamID := EffectiveStreamInstanceID(cfg, domain, ref.JobID, ref.JobInstanceID, ref.StreamInstanceID)
+	stream := streamBindingFrom(cfg, streamID)
 	projected, err := projectTaskForm(domain, payload, ref.JobInstanceID, jobInstanceLabel(domain, ref.JobID, ref.JobInstanceID), cfg.Catalogs, stream)
 	if err != nil {
 		return nil, err
