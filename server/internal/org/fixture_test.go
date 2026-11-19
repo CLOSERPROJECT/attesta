@@ -231,6 +231,9 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !strings.Contains(startRW, `status = "open"`) || !strings.Contains(startRW, "fullyProcessed") {
 		t.Fatalf("startLot.readyWhen = %q, want one-open-lot exclusivity", startRW)
 	}
+	if !strings.Contains(startRW, "truckId = $stream.id") {
+		t.Fatalf("startLot.readyWhen = %q, want truckId = $stream.id (per-truck line-busy)", startRW)
+	}
 	startReads, _ := startLot["reads"].(map[string]any)
 	startLots, _ := startReads["lots"].(map[string]any)
 	startWhere, _ := startLots["where"].(string)

@@ -56,13 +56,14 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 
 func TestCommitStartLotLabelFromConfigExpr(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 	result, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "ada", Org: "feragame", Roles: []string{"logistic"},
 	}, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		t.Fatal(err)

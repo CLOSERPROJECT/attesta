@@ -371,8 +371,8 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 			}
 		}
 	}
-	if !intakeCanStart {
-		t.Fatal("intake canStart want true while prior truck incomplete (parallel trucks)")
+	if intakeCanStart {
+		t.Fatal("intake canStart want false on instance Load (Play owns Nuovo camion)")
 	}
 }
 

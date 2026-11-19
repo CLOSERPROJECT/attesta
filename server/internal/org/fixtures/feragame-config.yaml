@@ -384,14 +384,16 @@ steps:
         substeps:
             - id: startLot
               roles: [logistic]
+              # Demo drift (#365): one open lot per truck ($stream.id), not plant-wide.
+              # Revert: drop truckId = $stream.id filters; restore plant-wide open count.
               readyWhen: >-
                 (
-                  $count($domain.lot.*[status = "open"]) = 0
-                  and $count($domain.lot.*[$not(status = "fullyProcessed") and $not(status = "open")]) >= 1
+                  $count($domain.lot.*[truckId = $stream.id and status = "open"]) = 0
+                  and $count($domain.lot.*[truckId = $stream.id and $not(status = "fullyProcessed") and $not(status = "open")]) >= 1
                 )
               blockedReason: >-
                 (
-                  $openId := $keys($sift($domain.lot, function($v){$v.status = "open"}))[0];
+                  $openId := $keys($sift($domain.lot, function($v){$v.status = "open" and $v.truckId = $stream.id}))[0];
                   $exists($openId)
                     ? 'Linea occupata: lotto ' & $openId & ' (camion ' & $lookup($domain.lot, $openId).truckId & ')'
                     : ''

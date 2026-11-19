@@ -262,9 +262,10 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	}
 
 	startedDA, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": SeedLoadDAID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": SeedLoadDAID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: SeedTruckID,
 	})
 	if err != nil {
 		return err
@@ -310,9 +311,10 @@ func seedFinishLotWithDPP(ctx context.Context, c *TaskCommitter, scope Scope, lo
 	weight float64
 }) error {
 	started, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": lotID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": lotID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: SeedTruckID,
 	})
 	if err != nil {
 		return err

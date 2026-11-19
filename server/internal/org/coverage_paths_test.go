@@ -1314,15 +1314,17 @@ func TestCommitErrorWrappingViaApply(t *testing.T) {
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("startingNew non-first = %v", err)
 	}
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 	logistic := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
 	if _, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot", Value: map[string]any{"lotId": loadID}, Mint: startingNewMint(),
+		StreamInstanceID: truckID,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot", Value: map[string]any{"lotId": loadID}, Mint: startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("duplicate startLot instance = %v", err)

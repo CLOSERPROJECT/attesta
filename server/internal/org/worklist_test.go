@@ -99,9 +99,13 @@ func TestLoadJSONWorklistIntakeStatuses(t *testing.T) {
 		t.Fatalf("weightCheck = %q, want actionable", inst.Tasks["weightCheck"])
 	}
 
-	lp, ok := worklistJobByID(result.Worklist, "lot_processing")
+	scoped, err := loader.LoadForStreamInstance(t.Context(), FeragameScope(), FixtureAllRolesOp(), truckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lp, ok := worklistJobByID(scoped.Worklist, "lot_processing")
 	if !ok || !lp.CanStart {
-		t.Fatalf("lot_processing canStart = %#v, want true", lp)
+		t.Fatalf("lot_processing canStart on truck = %#v, want true", lp)
 	}
 }
 

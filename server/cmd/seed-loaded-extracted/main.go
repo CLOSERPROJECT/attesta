@@ -67,9 +67,10 @@ func main() {
 	}
 
 	commit(c, logOp, org.CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     mintNew(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             mintNew(),
+		StreamInstanceID: truckID,
 	})
 	for _, row := range []struct {
 		id     string
