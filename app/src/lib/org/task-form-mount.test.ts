@@ -117,6 +117,45 @@ describe('TaskFormMount', () => {
 		expect(fetch).toHaveBeenCalledOnce();
 	});
 
+	test('applyGate blocked for unavailable leaf exposes reason without fetch', () => {
+		const fetch = vi.fn(async () => sample);
+		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
+		const wl: Worklist = {
+			jobs: [
+				{
+					...adminWorklist().jobs[0]!,
+					instances: [
+						{
+							id: 'L1',
+							label: 'L1',
+							tasks: {
+								register: 'done',
+								codiceFir: 'done',
+								palletWeight: 'unavailable'
+							},
+							blockedReasons: { palletWeight: 'Linea occupata' }
+						}
+					]
+				}
+			]
+		};
+
+		const result = mount.applyGate(wl, {
+			stream,
+			instance: truck,
+			jobId: 'intake',
+			taskId: 'palletWeight',
+			jobInstanceId: 'L1',
+			provisionalJob: false
+		});
+
+		expect(result).toEqual({ kind: 'blocked', reason: 'Linea occupata' });
+		expect(mount.status).toBe('blocked');
+		expect(mount.blockedReason).toBe('Linea occupata');
+		expect(mount.bundle).toBeNull();
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	test('overlapping loads ignore stale generation', async () => {
 		let releaseSlow: (bundle: TaskFormBundle) => void = () => {};
 		const slow = new Promise<TaskFormBundle>((resolve) => {

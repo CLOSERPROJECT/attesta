@@ -23,6 +23,28 @@ export function orgMyDashboardPath(stream: string): string {
 	return `/my/streams/org-${stream}/`;
 }
 
+/** `/my` instance timeline for an Org stream instance. */
+export function orgMyInstancePath(stream: string, instance: string): string {
+	return `/my/streams/org-${stream}/instance/${instance}`;
+}
+
+/** Anchor / stream-instance label from the filtered Worklist (truck id). */
+export function streamInstanceLabel(
+	worklist: Worklist | null | undefined,
+	instanceId: string
+): string {
+	const id = instanceId.trim();
+	if (!id || !worklist?.jobs?.length) return id;
+	for (const job of worklist.jobs) {
+		const inst = job.instances.find((row) => row.id === id);
+		if (inst) {
+			const label = inst.label?.trim();
+			return label || id;
+		}
+	}
+	return id;
+}
+
 export function orgPlayPath(stream: string): string {
 	return `/${stream}/new`;
 }

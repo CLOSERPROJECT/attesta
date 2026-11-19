@@ -6,11 +6,13 @@ import {
 	navPlaceKindFromRoute,
 	orgHomePath,
 	orgMyDashboardPath,
+	orgMyInstancePath,
 	orgPathSegments,
 	orgPlayPath,
 	orgRouteCoordsFromPath,
 	orgTaskPath,
-	resolveNavPlace
+	resolveNavPlace,
+	streamInstanceLabel
 } from './nav-place.js';
 import type { Worklist } from './types.js';
 
@@ -152,6 +154,17 @@ describe('§6 Routes table (pathname after /app base strip)', () => {
 
 	test('orgPathSegments strips trailing slash', () => {
 		expect(orgPathSegments('/recycling/i/T1/')).toEqual(['recycling', 'i', 'T1']);
+	});
+
+	test('orgMyInstancePath is /my timeline for stream instance', () => {
+		expect(orgMyInstancePath('recycling', 'T1')).toBe(
+			'/my/streams/org-recycling/instance/T1'
+		);
+	});
+
+	test('streamInstanceLabel reads anchor instance label from Worklist', () => {
+		expect(streamInstanceLabel(worklist, 'NIR-2')).toBe('Camion B');
+		expect(streamInstanceLabel(worklist, 'missing')).toBe('missing');
 	});
 });
 

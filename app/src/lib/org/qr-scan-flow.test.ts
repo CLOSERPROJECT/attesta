@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
+import * as m from '#lib/paraglide/messages.js';
+
 import { runQrScan } from './qr-scan-flow.js';
 import { QrResolveHttpError } from './qr-resolve-port.js';
 
@@ -49,6 +51,73 @@ describe('runQrScan', () => {
 			jobInstanceId: 'L1',
 			taskId: 'weigh'
 		});
+		expect(toast).not.toHaveBeenCalled();
+	});
+
+	test('toasts switched-instance then navigates when resolve targets another instance', async () => {
+		const drafts = new Map<string, Record<string, unknown>>();
+		const navigate = vi.fn();
+		const toast = vi.fn();
+		const result = await runQrScan(
+			{
+				resolve: async () => ({
+					navigate: {
+						jobId: 'line',
+						jobInstanceId: 'L2',
+						taskId: 'weigh',
+						streamInstanceId: '261102-2'
+					},
+					seed: { palletId: 'P2' }
+				}),
+				stream: 'recycling',
+				instance: '261102-1',
+				drafts: {
+					getDraft: (path, key) => drafts.get(`${path}::${key}`) ?? null,
+					setDraft: (path, key, value) => {
+						drafts.set(`${path}::${key}`, value);
+					}
+				},
+				navigate,
+				toast
+			},
+			'P2'
+		);
+		expect(result).toBe('navigated');
+		expect(toast).toHaveBeenCalledWith(m.scan_switched_instance());
+		expect(navigate).toHaveBeenCalledWith({
+			kind: 'task',
+			stream: 'recycling',
+			instance: '261102-2',
+			jobId: 'line',
+			jobInstanceId: 'L2',
+			taskId: 'weigh'
+		});
+	});
+
+	test('same-instance resolve does not toast switched-instance', async () => {
+		const toast = vi.fn();
+		await runQrScan(
+			{
+				resolve: async () => ({
+					navigate: {
+						jobId: 'line',
+						jobInstanceId: 'L1',
+						taskId: 'weigh',
+						streamInstanceId: '261102-1'
+					},
+					seed: {}
+				}),
+				stream: 'recycling',
+				instance: '261102-1',
+				drafts: {
+					getDraft: () => null,
+					setDraft: () => undefined
+				},
+				navigate: vi.fn(),
+				toast
+			},
+			'P1'
+		);
 		expect(toast).not.toHaveBeenCalled();
 	});
 
