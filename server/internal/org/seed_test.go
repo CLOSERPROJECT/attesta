@@ -612,4 +612,26 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if !finishedRow || !openRow {
 		t.Fatalf("truck A rows = %#v, want %s finished and %s open", each.Rows, SeedLoadCOID, SeedLoadDAID)
 	}
+
+	// Truck B Apri lotto is line-busy while DA is open on truck A.
+	wantBusy := "Linea occupata: lotto " + SeedLoadDAID + " (camion " + SeedTruckID + ")"
+	tlB := ProjectStreamTimeline(cfg, got, op, SeedTruckBID)
+	var startBlocked string
+	for _, step := range tlB.Steps {
+		if step.JobID != "lot_processing" {
+			continue
+		}
+		for _, row := range step.Rows {
+			if row.ID != SeedTruckBLotID {
+				continue
+			}
+			if len(row.Tasks) == 0 || row.Tasks[0].ID != "startLot" {
+				t.Fatalf("truck B lot timeline tasks = %#v", row.Tasks)
+			}
+			startBlocked = row.Tasks[0].BlockedReason
+		}
+	}
+	if startBlocked != wantBusy {
+		t.Fatalf("truck B Apri lotto blockedReason = %q, want %q", startBlocked, wantBusy)
+	}
 }

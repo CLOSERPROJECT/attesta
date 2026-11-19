@@ -56,8 +56,9 @@ type SeedOptions struct {
 // lot_processing Job instance id = lot id (1:1); no day/turno instances.
 //
 // Parallel-truck demo matrix (§9 / #315):
-//   Truck A (SeedTruckID): intake checked; SeedLoadCOID finished+DPP; SeedLoadDAID open with some pallets weighed.
-//   Truck B (SeedTruckBID): intake with SeedTruckBLotID registered, weightCheck still open.
+//
+//	Truck A (SeedTruckID): intake checked; SeedLoadCOID finished+DPP; SeedLoadDAID open with some pallets weighed.
+//	Truck B (SeedTruckBID): intake with SeedTruckBLotID registered, weightCheck still open.
 const (
 	SeedTruckID     = "261102-1"
 	SeedTruckBID    = "261102-2"
@@ -171,9 +172,11 @@ func domainSeedEmpty(d Domain) bool {
 }
 
 // seedStagedDemoDomain wipes then Commits the parallel-truck demo matrix:
-//   Truck A — weightCheck done; CO finished through lot_processing/lock (DPP);
-//             DA open on the line with one pallet weighed.
-//   Truck B — arrive + register only (weightCheck open) so /my shows two active trucks.
+//
+//	Truck A — weightCheck done; CO finished through lot_processing/lock (DPP);
+//	          DA open on the line with one pallet weighed.
+//	Truck B — arrive + register only (weightCheck open) so /my shows two active trucks.
+//
 // When passports is set, org rows are deleted before Domain Put so deterministic
 // seed subject ids can Lock again after --replace / --feragame-domain / --feragame-full.
 // A nil passports store still stages Domain facts via an ephemeral DPPStore for lock.
