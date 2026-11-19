@@ -189,11 +189,24 @@ func TestProjectWorklistEachStartUsesStreamBinding(t *testing.T) {
 	if lpA.CanStart {
 		t.Fatal("T-A canStart want false (no lots on this truck)")
 	}
+	intakeA := worklistMustJob(t, wlA, "intake")
+	if intakeA.CanStart {
+		t.Fatal("instance-scoped anchor canStart want false")
+	}
 
 	wlB := ProjectWorklist(cfg, domain, op, "T-B")
 	lpB := worklistMustJob(t, wlB, "lot_processing")
 	if !lpB.CanStart {
 		t.Fatal("T-B canStart want true (eligible lot on this truck)")
+	}
+	intakeB := worklistMustJob(t, wlB, "intake")
+	if intakeB.CanStart {
+		t.Fatal("instance-scoped anchor canStart want false")
+	}
+
+	all := ProjectWorklistAll(cfg, domain, op)
+	if !worklistMustJob(t, all, "intake").CanStart {
+		t.Fatal("unfiltered anchor canStart want true")
 	}
 }
 
