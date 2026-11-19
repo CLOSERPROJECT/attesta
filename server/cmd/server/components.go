@@ -369,6 +369,7 @@ type TimelineSubstep struct {
 	Selected      bool
 	ViewerOwned   bool
 	OrgActionable bool // Org act-now (available); Formata leaves false
+	SubmitMany    bool // Org submit: many; Formata leaves false
 	Body          *SubstepBodyView
 	Palette       string
 	Status        string

@@ -1,29 +1,58 @@
 {{ define "substep_shell" }}
   {{ $shell := substepShellDisplay .Substep }}
   {{ $substepDomID := replace .Substep.SubstepID "." "-" }}
-  <li
-    class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
+  {{ $orgCardLink := and (not .Substep.Body) .Substep.OrgActionable .Substep.Href }}
+  {{ $orgSubmissionsRow := and $orgCardLink .Substep.SubmitMany .Substep.Submissions }}
+<li class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
     data-role-palette="{{ $shell.Palette }}"
     data-viewer-owned="{{ if .Substep.ViewerOwned }}true{{ else }}false{{ end }}"
-    {{ if .Substep.OrgActionable }}data-org-actionable="true"{{ end }}
-  >
-    <details
-      class="substep-accordion js-process-substep-panel"
-      data-substep-id="{{ .Substep.SubstepID }}"
-      aria-labelledby="substep-{{ $substepDomID }}-heading"
-      {{ if .Substep.Selected }}open{{ end }}
-    >
+    {{ if .Substep.OrgActionable }}data-org-actionable="true"
+    {{ end }}>
+  {{ if $orgCardLink }}
+    <a class="substep-card-link"
+       href="{{ .Substep.Href }}"
+       aria-labelledby="substep-{{ $substepDomID }}-heading">
+      <div class="substep-summary-main">
+        <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+        <div class="substep-title">
+          <span class="substep-title-heading"
+                id="substep-{{ $substepDomID }}-heading">{{ .Substep.Title }}</span>
+        </div>
+      </div>
+      {{ if not .HideStatus }}
+        <span class="status" aria-label="Status: {{ if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end }}">{{- if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end -}}</span>
+      {{ end }}
+    </a>
+    {{ if $orgSubmissionsRow }}
+      <details class="substep-org-submissions">
+        <summary class="substep-org-submissions-summary">Submissions ({{ len .Substep.Submissions }})</summary>
+        <ul class="substep-org-submissions-list">
+          {{ range .Substep.Submissions }}
+            <li class="substep-org-submissions-item">
+              {{ if .Timestamp }}
+                {{ template "local_datetime" (dict "ISO" .Timestamp "Human" .TimestampHuman) }}
+              {{ else }}
+                <span class="muted">—</span>
+              {{ end }}
+              {{ if .UserID }}
+                <span class="muted">· {{ .UserID }}</span>
+              {{ end }}
+            </li>
+          {{ end }}
+        </ul>
+      </details>
+    {{ end }}
+  {{ else }}
+    <details class="substep-accordion js-process-substep-panel"
+             data-substep-id="{{ .Substep.SubstepID }}"
+             aria-labelledby="substep-{{ $substepDomID }}-heading"
+             {{ if .Substep.Selected }}open{{ end }}>
       <summary class="substep-accordion-summary">
         <div class="substep-summary-main">
           <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
           <div class="substep-title">
-            <span class="substep-title-heading" id="substep-{{ $substepDomID }}-heading">
-            {{ if .Substep.Href }}
-              <a href="{{ .Substep.Href }}" class="substep-title-link">{{ .Substep.Title }}</a>
-            {{ else }}
-              {{ .Substep.Title }}
-            {{ end }}
-          </span>
+            <span class="substep-title-heading"
+                  id="substep-{{ $substepDomID }}-heading">{{ .Substep.Title }}</span>
             {{ if eq $shell.Status "done" }}
               <div class="substep-meta">
                 {{ if $shell.DoneAt }}
@@ -51,57 +80,45 @@
           </div>
         </div>
         {{ if not .HideStatus }}
-          <span class="status" aria-label="Status: {{ if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end }}">
-            {{- if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end -}}
-          </span>
+          <span class="status" aria-label="Status: {{ if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end }}">{{- if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end -}}</span>
         {{ end }}
-        <span class="substep-accordion-chevron" aria-hidden="true">
-          {{ template "icon-chevron-down" . }}
-        </span>
+        <span class="substep-accordion-chevron" aria-hidden="true">{{ template "icon-chevron-down" . }}</span>
       </summary>
       <div class="substep-details">
         {{ with .Substep.Body }}
           {{ template "substep_body" . }}
         {{ else }}
-          {{ if or .Substep.Href .Substep.BlockedReason .Substep.Submissions }}
+          {{ if or .Substep.BlockedReason .Substep.Submissions }}
             <div class="substep-org-body stack u-gap-2">
               {{ if .Substep.BlockedReason }}
                 <p class="muted u-m-0 u-pre-line">{{ .Substep.BlockedReason }}</p>
               {{ end }}
-              {{ if .Substep.Href }}
-                <p class="u-m-0">
-                  <a class="btn btn-secondary btn-sm" href="{{ .Substep.Href }}">Open in /app</a>
-                </p>
-              {{ end }}
               {{ if .Substep.Submissions }}
-                <details class="substep-org-submissions">
-                  <summary class="substep-org-submissions-summary">
-                    Submissions ({{ len .Substep.Submissions }})
-                  </summary>
+                <details class="substep-org-submissions"{{ if eq $shell.Status "done" }} open{{ end }}>
+                  <summary class="substep-org-submissions-summary">Submissions ({{ len .Substep.Submissions }})</summary>
                   <ul class="substep-org-submissions-list">
                     {{ range .Substep.Submissions }}
-                    <li class="substep-org-submissions-item">
-                      {{ if .Timestamp }}
-                        {{ template "local_datetime" (dict "ISO" .Timestamp "Human" .TimestampHuman) }}
-                      {{ else }}
-                        <span class="muted">—</span>
-                      {{ end }}
-                      {{ if .UserID }}
-                        <span class="muted">· {{ .UserID }}</span>
-                      {{ end }}
-                    </li>
+                      <li class="substep-org-submissions-item">
+                        {{ if .Timestamp }}
+                          {{ template "local_datetime" (dict "ISO" .Timestamp "Human" .TimestampHuman) }}
+                        {{ else }}
+                          <span class="muted">—</span>
+                        {{ end }}
+                        {{ if .UserID }}
+                          <span class="muted">· {{ .UserID }}</span>
+                        {{ end }}
+                      </li>
                     {{ end }}
                   </ul>
                 </details>
               {{ end }}
             </div>
           {{ else }}
-            <p class="muted">
-              No data form configured for this substep
-            </p>
+            <p class="muted">No data form configured for this substep</p>
           {{ end }}
         {{ end }}
       </div>
     </details>
+  {{ end }}
   </li>
 {{ end }}

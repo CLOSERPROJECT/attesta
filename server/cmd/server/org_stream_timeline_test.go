@@ -33,7 +33,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 					Title: "Ingresso",
 					Tasks: []org.TaskConfig{
 						{"id": "arrive", "title": "Arrive"},
-						{"id": "check", "title": "Check"},
+						{"id": "check", "title": "Check", "submit": "many"},
 					},
 				},
 				"lot_processing": org.Job{
@@ -41,7 +41,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 					InstanceID: "$.lotId",
 					Tasks: []org.TaskConfig{
 						{"id": "startLot", "title": "Apri lotto"},
-						{"id": "weigh", "title": "Pesa"},
+						{"id": "weigh", "title": "Pesa", "submit": "many"},
 					},
 				},
 			},
@@ -103,6 +103,9 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	if steps[0].Substeps[0].OrgActionable || !steps[0].Substeps[1].OrgActionable {
 		t.Fatalf("org actionable flags = done=%v available=%v", steps[0].Substeps[0].OrgActionable, steps[0].Substeps[1].OrgActionable)
 	}
+	if steps[0].Substeps[0].SubmitMany || !steps[0].Substeps[1].SubmitMany {
+		t.Fatalf("submitMany flags = arrive=%v check=%v", steps[0].Substeps[0].SubmitMany, steps[0].Substeps[1].SubmitMany)
+	}
 	if len(steps[0].Substeps[0].Submissions) != 1 {
 		t.Fatalf("once submissions = %#v", steps[0].Substeps[0].Submissions)
 	}
@@ -122,8 +125,8 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	if len(open.Substeps[0].Submissions) != 1 || open.Substeps[0].OrgActionable {
 		t.Fatalf("open startLot submissions/actionable = %#v", open.Substeps[0])
 	}
-	if !open.Substeps[1].OrgActionable || len(open.Substeps[1].Submissions) != 0 {
-		t.Fatalf("weigh actionable/empty submissions = %#v", open.Substeps[1])
+	if !open.Substeps[1].OrgActionable || !open.Substeps[1].SubmitMany || len(open.Substeps[1].Submissions) != 0 {
+		t.Fatalf("weigh actionable/submitMany/empty submissions = %#v", open.Substeps[1])
 	}
 	wait := steps[1].Rows[1]
 	wantSeed := "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
@@ -181,16 +184,22 @@ func TestStreamTimelineTemplateRendersEachRows(t *testing.T) {
 		"Lavorazione ×2",
 		"Lotto: L-wait",
 		"Linea occupata: lotto L-open",
-		`href="/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"`,
 		`class="substep substep-locked"`,
+		`class="substep-accordion js-process-substep-panel"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in:\n%s", want, body)
 		}
 	}
+	if strings.Contains(body, "Open in /app") {
+		t.Fatalf("locked Org card must not render Open in /app, got:\n%s", body)
+	}
+	if strings.Contains(body, `class="substep-card-link"`) {
+		t.Fatalf("locked non-actionable must stay accordion, got:\n%s", body)
+	}
 }
 
-func TestSubstepShellRendersOrgActionableAndSubmissions(t *testing.T) {
+func TestSubstepShellRendersOrgActionableCardLink(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	view := StreamTimelineSubstepView{
 		Substep: TimelineSubstep{
@@ -198,6 +207,7 @@ func TestSubstepShellRendersOrgActionableAndSubmissions(t *testing.T) {
 			Title:         "Check",
 			Status:        "available",
 			OrgActionable: true,
+			SubmitMany:    true,
 			Href:          "/app/recycling/i/T1/intake/T1/check",
 			Submissions: []TimelineSubmissionView{
 				{Timestamp: "2026-11-19T11:00:00Z", TimestampHuman: "19 Nov 2026 at 11:00 UTC", UserID: "ops@test"},
@@ -212,14 +222,59 @@ func TestSubstepShellRendersOrgActionableAndSubmissions(t *testing.T) {
 	body := out.String()
 	for _, want := range []string{
 		`data-org-actionable="true"`,
+		`class="substep-card-link"`,
+		`href="/app/recycling/i/T1/intake/T1/check"`,
 		"Submissions (2)",
 		`datetime="2026-11-19T11:00:00Z"`,
 		"ops@test",
-		`href="/app/recycling/i/T1/intake/T1/check"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, "Open in /app") {
+		t.Fatalf("available card must not render Open in /app, got:\n%s", body)
+	}
+	if strings.Contains(body, `class="substep-accordion`) {
+		t.Fatalf("many+available must use card link, not accordion, got:\n%s", body)
+	}
+	cardIdx := strings.Index(body, `class="substep-card-link"`)
+	subsIdx := strings.Index(body, `class="substep-org-submissions"`)
+	if cardIdx < 0 || subsIdx < 0 || subsIdx < cardIdx {
+		t.Fatalf("submissions row must follow card link under li, got:\n%s", body)
+	}
+}
+
+func TestSubstepShellRendersDoneAccordionWithOpenSubmissions(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	view := StreamTimelineSubstepView{
+		Substep: TimelineSubstep{
+			SubstepID: "intake.arrive",
+			Title:     "Arrive",
+			Status:    "done",
+			Href:      "/app/recycling/i/T1/intake/T1/arrive",
+			Submissions: []TimelineSubmissionView{
+				{Timestamp: "2026-11-19T10:00:00Z", TimestampHuman: "19 Nov 2026 at 10:00 UTC", UserID: "ops@test"},
+			},
+		},
+	}
+	var out strings.Builder
+	if err := tmpl.ExecuteTemplate(&out, "substep_shell", view); err != nil {
+		t.Fatal(err)
+	}
+	body := out.String()
+	compact := strings.Join(strings.Fields(body), " ")
+	for _, want := range []string{
+		`class="substep-accordion js-process-substep-panel"`,
+		`class="substep-org-submissions" open`,
+		"Submissions (1)",
+	} {
+		if !strings.Contains(compact, want) && !strings.Contains(body, want) {
+			t.Fatalf("expected %q in:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, `class="substep-card-link"`) || strings.Contains(body, "Open in /app") {
+		t.Fatalf("done must accordion without Open in /app, got:\n%s", body)
 	}
 }
 
@@ -227,10 +282,11 @@ func TestSubstepShellOmitsEmptySubmissionsShell(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	view := StreamTimelineSubstepView{
 		Substep: TimelineSubstep{
-			SubstepID: "intake.check",
-			Title:     "Check",
-			Status:    "available",
-			Href:      "/app/recycling/i/T1/intake/T1/check",
+			SubstepID:     "intake.check",
+			Title:         "Check",
+			Status:        "available",
+			OrgActionable: true,
+			Href:          "/app/recycling/i/T1/intake/T1/check",
 		},
 	}
 	var out strings.Builder
@@ -241,7 +297,30 @@ func TestSubstepShellOmitsEmptySubmissionsShell(t *testing.T) {
 	if strings.Contains(body, "substep-org-submissions") || strings.Contains(body, "Submissions (") {
 		t.Fatalf("empty submissions must omit shell, got:\n%s", body)
 	}
+	if !strings.Contains(body, `class="substep-card-link"`) {
+		t.Fatalf("once-available must still be card link, got:\n%s", body)
+	}
+	if strings.Contains(body, "Open in /app") {
+		t.Fatalf("must not render Open in /app, got:\n%s", body)
+	}
+}
+
+func TestSubstepShellOmitsDataOrgActionableWhenNotActionable(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	view := StreamTimelineSubstepView{
+		Substep: TimelineSubstep{
+			SubstepID: "intake.check",
+			Title:     "Check",
+			Status:    "locked",
+			Href:      "/app/recycling/i/T1/intake/T1/check",
+		},
+	}
+	var out strings.Builder
+	if err := tmpl.ExecuteTemplate(&out, "substep_shell", view); err != nil {
+		t.Fatal(err)
+	}
+	body := out.String()
 	if strings.Contains(body, `data-org-actionable="true"`) {
-		t.Fatalf("Formata/non-actionable must omit data-org-actionable, got:\n%s", body)
+		t.Fatalf("non-actionable must omit data-org-actionable, got:\n%s", body)
 	}
 }

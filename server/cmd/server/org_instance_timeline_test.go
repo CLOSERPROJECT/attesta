@@ -73,8 +73,8 @@ func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
 	}
 
 	seedHref := `/app/recycling/i/` + truckID + `/lot_processing/new/startLot?seed.lotId=` + waitLot
-	if !strings.Contains(body, `href="`+seedHref+`"`) {
-		t.Fatalf("expected seeded start link %q, got:\n%s", seedHref, body)
+	if strings.Contains(body, `href="`+seedHref+`"`) {
+		t.Fatalf("locked wait-lot start must not be a form link until available, got seed href in:\n%s", body)
 	}
 	openTaskHref := `/app/recycling/i/` + truckID + `/lot_processing/` + openLot + `/`
 	if !strings.Contains(body, openTaskHref) {
@@ -112,6 +112,12 @@ func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
 	}
 	if !strings.Contains(body, "Submissions (") {
 		t.Fatalf("expected submissions under accordion when count >= 1, got:\n%s", body)
+	}
+	if !strings.Contains(body, `class="substep-card-link"`) {
+		t.Fatalf("expected available Org tasks as card links, got:\n%s", body)
+	}
+	if strings.Contains(body, "Open in /app") {
+		t.Fatalf("Org instance must not render Open in /app, got:\n%s", body)
 	}
 	if strings.Contains(body, "js-open-substep-override") || strings.Contains(body, "/override") {
 		t.Fatalf("Org instance must hide Formata override affordances, got:\n%s", body)

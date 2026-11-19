@@ -148,6 +148,9 @@ func buildOrgTimelineTaskSubsteps(job org.Job, jobID, jobInstanceID string, task
 			// available ← Worklist actionable + role-eligible can-start provisional
 			OrgActionable: task.State == org.StreamSubstepAvailable,
 		}
+		if tc, ok := org.TaskByID(job.Tasks, task.ID); ok {
+			sub.SubmitMany = org.TaskSubmitMany(tc)
+		}
 		switch {
 		case provisional && task.ID == startTaskID:
 			sub.Href = appOrgSeededStartTaskPath(streamKey, streamInstanceID, jobID, task.ID, seedField, jobInstanceID)

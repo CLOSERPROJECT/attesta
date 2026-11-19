@@ -142,6 +142,11 @@ func taskSubmitMany(t TaskConfig) bool {
 	return taskSubmit(t) == submitMany
 }
 
+// TaskSubmitMany reports whether the Task allows repeated commits (submit: many).
+func TaskSubmitMany(t TaskConfig) bool {
+	return taskSubmitMany(t)
+}
+
 func validateTaskSubmit(t TaskConfig, prefix string) error {
 	raw, present := t["submit"]
 	if !present {
