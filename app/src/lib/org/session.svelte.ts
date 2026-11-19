@@ -48,7 +48,7 @@ export type OrgSessionOptions = {
 	flushOnHide?: boolean;
 };
 
-type DraftIdentity = { org: string; userId: string };
+type DraftIdentity = { org: string; stream: string; userId: string };
 
 export class OrgSession {
 	readonly load: LoadDomainPort;
@@ -166,7 +166,7 @@ export class OrgSession {
 		if (id) {
 			removeStoredDraft(
 				this.#storage,
-				orgDraftStorageKey(id.org, id.userId, key)
+				orgDraftStorageKey(id.org, id.stream, id.userId, key)
 			);
 		}
 	};
@@ -183,12 +183,28 @@ export class OrgSession {
 		}
 	};
 
-	hydrate = async (): Promise<void> => {
+	/** Current stream/instance for Load and draft persistence. */
+	#scope: { stream: string; instance: string } | null = null;
+
+	setScope = (scope: { stream: string; instance: string }): void => {
+		this.#scope = {
+			stream: scope.stream.trim(),
+			instance: scope.instance.trim()
+		};
+	};
+
+	hydrate = async (scope?: { stream: string; instance: string }): Promise<void> => {
+		if (scope) this.setScope(scope);
+		const active = this.#scope;
+		if (!active?.stream || !active.instance) {
+			this.error = 'stream and instance required';
+			return;
+		}
 		this.loading = true;
 		this.error = null;
 		try {
-			this.result = await this.load.load();
-			this.#syncIdentityFromResult(this.result);
+			this.result = await this.load.load(active);
+			this.#syncIdentityFromResult(this.result, active.stream);
 		} catch (err) {
 			this.result = null;
 			this.error = err instanceof Error ? err.message : String(err);
@@ -203,12 +219,19 @@ export class OrgSession {
 	 * Does not rehydrate from storage (in-memory dirty wins).
 	 */
 	refreshKeepDrafts = async (): Promise<void> => {
+		const active = this.#scope;
+		if (!active?.stream || !active.instance) {
+			this.error = 'stream and instance required';
+			return;
+		}
 		this.loading = true;
 		try {
-			this.result = await this.load.load();
+			this.result = await this.load.load(active);
 			this.error = null;
 			// Identity change still resets bag; same-identity refresh does not rehydrate.
-			this.#syncIdentityFromResult(this.result, { rehydrateOnlyOnChange: true });
+			this.#syncIdentityFromResult(this.result, active.stream, {
+				rehydrateOnlyOnChange: true
+			});
 		} catch (err) {
 			// Keep prior result; surface Load failure separately from Commit denial.
 			this.error = err instanceof Error ? err.message : String(err);
@@ -275,13 +298,21 @@ export class OrgSession {
 
 	#syncIdentityFromResult = (
 		result: LoadResult | null,
+		stream: string,
 		opts: { rehydrateOnlyOnChange?: boolean } = {}
 	): void => {
-		if (!result?.org || !result.userId) return;
-		const next: DraftIdentity = { org: result.org, userId: result.userId };
+		if (!result?.org || !result.userId || !stream) return;
+		const next: DraftIdentity = {
+			org: result.org,
+			stream,
+			userId: result.userId
+		};
 		const prev = this.#identity;
 		const changed =
-			prev == null || prev.org !== next.org || prev.userId !== next.userId;
+			prev == null ||
+			prev.org !== next.org ||
+			prev.stream !== next.stream ||
+			prev.userId !== next.userId;
 		if (!changed) {
 			// Same identity: never rebuild bag from storage on refreshKeepDrafts.
 			if (opts.rehydrateOnlyOnChange) return;
@@ -306,7 +337,12 @@ export class OrgSession {
 		id: DraftIdentity,
 		opts: { keepMemoryDirty: boolean }
 	): void => {
-		const loaded = loadDirtyDraftsForIdentity(this.#storage, id.org, id.userId);
+		const loaded = loadDirtyDraftsForIdentity(
+			this.#storage,
+			id.org,
+			id.stream,
+			id.userId
+		);
 		const next: Record<string, DraftEntry> = opts.keepMemoryDirty
 			? { ...this.drafts }
 			: {};
@@ -339,7 +375,7 @@ export class OrgSession {
 		if (!id || !this.#storage) return;
 		writeStoredDraft(
 			this.#storage,
-			orgDraftStorageKey(id.org, id.userId, key),
+			orgDraftStorageKey(id.org, id.stream, id.userId, key),
 			value
 		);
 	};

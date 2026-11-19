@@ -10,6 +10,9 @@ import {
 } from './task-address.js';
 import { PROVISIONAL_JOB_INSTANCE_ID } from './types.js';
 
+const stream = 'recycling';
+const truck = '261102-1';
+
 describe('task-address', () => {
 	test('treats empty and new as provisional', () => {
 		expect(isProvisionalJobInstance('')).toBe(true);
@@ -26,11 +29,15 @@ describe('task-address', () => {
 	test('normalizeTaskAddress from route coords', () => {
 		expect(
 			normalizeTaskAddress({
+				stream,
+				instance: truck,
 				jobId: 'intake',
 				jobInstanceId: 'new',
 				taskId: 'register'
 			})
 		).toEqual({
+			stream,
+			instance: truck,
 			jobId: 'intake',
 			jobInstanceId: '',
 			taskId: 'register',
@@ -38,11 +45,15 @@ describe('task-address', () => {
 		});
 		expect(
 			normalizeTaskAddress({
+				stream,
+				instance: truck,
 				jobId: 'intake',
 				jobInstanceId: 'NIR-1',
 				taskId: 'register'
 			})
 		).toEqual({
+			stream,
+			instance: truck,
 			jobId: 'intake',
 			jobInstanceId: 'NIR-1',
 			taskId: 'register',
@@ -52,28 +63,44 @@ describe('task-address', () => {
 
 	test('addressKey and wire use new for provisional', () => {
 		const provisional = normalizeTaskAddress({
+			stream,
+			instance: truck,
 			jobId: 'intake',
 			jobInstanceId: '',
 			taskId: 'register'
 		});
 		expect(wireJobInstanceId(provisional)).toBe('new');
-		expect(taskAddressKey(provisional)).toBe('intake|new|register');
+		expect(taskAddressKey(provisional)).toBe(`${stream}|${truck}|intake|new|register`);
 
 		const concrete = normalizeTaskAddress({
+			stream,
+			instance: truck,
 			jobId: 'intake',
 			jobInstanceId: 'NIR-1',
 			taskId: 'register'
 		});
 		expect(wireJobInstanceId(concrete)).toBe('NIR-1');
-		expect(taskAddressKey(concrete)).toBe('intake|NIR-1|register');
+		expect(taskAddressKey(concrete)).toBe(`${stream}|${truck}|intake|NIR-1|register`);
 	});
 
 	test('empty and new route segments share the same address key', () => {
 		const fromEmpty = taskAddressKey(
-			normalizeTaskAddress({ jobId: 'intake', jobInstanceId: '', taskId: 'register' })
+			normalizeTaskAddress({
+				stream,
+				instance: truck,
+				jobId: 'intake',
+				jobInstanceId: '',
+				taskId: 'register'
+			})
 		);
 		const fromNew = taskAddressKey(
-			normalizeTaskAddress({ jobId: 'intake', jobInstanceId: 'new', taskId: 'register' })
+			normalizeTaskAddress({
+				stream,
+				instance: truck,
+				jobId: 'intake',
+				jobInstanceId: 'new',
+				taskId: 'register'
+			})
 		);
 		expect(fromEmpty).toBe(fromNew);
 	});

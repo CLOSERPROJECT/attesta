@@ -3,27 +3,41 @@ import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist, WorklistInstance, WorklistJob } from './types.js';
 import { worklistJobFor } from './types.js';
 
-/** Post-Commit / exit / deep-link SPA target (ADR-0006). */
+/** Post-Commit / exit / deep-link SPA target (ADR-0006 / ADR-0014). */
 export type PostCommitTarget =
 	| {
 			kind: 'task';
+			stream: string;
+			instance: string;
 			jobId: string;
 			jobInstanceId: string;
 			taskId: string;
 	  }
-	| { kind: 'overview'; jobId: string; jobInstanceId: string }
-	| { kind: 'archive' }
-	| { kind: 'home' };
+	| { kind: 'home'; stream: string; instance: string }
+	| { kind: 'myStream'; stream: string }
+	| { kind: 'my' };
 
 /** Commit follow-up: stay only when server `navigation` is stay. */
 export type CommitFollowUp = { kind: 'stay' } | PostCommitTarget;
 
+export type StreamNavScope = {
+	stream: string;
+	/** Org stream instance; empty on Play until Commit mints one. */
+	instance: string;
+};
+
+function asScope(stream: string, instance: string): StreamNavScope {
+	return { stream, instance };
+}
+
 /**
  * Post-Commit SPA decision from server `navigation` only (ADR-0006).
- * Stay is never inferred from HTTP links.
+ * Stay is never inferred from HTTP links. `home` means the instance home.
  */
 export function resolveCommitFollowUp(
 	navigation: CommitNavigation,
+	stream: string,
+	instance: string,
 	jobId: string,
 	jobInstanceId: string,
 	nextTaskFormBundle: TaskFormBundle | null | undefined
@@ -31,6 +45,8 @@ export function resolveCommitFollowUp(
 	if (navigation === 'stay') return { kind: 'stay' };
 	return resolvePostCommitNavigation(
 		navigation,
+		stream,
+		instance,
 		jobId,
 		jobInstanceId,
 		nextTaskFormBundle
@@ -40,12 +56,16 @@ export function resolveCommitFollowUp(
 /** Continue after stay: server `continueNavigation` only (never re-derive). */
 export function resolveContinueNavigation(
 	continueNavigation: ContinueNavigation | null | undefined,
+	stream: string,
+	instance: string,
 	jobId: string,
 	jobInstanceId: string,
 	nextTaskFormBundle: TaskFormBundle | null | undefined
 ): PostCommitTarget {
 	return resolvePostCommitNavigation(
 		continueNavigation ?? 'home',
+		stream,
+		instance,
 		jobId,
 		jobInstanceId,
 		nextTaskFormBundle
@@ -54,8 +74,9 @@ export function resolveContinueNavigation(
 
 export type TaskDeepLinkTarget =
 	| { kind: 'task' }
-	| { kind: 'overview'; jobId: string; jobInstanceId: string }
-	| { kind: 'home' };
+	| { kind: 'home'; stream: string; instance: string }
+	| { kind: 'myStream'; stream: string }
+	| { kind: 'my' };
 
 function instanceFor(
 	job: WorklistJob,
@@ -70,15 +91,23 @@ function viewerMayAct(inst: WorklistInstance, taskId: string): boolean {
 
 /**
  * When a Task cannot be mounted (deep-link gate miss, task-form 403/404):
- * always Home (overview unlinked as a product entry).
+ * instance home when scoped; Play → stream dashboard.
  */
 export function resolveUnmountableTaskTarget(
+	stream: string,
+	instance: string,
 	_jobId: string,
 	_jobInstanceId: string,
-	_provisionalJob: boolean,
+	provisionalJob: boolean,
 	_worklist: Worklist | null | undefined
-): Extract<PostCommitTarget, { kind: 'home' }> {
-	return { kind: 'home' };
+): Exclude<PostCommitTarget, { kind: 'task' }> {
+	if (instance) {
+		return { kind: 'home', stream, instance };
+	}
+	if (provisionalJob && stream) {
+		return { kind: 'myStream', stream };
+	}
+	return { kind: 'my' };
 }
 
 /**
@@ -88,70 +117,135 @@ export function resolveUnmountableTaskTarget(
  */
 export function resolvePostCommitNavigation(
 	navigation: Exclude<CommitNavigation, 'stay'> | ContinueNavigation,
+	stream: string,
+	instance: string,
 	jobId: string,
 	jobInstanceId: string,
 	nextTaskFormBundle: TaskFormBundle | null | undefined
 ): PostCommitTarget {
 	if (navigation === 'task') {
 		const bundle = nextTaskFormBundle;
+		const homeInstance = instance || jobInstanceId;
 		if (
 			bundle &&
 			bundle.jobId &&
 			bundle.taskId &&
 			bundle.jobInstanceId &&
-			bundle.jobId === jobId
+			bundle.jobId === jobId &&
+			stream &&
+			homeInstance
 		) {
 			return {
 				kind: 'task',
+				stream,
+				instance: homeInstance,
 				jobId: bundle.jobId,
 				jobInstanceId: bundle.jobInstanceId,
 				taskId: bundle.taskId
 			};
 		}
-		return { kind: 'home' };
+		return resolveInstanceHome(asScope(stream, instance), jobInstanceId);
 	}
 	// Legacy wire/Config overview → home (ADR-0006 hard cut).
-	return { kind: 'home' };
+	return resolveInstanceHome(asScope(stream, instance), jobInstanceId);
+}
+
+function resolveInstanceHome(
+	scope: StreamNavScope,
+	fallbackInstance: string
+): PostCommitTarget {
+	const instance = scope.instance || fallbackInstance;
+	if (scope.stream && instance) {
+		return { kind: 'home', stream: scope.stream, instance };
+	}
+	if (scope.stream) {
+		return { kind: 'myStream', stream: scope.stream };
+	}
+	return { kind: 'my' };
 }
 
 /**
  * Deep-link gate: provisional Start only when Worklist canStart + first Task
  * (same CollectActionableTaskRefs / ViewerMayMountTask law as task-form).
+ * Play (`play: true`) skips the Worklist canStart check — task-form is the gate.
  * Existing instance must be projected actionable or redirect Home.
  */
 export function resolveTaskDeepLink(
+	stream: string,
+	instance: string,
 	jobId: string,
 	jobInstanceId: string,
 	taskId: string,
 	provisionalJob: boolean,
-	worklist: Worklist | null | undefined
+	worklist: Worklist | null | undefined,
+	opts: { play?: boolean } = {}
 ): TaskDeepLinkTarget {
-	if (!jobId || !taskId) return { kind: 'home' };
+	if (!jobId || !taskId) {
+		return resolveUnmountableTaskTarget(
+			stream,
+			instance,
+			jobId,
+			jobInstanceId,
+			provisionalJob,
+			worklist
+		);
+	}
+
+	if (opts.play && provisionalJob) {
+		return { kind: 'task' };
+	}
 
 	const job = worklistJobFor(worklist, jobId);
 	if (provisionalJob) {
 		if (!job?.canStart || job.taskIds[0] !== taskId) {
-			return resolveUnmountableTaskTarget(jobId, jobInstanceId, true, worklist);
+			return resolveUnmountableTaskTarget(
+				stream,
+				instance,
+				jobId,
+				jobInstanceId,
+				true,
+				worklist
+			);
 		}
 		return { kind: 'task' };
 	}
 
 	const inst = job ? instanceFor(job, jobInstanceId) : null;
 	if (!job || !inst) {
-		return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
+		return resolveUnmountableTaskTarget(
+			stream,
+			instance,
+			jobId,
+			jobInstanceId,
+			false,
+			worklist
+		);
 	}
 
 	if (viewerMayAct(inst, taskId)) {
 		return { kind: 'task' };
 	}
-	return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
+	return resolveUnmountableTaskTarget(
+		stream,
+		instance,
+		jobId,
+		jobInstanceId,
+		false,
+		worklist
+	);
 }
 
-/** Exit from Task without Commit: always Home (overview unlinked). */
+/** Exit from Task without Commit: instance home (Play → stream dashboard). */
 export function resolveTaskExit(
-	_jobId: string,
-	_jobInstanceId: string,
-	_provisionalJob: boolean
-): Extract<PostCommitTarget, { kind: 'home' }> {
-	return { kind: 'home' };
+	stream: string,
+	instance: string,
+	provisionalJob: boolean
+): PostCommitTarget {
+	if (instance) {
+		return { kind: 'home', stream, instance };
+	}
+	if (provisionalJob && stream) {
+		return { kind: 'myStream', stream };
+	}
+	return { kind: 'my' };
 }

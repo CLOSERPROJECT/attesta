@@ -21,6 +21,11 @@ const sample: TaskFormBundle = {
 	bindings: { domain: {} }
 };
 
+const stream = 'recycling';
+const truck = '261102-1';
+const taskPath = `/${stream}/i/${truck}/intake/new/register`;
+const homeRedirect = { kind: 'home' as const, stream, instance: truck };
+
 function adminWorklist(): Worklist {
 	return {
 		jobs: [
@@ -47,7 +52,7 @@ describe('runTaskFormBeforeLoad', () => {
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 		const navigateRedirect = vi.fn();
 
-		await runTaskFormBeforeLoad('/intake/new/register', {
+		await runTaskFormBeforeLoad(taskPath, {
 			mount,
 			session: { result: { worklist: adminWorklist() } },
 			navigateRedirect
@@ -69,7 +74,7 @@ describe('runTaskFormBeforeLoad', () => {
 		};
 
 		await expect(
-			runTaskFormBeforeLoad('/intake/new/register', {
+			runTaskFormBeforeLoad(taskPath, {
 				mount,
 				session: { result: { worklist: blocked } },
 				navigateRedirect
@@ -77,8 +82,8 @@ describe('runTaskFormBeforeLoad', () => {
 		).rejects.toBe(deniedNav);
 
 		expect(mount.status).toBe('denied');
-		expect(mount.redirect).toEqual({ kind: 'home' });
-		expect(navigateRedirect).toHaveBeenCalledWith({ kind: 'home' });
+		expect(mount.redirect).toEqual(homeRedirect);
+		expect(navigateRedirect).toHaveBeenCalledWith(homeRedirect);
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
@@ -91,7 +96,7 @@ describe('runTaskFormBeforeLoad', () => {
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 		const navigateRedirect = vi.fn();
 
-		await runTaskFormBeforeLoad('/intake/new/register', {
+		await runTaskFormBeforeLoad(taskPath, {
 			mount,
 			session: { result: null },
 			navigateRedirect

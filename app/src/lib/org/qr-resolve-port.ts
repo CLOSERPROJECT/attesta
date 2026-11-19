@@ -9,6 +9,8 @@ export type QrNavigate = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
+	/** Stream instance (anchor) owning the target Task. */
+	streamInstanceId?: string;
 };
 
 export type QrResolveError = {
@@ -24,7 +26,10 @@ export type QrResolveResult = {
 };
 
 export type QrResolvePort = {
-	resolve(raw: string): Promise<QrResolveResult>;
+	resolve(
+		raw: string,
+		scope: { stream: string; instance?: string }
+	): Promise<QrResolveResult>;
 };
 
 export class QrResolveHttpError extends Error {
@@ -49,7 +54,14 @@ function parseNavigate(raw: unknown): QrNavigate | null {
 	const jobInstanceId = typeof rec.jobInstanceId === 'string' ? rec.jobInstanceId : '';
 	const taskId = typeof rec.taskId === 'string' ? rec.taskId : '';
 	if (!jobId || !jobInstanceId || !taskId) return null;
-	return { jobId, jobInstanceId, taskId };
+	const streamInstanceId =
+		typeof rec.streamInstanceId === 'string' ? rec.streamInstanceId.trim() : '';
+	return {
+		jobId,
+		jobInstanceId,
+		taskId,
+		...(streamInstanceId ? { streamInstanceId } : {})
+	};
 }
 
 function parseError(raw: unknown): QrResolveError | null {

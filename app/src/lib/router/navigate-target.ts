@@ -1,24 +1,31 @@
 import { navigate, p } from './index.js';
 import type { PostCommitTarget } from '../org/worklist-nav.js';
 
-/** Resolve ADR-0006 target to an href for `<a>` / Button `href` navigation. */
+/** Org catalog key for /my stream dashboard (matches server orgCatalogKey). */
+export function orgMyStreamDashboardPath(stream: string): string {
+	return `/my/streams/org-${stream}/`;
+}
+
+/** Resolve ADR-0006 / ADR-0014 target to an href for `<a>` / Button `href` navigation. */
 export function hrefOrgTarget(target: PostCommitTarget): string {
+	if (target.kind === 'my') {
+		return '/my';
+	}
+	if (target.kind === 'myStream') {
+		return orgMyStreamDashboardPath(target.stream);
+	}
 	if (target.kind === 'home') {
-		return p('/');
-	}
-	if (target.kind === 'archive') {
-		return p('/archive');
-	}
-	if (target.kind === 'overview') {
-		return p('/:jobId/:jobInstanceId', {
+		return p('/:stream/i/:instance', {
 			params: {
-				jobId: target.jobId,
-				jobInstanceId: target.jobInstanceId
+				stream: target.stream,
+				instance: target.instance
 			}
 		});
 	}
-	return p('/:jobId/:jobInstanceId/:taskId', {
+	return p('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 		params: {
+			stream: target.stream,
+			instance: target.instance,
 			jobId: target.jobId,
 			jobInstanceId: target.jobInstanceId,
 			taskId: target.taskId
@@ -28,22 +35,25 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 
 /** Programmatic navigate; return value is for `throw` inside sv-router hooks. */
 export function navigateOrgTargetAsync(target: PostCommitTarget): Promise<unknown> {
+	if (target.kind === 'my' || target.kind === 'myStream') {
+		const href = hrefOrgTarget(target);
+		if (typeof window !== 'undefined') {
+			window.location.assign(href);
+		}
+		return Promise.resolve();
+	}
 	if (target.kind === 'home') {
-		return navigate('/');
-	}
-	if (target.kind === 'archive') {
-		return navigate('/archive');
-	}
-	if (target.kind === 'overview') {
-		return navigate('/:jobId/:jobInstanceId', {
+		return navigate('/:stream/i/:instance', {
 			params: {
-				jobId: target.jobId,
-				jobInstanceId: target.jobInstanceId
+				stream: target.stream,
+				instance: target.instance
 			}
 		});
 	}
-	return navigate('/:jobId/:jobInstanceId/:taskId', {
+	return navigate('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 		params: {
+			stream: target.stream,
+			instance: target.instance,
 			jobId: target.jobId,
 			jobInstanceId: target.jobInstanceId,
 			taskId: target.taskId

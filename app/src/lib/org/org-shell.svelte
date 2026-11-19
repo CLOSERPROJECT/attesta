@@ -15,17 +15,29 @@
 		actNowRowsFromWorklist,
 		availableRowTarget,
 		taskRouteInstanceSegment,
-		type ActNowRow
+		type ActNowProps
 	} from './worklist-home.js';
 
+	type Props = {
+		stream: string;
+		instance: string;
+	};
+
+	let { stream, instance }: Props = $props();
+
 	onMount(() => {
-		void orgSession.hydrate();
+		void orgSession.hydrate({ stream, instance });
+	});
+
+	$effect(() => {
+		orgSession.setScope({ stream, instance });
 	});
 
 	const actNow = $derived(actNowRowsFromWorklist(orgSession.result?.worklist));
 	const drafts = $derived(orgSession.drafts);
+	const scope = $derived({ stream, instance });
 
-	function rowHasDirtyDraft(row: Extract<ActNowRow, { kind: 'task' }>): boolean {
+	function rowHasDirtyDraft(row: Extract<ActNowProps, { kind: 'task' }>): boolean {
 		void drafts;
 		const addr = draftAddressForTask({
 			jobId: row.jobId,
@@ -72,7 +84,7 @@
 									ready
 									showDraft={rowHasDirtyDraft(row)}
 									accentColor={row.jobColor}
-									href={hrefOrgTarget(availableRowTarget(row))}
+									href={hrefOrgTarget(availableRowTarget(row, scope))}
 								>
 									<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
 									<WorklistJobLine
@@ -91,6 +103,8 @@
 									submit={row.submit}
 									submissionCount={row.submissionCount}
 									request={{
+										stream,
+										instance,
 										jobId: row.jobId,
 										jobInstanceId: row.jobInstanceId,
 										taskId: row.taskId
@@ -103,8 +117,10 @@
 								data-testid="can-start-row"
 								data-job-id={row.jobId}
 								accentColor={row.jobColor}
-								href={p('/:jobId/:jobInstanceId/:taskId', {
+								href={p('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 									params: {
+										stream,
+										instance,
 										jobId: row.jobId,
 										jobInstanceId: taskRouteInstanceSegment(''),
 										taskId: row.firstTaskId

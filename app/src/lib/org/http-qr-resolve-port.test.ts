@@ -4,20 +4,23 @@ import { createHttpQrResolvePort } from './http-qr-resolve-port.js';
 import { QrResolveHttpError } from './qr-resolve-port.js';
 
 describe('HttpQrResolvePort', () => {
-	test('POST /api/org/qr-resolve with { raw } and parses navigate+seed', async () => {
+	test('POST /api/org/qr-resolve sends stream (+ optional instance)', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe('/api/org/qr-resolve');
+			expect(String(input)).toBe(
+				'/api/org/qr-resolve?stream=recycling&instance=261102-1'
+			);
 			expect(init?.method).toBe('POST');
 			expect(init?.credentials).toBe('include');
 			expect(JSON.parse(String(init?.body))).toEqual({
-				raw: 'https://plant.example/app?entityId=P1'
+				raw: 'https://plant.example/app/recycling?entityId=P1'
 			});
 			return new Response(
 				JSON.stringify({
 					navigate: {
 						jobId: 'line',
 						jobInstanceId: 'L1',
-						taskId: 'weigh'
+						taskId: 'weigh',
+						streamInstanceId: '261102-1'
 					},
 					seed: { palletId: 'P1' }
 				}),
@@ -26,11 +29,34 @@ describe('HttpQrResolvePort', () => {
 		});
 
 		const port = createHttpQrResolvePort({ fetch: fetchFn });
-		const got = await port.resolve('https://plant.example/app?entityId=P1');
+		const got = await port.resolve(
+			'https://plant.example/app/recycling?entityId=P1',
+			{ stream: 'recycling', instance: '261102-1' }
+		);
 		expect(got.error).toBeUndefined();
 		expect(got.navigate?.taskId).toBe('weigh');
 		expect(got.seed?.palletId).toBe('P1');
 		expect(fetchFn).toHaveBeenCalledOnce();
+	});
+
+	test('cold scan omits instance query param', async () => {
+		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+			expect(String(input)).toBe('/api/org/qr-resolve?stream=recycling');
+			return new Response(
+				JSON.stringify({
+					navigate: {
+						jobId: 'line',
+						jobInstanceId: 'L1',
+						taskId: 'weigh',
+						streamInstanceId: '261102-1'
+					},
+					seed: {}
+				}),
+				{ status: 200 }
+			);
+		});
+		const port = createHttpQrResolvePort({ fetch: fetchFn });
+		await port.resolve('P1', { stream: 'recycling' });
 	});
 
 	test('422 toastable error body is returned, not thrown', async () => {
@@ -47,7 +73,7 @@ describe('HttpQrResolvePort', () => {
 				)
 		);
 		const port = createHttpQrResolvePort({ fetch: fetchFn });
-		const got = await port.resolve('missing');
+		const got = await port.resolve('missing', { stream: 'recycling' });
 		expect(got.navigate).toBeUndefined();
 		expect(got.error?.code).toBe('ineligible');
 		expect(got.error?.message).toContain('non pesabile');
@@ -56,6 +82,8 @@ describe('HttpQrResolvePort', () => {
 	test('non-OK non-422 throws QrResolveHttpError', async () => {
 		const fetchFn = vi.fn(async () => new Response('boom', { status: 500 }));
 		const port = createHttpQrResolvePort({ fetch: fetchFn });
-		await expect(port.resolve('x')).rejects.toBeInstanceOf(QrResolveHttpError);
+		await expect(
+			port.resolve('x', { stream: 'recycling' })
+		).rejects.toBeInstanceOf(QrResolveHttpError);
 	});
 });

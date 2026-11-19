@@ -115,10 +115,13 @@
 		</p>
 	{:else if status === 'ready' && bundle}
 		<TaskForm
+			stream={addr.stream}
+			instance={addr.instance}
 			{jobId}
 			{taskId}
 			{jobInstanceId}
 			{bundle}
+			provisionalJob={addr.provisionalJob}
 			disabled={Boolean(stayedOutcome)}
 			onCommitted={onCommitted}
 		/>

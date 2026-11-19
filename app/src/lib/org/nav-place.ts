@@ -3,9 +3,8 @@ import * as m from '#lib/paraglide/messages.js';
 import type { Worklist } from './types.js';
 import { worklistJobFor } from './types.js';
 import { resolveTaskExit, type PostCommitTarget } from './worklist-nav.js';
-import { jobInstanceOverview } from './worklist-overview.js';
 
-export type NavPlaceRouteKind = 'home' | 'archive' | 'overview' | 'task';
+export type NavPlaceRouteKind = 'app-root' | 'stream' | 'play' | 'home' | 'task';
 
 /** Org path segments after base strip (trailing slash normalized). */
 export function orgPathSegments(pathname: string): string[] {
@@ -19,90 +18,121 @@ export function orgPathSegments(pathname: string): string[] {
 	return path.replace(/^\//, '').split('/').filter(Boolean);
 }
 
-const ARCHIVE_SEGMENT = 'archive';
+/** `/my` dashboard for an Org stream (`org-{stream}` catalog key). */
+export function orgMyDashboardPath(stream: string): string {
+	return `/my/streams/org-${stream}/`;
+}
+
+export function orgPlayPath(stream: string): string {
+	return `/${stream}/new`;
+}
+
+export function orgHomePath(stream: string, instance: string): string {
+	return `/${stream}/i/${instance}`;
+}
+
+export function orgTaskPath(
+	stream: string,
+	instance: string,
+	jobId: string,
+	jobInstanceId: string,
+	taskId: string
+): string {
+	return `${orgHomePath(stream, instance)}/${jobId}/${jobInstanceId}/${taskId}`;
+}
 
 /**
- * Task/overview coords from pathname only.
- * Nested group paths (5+ segments) are rejected — flat leaf routes only.
+ * Place coords from pathname only (base already removed).
+ * §6: / | /{stream} | /{stream}/new | /{stream}/i/{instance} | …/task
  */
 export type OrgRouteCoords = {
+	stream: string;
+	instance: string;
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
 };
 
+const emptyCoords = (): OrgRouteCoords => ({
+	stream: '',
+	instance: '',
+	jobId: '',
+	jobInstanceId: '',
+	taskId: ''
+});
+
 export function orgRouteCoordsFromPath(input: {
 	pathname: string;
 }): OrgRouteCoords {
 	const segments = orgPathSegments(input.pathname);
-	if (segments.length > 3) {
-		return {
-			jobId: '',
-			jobInstanceId: '',
-			taskId: ''
-		};
+	if (segments.length === 0) {
+		return emptyCoords();
 	}
-	if (segments.length === 3) {
-		return {
-			jobId: segments[0] ?? '',
-			jobInstanceId: segments[1] ?? '',
-			taskId: segments[2] ?? ''
-		};
-	}
-	if (segments.length === 2) {
-		return {
-			jobId: segments[0] ?? '',
-			jobInstanceId: segments[1] ?? '',
-			taskId: ''
-		};
+	const stream = segments[0] ?? '';
+	if (!stream || stream === 'i' || stream === 'new') {
+		return emptyCoords();
 	}
 	if (segments.length === 1) {
-		return {
-			jobId: segments[0] ?? '',
-			jobInstanceId: '',
-			taskId: ''
-		};
+		return { ...emptyCoords(), stream };
 	}
-	return {
-		jobId: '',
-		jobInstanceId: '',
-		taskId: ''
-	};
+	if (segments.length === 2 && segments[1] === 'new') {
+		return { ...emptyCoords(), stream };
+	}
+	if (segments[1] === 'i') {
+		const instance = segments[2] ?? '';
+		if (!instance) return emptyCoords();
+		if (segments.length === 3) {
+			return { ...emptyCoords(), stream, instance };
+		}
+		if (segments.length === 6) {
+			return {
+				stream,
+				instance,
+				jobId: segments[3] ?? '',
+				jobInstanceId: segments[4] ?? '',
+				taskId: segments[5] ?? ''
+			};
+		}
+	}
+	return emptyCoords();
 }
 
 /**
  * Place kind from stripped route.pathname only (base already removed).
- * Segment count — not route.params.taskId — because sv-router may retain a
- * stale taskId on 2-segment overview, which would mis-classify as task and
- * make Back navigate to the same overview (no-op).
- * Trailing slash → still home at `/`.
- * Flat Task: job / jobInstance / task (3 segments).
- * Static `/archive` is Archive (not a Job id).
+ * Segment shapes match the §6 Routes table — not route.params.
  */
 export function navPlaceKindFromRoute(input: {
 	pathname: string;
 }): NavPlaceRouteKind {
 	const segments = orgPathSegments(input.pathname);
 	if (segments.length === 0) {
-		return 'home';
+		return 'app-root';
 	}
-	if (segments.length === 1 && segments[0] === ARCHIVE_SEGMENT) {
-		return 'archive';
+	const stream = segments[0] ?? '';
+	if (!stream || stream === 'i' || stream === 'new') {
+		return 'app-root';
 	}
-	if (segments.length > 3) {
-		return 'home';
+	if (segments.length === 1) {
+		return 'stream';
 	}
-	if (segments.length === 3) {
-		return 'task';
+	if (segments.length === 2 && segments[1] === 'new') {
+		return 'play';
 	}
-	if (segments.length === 2) {
-		return 'overview';
+	if (segments[1] === 'i') {
+		if (segments.length === 3 && segments[2]) {
+			return 'home';
+		}
+		if (segments.length === 6) {
+			return 'task';
+		}
 	}
-	return 'overview';
+	return 'app-root';
 }
 
 export type NavPlaceInput = {
 	kind: NavPlaceRouteKind;
+	stream: string;
+	instance: string;
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
@@ -113,13 +143,11 @@ export type NavPlaceInput = {
 
 export type NavPlaceChrome = {
 	showBack: boolean;
-	/** Home from Archive/Task/overview (arrival tracking skipped — always home). */
-	backTarget: Extract<PostCommitTarget, { kind: 'home' | 'archive' }>;
+	backTarget: PostCommitTarget;
 	primaryLabel: string;
 	/**
-	 * Muted top line: authored Job.title on overview; on Task pages
-	 * `title · instance` (title alone when provisional Start has no instance).
-	 * Null omits the line (never raw job id alone as a stand-in title).
+	 * Muted top line: on Task pages `title · instance` (title alone when
+	 * provisional Start has no instance). Null omits the line.
 	 */
 	jobTitleLine: string | null;
 };
@@ -158,48 +186,65 @@ function taskTitleFromWorklist(
 	return taskId.trim() || taskId;
 }
 
+function instanceLabelFromWorklist(
+	worklist: Worklist | null | undefined,
+	jobId: string,
+	jobInstanceId: string
+): string {
+	const job = worklistJobFor(worklist, jobId);
+	const inst = job?.instances.find((row) => row.id === jobInstanceId);
+	const label = inst?.label?.trim();
+	return label || jobInstanceId;
+}
+
 /**
  * Place chrome DTO for org nav: label + back law only.
- * Reuses overview instance label and Worklist task/job title sources.
- * Overview never composes `·` (instance label only); taskId is ignored when kind is overview.
+ * Back from Task → instance home; Play → `/my` stream dashboard.
  */
 export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
-	const { kind, jobId, jobInstanceId, taskId, provisionalJob, worklist } = input;
+	const {
+		kind,
+		stream,
+		instance,
+		jobId,
+		jobInstanceId,
+		taskId,
+		provisionalJob,
+		worklist
+	} = input;
 
-	if (kind === 'home') {
+	if (kind === 'app-root') {
 		return {
 			showBack: false,
-			backTarget: { kind: 'home' },
+			backTarget: { kind: 'my' },
 			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		};
 	}
 
-	if (kind === 'archive') {
+	if (kind === 'stream') {
 		return {
-			showBack: true,
-			backTarget: { kind: 'home' },
-			primaryLabel: m.archive(),
+			showBack: false,
+			backTarget: { kind: 'myStream', stream },
+			primaryLabel: m.fallback_home(),
+			jobTitleLine: null
+		};
+	}
+
+	if (kind === 'home') {
+		return {
+			showBack: false,
+			backTarget: { kind: 'home', stream, instance },
+			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		};
 	}
 
 	const jobTitleLine = authoredJobTitle(worklist, jobId);
-
-	if (kind === 'overview') {
-		const overview = jobInstanceOverview(worklist, jobId, jobInstanceId);
-		return {
-			showBack: true,
-			backTarget: { kind: 'home' },
-			primaryLabel: overview?.label ?? m.fallback_job_instance(),
-			jobTitleLine
-		};
-	}
-
 	const taskTitle = taskTitleFromWorklist(worklist, jobId, taskId);
-	const backTarget = resolveTaskExit(jobId, jobInstanceId, provisionalJob);
+	const backTarget = resolveTaskExit(stream, instance, provisionalJob || kind === 'play');
 
-	if (provisionalJob) {
+	if (kind === 'play' || provisionalJob) {
 		return {
 			showBack: true,
 			backTarget,
@@ -208,8 +253,7 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 		};
 	}
 
-	const overview = jobInstanceOverview(worklist, jobId, jobInstanceId);
-	const instanceLabel = overview?.label ?? jobInstanceId;
+	const instanceLabel = instanceLabelFromWorklist(worklist, jobId, jobInstanceId);
 	return {
 		showBack: true,
 		backTarget,

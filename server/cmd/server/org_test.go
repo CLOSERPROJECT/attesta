@@ -442,8 +442,8 @@ func TestLivingProductHttpPortFromEnvOrSoftFail(t *testing.T) {
 	if handler.TaskCommitter.HttpPort != stub {
 		t.Fatalf("handler HttpPort = %T, want override", handler.TaskCommitter.HttpPort)
 	}
-	if handler.TaskCommitter.SubmitBindings["qrEndpoint"] != "https://plant.example/app" {
-		t.Fatalf("SubmitBindings = %#v", handler.TaskCommitter.SubmitBindings)
+	if got := org.OrgAppBaseURL("recycling"); got != "https://plant.example/app/recycling" {
+		t.Fatalf("OrgAppBaseURL(recycling) = %q", got)
 	}
 	if handler.Artifacts == nil {
 		t.Fatal("handler Artifacts should still come from env when HttpPort is overridden")

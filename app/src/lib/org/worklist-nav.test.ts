@@ -11,6 +11,9 @@ import {
 	resolveUnmountableTaskTarget
 } from './worklist-nav.js';
 
+const stream = 'recycling';
+const instance = 'NIR-1';
+
 const taskChrome = [
 	{ id: 'register', title: 'Registrazione', roles: ['administration'] },
 	{ id: 'codiceFir', title: 'Codice FIR', roles: ['administration'] },
@@ -72,136 +75,198 @@ const nextBundle: TaskFormBundle = {
 };
 
 describe('post-Commit navigation adapter', () => {
-	test('task next uses nextTaskFormBundle address', () => {
+	test('task next uses nextTaskFormBundle address under stream instance', () => {
 		expect(
-			resolvePostCommitNavigation('task', 'intake', 'NIR-advance', nextBundle)
+			resolvePostCommitNavigation(
+				'task',
+				stream,
+				'NIR-advance',
+				'intake',
+				'NIR-advance',
+				nextBundle
+			)
 		).toEqual({
 			kind: 'task',
+			stream,
+			instance: 'NIR-advance',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-advance',
 			taskId: 'codiceFir'
 		});
 	});
 
-	test('task next without usable bundle falls back to home', () => {
-		expect(resolvePostCommitNavigation('task', 'intake', 'NIR-advance', null)).toEqual({
-			kind: 'home'
+	test('task next without usable bundle falls back to instance home', () => {
+		expect(
+			resolvePostCommitNavigation('task', stream, instance, 'intake', 'NIR-advance', null)
+		).toEqual({
+			kind: 'home',
+			stream,
+			instance
 		});
 	});
 
-	test('legacy overview wire maps to home (never Archive overview)', () => {
-		expect(resolvePostCommitNavigation('overview', 'intake', 'NIR-1', null)).toEqual({
-			kind: 'home'
-		});
-		expect(resolvePostCommitNavigation('overview', 'intake', 'NIR-1', null).kind).not.toBe(
-			'overview'
+	test('legacy overview wire maps to instance home (never overview/archive)', () => {
+		const target = resolvePostCommitNavigation(
+			'overview',
+			stream,
+			instance,
+			'intake',
+			'NIR-1',
+			null
 		);
-		expect(resolvePostCommitNavigation('overview', 'intake', 'NIR-1', null).kind).not.toBe(
-			'archive'
-		);
+		expect(target).toEqual({ kind: 'home', stream, instance });
+		expect(target.kind).not.toBe('overview');
+		expect(target.kind).not.toBe('archive');
 	});
 
-	test('home next goes Home', () => {
-		expect(resolvePostCommitNavigation('home', 'intake', 'NIR-done', null)).toEqual({
-			kind: 'home'
+	test('home next goes instance home; Play Commit uses minted instance', () => {
+		expect(
+			resolvePostCommitNavigation('home', stream, instance, 'intake', 'NIR-done', null)
+		).toEqual({
+			kind: 'home',
+			stream,
+			instance
+		});
+		expect(resolvePostCommitNavigation('home', stream, '', 'intake', 'T-new', null)).toEqual({
+			kind: 'home',
+			stream,
+			instance: 'T-new'
 		});
 	});
 });
 
 describe('Task deep link + exit', () => {
-	test('unauthorized / unavailable Task URL → home; unknown → home', () => {
+	test('unauthorized / unavailable Task URL → instance home', () => {
 		expect(
-			resolveTaskDeepLink('intake', 'NIR-1', 'palletWeight', false, adminWorklist)
-		).toEqual({ kind: 'home' });
+			resolveTaskDeepLink(
+				stream,
+				instance,
+				'intake',
+				'NIR-1',
+				'palletWeight',
+				false,
+				adminWorklist
+			)
+		).toEqual({ kind: 'home', stream, instance });
 
 		expect(
-			resolveTaskDeepLink('intake', 'NIR-advance', 'codiceFir', false, adminWorklist)
+			resolveTaskDeepLink(
+				stream,
+				'NIR-advance',
+				'intake',
+				'NIR-advance',
+				'codiceFir',
+				false,
+				adminWorklist
+			)
 		).toEqual({ kind: 'task' });
 
 		expect(
-			resolveTaskDeepLink('intake', 'missing', 'register', false, adminWorklist)
-		).toEqual({ kind: 'home' });
-
-		expect(
-			resolveTaskDeepLink('intake', 'new', 'register', true, adminWorklist)
+			resolveTaskDeepLink(stream, instance, 'intake', 'new', 'register', true, adminWorklist)
 		).toEqual({ kind: 'task' });
 	});
 
-	test('provisional Start mounts only when canStart and first Task (server ViewerMayMountTask)', () => {
+	test('provisional Start mounts only when canStart and first Task', () => {
 		const blocked: Worklist = {
-			jobs: [
-				{
-					...adminWorklist.jobs[0]!,
-					canStart: false
-				}
-			]
+			jobs: [{ ...adminWorklist.jobs[0]!, canStart: false }]
 		};
-		// After truckArrive Commit: worklist updates before navigate; must not fetch /new.
 		expect(
-			resolveTaskDeepLink('intake', 'new', 'register', true, blocked)
-		).toEqual({ kind: 'home' });
+			resolveTaskDeepLink(stream, instance, 'intake', 'new', 'register', true, blocked)
+		).toEqual({ kind: 'home', stream, instance });
 		expect(
-			resolveTaskDeepLink('intake', '', 'register', true, blocked)
-		).toEqual({ kind: 'home' });
-		// Wrong leaf on a startable Job (CollectActionableTaskRefs is first Task only).
-		expect(
-			resolveTaskDeepLink('intake', 'new', 'codiceFir', true, adminWorklist)
-		).toEqual({ kind: 'home' });
+			resolveTaskDeepLink(stream, instance, 'intake', 'new', 'codiceFir', true, adminWorklist)
+		).toEqual({ kind: 'home', stream, instance });
 	});
 
-	test('task-form deny shares unmountable redirect with deep-link → home', () => {
+	test('Play provisional Start skips Worklist canStart (task-form is the gate)', () => {
 		expect(
-			resolveUnmountableTaskTarget('intake', 'NIR-1', false, adminWorklist)
-		).toEqual({ kind: 'home' });
-		expect(resolveUnmountableTaskTarget('intake', '', true, adminWorklist)).toEqual({
-			kind: 'home'
+			resolveTaskDeepLink(stream, '', 'intake', 'new', 'truckArrive', true, null, {
+				play: true
+			})
+		).toEqual({ kind: 'task' });
+	});
+
+	test('task-form deny shares unmountable redirect with deep-link', () => {
+		expect(
+			resolveUnmountableTaskTarget(stream, instance, 'intake', 'NIR-1', false, adminWorklist)
+		).toEqual({ kind: 'home', stream, instance });
+		expect(
+			resolveUnmountableTaskTarget(stream, '', 'intake', '', true, adminWorklist)
+		).toEqual({
+			kind: 'myStream',
+			stream
 		});
-		expect(
-			resolveUnmountableTaskTarget('intake', 'missing', false, adminWorklist)
-		).toEqual({ kind: 'home' });
 	});
 
-	test('Task exit: always home (minted and provisional)', () => {
-		expect(resolveTaskExit('intake', '', true)).toEqual({ kind: 'home' });
-		expect(resolveTaskExit('intake', 'NIR-1', false)).toEqual({ kind: 'home' });
+	test('Task exit: instance home; Play → my stream', () => {
+		expect(resolveTaskExit(stream, instance, false)).toEqual({
+			kind: 'home',
+			stream,
+			instance
+		});
+		expect(resolveTaskExit(stream, '', true)).toEqual({
+			kind: 'myStream',
+			stream
+		});
 	});
 
 	test('navigation stay parks; other destinations follow ADR law', () => {
-		expect(resolveCommitFollowUp('stay', 'intake', 'T1', null)).toEqual({
+		expect(resolveCommitFollowUp('stay', stream, instance, 'intake', 'T1', null)).toEqual({
 			kind: 'stay'
 		});
-		expect(resolveCommitFollowUp('overview', 'intake', 'T1', null)).toEqual({
-			kind: 'home'
+		expect(resolveCommitFollowUp('overview', stream, instance, 'intake', 'T1', null)).toEqual({
+			kind: 'home',
+			stream,
+			instance
 		});
 		expect(
-			resolveCommitFollowUp('task', 'intake', 'NIR-advance', nextBundle)
+			resolveCommitFollowUp(
+				'task',
+				stream,
+				'NIR-advance',
+				'intake',
+				'NIR-advance',
+				nextBundle
+			)
 		).toEqual({
 			kind: 'task',
+			stream,
+			instance: 'NIR-advance',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-advance',
 			taskId: 'codiceFir'
-		});
-		expect(resolveCommitFollowUp('home', 'lot_processing', 'L1', null)).toEqual({
-			kind: 'home'
 		});
 	});
 
 	test('Continue uses continueNavigation only', () => {
 		expect(
-			resolveContinueNavigation('overview', 'intake', 'T1', null)
+			resolveContinueNavigation('overview', stream, instance, 'intake', 'T1', null)
 		).toEqual({
-			kind: 'home'
+			kind: 'home',
+			stream,
+			instance
 		});
 		expect(
-			resolveContinueNavigation('task', 'intake', 'NIR-advance', nextBundle)
+			resolveContinueNavigation(
+				'task',
+				stream,
+				'NIR-advance',
+				'intake',
+				'NIR-advance',
+				nextBundle
+			)
 		).toEqual({
 			kind: 'task',
+			stream,
+			instance: 'NIR-advance',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-advance',
 			taskId: 'codiceFir'
 		});
-		expect(resolveContinueNavigation(null, 'intake', 'T1', null)).toEqual({
-			kind: 'home'
+		expect(resolveContinueNavigation(null, stream, instance, 'intake', 'T1', null)).toEqual({
+			kind: 'home',
+			stream,
+			instance
 		});
 	});
 });

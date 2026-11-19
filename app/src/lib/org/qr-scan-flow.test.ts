@@ -8,16 +8,20 @@ describe('runQrScan', () => {
 		const drafts = new Map<string, Record<string, unknown>>();
 		const navigate = vi.fn();
 		const toast = vi.fn();
+		const resolve = vi.fn(async () => ({
+			navigate: {
+				jobId: 'line',
+				jobInstanceId: 'L1',
+				taskId: 'weigh',
+				streamInstanceId: '261102-1'
+			},
+			seed: { palletId: 'P1' }
+		}));
 		const result = await runQrScan(
 			{
-				resolve: async () => ({
-					navigate: {
-						jobId: 'line',
-						jobInstanceId: 'L1',
-						taskId: 'weigh'
-					},
-					seed: { palletId: 'P1' }
-				}),
+				resolve,
+				stream: 'recycling',
+				instance: '261102-1',
 				drafts: {
 					getDraft: (path, key) => drafts.get(`${path}::${key}`) ?? null,
 					setDraft: (path, key, value) => {
@@ -27,14 +31,20 @@ describe('runQrScan', () => {
 				navigate,
 				toast
 			},
-			'https://plant.example/app?entityId=P1'
+			'https://plant.example/app/recycling?entityId=P1'
 		);
 		expect(result).toBe('navigated');
+		expect(resolve).toHaveBeenCalledWith(
+			'https://plant.example/app/recycling?entityId=P1',
+			{ stream: 'recycling', instance: '261102-1' }
+		);
 		expect(drafts.get('line/weigh::L1')).toEqual({
 			palletId: 'P1'
 		});
 		expect(navigate).toHaveBeenCalledWith({
 			kind: 'task',
+			stream: 'recycling',
+			instance: '261102-1',
 			jobId: 'line',
 			jobInstanceId: 'L1',
 			taskId: 'weigh'
@@ -50,6 +60,7 @@ describe('runQrScan', () => {
 				resolve: async () => ({
 					error: { code: 'many', message: 'Più destinazioni possibili' }
 				}),
+				stream: 'recycling',
 				drafts: {
 					getDraft: () => null,
 					setDraft: () => undefined
@@ -71,6 +82,7 @@ describe('runQrScan', () => {
 				resolve: async () => {
 					throw new QrResolveHttpError('org qr-resolve failed (500)', 500);
 				},
+				stream: 'recycling',
 				drafts: {
 					getDraft: () => null,
 					setDraft: () => undefined
@@ -78,7 +90,7 @@ describe('runQrScan', () => {
 				navigate: vi.fn(),
 				toast
 			},
-			'P1'
+			'x'
 		);
 		expect(toast).toHaveBeenCalledWith('org qr-resolve failed (500)');
 	});

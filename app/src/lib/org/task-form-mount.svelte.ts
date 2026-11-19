@@ -71,6 +71,8 @@ export class TaskFormMount {
 		if (!current) return { kind: 'allow' };
 
 		const gate = resolveTaskDeepLink(
+			current.stream,
+			current.instance,
 			current.jobId,
 			current.jobInstanceId,
 			current.taskId,
@@ -104,6 +106,8 @@ export class TaskFormMount {
 
 		try {
 			const next = await this.taskFormPort.fetch({
+				stream: addr.stream,
+				instance: addr.instance || undefined,
 				jobId: addr.jobId,
 				taskId: addr.taskId,
 				jobInstanceId: wireJobInstanceId(addr)
