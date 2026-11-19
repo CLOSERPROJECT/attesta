@@ -212,6 +212,90 @@ func TestRewriteOpenAPIServersErrors(t *testing.T) {
 	}
 }
 
+func TestEnhanceOpenAPIDocsAddsSessionCookieSecurityAndExamples(t *testing.T) {
+	input := []byte(`{
+		"openapi":"3.0.3",
+		"paths":{
+			"/api/catalog":{"get":{"parameters":[],"responses":{"200":{"description":"OK response."}}}},
+			"/login":{"post":{"operationId":"auth#login","responses":{"303":{"description":"See Other response."}}}},
+			"/org-admin/formata-builder":{"post":{"operationId":"formata_builder#saveStream","responses":{"204":{"description":"No Content response."}}}},
+			"/w/{workflow_key}/process/{process_id}/substep/{substep_id}/complete":{"post":{"operationId":"workflow#completeSubstep","parameters":[],"responses":{"200":{"description":"OK response."}}}},
+			"/01/{gtin}/10/{lot}/21/{serial}":{"get":{"parameters":[{"name":"gtin","in":"path","schema":{"type":"string","example":"Lorem ipsum"},"example":"Lorem ipsum"}],"responses":{"200":{"description":"OK response."}}}}
+		},
+		"components":{"schemas":{}}
+	}`)
+	data, err := enhanceOpenAPIDocs(input, "openapi3.json")
+	if err != nil {
+		t.Fatalf("enhanceOpenAPIDocs: %v", err)
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	components := doc["components"].(map[string]interface{})
+	schemes := components["securitySchemes"].(map[string]interface{})
+	session := schemes["attesta_session"].(map[string]interface{})
+	if session["in"] != "cookie" || session["name"] != "attesta_session" {
+		t.Fatalf("attesta_session scheme = %#v, want cookie attesta_session", session)
+	}
+	paths := doc["paths"].(map[string]interface{})
+	catalogGet := paths["/api/catalog"].(map[string]interface{})["get"].(map[string]interface{})
+	security := catalogGet["security"].([]interface{})
+	if len(security) != 1 {
+		t.Fatalf("catalog security = %#v", security)
+	}
+	if _, ok := catalogGet["responses"].(map[string]interface{})["401"]; !ok {
+		t.Fatalf("catalog responses missing 401: %#v", catalogGet["responses"])
+	}
+	dppGet := paths["/01/{gtin}/10/{lot}/21/{serial}"].(map[string]interface{})["get"].(map[string]interface{})
+	if _, ok := dppGet["security"]; ok {
+		t.Fatalf("public DPP operation should not require session: %#v", dppGet["security"])
+	}
+	params := dppGet["parameters"].([]interface{})
+	gtin := params[0].(map[string]interface{})
+	if gtin["example"] != "09506000134352" {
+		t.Fatalf("gtin example = %#v, want domain example", gtin["example"])
+	}
+	loginPost := paths["/login"].(map[string]interface{})["post"].(map[string]interface{})
+	loginBody := loginPost["requestBody"].(map[string]interface{})
+	loginContent := loginBody["content"].(map[string]interface{})
+	loginForm := loginContent["application/x-www-form-urlencoded"].(map[string]interface{})
+	loginSchema := loginForm["schema"].(map[string]interface{})
+	loginProps := loginSchema["properties"].(map[string]interface{})
+	if _, ok := loginProps["email"]; !ok {
+		t.Fatalf("login request body missing email field: %#v", loginProps)
+	}
+	completePost := paths["/w/{workflow_key}/process/{process_id}/substep/{substep_id}/complete"].(map[string]interface{})["post"].(map[string]interface{})
+	completeBody := completePost["requestBody"].(map[string]interface{})
+	completeContent := completeBody["content"].(map[string]interface{})
+	completeForm := completeContent["application/x-www-form-urlencoded"].(map[string]interface{})
+	completeSchema := completeForm["schema"].(map[string]interface{})
+	completeProps := completeSchema["properties"].(map[string]interface{})
+	if _, ok := completeProps["value"]; !ok {
+		t.Fatalf("complete request body missing value field: %#v", completeProps)
+	}
+	if !strings.Contains(completeBody["description"].(string), "not the Formata schema") {
+		t.Fatalf("complete request body should document schema validation gap: %q", completeBody["description"])
+	}
+	savePost := paths["/org-admin/formata-builder"].(map[string]interface{})["post"].(map[string]interface{})
+	saveBody := savePost["requestBody"].(map[string]interface{})
+	saveContent := saveBody["content"].(map[string]interface{})
+	if _, ok := saveContent["application/json"]; !ok {
+		t.Fatalf("save stream request body missing application/json: %#v", saveContent)
+	}
+}
+
+func TestEnhanceOpenAPIDocsLeavesNonOpenAPIFile(t *testing.T) {
+	input := []byte("plain")
+	data, err := enhanceOpenAPIDocs(input, "index.html")
+	if err != nil {
+		t.Fatalf("enhanceOpenAPIDocs: %v", err)
+	}
+	if string(data) != string(input) {
+		t.Fatalf("data changed for non OpenAPI file: %s", data)
+	}
+}
+
 func TestServeOpenAPIFileRewritesServerToRequestOrigin(t *testing.T) {
 	server := &Server{}
 	req := httptest.NewRequest(http.MethodGet, "http://internal:3000/docs/openapi3.json", nil)
