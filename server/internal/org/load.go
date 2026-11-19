@@ -17,8 +17,8 @@ type LoadResult struct {
 	ActiveConfigVersion string `json:"activeConfigVersion"`
 	ConfigID            string `json:"configId"`
 	// Viewer OperatorIdentity projection for SPA chrome ($operator) — not Cerbos.
-	UserID      string   `json:"userId"`
-	DisplayName string   `json:"displayName"`
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
 	// Roles are the caller's Config role slugs (OperatorIdentity; not Cerbos).
 	Roles    []string  `json:"roles"`
 	Domain   Domain    `json:"-"`
@@ -40,27 +40,27 @@ type DomainLoader struct {
 	LinkStore LinkStore
 }
 
-// Load returns the org Domain (empty when none stored) and the Active Config
+// Load returns the stream Domain (empty when none stored) and the Active Config
 // version document, projecting Worklist Available / canStart for op's roles.
-func (l *DomainLoader) Load(ctx context.Context, org string, op OperatorIdentity) (LoadResult, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
-		return LoadResult{}, fmt.Errorf("org: org required")
+func (l *DomainLoader) Load(ctx context.Context, scope Scope, op OperatorIdentity) (LoadResult, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return LoadResult{}, err
 	}
 	if l.Domains == nil || l.Configs == nil {
 		return LoadResult{}, fmt.Errorf("org: stores required")
 	}
 
-	version, err := l.Configs.ActiveVersion(ctx, org)
+	version, err := l.Configs.ActiveVersion(ctx, scope)
 	if err != nil {
 		return LoadResult{}, err
 	}
-	cfg, err := l.Configs.Get(ctx, org, version)
+	cfg, err := l.Configs.Get(ctx, scope, version)
 	if err != nil {
 		return LoadResult{}, err
 	}
 
-	domain, err := l.Domains.Get(ctx, org)
+	domain, err := l.Domains.Get(ctx, scope)
 	if err != nil {
 		if !errors.Is(err, ErrNotFound) {
 			return LoadResult{}, err
@@ -74,7 +74,7 @@ func (l *DomainLoader) Load(ctx context.Context, org string, op OperatorIdentity
 		displayName = strings.TrimSpace(op.UserID)
 	}
 	return LoadResult{
-		Org:                 org,
+		Org:                 scope.Org,
 		ActiveConfigVersion: version,
 		ConfigID:            cfg.ID,
 		UserID:              strings.TrimSpace(op.UserID),
@@ -91,31 +91,34 @@ func (l *DomainLoader) Load(ctx context.Context, org string, op OperatorIdentity
 // (empty or "new" = provisional start). Denied when outside viewer Worklist scope.
 func (l *DomainLoader) LoadTaskBundle(
 	ctx context.Context,
-	org string,
+	scope Scope,
 	op OperatorIdentity,
 	jobID, taskID, jobInstanceID string,
 ) (*TaskFormBundle, error) {
-	org = strings.TrimSpace(org)
+	scope, err := scope.Normalize()
+	if err != nil {
+		return nil, err
+	}
 	jobID = strings.TrimSpace(jobID)
 	taskID = strings.TrimSpace(taskID)
 	jobInstanceID = NormalizeJobInstanceID(jobInstanceID)
-	if org == "" || jobID == "" || taskID == "" {
+	if jobID == "" || taskID == "" {
 		return nil, fmt.Errorf("org: org, jobId, and taskId required")
 	}
 	if l.Domains == nil || l.Configs == nil {
 		return nil, fmt.Errorf("org: stores required")
 	}
 
-	version, err := l.Configs.ActiveVersion(ctx, org)
+	version, err := l.Configs.ActiveVersion(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := l.Configs.Get(ctx, org, version)
+	cfg, err := l.Configs.Get(ctx, scope, version)
 	if err != nil {
 		return nil, err
 	}
 
-	domain, err := l.Domains.Get(ctx, org)
+	domain, err := l.Domains.Get(ctx, scope)
 	if err != nil {
 		if !errors.Is(err, ErrNotFound) {
 			return nil, err

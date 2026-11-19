@@ -73,10 +73,10 @@ func TestLockLoadRecapMatchesCommitFreeze(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryDPPStore()
 	cfg := syntheticDPPConfig()
-	if err := configs.Put(t.Context(), "synth", "v1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "synth", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "synth", Stream: "synth"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
@@ -84,7 +84,7 @@ func TestLockLoadRecapMatchesCommitFreeze(t *testing.T) {
 		"W-3": {"lot": "LOT-3", "color": "red"},
 	})
 	domain.JobInstances = []JobInstance{{JobID: "issue", ID: "W-3", Label: "Widget W-3"}}
-	if err := domains.Put(t.Context(), "synth", domain); err != nil {
+	if err := domains.Put(t.Context(), Scope{Org: "synth", Stream: "synth"}, domain); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,11 +103,11 @@ func TestLockLoadRecapMatchesCommitFreeze(t *testing.T) {
 	c := &TaskCommitter{
 		Domains:    domains,
 		Configs:    configs,
-		DPPs:  passports,
+		DPPs:       passports,
 		Authorizer: AllowAllAuthorizer{},
 		Now:        func() time.Time { return time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC) },
 	}
-	_, err = c.Commit(t.Context(), "synth", OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}, CommitRequest{
+	_, err = c.Commit(t.Context(), Scope{Org: "synth", Stream: "synth"}, OperatorIdentity{UserID: "ada", Org: "synth", Roles: []string{"operator"}}, CommitRequest{
 		TaskPath:      "issue/lock",
 		JobInstanceID: "W-3",
 		Value:         map[string]any{"ack": true},
@@ -169,8 +169,8 @@ func TestPrepStripsInjectedPassportSnapshotChrome(t *testing.T) {
 		},
 	}
 	got, err := prepTaskSubmission(task, map[string]any{
-		"ack":                     true,
-		DPPSnapshotChromeID:  "ignored",
+		"ack":               true,
+		DPPSnapshotChromeID: "ignored",
 	}, nil)
 	if err != nil {
 		t.Fatal(err)

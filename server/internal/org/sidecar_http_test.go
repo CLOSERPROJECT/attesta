@@ -101,7 +101,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	c.HttpPort = UnconfiguredHttpPort{}
 
 	truckID := commitTruckArrive(t, c)
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
@@ -118,7 +118,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	if len(result.HttpErrors) != 2 {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
-	stored, err := domains.Get(t.Context(), "feragame")
+	stored, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 	c.HttpPort = NewSidecarHttpPort(srv.URL, "tok", srv.Client())
 
 	truckID := commitTruckArrive(t, c)
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),

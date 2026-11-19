@@ -12,14 +12,14 @@ import (
 
 type conflictDomainStore struct{ DomainStore }
 
-func (conflictDomainStore) Update(context.Context, string, func(Domain) (Domain, error)) (Domain, error) {
+func (conflictDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, error) {
 	return Domain{}, ErrDomainConflict
 }
 
 func TestMemoryDomainStoreUpdateMissingOrgPassesEmptyDomain(t *testing.T) {
 	s := NewMemoryDomainStore()
 	var seen Domain
-	got, err := s.Update(t.Context(), "acme", func(d Domain) (Domain, error) {
+	got, err := s.Update(t.Context(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
 		seen = d
 		d.Submissions = append(d.Submissions, Submission{JobID: "j", TaskID: "t"})
 		return d, nil
@@ -30,7 +30,7 @@ func TestMemoryDomainStoreUpdateMissingOrgPassesEmptyDomain(t *testing.T) {
 	if len(seen.Submissions) != 0 || seen.Entities == nil {
 		t.Fatalf("fn input = %#v, want EmptyDomain", seen)
 	}
-	stored, err := s.Get(t.Context(), "acme")
+	stored, err := s.Get(t.Context(), Scope{Org: "acme", Stream: "main"})
 	if err != nil || len(stored.Submissions) != 1 || len(got.Submissions) != 1 {
 		t.Fatalf("stored = %#v err=%v", stored, err)
 	}
@@ -39,14 +39,14 @@ func TestMemoryDomainStoreUpdateMissingOrgPassesEmptyDomain(t *testing.T) {
 func TestMemoryDomainStoreUpdateFnErrorWritesNothing(t *testing.T) {
 	s := NewMemoryDomainStore()
 	boom := errors.New("boom")
-	_, err := s.Update(t.Context(), "acme", func(d Domain) (Domain, error) {
+	_, err := s.Update(t.Context(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
 		d.Submissions = append(d.Submissions, Submission{JobID: "j"})
 		return d, boom
 	})
 	if err != boom {
 		t.Fatalf("err = %v, want the fn error unchanged", err)
 	}
-	if _, err := s.Get(t.Context(), "acme"); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Get(t.Context(), Scope{Org: "acme", Stream: "main"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Get after failed Update = %v, want ErrNotFound", err)
 	}
 }
@@ -59,7 +59,7 @@ func TestMemoryDomainStoreUpdateConcurrentAppendsAllLand(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.Update(context.Background(), "acme", func(d Domain) (Domain, error) {
+			_, err := s.Update(context.Background(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
 				d.Submissions = append(d.Submissions, Submission{JobID: "j", TaskID: "t", JobInstanceID: string(rune('a' + i))})
 				return d, nil
 			})
@@ -69,7 +69,7 @@ func TestMemoryDomainStoreUpdateConcurrentAppendsAllLand(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	got, err := s.Get(t.Context(), "acme")
+	got, err := s.Get(t.Context(), Scope{Org: "acme", Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestCommitConcurrentMintsDistinctIDs(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res, err := c.Commit(context.Background(), "feragame", op, CommitRequest{
+			res, err := c.Commit(context.Background(), FeragameScope(), op, CommitRequest{
 				TaskPath: "intake/truckArrive",
 				Value:    truckArriveValue(),
 				Mint:     startingNewMint(),
@@ -109,7 +109,7 @@ func TestCommitConcurrentMintsDistinctIDs(t *testing.T) {
 		}
 		seen[id] = true
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestCommitMapsDomainConflict(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	req := CommitRequest{TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint()}
 
-	_, err := c.Commit(t.Context(), "feragame", op, req)
+	_, err := c.Commit(t.Context(), FeragameScope(), op, req)
 	var ce *CommitError
 	if !asCommitError(err, &ce) || ce.Kind != "conflict" {
 		t.Fatalf("err = %v, want CommitError conflict", err)

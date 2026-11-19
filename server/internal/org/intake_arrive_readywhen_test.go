@@ -86,7 +86,7 @@ func TestCommitRegisterDeniedByReadyWhenBeforeArrive(t *testing.T) {
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "T1"}}
 	putKind(&domain, "truck", EntityMap{"T1": {"truckWeight": 1000.0, "lastScaleReading": 1000.0}})
-	if err := domains.Put(t.Context(), "feragame", domain); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), domain); err != nil {
 		t.Fatal(err)
 	}
 
@@ -95,7 +95,7 @@ func TestCommitRegisterDeniedByReadyWhenBeforeArrive(t *testing.T) {
 		t.Fatal("precondition: register readyWhen must be false before arrive")
 	}
 
-	_, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: "T1",
 		Value:         registerLotValue(),
@@ -105,7 +105,7 @@ func TestCommitRegisterDeniedByReadyWhenBeforeArrive(t *testing.T) {
 		t.Fatalf("register Commit before truckArrive must deny via readyWhen: %v", err)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: "T1",
 		Value:         map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 100.0},

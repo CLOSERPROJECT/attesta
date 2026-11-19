@@ -18,7 +18,7 @@ import (
 func seedOrgDemo(t *testing.T, server *Server) {
 	t.Helper()
 	server.ensureOrgStores()
-	if err := server.orgDomains.Put(t.Context(), "feragame", org.EmptyDomain()); err != nil {
+	if err := server.orgDomains.Put(t.Context(), org.FeragameScope(), org.EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := org.SeedDemo(t.Context(), server.orgDomains, server.orgConfigs, org.SeedOptions{
@@ -75,19 +75,19 @@ func TestEnsureLivingStoresDoesNotSeed(t *testing.T) {
 	domains := org.NewMemoryDomainStore()
 	seeded := org.EmptyDomain()
 	seeded.Entities["lot"] = org.EntityMap{"L1": {"client": "NO"}}
-	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+	if err := domains.Put(t.Context(), org.FeragameScope(), seeded); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{orgDomains: domains}
 	server.ensureOrgStores()
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), org.FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got.Kind("lot")) != 1 {
 		t.Fatalf("domain mutated by ensureOrgStores: %#v", got)
 	}
-	_, err = server.orgConfigs.ActiveVersion(t.Context(), "feragame")
+	_, err = server.orgConfigs.ActiveVersion(t.Context(), org.FeragameScope())
 	if !errors.Is(err, org.ErrNotFound) {
 		t.Fatalf("expected no Active Config (SeedDemo is task seed only), got %v", err)
 	}
@@ -248,9 +248,9 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 				EmailVerified:  true,
 			},
 		}),
-		store:            NewMemoryStore(),
-		enforceAuth:      true,
-		now:              func() time.Time { return now },
+		store:         NewMemoryStore(),
+		enforceAuth:   true,
+		now:           func() time.Time { return now },
 		orgAuthorizer: org.AllowAllAuthorizer{},
 		// Test double: product no longer plants FakeHttpPort; exercise Commit+links seam.
 		orgHttpPort: org.NewFakeHttpPort(),
@@ -277,7 +277,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if _, has := commitWire["domain"]; has {
 		t.Fatalf("Commit JSON must omit domain: %#v", commitWire["domain"])
 	}
-	domain, err := server.orgDomains.Get(t.Context(), "feragame")
+	domain, err := server.orgDomains.Get(t.Context(), org.FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,10 +365,10 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 
 func TestLivingCommitUnauthenticated(t *testing.T) {
 	server := &Server{
-		identity:         testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{}),
-		store:            NewMemoryStore(),
-		enforceAuth:      true,
-		now:              time.Now,
+		identity:      testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{}),
+		store:         NewMemoryStore(),
+		enforceAuth:   true,
+		now:           time.Now,
 		orgAuthorizer: org.AllowAllAuthorizer{},
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(`{}`))
@@ -451,9 +451,9 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 				EmailVerified:  true,
 			},
 		}),
-		store:            NewMemoryStore(),
-		enforceAuth:      true,
-		now:              func() time.Time { return now },
+		store:         NewMemoryStore(),
+		enforceAuth:   true,
+		now:           func() time.Time { return now },
 		orgAuthorizer: org.DenyAllAuthorizer{},
 	}
 	seedOrgDemo(t, server)
@@ -480,7 +480,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	if _, has := loadWire["domain"]; has {
 		t.Fatalf("Load JSON must omit domain")
 	}
-	domain, err := server.orgDomains.Get(t.Context(), "feragame")
+	domain, err := server.orgDomains.Get(t.Context(), org.FeragameScope())
 	if err != nil && !errors.Is(err, org.ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -512,10 +512,10 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 				EmailVerified:  true,
 			},
 		}),
-		store:            NewMemoryStore(),
-		enforceAuth:      true,
-		now:              func() time.Time { return now },
-		tmpl:             testTemplates(),
+		store:         NewMemoryStore(),
+		enforceAuth:   true,
+		now:           func() time.Time { return now },
+		tmpl:          testTemplates(),
 		orgAuthorizer: org.AllowAllAuthorizer{},
 	}
 	seedOrgDemo(t, server)
@@ -544,10 +544,10 @@ func TestLivingQRResolveMuxRegistration(t *testing.T) {
 				EmailVerified:  true,
 			},
 		}),
-		store:            NewMemoryStore(),
-		enforceAuth:      true,
-		now:              func() time.Time { return now },
-		tmpl:             testTemplates(),
+		store:         NewMemoryStore(),
+		enforceAuth:   true,
+		now:           func() time.Time { return now },
+		tmpl:          testTemplates(),
 		orgAuthorizer: org.AllowAllAuthorizer{},
 	}
 	seedOrgDemo(t, server)

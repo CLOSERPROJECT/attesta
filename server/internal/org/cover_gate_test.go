@@ -15,10 +15,10 @@ func TestDemoCommitHelpersSeedLotProcessingReady(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
-	if err := seedLotProcessingReadyDomain(t.Context(), domains, configs, "feragame"); err != nil {
+	if err := seedLotProcessingReadyDomain(t.Context(), domains, configs, FeragameScope()); err != nil {
 		t.Fatal(err)
 	}
-	domain, err := domains.Get(t.Context(), "feragame")
+	domain, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 
 	missingCfg := &API{
 		DomainLoader: &DomainLoader{Domains: NewMemoryDomainStore(), Configs: NewMemoryConfigStore()},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
 	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?jobId=intake&taskId=truckArrive", nil))
@@ -131,7 +131,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 
 	boomForm := &API{
 		DomainLoader: &DomainLoader{Domains: &errDomainStore{err: errors.New("boom")}, Configs: c.Configs},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
 	boomForm.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?jobId=intake&taskId=truckArrive", nil))
@@ -155,7 +155,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 
 	boomRecap := &API{
 		DomainLoader: &DomainLoader{Domains: &errDomainStore{err: errors.New("boom")}, Configs: c.Configs},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
 	boomRecap.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
@@ -187,7 +187,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 	}
 	boomQR := &API{
 		DomainLoader: &DomainLoader{Domains: &errDomainStore{err: errors.New("boom")}, Configs: c.Configs},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
 	boomQR.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve", strings.NewReader(`{"raw":"x"}`)))
@@ -225,7 +225,7 @@ func TestPassportValidateAndOptInErrorEdges(t *testing.T) {
 			Values: map[string]any{
 				"issue": Job{
 					Tasks: []TaskConfig{{
-						"id": "lock",
+						"id":       "lock",
 						"onSubmit": map[string]any{"passport": "yes"},
 					}},
 				},
@@ -248,8 +248,8 @@ func (s *createErrDPPStore) Get(context.Context, string, string) (DPPRecord, err
 func (s *createErrDPPStore) GetByIdentity(context.Context, string, string, string) (DPPRecord, error) {
 	return DPPRecord{}, ErrNotFound
 }
-func (s *createErrDPPStore) Create(context.Context, DPPRecord) error { return s.err }
-func (s *createErrDPPStore) DeleteByOrg(context.Context, string) error   { return nil }
+func (s *createErrDPPStore) Create(context.Context, DPPRecord) error   { return s.err }
+func (s *createErrDPPStore) DeleteByOrg(context.Context, string) error { return nil }
 
 func TestIssuePassportErrorEdges(t *testing.T) {
 	cfg := syntheticDPPConfig()
@@ -401,27 +401,27 @@ func TestFactTitlesFromConfigAndSchemaEarlyReturns(t *testing.T) {
 		t.Fatalf("title = %#v", got)
 	}
 
-	if (&DomainLoader{}).factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
+	if (&DomainLoader{}).factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
 		t.Fatal("nil configs")
 	}
 	configs := NewMemoryConfigStore()
 	l := &DomainLoader{Configs: configs}
-	if l.factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
+	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
 		t.Fatal("no active")
 	}
-	if err := configs.Put(t.Context(), "org", "v1", OrgConfig{
+	if err := configs.Put(t.Context(), Scope{Org: "org", Stream: "test"}, "v1", OrgConfig{
 		ID: "c", Org: "org", Version: "v1",
 		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{"j": "bad"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "org", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "org", Stream: "test"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
-	if l.factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
+	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
 		t.Fatal("non-job")
 	}
-	if err := configs.Put(t.Context(), "org", "v1", OrgConfig{
+	if err := configs.Put(t.Context(), Scope{Org: "org", Stream: "test"}, "v1", OrgConfig{
 		ID: "c", Org: "org", Version: "v1",
 		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{
 			"j": Job{Tasks: []TaskConfig{{"id": "other"}}},
@@ -429,13 +429,13 @@ func TestFactTitlesFromConfigAndSchemaEarlyReturns(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if l.factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "missing", TaskID: "t"}) != nil {
+	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "missing", TaskID: "t"}) != nil {
 		t.Fatal("missing job")
 	}
-	if l.factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
+	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
 		t.Fatal("missing leaf")
 	}
-	if err := configs.Put(t.Context(), "org", "v1", OrgConfig{
+	if err := configs.Put(t.Context(), Scope{Org: "org", Stream: "test"}, "v1", OrgConfig{
 		ID: "c", Org: "org", Version: "v1",
 		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{
 			"j": Job{Tasks: []TaskConfig{{"id": "t"}}},
@@ -443,7 +443,7 @@ func TestFactTitlesFromConfigAndSchemaEarlyReturns(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if l.factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
+	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
 		t.Fatal("nil payload schema")
 	}
 
@@ -451,7 +451,7 @@ func TestFactTitlesFromConfigAndSchemaEarlyReturns(t *testing.T) {
 		active: "v1",
 		err:    errors.New("get boom"),
 	}}
-	if boomGet.factTitlesFromConfig(t.Context(), "org", SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
+	if boomGet.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
 		t.Fatal("get boom")
 	}
 }
@@ -461,13 +461,16 @@ type activeOKGetErrConfigStore struct {
 	err    error
 }
 
-func (s *activeOKGetErrConfigStore) Get(context.Context, string, string) (OrgConfig, error) {
+func (s *activeOKGetErrConfigStore) Get(context.Context, Scope, string) (OrgConfig, error) {
 	return OrgConfig{}, s.err
 }
-func (s *activeOKGetErrConfigStore) Put(context.Context, string, string, OrgConfig) error { return nil }
-func (s *activeOKGetErrConfigStore) ActiveVersion(context.Context, string) (string, error) {
+func (s *activeOKGetErrConfigStore) Put(context.Context, Scope, string, OrgConfig) error { return nil }
+func (s *activeOKGetErrConfigStore) ActiveVersion(context.Context, Scope) (string, error) {
 	return s.active, nil
 }
-func (s *activeOKGetErrConfigStore) SetActiveVersion(context.Context, string, string) error {
+func (s *activeOKGetErrConfigStore) SetActiveVersion(context.Context, Scope, string) error {
 	return nil
+}
+func (s *activeOKGetErrConfigStore) ListStreams(context.Context, string) ([]string, error) {
+	return nil, nil
 }

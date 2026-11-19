@@ -25,7 +25,7 @@ func seedFullyProcessedLoad(t *testing.T, c *TaskCommitter) (loadID, lotID strin
 		"polvereDiVetro": {map[string]any{"weight": 100.0}},
 	}))
 	_ = commitCloseLot(t, c, lotID)
-	stored, err := c.Domains.Get(t.Context(), "feragame")
+	stored, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	c.Now = func() time.Time { return time.Date(2026, 11, 4, 14, 0, 0, 0, time.UTC) }
 	op := adminOp()
 
-	emptyWL, err := loader.Load(t.Context(), "feragame", op)
+	emptyWL, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 
 	loadID, _ := seedFullyProcessedLoad(t, c)
 
-	wl, err := loader.Load(t.Context(), "feragame", op)
+	wl, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("lot_processing/lock after closeLot = %q, want actionable; job=%#v", lockStatus, lp)
 	}
 
-	lockBundle, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "lot_processing", "lock", loadID)
+	lockBundle, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), op, "lot_processing", "lock", loadID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("Load chromeDisplay != EvalDPPSnapshot\ngot  %s\nwant %s", gotJSON, wantJSON)
 	}
 
-	locked, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	locked, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "lot_processing/lock",
 		JobInstanceID: loadID,
 		Value:         map[string]any{"ack": true},
@@ -187,7 +187,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("freeze rows != Load rows\nfreeze %s\nload   %s", freezeRows, loadRows)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "lot_processing/lock",
 		JobInstanceID: loadID,
 		Value:         map[string]any{"ack": true},
@@ -197,7 +197,7 @@ func TestFeragamePassportLockJobFlow(t *testing.T) {
 		t.Fatalf("second lock err = %v (want passport-exists)", err)
 	}
 
-	afterLock, err := loader.Load(t.Context(), "feragame", op)
+	afterLock, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}

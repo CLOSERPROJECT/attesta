@@ -26,7 +26,7 @@ func TestLotSessionStaysOpenUntilCloseLot(t *testing.T) {
 		}
 	}
 
-	after, err := loader.Load(t.Context(), "feragame", adminOp())
+	after, err := loader.Load(t.Context(), FeragameScope(), adminOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestCloseLotDeniedUntilWeighedAndLoaded(t *testing.T) {
 
 	assertCloseLotDenied := func(when string) {
 		t.Helper()
-		_, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		_, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 			TaskPath: "lot_processing/closeLot", JobInstanceID: loadID, Value: map[string]any{},
 		})
 		if err == nil {
@@ -107,7 +107,7 @@ func TestContainerRegDoesNotSetFullyProcessed(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID := plantSeedOpenLotReadyForContainer(t, c)
 
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: loadID,
 		Value: map[string]any{

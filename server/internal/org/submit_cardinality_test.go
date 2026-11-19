@@ -61,10 +61,10 @@ func submitCardinalityCommitter(t *testing.T, auth Authorizer) *TaskCommitter {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	cfg := submitCardinalityConfig()
-	if err := configs.Put(t.Context(), "cardorg", "v1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "cardorg", Stream: "card"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "cardorg", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "cardorg", Stream: "card"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
 	if auth == nil {
@@ -115,7 +115,7 @@ func TestSubmitManyStaysActionableAcrossTwoCommits(t *testing.T) {
 	c := submitCardinalityCommitter(t, nil)
 	op := OperatorIdentity{UserID: "ada", Org: "cardorg", Roles: []string{"operator"}}
 
-	start, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	start, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath: "session/start",
 		Value:    map[string]any{},
 		Mint:     startingNewMint(),
@@ -125,7 +125,7 @@ func TestSubmitManyStaysActionableAcrossTwoCommits(t *testing.T) {
 	}
 	sid := start.JobInstanceID
 
-	first, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	first, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath:      "session/repeat",
 		JobInstanceID: sid,
 		Value:         map[string]any{},
@@ -141,7 +141,7 @@ func TestSubmitManyStaysActionableAcrossTwoCommits(t *testing.T) {
 	}
 	subsAfterFirst := len(first.Domain.Submissions)
 
-	second, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	second, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath:      "session/repeat",
 		JobInstanceID: sid,
 		Value:         map[string]any{},
@@ -161,7 +161,7 @@ func TestSubmitOnceBecomesDoneAndSecondCommitDenied(t *testing.T) {
 	c := submitCardinalityCommitter(t, nil)
 	op := OperatorIdentity{UserID: "ada", Org: "cardorg", Roles: []string{"operator"}}
 
-	start, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	start, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath: "session/start",
 		Value:    map[string]any{},
 		Mint:     startingNewMint(),
@@ -174,7 +174,7 @@ func TestSubmitOnceBecomesDoneAndSecondCommitDenied(t *testing.T) {
 		t.Fatalf("once start status = %q, want done", got)
 	}
 
-	_, err = c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	_, err = c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath:      "session/start",
 		JobInstanceID: sid,
 		Value:         map[string]any{},

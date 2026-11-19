@@ -101,11 +101,12 @@ type TaskCommitter struct {
 	Now  func() time.Time
 }
 
-func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
-		return CommitResult{}, &CommitError{Kind: "forbidden", Message: "organization required"}
+func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return CommitResult{}, &CommitError{Kind: "forbidden", Message: "organization and stream required"}
 	}
+	org := scope.Org
 	if c.Domains == nil || c.Configs == nil || c.Authorizer == nil {
 		return CommitResult{}, fmt.Errorf("org: commit stores/authorizer required")
 	}
@@ -141,11 +142,11 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 		return CommitResult{}, &CommitError{Kind: "prep", Message: "value required"}
 	}
 
-	version, err := c.Configs.ActiveVersion(ctx, org)
+	version, err := c.Configs.ActiveVersion(ctx, scope)
 	if err != nil {
 		return CommitResult{}, err
 	}
-	cfg, err := c.Configs.Get(ctx, org, version)
+	cfg, err := c.Configs.Get(ctx, scope, version)
 	if err != nil {
 		return CommitResult{}, err
 	}
@@ -179,7 +180,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 
 	// Gates are re-evaluated on each retry so a concurrent Commit cannot slip past readyWhen.
 	var applied appliedCommit
-	_, err = c.Domains.Update(ctx, org, func(domain Domain) (Domain, error) {
+	_, err = c.Domains.Update(ctx, scope, func(domain Domain) (Domain, error) {
 		allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 			Operator:      op,
 			Org:           org,

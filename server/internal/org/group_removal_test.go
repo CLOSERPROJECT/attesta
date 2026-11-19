@@ -39,7 +39,7 @@ func TestValidateTaskConfigsRejectsGroupOnlyKeys(t *testing.T) {
 
 func TestCommitRejectsSpawningNewMint(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: "T1",
 		Value:         map[string]any{},
@@ -56,7 +56,7 @@ func TestCommitRejectsSpawningNewMint(t *testing.T) {
 
 func TestCommitRejectsNestedTaskPath(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/lots/L1/register",
 		JobInstanceID: "T1",
 		Value:         map[string]any{},

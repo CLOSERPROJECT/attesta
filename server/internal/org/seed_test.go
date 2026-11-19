@@ -13,7 +13,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	seeded.Submissions = []Submission{
 		{JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada"},
 	}
-	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), seeded); err != nil {
 		t.Fatal(err)
 	}
 
@@ -24,7 +24,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	if cfg.Org != "feragame" || cfg.Version != DefaultFixtureVersion {
 		t.Fatalf("cfg = %#v", cfg)
 	}
-	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	version, err := configs.ActiveVersion(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 		t.Fatalf("active = %q", version)
 	}
 
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
-	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), seeded); err != nil {
 		t.Fatal(err)
 	}
 
@@ -55,7 +55,7 @@ func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := domains.Get(t.Context(), cfg.Org)
+	got, err := domains.Get(t.Context(), mustScope(t, cfg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	assertStagedDemoDomain(t, got)
 
 	loader := &DomainLoader{Domains: domains, Configs: configs}
-	loaded, err := loader.Load(t.Context(), cfg.Org, FixtureAllRolesOp())
+	loaded, err := loader.Load(t.Context(), mustScope(t, cfg), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 
 	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
 		WipeDomain: true,
-		DPPs:  passports,
+		DPPs:       passports,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestSeedDemoFillsMissingDomainWithoutWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := domains.Get(t.Context(), cfg.Org)
+	got, err := domains.Get(t.Context(), mustScope(t, cfg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestSeedDemoFillsMissingDomainWithoutWipe(t *testing.T) {
 func TestSeedDemoFillsEmptyDomainWithoutWipe(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
-	if err := domains.Put(t.Context(), "feragame", EmptyDomain()); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,7 +134,7 @@ func TestSeedDemoFillsEmptyDomainWithoutWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := domains.Get(t.Context(), cfg.Org)
+	got, err := domains.Get(t.Context(), mustScope(t, cfg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestSeedDemoFillsEmptyDomainWithoutWipe(t *testing.T) {
 func TestSeedDemoSkipEmptyDomainStaging(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
-	if err := domains.Put(t.Context(), "feragame", EmptyDomain()); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -155,14 +155,14 @@ func TestSeedDemoSkipEmptyDomainStaging(t *testing.T) {
 	if cfg.Org != "feragame" {
 		t.Fatalf("cfg = %#v", cfg)
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 {
 		t.Fatalf("empty Domain staged despite SkipEmptyDomainStaging: %#v", got)
 	}
-	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	version, err := configs.ActiveVersion(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 	passports := NewMemoryDPPStore()
 	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "L1"}}
-	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), seeded); err != nil {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
@@ -188,8 +188,8 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 	}
 
 	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
-		Scope:     SeedScopeFeragameConfig,
-		DPPs: passports,
+		Scope: SeedScopeFeragameConfig,
+		DPPs:  passports,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -197,14 +197,14 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 	if cfg.Org != "feragame" || cfg.Version != DefaultFixtureVersion {
 		t.Fatalf("cfg = %#v", cfg)
 	}
-	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	version, err := configs.ActiveVersion(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if version != DefaultFixtureVersion {
 		t.Fatalf("active = %q", version)
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 	passports := NewMemoryDPPStore()
 	seeded := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "L1"}}
-	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), seeded); err != nil {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
@@ -247,12 +247,12 @@ func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 
 	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
 		Scope:      SeedScopeFeragameConfig,
-		DPPs:  passports,
+		DPPs:       passports,
 		KeepDomain: true,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,13 +280,13 @@ func TestSeedDemoFeragameDomainWipesAndStages(t *testing.T) {
 	passports := NewMemoryDPPStore()
 	marker := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	marker.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
-	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), marker); err != nil {
 		t.Fatal(err)
 	}
 
 	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
-		Scope:     SeedScopeFeragameDomain,
-		DPPs: passports,
+		Scope: SeedScopeFeragameDomain,
+		DPPs:  passports,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -294,7 +294,7 @@ func TestSeedDemoFeragameDomainWipesAndStages(t *testing.T) {
 	if cfg.Org != "feragame" || cfg.Version != DefaultFixtureVersion {
 		t.Fatalf("cfg = %#v", cfg)
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,7 +310,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	passports := NewMemoryDPPStore()
 	marker := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
 	marker.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
-	if err := domains.Put(t.Context(), "feragame", marker); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), marker); err != nil {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
@@ -321,8 +321,8 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	}
 
 	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
-		Scope:     SeedScopeFeragameFull,
-		DPPs: passports,
+		Scope: SeedScopeFeragameFull,
+		DPPs:  passports,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -330,7 +330,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 	if cfg.Org != "feragame" || cfg.Version != DefaultFixtureVersion {
 		t.Fatalf("cfg = %#v", cfg)
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,19 +351,19 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 
-	admin, err := loader.Load(t.Context(), "feragame", OperatorIdentity{
+	admin, err := loader.Load(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "administration", Org: "feragame", Roles: []string{"administration"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	logistic, err := loader.Load(t.Context(), "feragame", OperatorIdentity{
+	logistic, err := loader.Load(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "logistic", Org: "feragame", Roles: []string{"logistic"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	line, err := loader.Load(t.Context(), "feragame", OperatorIdentity{
+	line, err := loader.Load(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "line", Org: "feragame", Roles: []string{"line"},
 	})
 	if err != nil {
@@ -456,7 +456,6 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	}
 }
 
-
 func TestSeedDemoWipeRequiresDomainStore(t *testing.T) {
 	_, err := SeedDemo(t.Context(), nil, NewMemoryConfigStore(), SeedOptions{WipeDomain: true})
 	if err == nil {
@@ -494,7 +493,7 @@ func TestSeedDemoReplaceIsNotHarnessRunsAPI(t *testing.T) {
 	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{WipeDomain: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := domains.Get(t.Context(), "feragame"); err != nil && !errors.Is(err, ErrNotFound) {
+	if _, err := domains.Get(t.Context(), FeragameScope()); err != nil && !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
 }

@@ -9,7 +9,7 @@ func TestCommitTruckArriveAdvancesToRegister(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	arrived, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	arrived, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -33,7 +33,7 @@ func TestCommitStartLotAdvancesToWeigh(t *testing.T) {
 	_, loadID := plantIntakeOneLot(t, c)
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic", "line"}}
 
-	started, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	started, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot",
 		Value:    map[string]any{"lotId": loadID},
 		Mint:     startingNewMint(),
@@ -123,7 +123,7 @@ func TestCommitLinkStayContinueNavigationWire(t *testing.T) {
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
 
-	lot, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	lot, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),

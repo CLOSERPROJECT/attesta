@@ -66,7 +66,7 @@ func TestMarkProgressUnavailableUntilWeigh(t *testing.T) {
 
 func mustDomain(t *testing.T, c *TaskCommitter) Domain {
 	t.Helper()
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}

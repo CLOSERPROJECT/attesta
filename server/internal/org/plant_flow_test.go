@@ -51,7 +51,7 @@ func commitIntakeThroughLotsClosed(t *testing.T, c *TaskCommitter) (truckID, loa
 	if loadID == "" {
 		t.Fatal("expected minted lot")
 	}
-	stored, err := c.Domains.Get(t.Context(), "feragame")
+	stored, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func seedLotReadyAfterWeigh(t *testing.T, c *TaskCommitter) (loadID, lotInstance
 func completeIntakeThroughPalletWeight(t *testing.T, c *TaskCommitter, _ string) Domain {
 	t.Helper()
 	_, _ = seedLotReadyAfterWeigh(t, c)
-	stored, err := c.Domains.Get(t.Context(), "feragame")
+	stored, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	op := adminOp()
 
 	truckID := commitTruckArrive(t, c)
-	arriveWL, err := loader.Load(t.Context(), "feragame", op)
+	arriveWL, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 		t.Fatalf("lots = %#v", second.Domain.Kind("lot"))
 	}
 
-	mid, err := loader.Load(t.Context(), "feragame", op)
+	mid, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 		t.Fatalf("weightCheck after ≥1 lot = %q, want actionable", inst.Tasks["weightCheck"])
 	}
 
-	wc, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	wc, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 600.0},
 	})
@@ -193,7 +193,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	if wc.Domain.Kind("truck")[truckID]["checkedLotSum"] != 600.0 {
 		t.Fatalf("weightCheck patch = %#v", wc.Domain.Kind("truck")[truckID])
 	}
-	afterWC, err := loader.Load(t.Context(), "feragame", op)
+	afterWC, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 		t.Fatalf("register after weightCheck = %q, want unavailable", inst.Tasks["register"])
 	}
 
-	lpWL, err := loader.Load(t.Context(), "feragame", op)
+	lpWL, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	}
 
 	_ = commitStartLot(t, c, load1)
-	afterStart, err := loader.Load(t.Context(), "feragame", op)
+	afterStart, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 
 	_ = commitWeigh(t, c, load1, load1+".1", 11)
 	weighed := commitWeigh(t, c, load1, load1+".2", 22)
-	afterWeigh, err := loader.Load(t.Context(), "feragame", op)
+	afterWeigh, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	if closed.Domain.Kind("lot")[load1]["status"] != "fullyProcessed" {
 		t.Fatalf("closeLot status = %#v", closed.Domain.Kind("lot")[load1])
 	}
-	afterClose, err := loader.Load(t.Context(), "feragame", op)
+	afterClose, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}

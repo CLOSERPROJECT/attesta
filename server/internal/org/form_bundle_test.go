@@ -20,7 +20,7 @@ func bundleAddress(b *TaskFormBundle) string {
 
 func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
-	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	loaded, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 	}
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	committed, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	committed, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -94,7 +94,7 @@ func TestLoadJSONOmitsBulkTaskFormBundlesWhenCanStart(t *testing.T) {
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	op := FixtureAllRolesOp()
-	result, err := loader.Load(t.Context(), "feragame", op)
+	result, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 	all := FixtureAllRolesOp()
 	truckID := commitTruckArrive(t, c)
 
-	result, err := loader.Load(t.Context(), "feragame", all)
+	result, err := loader.Load(t.Context(), FeragameScope(), all)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,15 +139,15 @@ func TestLoadOmitsBulkWhileAddressedFetchServesAvailable(t *testing.T) {
 		t.Fatalf("home Load must omit bulk bundles; got %#v", addresses(result.TaskFormBundles))
 	}
 
-	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", truckID)
+	provisional, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "register", truckID)
 	if err != nil || provisional == nil {
 		t.Fatalf("addressed register: %v %#v", err, provisional)
 	}
 	// Prior truck still incomplete → Nuovo camion / provisional truckArrive off.
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "truckArrive", ""); err == nil {
 		t.Fatal("provisional truckArrive must deny while prior truck incomplete")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", truckID); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "truckArrive", truckID); err == nil {
 		t.Fatal("done truckArrive must be forbidden on addressed fetch")
 	}
 }
@@ -164,14 +164,14 @@ func TestLoadTaskBundlePalletWeightFlatForm(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	_ = commitStartLot(t, c, loadID)
-	home, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	home, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(home.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(home.TaskFormBundles))
 	}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", FixtureAllRolesOp(), "lot_processing", "weigh", loadID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), FixtureAllRolesOp(), "lot_processing", "weigh", loadID)
 	if err != nil || bundle == nil {
 		t.Fatalf("missing weigh: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 	if _, ok := wire["roles"].([]any); !ok {
 		t.Fatalf("HTTP Load missing roles: %s", rec.Body.String())
 	}
-	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", op, "intake", "register", truckID)
+	spawn, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), op, "intake", "register", truckID)
 	if err != nil || spawn == nil {
 		t.Fatalf("addressed register after Load: %v", err)
 	}
@@ -413,18 +413,18 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	all := FixtureAllRolesOp()
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
-	loaded, err := loader.Load(t.Context(), "feragame", all)
+	loaded, err := loader.Load(t.Context(), FeragameScope(), all)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(loaded.TaskFormBundles) != 0 {
 		t.Fatalf("home Load must omit bulk; got %#v", addresses(loaded.TaskFormBundles))
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "weightCheck", truckID); err != nil {
 		t.Fatalf("pre-commit addressed weightCheck: %v", err)
 	}
 
-	committed, err := c.Commit(t.Context(), "feragame", all, CommitRequest{
+	committed, err := c.Commit(t.Context(), FeragameScope(), all, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
 		Value:         map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
@@ -435,10 +435,10 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if committed.Navigation != CommitNextHome && committed.Navigation != CommitNextTask {
 		t.Fatalf("advance Navigation = %q", committed.Navigation)
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "weightCheck", truckID); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "weightCheck", truckID); err == nil {
 		t.Fatal("addressed weightCheck must deny after it leaves available")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "truckArrive", ""); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), all, "intake", "truckArrive", ""); err != nil {
 		t.Fatalf("provisional truckArrive while canStart: %v", err)
 	}
 
@@ -467,14 +467,14 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "truckArrive", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), opLine, "intake", "truckArrive", ""); err == nil {
 		t.Fatal("line viewer must not mount intake provisional truckArrive")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "startLot", ""); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), opLine, "lot_processing", "startLot", ""); err == nil {
 		t.Fatal("line must not canStart startLot (logistic-only)")
 	}
 
-	loaded, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
+	loaded, err := c.Commit(t.Context(), FeragameScope(), opLine, CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value: map[string]any{
@@ -493,7 +493,7 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	if loaded.NextTaskFormBundle == nil || loaded.NextTaskFormBundle.TaskID != "markProgress" {
 		t.Fatalf("stay bundle = %#v, want markProgress", loaded.NextTaskFormBundle)
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "lot_processing", "containerReg", lotID); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), opLine, "lot_processing", "containerReg", lotID); err == nil {
 		t.Fatal("line viewer must not mount containerReg")
 	}
 	lpWL, ok := worklistJobByID(loaded.Worklist, "lot_processing")
@@ -900,10 +900,10 @@ func TestLoadTaskBundleAuthoredInitialDataEndToEnd(t *testing.T) {
     "meta": {"source": $facts.label, "open": $facts.open}
   }
 )`)
-	if err := configs.Put(t.Context(), "seedorg", "1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, "1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "seedorg", "1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, "1"); err != nil {
 		t.Fatal(err)
 	}
 	domain := domainFromKinds(map[string]EntityMap{
@@ -911,12 +911,12 @@ func TestLoadTaskBundleAuthoredInitialDataEndToEnd(t *testing.T) {
 			"X1": {"label": "from-domain", "open": true},
 		},
 	})
-	if err := domains.Put(t.Context(), "seedorg", domain); err != nil {
+	if err := domains.Put(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, domain); err != nil {
 		t.Fatal(err)
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	op := OperatorIdentity{UserID: "bo", Org: "seedorg", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, op, "probe", "seedProbe", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -949,18 +949,18 @@ func TestCommitAuthoredInitialDataTaskUsesClientValue(t *testing.T) {
   "note": "seed-note",
   "meta": {"source": "seed", "open": true}
 }`)
-	if err := configs.Put(t.Context(), "seedorg", "1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, "1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "seedorg", "1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, "1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := domains.Put(t.Context(), "seedorg", EmptyDomain()); err != nil {
+	if err := domains.Put(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	op := OperatorIdentity{UserID: "bo", Org: "seedorg", Roles: []string{"logistic"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "seedorg", op, "probe", "seedProbe", "")
+	bundle, err := loader.LoadTaskBundle(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, op, "probe", "seedProbe", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -973,7 +973,7 @@ func TestCommitAuthoredInitialDataTaskUsesClientValue(t *testing.T) {
 		Configs:    configs,
 		Authorizer: AllowAllAuthorizer{},
 	}
-	result, err := c.Commit(t.Context(), "seedorg", op, CommitRequest{
+	result, err := c.Commit(t.Context(), Scope{Org: "seedorg", Stream: "probe"}, op, CommitRequest{
 		TaskPath: "probe/seedProbe",
 		Value:    map[string]any{"note": "from-client", "tag": "client-tag"},
 		Mint:     startingNewMint(),

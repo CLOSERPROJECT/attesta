@@ -83,7 +83,7 @@ func TestMongoCodecUsesEntities(t *testing.T) {
 	putKind(&domain, "lot", EntityMap{"a.b": {"k.v": 1}})
 	putKind(&domain, "kind.x", EntityMap{"id.1": {"f.g": true}})
 
-	doc := domainToMongoDoc("org", domain)
+	doc := domainToMongoDoc(Scope{Org: "org", Stream: "main"}, domain)
 	if doc.Entities["lot"]["a_b"]["k_v"] != 1 {
 		t.Fatalf("encode load = %#v", doc.Entities)
 	}

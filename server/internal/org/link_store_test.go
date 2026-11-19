@@ -89,7 +89,7 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 		t.Fatalf("stored links = %#v", stored)
 	}
 
-	domain, err := domains.Get(t.Context(), "feragame")
+	domain, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestCommitLinkStoreFailureDoesNotFailOrRollback(t *testing.T) {
 	c.LinkStore = &errLinkStore{err: errors.New("links down")}
 
 	truckID := commitTruckArrive(t, c)
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
@@ -191,7 +191,7 @@ func TestCommitLinkStoreFailureDoesNotFailOrRollback(t *testing.T) {
 	if result.Domain.Kind("lot")[loadID]["client"] != "CO" {
 		t.Fatalf("domain missing after link store failure: %#v", result.Domain.Kind("lot"))
 	}
-	stored, err := domains.Get(t.Context(), "feragame")
+	stored, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}

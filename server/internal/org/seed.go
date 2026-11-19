@@ -86,7 +86,7 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 		}
 		return seedDemoBoth(ctx, domains, configs, SeedOptions{
 			WipeDomain: true,
-			DPPs:  opts.DPPs,
+			DPPs:       opts.DPPs,
 		})
 	default:
 		if opts.KeepDomain {
@@ -101,12 +101,16 @@ func seedDemoBoth(ctx context.Context, domains DomainStore, configs ConfigStore,
 	if err != nil {
 		return OrgConfig{}, err
 	}
+	scope, err := ScopeFromConfig(cfg)
+	if err != nil {
+		return OrgConfig{}, err
+	}
 	needDomain := opts.WipeDomain
 	if !needDomain {
 		if domains == nil {
 			return cfg, nil
 		}
-		domain, err := domains.Get(ctx, cfg.Org)
+		domain, err := domains.Get(ctx, scope)
 		switch {
 		case err == nil:
 			if opts.SkipEmptyDomainStaging || !domainSeedEmpty(domain) {
@@ -125,7 +129,7 @@ func seedDemoBoth(ctx context.Context, domains DomainStore, configs ConfigStore,
 	if domains == nil {
 		return OrgConfig{}, fmt.Errorf("org: domain store required to seed Domain")
 	}
-	if err := seedStagedDemoDomain(ctx, domains, configs, opts.DPPs, cfg.Org); err != nil {
+	if err := seedStagedDemoDomain(ctx, domains, configs, opts.DPPs, scope); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
@@ -136,15 +140,19 @@ func seedDemoFeragameEmptyDomain(ctx context.Context, domains DomainStore, confi
 	if err != nil {
 		return OrgConfig{}, err
 	}
+	scope, err := ScopeFromConfig(cfg)
+	if err != nil {
+		return OrgConfig{}, err
+	}
 	if domains == nil {
 		return OrgConfig{}, fmt.Errorf("org: domain store required for Feragame empty-Domain seed")
 	}
 	if passports != nil {
-		if err := passports.DeleteByOrg(ctx, cfg.Org); err != nil {
+		if err := passports.DeleteByOrg(ctx, scope.Org); err != nil {
 			return OrgConfig{}, err
 		}
 	}
-	if err := domains.Put(ctx, cfg.Org, EmptyDomain()); err != nil {
+	if err := domains.Put(ctx, scope, EmptyDomain()); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
@@ -164,13 +172,18 @@ func domainSeedEmpty(d Domain) bool {
 // openTurno/closeTurno Commits. No lot_processing/lock Commit (demo leaves DPP open).
 // When passports is set, org rows are deleted before Domain Put so deterministic
 // seed subject ids can Lock again after --replace / --feragame-domain / --feragame-full.
-func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports DPPStore, org string) error {
+func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports DPPStore, scope Scope) error {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return err
+	}
+	org := scope.Org
 	if passports != nil {
 		if err := passports.DeleteByOrg(ctx, org); err != nil {
 			return err
 		}
 	}
-	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+	if err := domains.Put(ctx, scope, EmptyDomain()); err != nil {
 		return err
 	}
 	c := &TaskCommitter{
@@ -183,7 +196,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	logistic := OperatorIdentity{UserID: "seed-logistic", Org: org, Roles: []string{"logistic"}}
 	lineOp := OperatorIdentity{UserID: "seed-line", Org: org, Roles: []string{"line"}}
 
-	arrive, err := seedCommit(ctx, c, org, admin, CommitRequest{
+	arrive, err := seedCommit(ctx, c, scope, admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    seedTruckArriveValue(1000),
 		Mint:     startingNewMint(),
@@ -204,7 +217,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		{"CO", "FIR-SEED-CO", 2, 700, SeedLoadCOID},
 		{"DA", "FIR-SEED-DA", 2, 400, SeedLoadDAID},
 	} {
-		res, err := seedCommit(ctx, c, org, admin, CommitRequest{
+		res, err := seedCommit(ctx, c, scope, admin, CommitRequest{
 			TaskPath:      "intake/register",
 			JobInstanceID: SeedTruckID,
 			Value:         seedLotRegisterValue(lot.client, lot.fir, lot.pallets, lot.after),
@@ -233,7 +246,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 			weight float64
 		}{{SeedLoadDAID + ".1", 90.0}, {SeedLoadDAID + ".2", 85.0}}},
 	} {
-		started, err := seedCommit(ctx, c, org, logistic, CommitRequest{
+		started, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
 			TaskPath: "lot_processing/startLot",
 			Value:    map[string]any{"lotId": lot.id},
 			Mint:     startingNewMint(),
@@ -246,7 +259,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		}
 		progress := map[string]any{}
 		for _, row := range lot.pallets {
-			if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+			if _, err := seedCommit(ctx, c, scope, lineOp, CommitRequest{
 				TaskPath:      "lot_processing/weigh",
 				JobInstanceID: lot.id,
 				Value:         weighValue(row.id, row.weight),
@@ -255,14 +268,14 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 			}
 			progress[row.id] = "done"
 		}
-		if _, err := seedCommit(ctx, c, org, lineOp, CommitRequest{
+		if _, err := seedCommit(ctx, c, scope, lineOp, CommitRequest{
 			TaskPath:      "lot_processing/markProgress",
 			JobInstanceID: lot.id,
 			Value:         map[string]any{"progress": progress},
 		}); err != nil {
 			return err
 		}
-		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
+		if _, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
 			TaskPath:      "lot_processing/containerReg",
 			JobInstanceID: lot.id,
 			Value: map[string]any{
@@ -274,7 +287,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		}); err != nil {
 			return err
 		}
-		if _, err := seedCommit(ctx, c, org, logistic, CommitRequest{
+		if _, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
 			TaskPath:      "lot_processing/closeLot",
 			JobInstanceID: lot.id,
 			Value:         map[string]any{},
@@ -285,8 +298,8 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	return nil
 }
 
-func seedCommit(ctx context.Context, c *TaskCommitter, org string, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
-	res, err := c.Commit(ctx, org, op, req)
+func seedCommit(ctx context.Context, c *TaskCommitter, scope Scope, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
+	res, err := c.Commit(ctx, scope, op, req)
 	if err != nil {
 		return CommitResult{}, fmt.Errorf("org seed %s: %w", req.TaskPath, err)
 	}
