@@ -358,8 +358,8 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 			}
 		}
 	}
-	if intakeCanStart {
-		t.Fatal("intake canStart want false while prior truck incomplete")
+	if !intakeCanStart {
+		t.Fatal("intake canStart want true while prior truck incomplete (parallel trucks)")
 	}
 }
 

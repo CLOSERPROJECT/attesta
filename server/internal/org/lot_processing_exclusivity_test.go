@@ -26,7 +26,7 @@ func (readyWhenGateAuthorizer) AllowCommit(_ context.Context, q AuthorizeCommit)
 	return false, nil
 }
 
-func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
+func TestIntakeAllowsParallelIncompleteTrucks(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, readyWhenGateAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	cfg := mustActiveConfig(t, c)
@@ -57,35 +57,9 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 		t.Fatalf("truck must not stamp turno: %#v", truck)
 	}
 
-	blocked, ok := worklistJobByID(projectWorklistUnfiltered(cfg, arrive.Domain, admin), "intake")
-	if !ok || blocked.CanStart {
-		t.Fatalf("intake canStart with open incomplete truck = %#v, want false", blocked)
-	}
-	_, err = c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
-		TaskPath: "intake/truckArrive",
-		Value:    truckArriveValue(),
-		Mint:     startingNewMint(),
-	})
-	var deny *CommitError
-	if err == nil || !asCommitError(err, &deny) || deny.Kind != "unauthorized" {
-		t.Fatalf("second truckArrive while prior incomplete must deny: %v", err)
-	}
-
-	reg := plantCommitRegister(t, c, truckID, registerLotValue())
-	loadID := firstLoadID(reg.Domain)
-	if loadID == "" {
-		t.Fatal("expected minted lot")
-	}
-	net, _ := reg.Domain.Kind("lot")[loadID]["netWeight"].(float64)
-	plantCommitWeightCheck(t, c, truckID, 1000.0, net)
-
-	domain, err := c.Domains.Get(t.Context(), FeragameScope())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ready, ok := worklistJobByID(projectWorklistUnfiltered(cfg, domain, admin), "intake")
-	if !ok || !ready.CanStart {
-		t.Fatalf("intake canStart after weightCheck = %#v, want true", ready)
+	parallel, ok := worklistJobByID(projectWorklistUnfiltered(cfg, arrive.Domain, admin), "intake")
+	if !ok || !parallel.CanStart {
+		t.Fatalf("intake canStart with incomplete truck = %#v, want true (parallel trucks)", parallel)
 	}
 	second, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
@@ -93,10 +67,10 @@ func TestIntakeExclusivityOneIncompleteTruck(t *testing.T) {
 		Mint:     startingNewMint(),
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("second truckArrive while prior incomplete must allow: %v", err)
 	}
-	if second.JobInstanceID == truckID {
-		t.Fatalf("second truck id = %q, want distinct", second.JobInstanceID)
+	if second.JobInstanceID == "" || second.JobInstanceID == truckID {
+		t.Fatalf("second truck id = %q, want distinct from %q", second.JobInstanceID, truckID)
 	}
 }
 

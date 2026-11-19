@@ -437,9 +437,9 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	lineLot, _ := worklistJobByID(line.Worklist, "lot_processing")
 	logLot, _ := worklistJobByID(logistic.Worklist, "lot_processing")
 	adminLot, _ := worklistJobByID(admin.Worklist, "lot_processing")
-	// Seed truck is mid-intake (weightCheck still open) — Nuovo camion stays off.
-	if adminIntake.CanStart {
-		t.Fatal("administration canStart intake want false while prior truck incomplete")
+	// Seed truck is mid-intake; parallel trucks keep Nuovo camion available for administration.
+	if !adminIntake.CanStart {
+		t.Fatal("administration canStart intake want true while prior truck incomplete (parallel)")
 	}
 	if logIntake.CanStart {
 		t.Fatal("logistic canStart intake want false")

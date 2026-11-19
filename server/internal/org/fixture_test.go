@@ -113,8 +113,8 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !okArrive {
 		t.Fatal("truckArrive missing")
 	}
-	if rw, _ := truckArrive["readyWhen"].(string); !strings.Contains(rw, "checkedTruckWeight") {
-		t.Fatalf("truckArrive.readyWhen = %#v, want prior-truck weightCheck gate", truckArrive["readyWhen"])
+	if _, has := truckArrive["readyWhen"]; has {
+		t.Fatalf("truckArrive must omit serialising readyWhen, got %#v", truckArrive["readyWhen"])
 	}
 	wantIntakeTasks := []string{"truckArrive", "register", "weightCheck"}
 	if got := OrderedTaskIDs(intake.Tasks); strings.Join(got, ",") != strings.Join(wantIntakeTasks, ",") {
@@ -230,6 +230,16 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	startRW, _ := startLot["readyWhen"].(string)
 	if !strings.Contains(startRW, `status = "open"`) || !strings.Contains(startRW, "fullyProcessed") {
 		t.Fatalf("startLot.readyWhen = %q, want one-open-lot exclusivity", startRW)
+	}
+	startReads, _ := startLot["reads"].(map[string]any)
+	startLots, _ := startReads["lots"].(map[string]any)
+	startWhere, _ := startLots["where"].(string)
+	if !strings.Contains(startWhere, "truckId = $stream.id") {
+		t.Fatalf("startLot.reads.lots.where = %q, want truckId = $stream.id", startWhere)
+	}
+	startBR, _ := startLot["blockedReason"].(string)
+	if !strings.Contains(startBR, "Linea occupata") {
+		t.Fatalf("startLot.blockedReason = %q, want Linea occupata", startBR)
 	}
 	weigh, _ := TaskByID(lp.Tasks, "weigh")
 	weighRoles, _ := weigh["roles"].([]any)
