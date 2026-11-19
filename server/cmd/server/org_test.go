@@ -28,9 +28,13 @@ func seedOrgDemo(t *testing.T, server *Server) {
 	}
 }
 
-func livingCommit(t *testing.T, server *Server, sessionID, body string) org.CommitResult {
+func livingCommit(t *testing.T, server *Server, sessionID, query, body string) org.CommitResult {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	path := "/api/org/commit"
+	if query != "" {
+		path += "?" + query
+	}
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(rec, req)
@@ -46,7 +50,7 @@ func livingCommit(t *testing.T, server *Server, sessionID, body string) org.Comm
 
 func arriveIntakeTruck(t *testing.T, server *Server, sessionID string) string {
 	t.Helper()
-	arrived := livingCommit(t, server, sessionID,
+	arrived := livingCommit(t, server, sessionID, "stream=recycling",
 		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`)
 	if arrived.JobInstanceID == "" {
 		t.Fatal("truck jobInstanceId empty")
@@ -112,8 +116,10 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 	seedOrgDemo(t, server)
+	server.orgAuthorizer = org.AllowAllAuthorizer{}
+	truckID := arriveIntakeTruck(t, server, sessionID)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgDomainHandler().ServeHTTP(rec, req)
@@ -148,6 +154,11 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 		if job["jobId"] != wantIDs[i] {
 			t.Fatalf("jobs[%d].jobId = %#v, want %q; worklist=%#v", i, job["jobId"], wantIDs[i], wl)
 		}
+	}
+	intakeJob, _ := jobs[0].(map[string]any)
+	instances, _ := intakeJob["instances"].([]any)
+	if len(instances) != 1 {
+		t.Fatalf("scoped intake instances = %#v", instances)
 	}
 	lpJob, _ := jobs[1].(map[string]any)
 	taskIDs, _ := lpJob["taskIds"].([]any)
@@ -223,8 +234,10 @@ func TestLivingDomainMuxRegistration(t *testing.T) {
 		tmpl:        testTemplates(),
 	}
 	seedOrgDemo(t, server)
+	server.orgAuthorizer = org.AllowAllAuthorizer{}
+	truckID := arriveIntakeTruck(t, server, sessionID)
 	mux := server.newMux()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -259,7 +272,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	truckID := arriveIntakeTruck(t, server, sessionID)
 
 	body := `{"taskPath":"intake/register","jobInstanceId":"` + truckID + `","value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling&instance="+truckID, strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(rec, req)
@@ -324,7 +337,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		t.Fatalf("Commit worklist intake register not actionable: %#v", committed.Worklist)
 	}
 
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
 	loadReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	loadRec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(loadRec, loadReq)
@@ -458,7 +471,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	}
 	seedOrgDemo(t, server)
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(rec, req)
@@ -466,35 +479,12 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
 
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
-	loadReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-	loadRec := httptest.NewRecorder()
-	server.orgAPI().ServeHTTP(loadRec, loadReq)
-	if loadRec.Code != http.StatusOK {
-		t.Fatalf("load status = %d", loadRec.Code)
-	}
-	var loadWire map[string]any
-	if err := json.Unmarshal(loadRec.Body.Bytes(), &loadWire); err != nil {
-		t.Fatal(err)
-	}
-	if _, has := loadWire["domain"]; has {
-		t.Fatalf("Load JSON must omit domain")
-	}
 	domain, err := server.orgDomains.Get(t.Context(), org.FeragameScope())
 	if err != nil && !errors.Is(err, org.ErrNotFound) {
 		t.Fatal(err)
 	}
-	if err == nil && (len(domain.Submissions) != 0 || len(domain.Kind("lot")) != 0) {
+	if err == nil && (len(domain.Submissions) != 0 || len(domain.Kind("lot")) != 0 || len(domain.JobInstances) != 0) {
 		t.Fatalf("domain should be unchanged after deny: %#v", domain)
-	}
-	var loaded org.LoadResult
-	if err := json.Unmarshal(loadRec.Body.Bytes(), &loaded); err != nil {
-		t.Fatal(err)
-	}
-	for _, j := range loaded.Worklist.Jobs {
-		if len(j.Instances) != 0 {
-			t.Fatalf("worklist should stay empty after deny: %#v", loaded.Worklist)
-		}
 	}
 }
 
@@ -521,7 +511,7 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 	seedOrgDemo(t, server)
 	mux := server.newMux()
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -552,7 +542,7 @@ func TestLivingQRResolveMuxRegistration(t *testing.T) {
 	}
 	seedOrgDemo(t, server)
 	mux := server.newMux()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve",
+	req := httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling",
 		strings.NewReader(`{"raw":"missing-pallet"}`))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()

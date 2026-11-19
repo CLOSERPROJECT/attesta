@@ -54,6 +54,11 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T-empty", Label: "T-empty"}}
+	if err := domains.Put(t.Context(), FeragameScope(), domain); err != nil {
+		t.Fatal(err)
+	}
 	h := &API{
 		DomainLoader: &DomainLoader{Domains: domains, Configs: configs},
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -62,7 +67,7 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-empty", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())

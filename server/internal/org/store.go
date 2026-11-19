@@ -32,33 +32,6 @@ func ScopeFromConfig(cfg OrgConfig) (Scope, error) {
 	return Scope{Org: cfg.Org, Stream: cfg.Stream.Key}.Normalize()
 }
 
-// ErrAmbiguousStreams is returned when RequireSoleStream finds more than one stream.
-var ErrAmbiguousStreams = fmt.Errorf("org: expected exactly one stream")
-
-// RequireSoleStream returns the org's only stream Scope.
-// Temporary until #309 scopes the Org API to an explicit stream.
-func RequireSoleStream(ctx context.Context, configs ConfigStore, org string) (Scope, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
-		return Scope{}, fmt.Errorf("org: org required")
-	}
-	if configs == nil {
-		return Scope{}, fmt.Errorf("org: config store required")
-	}
-	streams, err := configs.ListStreams(ctx, org)
-	if err != nil {
-		return Scope{}, err
-	}
-	switch len(streams) {
-	case 0:
-		return Scope{}, ErrNotFound
-	case 1:
-		return Scope{Org: org, Stream: streams[0]}, nil
-	default:
-		return Scope{}, fmt.Errorf("%w for %q (got %d)", ErrAmbiguousStreams, org, len(streams))
-	}
-}
-
 // DomainStore persists the stream Domain document.
 type DomainStore interface {
 	Get(ctx context.Context, scope Scope) (Domain, error)

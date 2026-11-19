@@ -1,7 +1,6 @@
 package org
 
 import (
-	"errors"
 	"testing"
 )
 
@@ -85,38 +84,5 @@ func TestStreamsKeepSeparateDomainsAndActiveVersions(t *testing.T) {
 	}
 	if len(streams) != 2 || streams[0] != "other" || streams[1] != "recycling" {
 		t.Fatalf("streams = %#v", streams)
-	}
-}
-
-func TestRequireSoleStream(t *testing.T) {
-	configs := NewMemoryConfigStore()
-	if _, err := RequireSoleStream(t.Context(), configs, "feragame"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("empty = %v", err)
-	}
-	if _, err := SeedFixtureConfigStore(configs); err != nil {
-		t.Fatal(err)
-	}
-	scope, err := RequireSoleStream(t.Context(), configs, "feragame")
-	if err != nil || scope != FeragameScope() {
-		t.Fatalf("sole = %#v err=%v", scope, err)
-	}
-
-	other, err := LoadSecondStreamConfigFixture()
-	if err != nil {
-		t.Fatal(err)
-	}
-	other.Org = "feragame"
-	otherScope, err := ScopeFromConfig(other)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := configs.Put(t.Context(), otherScope, other.Version, other); err != nil {
-		t.Fatal(err)
-	}
-	if err := configs.SetActiveVersion(t.Context(), otherScope, other.Version); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := RequireSoleStream(t.Context(), configs, "feragame"); !errors.Is(err, ErrAmbiguousStreams) {
-		t.Fatalf("ambiguous = %v", err)
 	}
 }

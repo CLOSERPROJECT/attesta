@@ -193,7 +193,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -226,7 +226,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	}
 
 	loadRec := httptest.NewRecorder()
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=261029-1", nil)
 	h.ServeHTTP(loadRec, loadReq)
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d", loadRec.Code)

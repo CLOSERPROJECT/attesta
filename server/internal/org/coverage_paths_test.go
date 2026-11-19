@@ -423,6 +423,11 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
+	seed := EmptyDomain()
+	seed.JobInstances = []JobInstance{{JobID: "intake", ID: "T-cov", Label: "T-cov"}}
+	if err := domains.Put(t.Context(), FeragameScope(), seed); err != nil {
+		t.Fatal(err)
+	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	c := &TaskCommitter{Domains: domains, Configs: configs, Authorizer: AllowAllAuthorizer{}}
 	gateOK := func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -476,7 +481,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodHead, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodHead, "/api/org/domain?stream=recycling&instance=T-cov", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
 		t.Fatalf("HEAD load = %d body=%q", rec.Code, rec.Body.String())
@@ -487,20 +492,20 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
-	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain", nil))
+	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-cov", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("load missing config = %d", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(`{`)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(`{`)))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad json = %d", rec.Code)
 	}
 
 	deny := &API{DomainLoader: loader, TaskCommitter: &TaskCommitter{Domains: domains, Configs: configs, Authorizer: DenyAllAuthorizer{}}, Gate: gateOK}
 	rec = httptest.NewRecorder()
-	deny.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(
+	deny.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(
 		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`,
 	)))
 	if rec.Code != http.StatusForbidden {
@@ -508,7 +513,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(
 		`{"taskPath":"nope","value":{}}`,
 	)))
 	if rec.Code != http.StatusBadRequest {
@@ -516,7 +521,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling&instance=T-cov", strings.NewReader(
 		`{"taskPath":"intake/weightCheck","jobInstanceId":"x","mint":{"kind":"none"},"value":{}}`,
 	)))
 	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusForbidden && rec.Code != http.StatusConflict {
@@ -1768,7 +1773,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		Gate:         gateOK,
 	}
 	rec := httptest.NewRecorder()
-	boomLoad.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain", nil))
+	boomLoad.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-boom", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("load boom = %d", rec.Code)
 	}
@@ -1776,7 +1781,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	c := &TaskCommitter{Domains: domains, Configs: configs, Authorizer: AllowAllAuthorizer{}}
 	h := &API{DomainLoader: &DomainLoader{Domains: domains, Configs: configs}, TaskCommitter: c, Gate: gateOK}
 	rec = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", errReader{})
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", errReader{})
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("commit read err = %d", rec.Code)

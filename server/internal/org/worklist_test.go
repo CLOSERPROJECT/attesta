@@ -176,6 +176,11 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T-load", Label: "T-load"}}
+	if err := domains.Put(t.Context(), FeragameScope(), domain); err != nil {
+		t.Fatal(err)
+	}
 	h := &API{
 		DomainLoader: &DomainLoader{Domains: domains, Configs: configs},
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -183,7 +188,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-load", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -196,8 +201,8 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 		t.Fatalf("worklist jobs = %#v", got.Worklist.Jobs)
 	}
 	intake, _ := worklistJobByID(got.Worklist, "intake")
-	if !intake.CanStart {
-		t.Fatal("administration intake canStart want true on empty domain")
+	if len(intake.Instances) != 1 || intake.Instances[0].ID != "T-load" {
+		t.Fatalf("scoped intake instances = %#v", intake.Instances)
 	}
 	lp, _ := worklistJobByID(got.Worklist, "lot_processing")
 	if lp.CanStart {
@@ -220,7 +225,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -243,7 +248,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 		t.Fatal(err)
 	}
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	want := projectWorklistUnfiltered(mustActiveConfig(t, c), domain, admin)
+	want := ProjectWorklist(mustActiveConfig(t, c), domain, admin, got.JobInstanceID)
 	if len(got.Worklist.Jobs) != len(want.Jobs) {
 		t.Fatalf("worklist jobs = %#v, want %#v", got.Worklist.Jobs, want.Jobs)
 	}
