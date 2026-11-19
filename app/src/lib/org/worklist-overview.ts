@@ -138,15 +138,19 @@ export function jobInstanceOverview(
 			? [...firstOpen.roles]
 			: null;
 
-	// Completion ignores submit: many (same law as home instanceTaskProgress / Go remaining-work).
+	// Prefer server finished when present; else same law as Go / home progress (ignore many).
 	const onceRows = tasks.filter((t) => taskChrome(job, t.taskId)?.submit !== 'many');
+	const finished =
+		typeof inst.finished === 'boolean'
+			? inst.finished
+			: tasks.length > 0 && onceRows.every((t) => t.status === 'done');
 	return {
 		jobId,
 		jobInstanceId,
 		label: inst.label || inst.id,
 		tasks,
 		handoffRoles,
-		finished: tasks.length > 0 && onceRows.every((t) => t.status === 'done')
+		finished
 	};
 }
 
