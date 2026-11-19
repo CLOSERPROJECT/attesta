@@ -200,6 +200,10 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 	// Gates are re-evaluated on each retry so a concurrent Commit cannot slip past readyWhen.
 	var applied appliedCommit
 	_, err = c.Domains.Update(ctx, scope, func(domain Domain) (Domain, error) {
+		streamID := ResolveStreamInstanceID(cfg, domain, ref.JobID, jobInstanceID)
+		if streamID == "" {
+			streamID = strings.TrimSpace(req.StreamInstanceID)
+		}
 		allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 			Operator:      op,
 			Org:           org,
@@ -212,7 +216,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 			SequenceOk:    sequenceOkForPath(cfg, domain, ref, jobInstanceID),
 			ReadyWhenOk: readyWhenOkForCommit(
 				domain, task, jobInstanceID, cfg.Catalogs,
-				streamBindingFrom(cfg, ResolveStreamInstanceID(cfg, domain, ref.JobID, jobInstanceID)),
+				streamBindingFrom(cfg, streamID),
 			),
 		})
 		if err != nil {

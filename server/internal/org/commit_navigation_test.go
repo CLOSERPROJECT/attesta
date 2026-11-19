@@ -30,13 +30,14 @@ func TestCommitTruckArriveAdvancesToRegister(t *testing.T) {
 
 func TestCommitStartLotAdvancesToWeigh(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic", "line"}}
 
 	started, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		t.Fatal(err)

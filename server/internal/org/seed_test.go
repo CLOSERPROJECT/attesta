@@ -410,9 +410,9 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	if logIntake.CanStart {
 		t.Fatal("logistic canStart intake want false")
 	}
-	// DA is open — plant one-open-lot blocks further startLot; truck B Apri lotto is unavailable.
+	// Unfiltered Play: $stream.id unbound ⇒ startLot readyWhen false (no truck-scoped eligible lots).
 	if logLot.CanStart {
-		t.Fatal("logistic canStart lot_processing want false while DA is open")
+		t.Fatal("logistic canStart lot_processing want false on unfiltered Play while DA is open")
 	}
 	if lineLot.CanStart {
 		t.Fatal("line canStart lot_processing want false")
@@ -613,9 +613,9 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 		t.Fatalf("truck A rows = %#v, want %s finished and %s open", each.Rows, SeedLoadCOID, SeedLoadDAID)
 	}
 
-	// Truck B Apri lotto is line-busy while DA is open on truck A.
-	wantBusy := "Linea occupata: lotto " + SeedLoadDAID + " (camion " + SeedTruckID + ")"
+	// Truck B Apri lotto stays open while DA is open on truck A (per-truck line-busy).
 	tlB := ProjectStreamTimeline(cfg, got, op, SeedTruckBID)
+	var startState StreamSubstepState
 	var startBlocked string
 	for _, step := range tlB.Steps {
 		if step.JobID != "lot_processing" {
@@ -628,10 +628,14 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 			if len(row.Tasks) == 0 || row.Tasks[0].ID != "startLot" {
 				t.Fatalf("truck B lot timeline tasks = %#v", row.Tasks)
 			}
+			startState = row.Tasks[0].State
 			startBlocked = row.Tasks[0].BlockedReason
 		}
 	}
-	if startBlocked != wantBusy {
-		t.Fatalf("truck B Apri lotto blockedReason = %q, want %q", startBlocked, wantBusy)
+	if startState == StreamSubstepLocked {
+		t.Fatalf("truck B Apri lotto state = %q, want not locked", startState)
+	}
+	if startBlocked != "" {
+		t.Fatalf("truck B Apri lotto blockedReason = %q, want empty", startBlocked)
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// Parallel trucks on the recycling stream: two intake trucks at once, one open
-// lot plant-wide, truck B's provisional Apri lotto blocked with Linea occupata.
+// Parallel trucks on the recycling stream: two intake trucks at once; line-busy
+// is per truck, so truck B can Apri lotto while truck A has an open lot.
 func TestParallelTrucksIntakeAndLineBusyBlockedReason(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, readyWhenGateAuthorizer{})
 	cfg := mustActiveConfig(t, c)
@@ -70,18 +70,7 @@ func TestParallelTrucksIntakeAndLineBusyBlockedReason(t *testing.T) {
 		t.Fatalf("truck B intake view = %#v", intakeB)
 	}
 
-	_, err = c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": lotB},
-		Mint:     startingNewMint(),
-	})
-	var ce *CommitError
-	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
-		t.Fatalf("startLot for truck B while A open must deny: %v", err)
-	}
-
 	tl := ProjectStreamTimeline(cfg, domain, logistic, truckB.JobInstanceID)
-	var startBlocked string
 	for _, step := range tl.Steps {
 		if step.JobID != "lot_processing" {
 			continue
@@ -93,15 +82,26 @@ func TestParallelTrucksIntakeAndLineBusyBlockedReason(t *testing.T) {
 			if len(row.Tasks) == 0 || row.Tasks[0].ID != "startLot" {
 				t.Fatalf("lot B timeline tasks = %#v", row.Tasks)
 			}
-			if row.Tasks[0].State != StreamSubstepLocked {
-				t.Fatalf("Apri lotto state = %q, want locked", row.Tasks[0].State)
+			if row.Tasks[0].State == StreamSubstepLocked {
+				t.Fatalf("Apri lotto state = %q, want not locked (per-truck line-busy)", row.Tasks[0].State)
 			}
-			startBlocked = row.Tasks[0].BlockedReason
+			if row.Tasks[0].BlockedReason != "" {
+				t.Fatalf("blockedReason = %q, want empty", row.Tasks[0].BlockedReason)
+			}
 		}
 	}
-	want := "Linea occupata: lotto " + lotA + " (camion " + truckA + ")"
-	if startBlocked != want {
-		t.Fatalf("blockedReason = %q, want %q", startBlocked, want)
+
+	openedB, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": lotB},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckB.JobInstanceID,
+	})
+	if err != nil {
+		t.Fatalf("startLot for truck B while A open must allow: %v", err)
+	}
+	if openedB.Domain.Kind("lot")[lotB]["status"] != "open" {
+		t.Fatalf("lot B status = %#v, want open", openedB.Domain.Kind("lot")[lotB])
 	}
 }
 
@@ -115,6 +115,10 @@ func TestFeragameStartLotScopesLotsReadAndBlockedReason(t *testing.T) {
 	if !ok {
 		t.Fatal("startLot missing")
 	}
+	rw, _ := startLot["readyWhen"].(string)
+	if !strings.Contains(rw, "truckId = $stream.id") {
+		t.Fatalf("startLot.readyWhen = %q, want truckId = $stream.id", rw)
+	}
 	reads, _ := startLot["reads"].(map[string]any)
 	lots, _ := reads["lots"].(map[string]any)
 	where, _ := lots["where"].(string)
@@ -124,6 +128,9 @@ func TestFeragameStartLotScopesLotsReadAndBlockedReason(t *testing.T) {
 	br, _ := startLot["blockedReason"].(string)
 	if !strings.Contains(br, "Linea occupata") || !strings.Contains(br, "camion") {
 		t.Fatalf("startLot.blockedReason = %q, want Linea occupata naming lot and truck", br)
+	}
+	if !strings.Contains(br, "truckId = $stream.id") {
+		t.Fatalf("startLot.blockedReason = %q, want truckId = $stream.id sift", br)
 	}
 	arrive, ok := TaskByID(cfg.Jobs.Values["intake"].(Job).Tasks, "truckArrive")
 	if !ok {

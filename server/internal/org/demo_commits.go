@@ -67,15 +67,16 @@ func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *TaskCommitter, sco
 }
 
 func commitIntakeThroughPalletWeight(ctx context.Context, c *TaskCommitter, scope Scope) (Domain, error) {
-	_, loadID, err := commitIntakeThroughLotsClosedCtx(ctx, c, scope)
+	truckID, loadID, err := commitIntakeThroughLotsClosedCtx(ctx, c, scope)
 	if err != nil {
 		return Domain{}, err
 	}
 	op := OperatorIdentity{UserID: "ada", Org: scope.Org, Roles: []string{"administration", "logistic", "line"}}
 	started, err := c.Commit(ctx, scope, op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		return Domain{}, err

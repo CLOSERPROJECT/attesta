@@ -206,7 +206,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 		t.Fatalf("register after weightCheck = %q, want unavailable", inst.Tasks["register"])
 	}
 
-	lpWL, err := loader.Load(t.Context(), FeragameScope(), op)
+	lpWL, err := loader.LoadForStreamInstance(t.Context(), FeragameScope(), op, truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 	if closed.Domain.Kind("lot")[load1]["status"] != "fullyProcessed" {
 		t.Fatalf("closeLot status = %#v", closed.Domain.Kind("lot")[load1])
 	}
-	afterClose, err := loader.Load(t.Context(), FeragameScope(), op)
+	afterClose, err := loader.LoadForStreamInstance(t.Context(), FeragameScope(), op, truckID)
 	if err != nil {
 		t.Fatal(err)
 	}

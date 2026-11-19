@@ -38,12 +38,13 @@ func TestCommitStartLotViaCerbosAfterIntake(t *testing.T) {
 	defer pdp.Close()
 
 	c, _, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
 	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		t.Fatal(err)

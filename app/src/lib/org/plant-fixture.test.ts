@@ -68,9 +68,11 @@ describe('feragame plant fixture ($org-fixtures)', () => {
 		const arrive = taskConfig(config.jobs.intake, 'truckArrive')!;
 		expect(arrive.readyWhen).toBeUndefined();
 		const startLot = taskConfig(config.jobs.lot_processing, 'startLot')!;
+		expect(String(startLot.readyWhen)).toContain('truckId = $stream.id');
 		const lotsWhere = String((startLot.reads as { lots?: { where?: string } })?.lots?.where ?? '');
 		expect(lotsWhere).toContain('truckId = $stream.id');
 		expect(String(startLot.blockedReason)).toContain('Linea occupata');
+		expect(String(startLot.blockedReason)).toContain('truckId = $stream.id');
 		const register = taskConfig(config.jobs.intake, 'register')!;
 		const http = (register.onSubmit as { http?: { body?: string }[] })?.http ?? [];
 		expect(http.some((op) => String(op.body).includes('$qrEndpoint'))).toBe(true);

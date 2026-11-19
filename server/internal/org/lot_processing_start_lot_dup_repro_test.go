@@ -8,13 +8,14 @@ import (
 // duplicate lot_processing JobInstance (JobPanel keyed-each would crash).
 func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 	first, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -24,9 +25,10 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	}
 
 	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
