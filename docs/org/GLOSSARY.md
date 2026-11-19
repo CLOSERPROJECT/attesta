@@ -77,6 +77,9 @@ _Avoid_: Auto-issue on Domain predicate alone; conflating Passport Domain `locke
 **Passport snapshot**: Immutable projection of related Domain facts frozen into the Passport record on Commit. Later Domain edits do not rewrite what the Passport claims. See [ADR-0007](../adr/0007-org-dpp-production.md).\
 _Avoid_: Live Domain as the passport body; mutable “current view” credentials; “passport” as just another Domain entity row
 
+**Passport chain**: Org Configs of different Organizations linked because each downstream Config takes upstream **Passports** as inputs, inheriting their **Passport snapshots**. The value chain those Passports trace; “Stream” becomes its user-facing label once legacy Streams are retired.\
+_Avoid_: Stream (while legacy Streams live); one multi-org Config; reading another org’s live Domain
+
 ### Operator surfaces
 
 **Dumb executor**: Platform code only evaluates Org Config; plant business rules live in Config. See [`AGENTS.md`](../../AGENTS.md).\

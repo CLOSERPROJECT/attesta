@@ -20,6 +20,7 @@ Every vocabulary file is named `GLOSSARY.md`. This map is `GLOSSARY-MAP.md`. How
 ## Relationships
 
 - **Org ↛ Stream runtime:** `/app` does not load Streams or Stream instances. Org Config ≠ Stream blueprint.
+- **Stream → Passport chain:** legacy multi-org Streams convert into **Passport chains** (one Org Config per org, linked by Passports); the Stream runtime retires after.
 - **Feragame → Org:** Feragame is one Organization’s Config + Domain shape evaluated by the dumb executor. Plant entity names and open/close laws belong in the Feragame glossary / fixture, not in Attesta ADRs.
 - **Shared → both surfaces:** Organization / Affiliation / Organization roles gate who may act; **Config role** slugs (Org) should align with **Organization role** slugs where Cerbos checks membership.
 - **Role catalog vs Role catalog:** Organization Role catalog lives in root [`GLOSSARY.md`](GLOSSARY.md); Config Role catalog lives in [`docs/org/GLOSSARY.md`](docs/org/GLOSSARY.md)—do not conflate.
