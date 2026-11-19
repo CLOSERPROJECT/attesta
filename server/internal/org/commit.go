@@ -27,6 +27,8 @@ type CommitRequest struct {
 	JobInstanceID string         `json:"jobInstanceId"`
 	Value         map[string]any `json:"value"`
 	Mint          *CommitMint    `json:"mint,omitempty"`
+	// StreamInstanceID is the Org stream instance scope from the HTTP API (not JSON).
+	StreamInstanceID string `json:"-"`
 }
 
 func (req CommitRequest) mintKind() MintKind {
@@ -168,6 +170,22 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 			Message: fmt.Sprintf("Task %q has no onSubmit.transform", taskPath),
 		}
 	}
+	if req.StreamInstanceID != "" && jobInstanceID != "" {
+		domainForMember, err := c.Domains.Get(ctx, scope)
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				return CommitResult{}, err
+			}
+			domainForMember = EmptyDomain()
+		}
+		if !JobInstanceBelongsToStream(cfg, domainForMember, ref.JobID, jobInstanceID, req.StreamInstanceID) {
+			return CommitResult{}, &CommitError{
+				Kind:    "conflict",
+				Message: "job instance is not a member of the stream instance",
+			}
+		}
+	}
+
 	wantsPassport := taskOnSubmitDPP(task)
 
 	now := c.Now
@@ -184,6 +202,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 		allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 			Operator:      op,
 			Org:           org,
+			Stream:        scope.Stream,
 			TaskPath:      taskPath,
 			JobID:         ref.JobID,
 			TaskID:        ref.TaskID,
@@ -225,7 +244,16 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 		return CommitResult{}, err
 	}
 
-	wl := projectWorklistUnfiltered(cfg, applied.Domain, op)
+	streamInstanceID := strings.TrimSpace(req.StreamInstanceID)
+	if streamInstanceID == "" && mintKind == MintKindStartingNew && cfg.Stream != nil && ref.JobID == cfg.Stream.Instance.Job {
+		streamInstanceID = applied.JobInstanceID
+	}
+	var wl Worklist
+	if streamInstanceID == "" {
+		wl = projectWorklistUnfiltered(cfg, applied.Domain, op)
+	} else {
+		wl = ProjectWorklist(cfg, applied.Domain, op, streamInstanceID)
+	}
 	nav, continueNav, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
 	if err != nil {
 		return CommitResult{}, err

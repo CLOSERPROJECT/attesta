@@ -26,6 +26,7 @@ func TestCerbosAuthorizerAllowCommitBuildsLivingCheck(t *testing.T) {
 	allowed, err := auth.AllowCommit(t.Context(), AuthorizeCommit{
 		Operator:     OperatorIdentity{UserID: "ada", Org: "operator-org", Roles: []string{"administration", "line"}},
 		Org:          "target-org",
+		Stream:       "recycling",
 		TaskPath:     "intake/register",
 		JobID:        "intake",
 		TaskID:       "register",
@@ -75,6 +76,9 @@ func TestCerbosAuthorizerAllowCommitBuildsLivingCheck(t *testing.T) {
 	}
 	if attr["readyWhenOk"] != true {
 		t.Fatalf("readyWhenOk = %#v", attr["readyWhenOk"])
+	}
+	if attr["stream"] != "recycling" {
+		t.Fatalf("resource.stream = %#v", attr["stream"])
 	}
 	actions := captured["actions"].([]any)
 	if len(actions) != 1 || actions[0] != "commit" {

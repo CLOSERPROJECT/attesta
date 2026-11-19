@@ -41,8 +41,14 @@ type DomainLoader struct {
 }
 
 // Load returns the stream Domain (empty when none stored) and the Active Config
-// version document, projecting Worklist Available / canStart for op's roles.
+// version document, projecting the unfiltered Worklist. Prefer LoadForStreamInstance
+// when an Org stream instance id is known (§5).
 func (l *DomainLoader) Load(ctx context.Context, scope Scope, op OperatorIdentity) (LoadResult, error) {
+	return l.LoadForStreamInstance(ctx, scope, op, "")
+}
+
+// LoadForStreamInstance is Load with Worklist filtered to streamInstanceID when non-empty.
+func (l *DomainLoader) LoadForStreamInstance(ctx context.Context, scope Scope, op OperatorIdentity, streamInstanceID string) (LoadResult, error) {
 	scope, err := scope.Normalize()
 	if err != nil {
 		return LoadResult{}, err
@@ -68,7 +74,12 @@ func (l *DomainLoader) Load(ctx context.Context, scope Scope, op OperatorIdentit
 		domain = EmptyDomain()
 	}
 
-	wl := projectWorklistUnfiltered(cfg, domain, op)
+	var wl Worklist
+	if strings.TrimSpace(streamInstanceID) == "" {
+		wl = projectWorklistUnfiltered(cfg, domain, op)
+	} else {
+		wl = ProjectWorklist(cfg, domain, op, streamInstanceID)
+	}
 	displayName := strings.TrimSpace(op.DisplayName)
 	if displayName == "" {
 		displayName = strings.TrimSpace(op.UserID)
@@ -94,6 +105,16 @@ func (l *DomainLoader) LoadTaskBundle(
 	scope Scope,
 	op OperatorIdentity,
 	jobID, taskID, jobInstanceID string,
+) (*TaskFormBundle, error) {
+	return l.LoadTaskBundleForStreamInstance(ctx, scope, op, jobID, taskID, jobInstanceID, "")
+}
+
+// LoadTaskBundleForStreamInstance is LoadTaskBundle with Worklist filtered to streamInstanceID when set.
+func (l *DomainLoader) LoadTaskBundleForStreamInstance(
+	ctx context.Context,
+	scope Scope,
+	op OperatorIdentity,
+	jobID, taskID, jobInstanceID, streamInstanceID string,
 ) (*TaskFormBundle, error) {
 	scope, err := scope.Normalize()
 	if err != nil {
@@ -126,7 +147,12 @@ func (l *DomainLoader) LoadTaskBundle(
 		domain = EmptyDomain()
 	}
 
-	wl := projectWorklistUnfiltered(cfg, domain, op)
+	var wl Worklist
+	if strings.TrimSpace(streamInstanceID) == "" {
+		wl = projectWorklistUnfiltered(cfg, domain, op)
+	} else {
+		wl = ProjectWorklist(cfg, domain, op, streamInstanceID)
+	}
 	ref := ActionableTaskRef{
 		JobID:         jobID,
 		TaskID:        taskID,

@@ -236,7 +236,7 @@ func TestHandleQrResolveHTTPOneAndErrors(t *testing.T) {
 	palletID := loadID + ".1"
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve",
+	req := httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling",
 		strings.NewReader(`{"raw":"https://plant.example/app?entityId=`+palletID+`"}`))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -257,7 +257,7 @@ func TestHandleQrResolveHTTPOneAndErrors(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve",
+	req = httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling",
 		strings.NewReader(`{"raw":"missing-pallet"}`))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnprocessableEntity {

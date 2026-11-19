@@ -67,8 +67,8 @@ func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity, streamIn
 	return projectWorklist(cfg, domain, op, streamBindingFrom(cfg, streamInstanceID), true)
 }
 
-// ProjectWorklistAll is the unfiltered board (QR resolve, stream list, Load until
-// instance-scoped API). Prefer ProjectWorklist when an instance id is known.
+// ProjectWorklistAll is the unfiltered board (QR resolve, stream list, Play).
+// Prefer ProjectWorklist when an instance id is known.
 func ProjectWorklistAll(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
 	return projectWorklistUnfiltered(cfg, domain, op)
 }

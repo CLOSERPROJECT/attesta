@@ -14,3 +14,4 @@ resourcePolicy:
               - expr: request.principal.attr.roleSlugs.exists(r, r in request.resource.attr.rolesAllowed)
               - expr: request.resource.attr.sequenceOk == true
               - expr: request.resource.attr.readyWhenOk == true
+              - expr: request.resource.attr.stream != ""

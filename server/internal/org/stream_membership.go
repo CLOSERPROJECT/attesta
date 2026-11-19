@@ -66,3 +66,37 @@ func ResolveStreamInstanceID(cfg OrgConfig, domain Domain, jobID, jobInstanceID 
 	}
 	return ""
 }
+
+// StreamInstanceExists reports whether instanceID is an anchor Job instance for the stream.
+func StreamInstanceExists(cfg OrgConfig, domain Domain, instanceID string) bool {
+	if cfg.Stream == nil || instanceID == "" {
+		return false
+	}
+	anchor := cfg.Stream.Instance.Job
+	for _, inst := range domain.JobInstances {
+		if inst.JobID == anchor && inst.ID == instanceID {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAnchorStartTask reports whether jobID/taskID is the anchor Job's first Task (Play).
+func IsAnchorStartTask(cfg OrgConfig, jobID, taskID string) bool {
+	if cfg.Stream == nil || jobID == "" || taskID == "" {
+		return false
+	}
+	if jobID != cfg.Stream.Instance.Job {
+		return false
+	}
+	jobVal, ok := cfg.Jobs.Get(jobID)
+	if !ok {
+		return false
+	}
+	job, ok := AsJob(jobVal)
+	if !ok {
+		return false
+	}
+	ordered := OrderedTaskIDs(job.Tasks)
+	return len(ordered) > 0 && ordered[0] == taskID
+}
