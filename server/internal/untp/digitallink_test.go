@@ -46,6 +46,35 @@ func TestParseEventsPath(t *testing.T) {
 	}
 }
 
+func TestParsePathErrors(t *testing.T) {
+	if _, _, _, _, ok, err := ParseAttachmentPath("/01/%zz/10/LOT-001/21/SERIAL-001/attachment/id/file"); !ok || err == nil {
+		t.Fatalf("attachment with bad gtin = ok=%v err=%v", ok, err)
+	}
+	if _, _, _, _, ok, err := ParseAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/%zz/file"); !ok || err == nil {
+		t.Fatalf("attachment with bad id escape = ok=%v err=%v", ok, err)
+	}
+	if _, _, _, _, ok, err := ParseAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/   /file"); !ok || err == nil {
+		t.Fatalf("attachment with blank id = ok=%v err=%v", ok, err)
+	}
+	if _, _, _, _, ok, err := ParseAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/other/id/file"); ok || err != nil {
+		t.Fatalf("wrong attachment marker = ok=%v err=%v", ok, err)
+	}
+
+	if _, _, _, ok, err := ParseEventsPath("/01/%zz/10/LOT-1/21/SER-1/events"); !ok || err == nil {
+		t.Fatalf("events with bad gtin = ok=%v err=%v", ok, err)
+	}
+
+	if _, _, _, err := ParsePath("/01/09506000134352/10/ /21/SER-1"); err == nil {
+		t.Fatal("blank lot must be rejected")
+	}
+	if _, _, _, err := ParsePath("/01/09506000134352/10/LOT-1/21/%zz"); err == nil {
+		t.Fatal("bad serial escape must be rejected")
+	}
+	if _, err := NormalizeGTIN("123456789012345"); err == nil {
+		t.Fatal("gtin longer than 14 digits must be rejected")
+	}
+}
+
 func TestURLAndGS1ElementString(t *testing.T) {
 	if got := URL("09506000134352", "LOT 001", "SERIAL/001"); got != "/01/09506000134352/10/LOT%20001/21/SERIAL%2F001" {
 		t.Fatalf("URL() = %q", got)

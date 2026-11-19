@@ -1,18 +1,16 @@
 name: 🧪 Tests
 
+# Every pull request into either branch reports this check, including
+# documentation-only changes, so a required check never stays pending.
 on:
   pull_request:
-    paths-ignore:
-      - '*.md'
-      - '*.org'
     branches:
       - master
+      - feat/org-config-as-stream-v2
   push:
-    paths-ignore:
-      - '*.md'
-      - '*.org'
     branches:
       - master
+      - feat/org-config-as-stream-v2
 
 jobs:
   test:

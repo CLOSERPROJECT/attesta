@@ -1,6 +1,7 @@
 package untp
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -97,5 +98,53 @@ func TestBuildModifyEventsAndDTE(t *testing.T) {
 	})
 	if got, want := strings.Join(credential.Type, ","), "DigitalTraceabilityEvent,VerifiableCredential"; got != want {
 		t.Fatalf("type = %q", got)
+	}
+}
+
+func TestLinksetHelpers(t *testing.T) {
+	if PrefersLinkset(nil) {
+		t.Fatal("nil request must not prefer linkset")
+	}
+	request := &http.Request{Header: http.Header{}}
+	if PrefersLinkset(request) {
+		t.Fatal("empty Accept must not prefer linkset")
+	}
+	request.Header.Set("Accept", "application/json")
+	if PrefersLinkset(request) {
+		t.Fatal("application/json must not prefer linkset")
+	}
+	request.Header.Set("Accept", "application/linkset+json; q=1")
+	if !PrefersLinkset(request) {
+		t.Fatal("application/linkset+json must prefer linkset")
+	}
+
+	if scope, ok := LinksetScope(" DPP "); !ok || scope != "dpp" {
+		t.Fatalf("LinksetScope(DPP) = (%q, %v)", scope, ok)
+	}
+	if _, ok := LinksetScope("unknown"); ok {
+		t.Fatal("unknown link type must not resolve")
+	}
+
+	linkset := BuildLinkset("https://dl.example.com", "/01/09506000134352/10/LOT-001/21/SERIAL-001")
+	if _, ok := FilterLinkset(Linkset{}, "dpp"); ok {
+		t.Fatal("empty linkset must not filter")
+	}
+	if _, ok := FilterLinkset(linkset, "unknown"); ok {
+		t.Fatal("unknown relation must not filter")
+	}
+	if _, ok := FilterLinkset(Linkset{Linkset: []LinksetContext{{Anchor: "x"}}}, "pip"); ok {
+		t.Fatal("relation without links must not filter")
+	}
+	for _, relation := range []string{"dte", "pip"} {
+		filtered, ok := FilterLinkset(linkset, relation)
+		if !ok || len(filtered.Linkset) != 1 {
+			t.Fatalf("FilterLinkset(%s) = (%#v, %v)", relation, filtered, ok)
+		}
+		if relation == "dte" && filtered.Linkset[0].DTE == nil {
+			t.Fatalf("dte filter = %#v", filtered)
+		}
+		if relation == "pip" && filtered.Linkset[0].PIP == nil {
+			t.Fatalf("pip filter = %#v", filtered)
+		}
 	}
 }

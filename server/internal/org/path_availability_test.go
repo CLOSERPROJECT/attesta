@@ -74,6 +74,34 @@ func TestSequenceOkForPathIsNotDoneAndStartsWhen(t *testing.T) {
 	}
 }
 
+func TestEvaluatePathAvailabilityUnknownJobOrTask(t *testing.T) {
+	cfg := intakePathCfg()
+	badCfg := OrgConfig{Jobs: OrderedObject{
+		Keys:   []string{"bad"},
+		Values: map[string]any{"bad": "not-a-job"},
+	}}
+
+	if got := EvaluatePathAvailability(cfg, EmptyDomain(), TaskPathRef{JobID: "missing", TaskID: "truckArrive"}, "T1"); got.Done {
+		t.Fatalf("unknown job = %#v, want not done", got)
+	}
+	if got := EvaluatePathAvailability(badCfg, EmptyDomain(), TaskPathRef{JobID: "bad", TaskID: "truckArrive"}, "T1"); got.Done {
+		t.Fatalf("non-Job value = %#v, want not done", got)
+	}
+	if got := EvaluatePathAvailability(cfg, EmptyDomain(), TaskPathRef{JobID: "intake", TaskID: "missing"}, "T1"); got.Done {
+		t.Fatalf("unknown task = %#v, want not done", got)
+	}
+
+	if sequenceOkForPath(cfg, EmptyDomain(), TaskPathRef{JobID: "missing", TaskID: "truckArrive"}, "T1") {
+		t.Fatal("sequenceOk for unknown job must be false")
+	}
+	if sequenceOkForPath(badCfg, EmptyDomain(), TaskPathRef{JobID: "bad", TaskID: "truckArrive"}, "T1") {
+		t.Fatal("sequenceOk for non-Job value must be false")
+	}
+	if sequenceOkForPath(cfg, EmptyDomain(), TaskPathRef{JobID: "intake", TaskID: "missing"}, "T1") {
+		t.Fatal("sequenceOk for unknown task must be false")
+	}
+}
+
 func TestProjectTaskStatusMapsPathAvailability(t *testing.T) {
 	cfg := intakePathCfg()
 	domain := Domain{Submissions: []Submission{sub("intake", "truckArrive", "T1")}}
