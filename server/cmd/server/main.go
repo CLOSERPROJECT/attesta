@@ -250,6 +250,10 @@ type User struct {
 }
 
 type RuntimeConfig struct {
+	// Kind distinguishes Formata blueprints from Org-backed streams (org).
+	// Handlers branch on Kind, never on plant names.
+	Kind         string `yaml:"-"`
+	OrgStreamKey string `yaml:"-"`
 	Workflow      WorkflowDef            `yaml:"workflow"`
 	Organizations []WorkflowOrganization `yaml:"organizations"`
 	Roles         []WorkflowRole         `yaml:"roles"`
@@ -382,6 +386,7 @@ type HomeView struct {
 	FilterOptions       []ProcessStatusGroup
 	ProcessGroups       []ProcessStatusGroup
 	Preview             StreamInstanceDetailView
+	ShowPreview         bool
 }
 
 type LoginView struct {
@@ -1715,6 +1720,9 @@ func (s *Server) selectedWorkflowOrRedirectHome(w http.ResponseWriter, r *http.R
 }
 
 func (s *Server) validateWorkflowRefs(ctx context.Context, cfg RuntimeConfig) error {
+	if cfg.isOrgKind() {
+		return nil
+	}
 	if s == nil || s.identity == nil {
 		return nil
 	}
@@ -5403,7 +5411,8 @@ func (s *Server) handleStreamRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	workflowKey := strings.TrimSpace(parts[0])
-	cfg, err := s.workflowByKey(workflowKey)
+	user, _, _ := s.currentUser(r)
+	cfg, err := s.resolveWorkflowForUser(r.Context(), workflowKey, user)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -5422,12 +5431,20 @@ func (s *Server) handleStreamRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, tail))
 		return
 	case tail == "/delete":
+		if cfg.isOrgKind() {
+			http.NotFound(w, r)
+			return
+		}
 		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, tail))
 		return
 	case strings.HasPrefix(tail, "/instance/"):
 		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, tail))
 		return
 	case tail == "/events":
+		if cfg.isOrgKind() {
+			http.NotFound(w, r)
+			return
+		}
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, tail))
 		return
 	default:
@@ -5595,12 +5612,67 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 		FilterOptions:       filterOptions,
 		ProcessGroups:       []ProcessStatusGroup{activeGroup},
 		Preview:             preview,
+		ShowPreview:         true,
 	}
 	if streamIsStartable(user, cfg) {
 		view.Start = &StartStreamInstanceView{
 			DialogID:    "new-instance-dialog",
 			StartAction: streamPath(workflowKey) + "/instance/start",
 			ReturnPath:  streamPath(workflowKey) + "/",
+		}
+	}
+	return view
+}
+
+func (s *Server) buildOrgWorkflowHomeView(ctx context.Context, r *http.Request, user *AccountUser, workflowKey string, cfg RuntimeConfig, workflowError string) HomeView {
+	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
+	statusFilter := normalizeHomeStatusFilter(r.URL.Query().Get("filter"))
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
+
+	scope := org.Scope{Org: strings.TrimSpace(user.OrgSlug), Stream: cfg.OrgStreamKey}
+	orgCfg, err := s.loadOrgActiveConfig(ctx, scope)
+	if err != nil {
+		logRequestError(r, err, "failed to load Org Config for stream %s", workflowKey)
+		orgCfg = org.OrgConfig{}
+	}
+	domain := org.EmptyDomain()
+	if s.orgDomains != nil {
+		if loaded, domainErr := s.orgDomains.Get(ctx, scope); domainErr == nil {
+			domain = loaded
+		} else if !errors.Is(domainErr, org.ErrNotFound) {
+			logRequestError(r, domainErr, "failed to load Org Domain for stream %s", workflowKey)
+		}
+	}
+	op := org.OperatorIdentity{
+		Org:   scope.Org,
+		Roles: append([]string(nil), user.RoleSlugs...),
+	}
+	processes := orgStreamInstanceCards(orgCfg, domain, op, workflowKey)
+	path := streamPath(workflowKey)
+	filterOptions := buildHomeFilterOptions(processes)
+	activeGroup := buildHomeActiveProcessGroup(path, processes, statusFilter, sortKey, page)
+
+	base := s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name)
+	if r != nil {
+		base.ToastError = toastErrorMessage(r)
+	}
+	view := HomeView{
+		PageBase:            base,
+		Breadcrumbs:         buildStreamBreadcrumbs(workflowKey, cfg.Workflow.Name),
+		WorkflowDescription: normalizeOptionalText(cfg.Workflow.Description),
+		Error:               workflowError,
+		Sort:                sortKey,
+		StatusFilter:        statusFilter,
+		FilterOptions:       filterOptions,
+		ProcessGroups:       []ProcessStatusGroup{activeGroup},
+		ShowPreview:         false,
+	}
+	if orgStreamIsStartable(user, orgCfg) {
+		view.Start = &StartStreamInstanceView{
+			DialogID:    "new-instance-dialog",
+			StartAction: streamPath(workflowKey) + "/instance/start",
+			ReturnPath:  streamPath(workflowKey) + "/",
+			Direct:      true,
 		}
 	}
 	return view
@@ -5630,18 +5702,25 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	workflowError := homePickerMessage(r, "error")
-	if validationErr := s.validateWorkflowRefs(ctx, cfg); validationErr != nil {
-		var refErr *WorkflowRefValidationError
-		if !errors.As(validationErr, &refErr) {
-			http.Error(w, validationErr.Error(), http.StatusInternalServerError)
-			return
-		}
-		if workflowError == "" {
-			workflowError = refErr.Error()
+	if !cfg.isOrgKind() {
+		if validationErr := s.validateWorkflowRefs(ctx, cfg); validationErr != nil {
+			var refErr *WorkflowRefValidationError
+			if !errors.As(validationErr, &refErr) {
+				http.Error(w, validationErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			if workflowError == "" {
+				workflowError = refErr.Error()
+			}
 		}
 	}
 
-	view := s.buildWorkflowHomeView(ctx, r, user, workflowKey, cfg, workflowError)
+	var view HomeView
+	if cfg.isOrgKind() {
+		view = s.buildOrgWorkflowHomeView(ctx, r, user, workflowKey, cfg, workflowError)
+	} else {
+		view = s.buildWorkflowHomeView(ctx, r, user, workflowKey, cfg, workflowError)
+	}
 	if isHTMXRequest(r) {
 		s.renderStreamDashboardResults(w, view)
 		return
@@ -5658,16 +5737,20 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	user, _, ok := s.requireVerifiedPage(w, r)
+	if !ok {
+		return
+	}
+	if cfg.isOrgKind() {
+		s.handleOrgStartProcess(w, r, user, cfg)
+		return
+	}
 	fallbackReturn := streamPath(workflowKey) + "/"
 	_ = r.ParseForm()
 	returnPath := safeReturnPath(r.FormValue("next"), fallbackReturn)
 	name := normalizeProcessName(r.FormValue("name"))
 	if name == "" {
 		redirectWithToastError(w, r, returnPath, errInstanceNameRequired)
-		return
-	}
-	user, _, ok := s.requireVerifiedPage(w, r)
-	if !ok {
 		return
 	}
 	if !streamIsStartable(user, cfg) {
@@ -5698,6 +5781,20 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
 	http.Redirect(w, r, streamInstancePath(workflowKey, id.Hex()), http.StatusSeeOther)
+}
+
+func (s *Server) handleOrgStartProcess(w http.ResponseWriter, r *http.Request, user *AccountUser, cfg RuntimeConfig) {
+	scope := org.Scope{Org: strings.TrimSpace(user.OrgSlug), Stream: cfg.OrgStreamKey}
+	orgCfg, err := s.loadOrgActiveConfig(r.Context(), scope)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !orgStreamIsStartable(user, orgCfg) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	http.Redirect(w, r, appOrgStreamNewPath(cfg.OrgStreamKey), http.StatusSeeOther)
 }
 
 const maxProcessNameRunes = 80
