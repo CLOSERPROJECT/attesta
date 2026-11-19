@@ -30,9 +30,10 @@ type QrMessages struct {
 }
 
 type QrNavigate struct {
-	JobID         string `json:"jobId"`
-	JobInstanceID string `json:"jobInstanceId"`
-	TaskID        string `json:"taskId"`
+	JobID            string `json:"jobId"`
+	JobInstanceID    string `json:"jobInstanceId"`
+	TaskID           string `json:"taskId"`
+	StreamInstanceID string `json:"streamInstanceId,omitempty"`
 }
 
 type QrResolveError struct {
@@ -75,7 +76,7 @@ func DecodeScanEntityID(raw string) string {
 	return raw
 }
 
-// ResolveQR runs Org Config qr.rules against the viewer Worklist.
+// ResolveQR runs Org Config qr.rules against the viewer Worklist (unfiltered: QR may jump instances).
 // First when-matching rule owns the outcome (eligible / zero / one / many).
 func ResolveQR(cfg OrgConfig, domain Domain, op OperatorIdentity, raw string) QrResolveResult {
 	if cfg.QR == nil || len(cfg.QR.Rules) == 0 {
@@ -109,6 +110,7 @@ func ResolveQR(cfg OrgConfig, domain Domain, op OperatorIdentity, raw string) Qr
 				return qrErr("seed", "QR seed not evaluable")
 			}
 			nav := cands[0]
+			nav.StreamInstanceID = ResolveStreamInstanceID(cfg, domain, nav.JobID, nav.JobInstanceID)
 			return QrResolveResult{Navigate: &nav, Seed: seed}
 		default:
 			return qrErr("many", msgOr(rule.Messages.OnMany, "Multiple destinations"))
