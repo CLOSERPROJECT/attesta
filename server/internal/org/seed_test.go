@@ -82,13 +82,13 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryDPPStore()
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "other", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
+		Org: "other", Stream: "recycling", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/2/b/t",
 	}); err != nil {
 		t.Fatal(err)
@@ -100,10 +100,10 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
+	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("feragame passport after wipe = %v, want ErrNotFound", err)
 	}
-	if _, err := passports.Get(t.Context(), "other", "X"); err != nil {
+	if _, err := passports.Get(t.Context(), Scope{Org: "other", Stream: "recycling"}, "X"); err != nil {
 		t.Fatalf("other org passport must survive: %v", err)
 	}
 }
@@ -181,7 +181,7 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -214,7 +214,7 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 	if _, ok := got.Kind("truck")[SeedTruckID]; ok {
 		t.Fatal("feragame-config must not stage Domain")
 	}
-	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
+	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("passport after feragame-config = %v, want ErrNotFound", err)
 	}
 }
@@ -239,7 +239,7 @@ func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 	if got.Kind("lot")["L1"] == nil || len(got.Submissions) != 1 {
 		t.Fatalf("Domain must be kept: %#v", got)
 	}
-	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); err != nil {
+	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); err != nil {
 		t.Fatalf("passport must be kept: %v", err)
 	}
 }
@@ -314,7 +314,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 		t.Fatal("pre-wipe L1 must not survive feragame-full rebuild")
 	}
 	assertStagedDemoDomain(t, got)
-	if _, err := passports.Get(t.Context(), "feragame", SeedLoadCOID); !errors.Is(err, ErrNotFound) {
+	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("passport after feragame-full = %v, want ErrNotFound", err)
 	}
 }

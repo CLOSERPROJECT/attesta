@@ -405,6 +405,69 @@ func TestMongoStreamsOfOneOrgKeepSeparateDomainsAndActiveVersions(t *testing.T) 
 	}
 }
 
+func TestMongoStreamsOfOneOrgKeepSeparateDPPsAndLinks(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	passports := NewMongoDPPStore(db)
+	links := NewMongoLinkStore(db)
+
+	scopeA := Scope{Org: "mongo-dpp-" + t.Name(), Stream: "recycling"}
+	scopeB := Scope{Org: scopeA.Org, Stream: "other"}
+	addr := SubmissionAddress{JobID: "intake", JobInstanceID: "T1", TaskID: "register"}
+	ts := "2026-11-19T12:00:00.000000000Z"
+
+	if err := passports.Create(ctx, DPPRecord{
+		Org: scopeA.Org, Stream: scopeA.Stream, SubjectID: "L-A",
+		GTIN: "09506000134352", Lot: "LOT-A", Serial: "L-A",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/a",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(ctx, DPPRecord{
+		Org: scopeB.Org, Stream: scopeB.Stream, SubjectID: "L-A",
+		GTIN: "09506000134352", Lot: "LOT-B", Serial: "L-A",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/b",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gotA, err := passports.Get(ctx, scopeA, "L-A")
+	if err != nil || gotA.Lot != "LOT-A" || gotA.Stream != scopeA.Stream {
+		t.Fatalf("passport A = %#v err=%v", gotA, err)
+	}
+	gotB, err := passports.Get(ctx, scopeB, "L-A")
+	if err != nil || gotB.Lot != "LOT-B" || gotB.Stream != scopeB.Stream {
+		t.Fatalf("passport B = %#v err=%v", gotB, err)
+	}
+
+	dup := DPPRecord{
+		Org: scopeB.Org, Stream: scopeB.Stream, SubjectID: "L-dup",
+		GTIN: "09506000134352", Lot: "LOT-A", Serial: "L-A",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/dup",
+	}
+	if err := passports.Create(ctx, dup); !errors.Is(err, ErrDPPExists) {
+		t.Fatalf("cross-stream identity = %v, want ErrDPPExists", err)
+	}
+	byID, err := passports.GetByIdentity(ctx, "09506000134352", "LOT-A", "L-A")
+	if err != nil || byID.Stream != scopeA.Stream {
+		t.Fatalf("GetByIdentity = %#v err=%v", byID, err)
+	}
+
+	if err := links.Put(ctx, scopeA, addr, ts, []HttpLinkItem{{Label: "A", URL: "blob:a", Action: HttpActionLink}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := links.Put(ctx, scopeB, addr, ts, []HttpLinkItem{{Label: "B", URL: "blob:b", Action: HttpActionDownload, Filename: "b.csv"}}); err != nil {
+		t.Fatal(err)
+	}
+	storedA, err := links.Get(ctx, scopeA, addr, ts)
+	if err != nil || len(storedA) != 1 || storedA[0].URL != "blob:a" {
+		t.Fatalf("links A = %#v err=%v", storedA, err)
+	}
+	storedB, err := links.Get(ctx, scopeB, addr, ts)
+	if err != nil || len(storedB) != 1 || storedB[0].Filename != "b.csv" {
+		t.Fatalf("links B = %#v err=%v", storedB, err)
+	}
+}
+
 func livingTestMongoDB(t *testing.T) *mongo.Database {
 	t.Helper()
 	uri := os.Getenv("MONGODB_URI")
@@ -430,6 +493,8 @@ func livingTestMongoDB(t *testing.T) *mongo.Database {
 		_ = db.Collection(collectionOrgDomains).Drop(context.Background())
 		_ = db.Collection(collectionOrgConfigs).Drop(context.Background())
 		_ = db.Collection(collectionOrgActiveConfig).Drop(context.Background())
+		_ = db.Collection(collectionOrgDPPs).Drop(context.Background())
+		_ = db.Collection(collectionOrgSubmissionLinks).Drop(context.Background())
 	})
 	return db
 }

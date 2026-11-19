@@ -115,7 +115,7 @@ func TestLockLoadRecapMatchesCommitFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec, err := passports.Get(t.Context(), "synth", "W-3")
+	rec, err := passports.Get(t.Context(), Scope{Org: "synth", Stream: "synth"}, "W-3")
 	if err != nil {
 		t.Fatal(err)
 	}
