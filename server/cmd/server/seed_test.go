@@ -161,16 +161,19 @@ func TestSeedOrgStoresWipeDomainOnReplace(t *testing.T) {
 		t.Fatal("pre-replace L1 must not survive staged rebuild")
 	}
 	if _, ok := got.Kind("truck")[org.SeedTruckID]; !ok {
-		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+		t.Fatalf("staged Domain missing truck A: %#v", got.Kind("truck"))
 	}
-	if got.Kind("lot")[org.SeedLoadCOID] == nil || got.Kind("lot")[org.SeedLoadDAID] == nil {
+	if _, ok := got.Kind("truck")[org.SeedTruckBID]; !ok {
+		t.Fatalf("staged Domain missing truck B: %#v", got.Kind("truck"))
+	}
+	if got.Kind("lot")[org.SeedLoadCOID] == nil || got.Kind("lot")[org.SeedLoadDAID] == nil || got.Kind("lot")[org.SeedTruckBLotID] == nil {
 		t.Fatalf("staged Domain missing lots: %#v", got.Kind("lot"))
 	}
 	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
 		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))
 	}
-	if _, err := passports.Get(t.Context(), org.FeragameScope(), org.SeedLoadCOID); !errors.Is(err, org.ErrNotFound) {
-		t.Fatalf("passport after replace = %v, want ErrNotFound", err)
+	if _, err := passports.Get(t.Context(), org.FeragameScope(), org.SeedLoadCOID); err != nil {
+		t.Fatalf("finished lot passport after replace = %v, want issued DPP", err)
 	}
 	version, err := configs.ActiveVersion(t.Context(), org.FeragameScope())
 	if err != nil {
@@ -478,7 +481,10 @@ func TestSeedFeragameDomainWipesAndStagesWithoutIdentity(t *testing.T) {
 		t.Fatal("pre-wipe L1 must not survive")
 	}
 	if _, ok := got.Kind("truck")[org.SeedTruckID]; !ok {
-		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+		t.Fatalf("staged Domain missing truck A: %#v", got.Kind("truck"))
+	}
+	if _, ok := got.Kind("truck")[org.SeedTruckBID]; !ok {
+		t.Fatalf("staged Domain missing truck B: %#v", got.Kind("truck"))
 	}
 }
 
@@ -642,7 +648,13 @@ func TestSeedFeragameFullHardResetsAndStages(t *testing.T) {
 		t.Fatal("pre-wipe L1 must not survive")
 	}
 	if _, ok := got.Kind("truck")[org.SeedTruckID]; !ok {
-		t.Fatalf("staged Domain missing truck: %#v", got.Kind("truck"))
+		t.Fatalf("staged Domain missing truck A: %#v", got.Kind("truck"))
+	}
+	if _, ok := got.Kind("truck")[org.SeedTruckBID]; !ok {
+		t.Fatalf("staged Domain missing truck B: %#v", got.Kind("truck"))
+	}
+	if _, err := passports.Get(t.Context(), org.FeragameScope(), org.SeedLoadCOID); err != nil {
+		t.Fatalf("finished lot passport after feragame-full = %v, want issued DPP", err)
 	}
 	version, err := configs.ActiveVersion(t.Context(), org.FeragameScope())
 	if err != nil {

@@ -182,9 +182,12 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, ok := got.Kind("truck")[SeedTruckID]; !ok {
-		t.Fatalf("demo truck missing after wipe+seed: %#v", got.Kind("truck"))
+		t.Fatalf("demo truck A missing after wipe+seed: %#v", got.Kind("truck"))
 	}
-	if got.Kind("lot")[SeedLoadCOID] == nil || got.Kind("lot")[SeedLoadDAID] == nil {
+	if _, ok := got.Kind("truck")[SeedTruckBID]; !ok {
+		t.Fatalf("demo truck B missing after wipe+seed: %#v", got.Kind("truck"))
+	}
+	if got.Kind("lot")[SeedLoadCOID] == nil || got.Kind("lot")[SeedLoadDAID] == nil || got.Kind("lot")[SeedTruckBLotID] == nil {
 		t.Fatalf("demo loads missing after wipe+seed: %#v", got.Kind("lot"))
 	}
 	if len(got.Submissions) < 8 {

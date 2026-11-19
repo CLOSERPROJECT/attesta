@@ -100,8 +100,8 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("feragame passport after wipe = %v, want ErrNotFound", err)
+	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); err != nil {
+		t.Fatalf("finished lot passport after wipe+stage = %v, want issued DPP", err)
 	}
 	if _, err := passports.Get(t.Context(), Scope{Org: "other", Stream: "recycling"}, "X"); err != nil {
 		t.Fatalf("other org passport must survive: %v", err)
@@ -338,8 +338,8 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 		t.Fatal("pre-wipe L1 must not survive feragame-full rebuild")
 	}
 	assertStagedDemoDomain(t, got)
-	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("passport after feragame-full = %v, want ErrNotFound", err)
+	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); err != nil {
+		t.Fatalf("finished lot passport after feragame-full = %v, want issued DPP", err)
 	}
 }
 
@@ -374,59 +374,26 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	logRefs := CollectActionableTaskRefs(logistic.Config, logistic.Worklist)
 	lineRefs := CollectActionableTaskRefs(line.Config, line.Worklist)
 
-	if !hasActionableRef(adminRefs, "intake", "weightCheck", SeedTruckID) {
-		t.Fatalf("administration actionable missing weightCheck@%s: %#v", SeedTruckID, adminRefs)
+	if !hasActionableRef(adminRefs, "intake", "weightCheck", SeedTruckBID) {
+		t.Fatalf("administration actionable missing weightCheck@%s: %#v", SeedTruckBID, adminRefs)
 	}
-	for _, lotID := range []string{SeedLoadCOID, SeedLoadDAID} {
-		if hasActionableRef(adminRefs, "lot_processing", "weigh", lotID) {
-			t.Fatalf("administration must not see weigh: %#v", adminRefs)
-		}
-		if hasActionableRef(adminRefs, "lot_processing", "markProgress", lotID) {
-			t.Fatalf("administration must not see markProgress: %#v", adminRefs)
-		}
-		if hasActionableRef(adminRefs, "lot_processing", "containerReg", lotID) {
-			t.Fatalf("administration must not see containerReg: %#v", adminRefs)
-		}
-		if hasActionableRef(adminRefs, "lot_processing", "closeLot", lotID) {
-			t.Fatalf("administration must not see closeLot: %#v", adminRefs)
-		}
+	if hasActionableRef(adminRefs, "intake", "weightCheck", SeedTruckID) {
+		t.Fatalf("truck A weightCheck must be done, not actionable: %#v", adminRefs)
 	}
-
-	// Staged seed closed both lots; logistic peer Tasks are unavailable (no open lot).
-	for _, lotID := range []string{SeedLoadCOID, SeedLoadDAID} {
-		if hasActionableRef(logRefs, "lot_processing", "containerReg", lotID) {
-			t.Fatalf("logistic must not see containerReg after closeLot: %#v", logRefs)
-		}
-		if hasActionableRef(logRefs, "lot_processing", "weigh", lotID) {
-			t.Fatalf("logistic must not see weigh: %#v", logRefs)
-		}
-		if hasActionableRef(lineRefs, "lot_processing", "markProgress", lotID) {
-			t.Fatalf("line must not see markProgress after staged closeLot: %#v", lineRefs)
-		}
-		if hasActionableRef(lineRefs, "lot_processing", "weigh", lotID) {
-			t.Fatalf("line must not see weigh after staged closeLot: %#v", lineRefs)
-		}
-		if hasActionableRef(lineRefs, "lot_processing", "containerReg", lotID) {
-			t.Fatalf("line must not see containerReg: %#v", lineRefs)
-		}
-		if hasActionableRef(lineRefs, "lot_processing", "closeLot", lotID) {
-			t.Fatalf("line must not see closeLot: %#v", lineRefs)
-		}
+	if hasActionableRef(adminRefs, "lot_processing", "weigh", SeedLoadDAID) {
+		t.Fatalf("administration must not see weigh: %#v", adminRefs)
 	}
-	if hasActionableRef(logRefs, "intake", "weightCheck", SeedTruckID) {
+	if hasActionableRef(adminRefs, "lot_processing", "lock", SeedLoadCOID) {
+		t.Fatalf("finished lot lock must not stay actionable: %#v", adminRefs)
+	}
+	if hasActionableRef(logRefs, "intake", "weightCheck", SeedTruckBID) {
 		t.Fatalf("logistic must not see weightCheck: %#v", logRefs)
 	}
-
-	for _, lotID := range []string{SeedLoadCOID, SeedLoadDAID} {
-		if !hasActionableRef(adminRefs, "lot_processing", "lock", lotID) {
-			t.Fatalf("administration must see lot_processing/lock on %s: %#v", lotID, adminRefs)
-		}
-		if hasActionableRef(logRefs, "lot_processing", "lock", lotID) {
-			t.Fatalf("logistic must not see lock: %#v", logRefs)
-		}
-		if hasActionableRef(lineRefs, "lot_processing", "lock", lotID) {
-			t.Fatalf("line must not see lock: %#v", lineRefs)
-		}
+	if !hasActionableRef(lineRefs, "lot_processing", "weigh", SeedLoadDAID) {
+		t.Fatalf("line must see weigh on open lot %s: %#v", SeedLoadDAID, lineRefs)
+	}
+	if hasActionableRef(lineRefs, "lot_processing", "weigh", SeedLoadCOID) {
+		t.Fatalf("line must not see weigh on finished lot: %#v", lineRefs)
 	}
 	if _, ok := worklistJobByID(admin.Worklist, "passport"); ok {
 		t.Fatal("passport Job must not appear on Worklist")
@@ -437,16 +404,15 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	lineLot, _ := worklistJobByID(line.Worklist, "lot_processing")
 	logLot, _ := worklistJobByID(logistic.Worklist, "lot_processing")
 	adminLot, _ := worklistJobByID(admin.Worklist, "lot_processing")
-	// Seed truck is mid-intake; parallel trucks keep Nuovo camion available for administration.
 	if !adminIntake.CanStart {
-		t.Fatal("administration canStart intake want true while prior truck incomplete (parallel)")
+		t.Fatal("administration canStart intake want true (parallel trucks)")
 	}
 	if logIntake.CanStart {
 		t.Fatal("logistic canStart intake want false")
 	}
-	// Both lots fullyProcessed — no eligible startLot; line/admin lack startLot role.
+	// DA is open — plant one-open-lot blocks further startLot; truck B Apri lotto is unavailable.
 	if logLot.CanStart {
-		t.Fatal("logistic canStart lot_processing want false after both lots closed")
+		t.Fatal("logistic canStart lot_processing want false while DA is open")
 	}
 	if lineLot.CanStart {
 		t.Fatal("line canStart lot_processing want false")
@@ -501,25 +467,31 @@ func TestSeedDemoReplaceIsNotHarnessRunsAPI(t *testing.T) {
 func assertStagedDemoDomain(t *testing.T, got Domain) {
 	t.Helper()
 	loads := got.Kind("lot")
-	if loads[SeedLoadCOID] == nil || loads[SeedLoadDAID] == nil {
-		t.Fatalf("staged loads = %#v, want %s and %s", loads, SeedLoadCOID, SeedLoadDAID)
+	if loads[SeedLoadCOID] == nil || loads[SeedLoadDAID] == nil || loads[SeedTruckBLotID] == nil {
+		t.Fatalf("staged loads = %#v, want %s, %s, and %s", loads, SeedLoadCOID, SeedLoadDAID, SeedTruckBLotID)
 	}
-	if len(got.Kind("truck")) != 1 {
-		t.Fatalf("staged trucks = %#v, want 1", got.Kind("truck"))
+	trucks := got.Kind("truck")
+	if len(trucks) != 2 {
+		t.Fatalf("staged trucks = %#v, want 2", trucks)
 	}
-	if _, ok := got.Kind("truck")[SeedTruckID]; !ok {
-		t.Fatalf("staged truck missing %s: %#v", SeedTruckID, got.Kind("truck"))
+	if _, ok := trucks[SeedTruckID]; !ok {
+		t.Fatalf("staged truck A missing %s: %#v", SeedTruckID, trucks)
 	}
-	if len(got.Kind("pallet")) != 4 {
-		t.Fatalf("staged pallets = %#v, want 4", got.Kind("pallet"))
+	if _, ok := trucks[SeedTruckBID]; !ok {
+		t.Fatalf("staged truck B missing %s: %#v", SeedTruckBID, trucks)
+	}
+	// Truck A: 2 lots × 2 pallets; truck B: 1 lot × 2 pallets.
+	if len(got.Kind("pallet")) != 6 {
+		t.Fatalf("staged pallets = %#v, want 6", got.Kind("pallet"))
 	}
 	if len(got.Kind("workingDay")) != 0 {
 		t.Fatalf("staged workingDay must be absent: %#v", got.Kind("workingDay"))
 	}
-	if len(got.JobInstances) != 3 {
-		t.Fatalf("jobInstances = %d, want 3 (1 intake + 2 lot_processing)", len(got.JobInstances))
+	// 2 intake + 2 lot_processing (CO finished, DA open); truck B has no lot_processing yet.
+	if len(got.JobInstances) != 4 {
+		t.Fatalf("jobInstances = %d, want 4 (2 intake + 2 lot_processing)", len(got.JobInstances))
 	}
-	// truckArrive + 2× register + 2× startLot + 4× weigh + 2× markProgress + 2× containerReg + 2× closeLot
+	// truckA: arrive+2×register+weightCheck+CO(full incl lock)+DA(start+1 weigh); truckB: arrive+register
 	if len(got.Submissions) < 15 {
 		t.Fatalf("submissions = %d, want >= 15", len(got.Submissions))
 	}
@@ -537,58 +509,129 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wl := projectWorklistUnfiltered(cfg, got, FixtureAllRolesOp())
+	op := FixtureAllRolesOp()
+	wl := projectWorklistUnfiltered(cfg, got, op)
 	intake, ok := worklistJobByID(wl, "intake")
 	if !ok {
 		t.Fatal("missing intake worklist")
 	}
-	truck, ok := worklistInstance(intake, SeedTruckID)
-	if !ok || truck.Tasks["truckArrive"] != TaskStatusDone || truck.Tasks["register"] != TaskStatusActionable {
-		t.Fatalf("intake truck = %#v", truck)
+	truckA, ok := worklistInstance(intake, SeedTruckID)
+	if !ok || truckA.Tasks["truckArrive"] != TaskStatusDone || !truckA.Finished {
+		t.Fatalf("truck A intake = %#v, want finished after weightCheck", truckA)
 	}
-	if truck.Tasks["weightCheck"] != TaskStatusActionable {
-		t.Fatalf("weightCheck = %q, want actionable", truck.Tasks["weightCheck"])
+	if truckA.Tasks["weightCheck"] != TaskStatusDone {
+		t.Fatalf("truck A weightCheck = %q, want done", truckA.Tasks["weightCheck"])
 	}
+	truckB, ok := worklistInstance(intake, SeedTruckBID)
+	if !ok || truckB.Tasks["truckArrive"] != TaskStatusDone {
+		t.Fatalf("truck B intake = %#v", truckB)
+	}
+	if truckB.Tasks["weightCheck"] != TaskStatusActionable {
+		t.Fatalf("truck B weightCheck = %q, want actionable (intake incomplete)", truckB.Tasks["weightCheck"])
+	}
+	if truckB.Finished {
+		t.Fatal("truck B intake must not be finished")
+	}
+
 	lotProc, ok := worklistJobByID(wl, "lot_processing")
 	if !ok {
 		t.Fatal("missing lot_processing worklist")
 	}
-	if lotProc.CanStart {
-		t.Fatal("lot_processing CanStart want false after both lots fullyProcessed")
+	finished, ok := worklistInstance(lotProc, SeedLoadCOID)
+	if !ok || !finished.Finished || finished.Tasks["lock"] != TaskStatusDone {
+		t.Fatalf("finished lot %s = %#v, want lock done", SeedLoadCOID, finished)
 	}
-	for _, lotID := range []string{SeedLoadCOID, SeedLoadDAID} {
-		inst, ok := worklistInstance(lotProc, lotID)
-		if !ok || inst.Tasks["startLot"] != TaskStatusDone {
-			t.Fatalf("lot_processing %s = %#v", lotID, inst)
-		}
-		for _, id := range []string{"weigh", "markProgress", "containerReg", "closeLot"} {
-			if inst.Tasks[id] != TaskStatusUnavailable {
-				t.Fatalf("%s@%s = %q, want unavailable after closeLot", id, lotID, inst.Tasks[id])
-			}
-		}
-		if _, ok := inst.Tasks["openTurno"]; ok {
-			t.Fatalf("lot_processing must not expose openTurno: %#v", inst.Tasks)
-		}
-		if _, ok := inst.Tasks["closeTurno"]; ok {
-			t.Fatalf("lot_processing must not expose closeTurno: %#v", inst.Tasks)
-		}
+	openLot, ok := worklistInstance(lotProc, SeedLoadDAID)
+	if !ok || openLot.Tasks["startLot"] != TaskStatusDone {
+		t.Fatalf("open lot %s = %#v", SeedLoadDAID, openLot)
 	}
-	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
-		facts := loads[loadID]
-		if facts["status"] != "fullyProcessed" {
-			t.Fatalf("lot %s status = %#v, want fullyProcessed", loadID, facts["status"])
-		}
-		if facts["locked"] == true {
-			t.Fatalf("lot %s must not be passport-locked", loadID)
-		}
+	if openLot.Tasks["weigh"] != TaskStatusActionable {
+		t.Fatalf("open lot weigh = %q, want actionable after partial weigh", openLot.Tasks["weigh"])
+	}
+	if openLot.Finished {
+		t.Fatal("open lot must not be finished")
+	}
+	if _, ok := worklistInstance(lotProc, SeedTruckBLotID); ok {
+		t.Fatalf("truck B lot %s must not have lot_processing yet", SeedTruckBLotID)
+	}
+
+	if loads[SeedLoadCOID]["status"] != "fullyProcessed" || loads[SeedLoadCOID]["locked"] != true {
+		t.Fatalf("finished lot facts = %#v, want fullyProcessed+locked", loads[SeedLoadCOID])
+	}
+	if loads[SeedLoadDAID]["status"] != "open" {
+		t.Fatalf("open lot status = %#v, want open", loads[SeedLoadDAID])
+	}
+	if loads[SeedTruckBLotID]["status"] == "open" || loads[SeedTruckBLotID]["status"] == "fullyProcessed" {
+		t.Fatalf("truck B lot status = %#v, want registered (not open/fullyProcessed)", loads[SeedTruckBLotID])
 	}
 	if _, ok := worklistJobByID(wl, "passport"); ok {
 		t.Fatal("passport Job must not appear on Worklist")
 	}
-	refs := CollectActionableTaskRefs(cfg, wl)
-	for _, loadID := range []string{SeedLoadCOID, SeedLoadDAID} {
-		if !hasActionableRef(refs, "lot_processing", "lock", loadID) {
-			t.Fatalf("lot_processing/lock must be actionable on %s: %#v", loadID, refs)
+
+	list := ListStreamInstances(cfg, got, op)
+	if len(list) != 2 {
+		t.Fatalf("ListStreamInstances = %#v, want 2 trucks", list)
+	}
+	active := 0
+	for _, row := range list {
+		if row.Status == StreamInstanceActive {
+			active++
 		}
+	}
+	if active != 2 {
+		t.Fatalf("active trucks = %d in %#v, want 2", active, list)
+	}
+
+	// /my truck A timeline: one finished lot (DPP) + one open mid-weigh row.
+	tl := ProjectStreamTimeline(cfg, got, op, SeedTruckID)
+	var each *StreamTimelineStep
+	for i := range tl.Steps {
+		if tl.Steps[i].JobID == "lot_processing" {
+			each = &tl.Steps[i]
+			break
+		}
+	}
+	if each == nil || len(each.Rows) != 2 {
+		t.Fatalf("truck A Lavorazione rows = %#v, want 2 (finished + open)", tl.Steps)
+	}
+	var finishedRow, openRow bool
+	for _, row := range each.Rows {
+		switch row.ID {
+		case SeedLoadCOID:
+			if !row.Finished {
+				t.Fatalf("finished lot row %#v, want Finished", row)
+			}
+			finishedRow = true
+		case SeedLoadDAID:
+			if row.Finished {
+				t.Fatalf("open lot row %#v must not be Finished", row)
+			}
+			openRow = true
+		}
+	}
+	if !finishedRow || !openRow {
+		t.Fatalf("truck A rows = %#v, want %s finished and %s open", each.Rows, SeedLoadCOID, SeedLoadDAID)
+	}
+
+	// Truck B Apri lotto is line-busy while DA is open on truck A.
+	wantBusy := "Linea occupata: lotto " + SeedLoadDAID + " (camion " + SeedTruckID + ")"
+	tlB := ProjectStreamTimeline(cfg, got, op, SeedTruckBID)
+	var startBlocked string
+	for _, step := range tlB.Steps {
+		if step.JobID != "lot_processing" {
+			continue
+		}
+		for _, row := range step.Rows {
+			if row.ID != SeedTruckBLotID {
+				continue
+			}
+			if len(row.Tasks) == 0 || row.Tasks[0].ID != "startLot" {
+				t.Fatalf("truck B lot timeline tasks = %#v", row.Tasks)
+			}
+			startBlocked = row.Tasks[0].BlockedReason
+		}
+	}
+	if startBlocked != wantBusy {
+		t.Fatalf("truck B Apri lotto blockedReason = %q, want %q", startBlocked, wantBusy)
 	}
 }

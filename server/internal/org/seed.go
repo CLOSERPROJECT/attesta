@@ -54,10 +54,17 @@ type SeedOptions struct {
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
 // Truck / lot grammars use $today from the seed clock (2026-11-02 → 261102).
 // lot_processing Job instance id = lot id (1:1); no day/turno instances.
+//
+// Parallel-truck demo matrix (§9 / #315):
+//
+//	Truck A (SeedTruckID): intake checked; SeedLoadCOID finished+DPP; SeedLoadDAID open with some pallets weighed.
+//	Truck B (SeedTruckBID): intake with SeedTruckBLotID registered, weightCheck still open.
 const (
-	SeedTruckID  = "261102-1"
-	SeedLoadCOID = "CO-261102-1"
-	SeedLoadDAID = "DA-261102-1"
+	SeedTruckID     = "261102-1"
+	SeedTruckBID    = "261102-2"
+	SeedLoadCOID    = "CO-261102-1"
+	SeedLoadDAID    = "DA-261102-1"
+	SeedTruckBLotID = "DI-261102-1"
 )
 
 // SeedDemo applies the demo Feragame fixture per opts.Scope:
@@ -164,14 +171,15 @@ func domainSeedEmpty(d Domain) bool {
 	return len(d.JobInstances) == 0 && len(d.Submissions) == 0
 }
 
-// seedStagedDemoDomain wipes then Commits one coherent plant story:
-// intake (truck + two lots CO/DA) → per-lot lot_processing
-// startLot→weigh→markProgress→containerReg→closeLot (closeLot sole fullyProcessed
-// writer). Leaves weightCheck open; lots stay fullyProcessed unlocked so
-// lot_processing/lock is actionable for administration. No workingDay /
-// openTurno/closeTurno Commits. No lot_processing/lock Commit (demo leaves DPP open).
+// seedStagedDemoDomain wipes then Commits the parallel-truck demo matrix:
+//
+//	Truck A — weightCheck done; CO finished through lot_processing/lock (DPP);
+//	          DA open on the line with one pallet weighed.
+//	Truck B — arrive + register only (weightCheck open) so /my shows two active trucks.
+//
 // When passports is set, org rows are deleted before Domain Put so deterministic
 // seed subject ids can Lock again after --replace / --feragame-domain / --feragame-full.
+// A nil passports store still stages Domain facts via an ephemeral DPPStore for lock.
 func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs ConfigStore, passports DPPStore, scope Scope) error {
 	scope, err := scope.Normalize()
 	if err != nil {
@@ -186,17 +194,22 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if err := domains.Put(ctx, scope, EmptyDomain()); err != nil {
 		return err
 	}
+	dppStore := passports
+	if dppStore == nil {
+		dppStore = NewMemoryDPPStore()
+	}
 	c := &TaskCommitter{
 		Domains:    domains,
 		Configs:    configs,
 		Authorizer: AllowAllAuthorizer{},
+		DPPs:       dppStore,
 		Now:        func() time.Time { return time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC) },
 	}
 	admin := OperatorIdentity{UserID: "seed-admin", Org: org, Roles: []string{"administration"}}
 	logistic := OperatorIdentity{UserID: "seed-logistic", Org: org, Roles: []string{"logistic"}}
 	lineOp := OperatorIdentity{UserID: "seed-line", Org: org, Roles: []string{"line"}}
 
-	arrive, err := seedCommit(ctx, c, scope, admin, CommitRequest{
+	arriveA, err := seedCommit(ctx, c, scope, admin, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    seedTruckArriveValue(1000),
 		Mint:     startingNewMint(),
@@ -204,8 +217,8 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if err != nil {
 		return err
 	}
-	if arrive.JobInstanceID != SeedTruckID {
-		return fmt.Errorf("org seed: truck id %q, want %q", arrive.JobInstanceID, SeedTruckID)
+	if arriveA.JobInstanceID != SeedTruckID {
+		return fmt.Errorf("org seed: truck A id %q, want %q", arriveA.JobInstanceID, SeedTruckID)
 	}
 
 	for _, lot := range []struct {
@@ -230,70 +243,126 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 		}
 	}
 
-	for _, lot := range []struct {
-		id      string
-		pallets []struct {
-			id     string
-			weight float64
-		}
-	}{
-		{SeedLoadCOID, []struct {
-			id     string
-			weight float64
-		}{{SeedLoadCOID + ".1", 125.0}, {SeedLoadCOID + ".2", 100.0}}},
-		{SeedLoadDAID, []struct {
-			id     string
-			weight float64
-		}{{SeedLoadDAID + ".1", 90.0}, {SeedLoadDAID + ".2", 85.0}}},
-	} {
-		started, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
-			TaskPath: "lot_processing/startLot",
-			Value:    map[string]any{"lotId": lot.id},
-			Mint:     startingNewMint(),
-		})
-		if err != nil {
-			return err
-		}
-		if started.JobInstanceID != lot.id {
-			return fmt.Errorf("org seed: lot_processing id %q, want %q", started.JobInstanceID, lot.id)
-		}
-		progress := map[string]any{}
-		for _, row := range lot.pallets {
-			if _, err := seedCommit(ctx, c, scope, lineOp, CommitRequest{
-				TaskPath:      "lot_processing/weigh",
-				JobInstanceID: lot.id,
-				Value:         weighValue(row.id, row.weight),
-			}); err != nil {
-				return err
-			}
-			progress[row.id] = "done"
-		}
+	if _, err := seedCommit(ctx, c, scope, admin, CommitRequest{
+		TaskPath:      "intake/weightCheck",
+		JobInstanceID: SeedTruckID,
+		Value: map[string]any{
+			"checkedTruckWeight": 1000.0,
+			"checkedLotSum":      600.0,
+		},
+	}); err != nil {
+		return err
+	}
+
+	if err := seedFinishLotWithDPP(ctx, c, scope, logistic, lineOp, admin, SeedLoadCOID, []struct {
+		id     string
+		weight float64
+	}{{SeedLoadCOID + ".1", 125.0}, {SeedLoadCOID + ".2", 100.0}}); err != nil {
+		return err
+	}
+
+	startedDA, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
+		TaskPath: "lot_processing/startLot",
+		Value:    map[string]any{"lotId": SeedLoadDAID},
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		return err
+	}
+	if startedDA.JobInstanceID != SeedLoadDAID {
+		return fmt.Errorf("org seed: lot_processing id %q, want %q", startedDA.JobInstanceID, SeedLoadDAID)
+	}
+	if _, err := seedCommit(ctx, c, scope, lineOp, CommitRequest{
+		TaskPath:      "lot_processing/weigh",
+		JobInstanceID: SeedLoadDAID,
+		Value:         weighValue(SeedLoadDAID+".1", 90.0),
+	}); err != nil {
+		return err
+	}
+
+	arriveB, err := seedCommit(ctx, c, scope, admin, CommitRequest{
+		TaskPath: "intake/truckArrive",
+		Value:    seedTruckArriveValue(1000),
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		return err
+	}
+	if arriveB.JobInstanceID != SeedTruckBID {
+		return fmt.Errorf("org seed: truck B id %q, want %q", arriveB.JobInstanceID, SeedTruckBID)
+	}
+	resB, err := seedCommit(ctx, c, scope, admin, CommitRequest{
+		TaskPath:      "intake/register",
+		JobInstanceID: SeedTruckBID,
+		Value:         seedLotRegisterValue("DI", "FIR-SEED-B-DI", 2, 700),
+	})
+	if err != nil {
+		return err
+	}
+	if _, ok := resB.Domain.Kind("lot")[SeedTruckBLotID]; !ok {
+		return fmt.Errorf("org seed: expected lot %q, got %#v", SeedTruckBLotID, resB.Domain.Kind("lot"))
+	}
+	return nil
+}
+
+func seedFinishLotWithDPP(ctx context.Context, c *TaskCommitter, scope Scope, logistic, lineOp, admin OperatorIdentity, lotID string, pallets []struct {
+	id     string
+	weight float64
+}) error {
+	started, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
+		TaskPath: "lot_processing/startLot",
+		Value:    map[string]any{"lotId": lotID},
+		Mint:     startingNewMint(),
+	})
+	if err != nil {
+		return err
+	}
+	if started.JobInstanceID != lotID {
+		return fmt.Errorf("org seed: lot_processing id %q, want %q", started.JobInstanceID, lotID)
+	}
+	progress := map[string]any{}
+	for _, row := range pallets {
 		if _, err := seedCommit(ctx, c, scope, lineOp, CommitRequest{
-			TaskPath:      "lot_processing/markProgress",
-			JobInstanceID: lot.id,
-			Value:         map[string]any{"progress": progress},
+			TaskPath:      "lot_processing/weigh",
+			JobInstanceID: lotID,
+			Value:         weighValue(row.id, row.weight),
 		}); err != nil {
 			return err
 		}
-		if _, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
-			TaskPath:      "lot_processing/containerReg",
-			JobInstanceID: lot.id,
-			Value: map[string]any{
-				"sourceLotId": lot.id,
-				"polvereDiVetro": []any{
-					map[string]any{"weight": 100.0},
-				},
+		progress[row.id] = "done"
+	}
+	if _, err := seedCommit(ctx, c, scope, lineOp, CommitRequest{
+		TaskPath:      "lot_processing/markProgress",
+		JobInstanceID: lotID,
+		Value:         map[string]any{"progress": progress},
+	}); err != nil {
+		return err
+	}
+	if _, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
+		TaskPath:      "lot_processing/containerReg",
+		JobInstanceID: lotID,
+		Value: map[string]any{
+			"sourceLotId": lotID,
+			"polvereDiVetro": []any{
+				map[string]any{"weight": 100.0},
 			},
-		}); err != nil {
-			return err
-		}
-		if _, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
-			TaskPath:      "lot_processing/closeLot",
-			JobInstanceID: lot.id,
-			Value:         map[string]any{},
-		}); err != nil {
-			return err
-		}
+		},
+	}); err != nil {
+		return err
+	}
+	if _, err := seedCommit(ctx, c, scope, logistic, CommitRequest{
+		TaskPath:      "lot_processing/closeLot",
+		JobInstanceID: lotID,
+		Value:         map[string]any{},
+	}); err != nil {
+		return err
+	}
+	if _, err := seedCommit(ctx, c, scope, admin, CommitRequest{
+		TaskPath:      "lot_processing/lock",
+		JobInstanceID: lotID,
+		Value:         map[string]any{"ack": true},
+	}); err != nil {
+		return err
 	}
 	return nil
 }
