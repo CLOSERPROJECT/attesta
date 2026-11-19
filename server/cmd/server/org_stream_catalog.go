@@ -204,15 +204,15 @@ func (s *Server) buildOrgPublicStreamCardView(ctx context.Context, user *Account
 		}
 	}
 	return PublicStreamCardView{
-		Name:            cfg.Workflow.Name,
-		Description:     normalizeOptionalText(cfg.Workflow.Description),
-		Href:            streamPath(key) + "/",
-		InstanceCount:   instanceCount,
-		ActiveCount:     activeCount,
-		AllCompleted:    instanceCount > 0 && activeCount == 0,
-		StepCount:       stepCount,
+		Name:              cfg.Workflow.Name,
+		Description:       normalizeOptionalText(cfg.Workflow.Description),
+		Href:              streamPath(key) + "/",
+		InstanceCount:     instanceCount,
+		ActiveCount:       activeCount,
+		AllCompleted:      instanceCount > 0 && activeCount == 0,
+		StepCount:         stepCount,
 		OrganizationCount: len(cfg.Organizations),
-		Organizations: publicStreamCardOrgViews(cfg.Organizations),
+		Organizations:     publicStreamCardOrgViews(cfg.Organizations),
 	}, nil
 }
 

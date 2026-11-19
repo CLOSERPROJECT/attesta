@@ -268,7 +268,6 @@ func TestOrgStreamForeignOrgGetsNotFound(t *testing.T) {
 	}
 }
 
-
 func TestOrgStreamHidesStreamOnlyActions(t *testing.T) {
 	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
 	server := &Server{
