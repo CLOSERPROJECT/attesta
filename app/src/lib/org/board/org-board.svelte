@@ -28,6 +28,7 @@
 	} from '../../router/navigate-target.js';
 	import { navigate } from '../../router/index.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
+	import { boardEmbedOpen } from './board-embed-open.svelte.js';
 	import {
 		boardFormCache,
 		type BoardFormEntry
@@ -143,10 +144,24 @@
 		const next = boardTaskFromAddress(addr);
 		focus = next;
 		syncFocusToUrl(next);
+		boardEmbedOpen.setOpen(addr, true);
 		const el = document.querySelector(
 			`[data-address-key="${CSS.escape(taskAddressKey(addr))}"]`
 		);
 		el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+	}
+
+	function isEmbedOpen(addr: TaskAddress): boolean {
+		void boardEmbedOpen.closed;
+		return boardEmbedOpen.isOpen(addr);
+	}
+
+	function setEmbedOpen(addr: TaskAddress, open: boolean): void {
+		boardEmbedOpen.setOpen(addr, open);
+	}
+
+	function toggleEmbedOpen(addr: TaskAddress): boolean {
+		return boardEmbedOpen.toggle(addr);
 	}
 
 	function clearFocus() {
@@ -305,6 +320,9 @@
 			return focusMatchesAddress(focus, addr);
 		},
 		setFocus,
+		isEmbedOpen,
+		setEmbedOpen,
+		toggleEmbedOpen,
 		stayedFor,
 		onCommitted,
 		onContinue,
@@ -546,6 +564,8 @@
 					focused={focusMatchesAddress(focus, playAddress)}
 					play={true}
 					stayedOutcome={stayedFor(playAddress)}
+					open={isEmbedOpen(playAddress)}
+					onOpenChange={(next) => setEmbedOpen(playAddress!, next)}
 					onFocus={() => setFocus(playAddress!)}
 					onCommitted={(outcome) => onCommitted(playAddress!, outcome)}
 					onContinue={() => onContinue(playAddress!)}
@@ -560,6 +580,8 @@
 					entry={getEntry(orphanFocus)}
 					focused={true}
 					stayedOutcome={stayedFor(orphanFocus)}
+					open={isEmbedOpen(orphanFocus)}
+					onOpenChange={(next) => setEmbedOpen(orphanFocus, next)}
 					onFocus={() => setFocus(orphanFocus)}
 					onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
 					onContinue={() => onContinue(orphanFocus)}

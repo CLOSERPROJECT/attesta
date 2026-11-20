@@ -104,62 +104,61 @@
 			{/if}
 		</Tabs.List>
 
-		<div
-			class={cn('substep-org-body w-full min-w-0 gap-2', !open && 'hidden')}
-			data-testid="embed-panel-body"
-		>
-			<Tabs.Content value="form" class="outline-none" data-testid="embed-form-pane">
-				{#if status === 'loading' || status === 'idle'}
-					<p class="muted u-m-0" data-testid="embed-form-skeleton">{m.loading()}</p>
-				{:else if status === 'error'}
-					<p class="text-sm text-red-700" data-testid="embed-form-error" role="alert">
-						{error}
-					</p>
-				{:else if status === 'ready' && bundle}
-					<TaskForm
-						stream={address.stream}
-						instance={address.instance}
-						jobId={address.jobId}
-						taskId={address.taskId}
-						jobInstanceId={address.jobInstanceId}
-						{bundle}
-						provisionalJob={address.provisionalJob}
-						{play}
-						disabled={disabled || Boolean(stayedOutcome)}
-						onCommitted={(outcome) => onCommitted?.(outcome)}
-					/>
-					{#if stayedOutcome}
-						<div class="space-y-3" data-testid="task-links-stay">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								class="bg-[var(--input)]"
-								data-testid="task-links-continue"
-								onclick={() => onContinue?.()}
-							>
-								{m.continue()}
-							</Button>
-						</div>
-					{/if}
-				{/if}
-			</Tabs.Content>
-
-			{#if submitMany}
-				<Tabs.Content value="recap" class="outline-none" data-testid="embed-recap-pane">
-					{#if submissions.length > 0}
-						<TimelineSubmissions {submissions} open={true} />
-					{/if}
-					{#if !address.provisionalJob && address.jobInstanceId}
-						<ManySubmitHistory
-							submit="many"
-							submissionCount={submissions.length}
-							request={recapRequest}
-							data-testid="embed-many-submit-history"
+		{#if open}
+			<div class="substep-org-body w-full min-w-0 gap-2" data-testid="embed-panel-body">
+				<Tabs.Content value="form" class="outline-none" data-testid="embed-form-pane">
+					{#if status === 'loading' || status === 'idle'}
+						<p class="muted u-m-0" data-testid="embed-form-skeleton">{m.loading()}</p>
+					{:else if status === 'error'}
+						<p class="text-sm text-red-700" data-testid="embed-form-error" role="alert">
+							{error}
+						</p>
+					{:else if status === 'ready' && bundle}
+						<TaskForm
+							stream={address.stream}
+							instance={address.instance}
+							jobId={address.jobId}
+							taskId={address.taskId}
+							jobInstanceId={address.jobInstanceId}
+							{bundle}
+							provisionalJob={address.provisionalJob}
+							{play}
+							disabled={disabled || Boolean(stayedOutcome)}
+							onCommitted={(outcome) => onCommitted?.(outcome)}
 						/>
+						{#if stayedOutcome}
+							<div class="space-y-3" data-testid="task-links-stay">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									class="bg-[var(--input)]"
+									data-testid="task-links-continue"
+									onclick={() => onContinue?.()}
+								>
+									{m.continue()}
+								</Button>
+							</div>
+						{/if}
 					{/if}
 				</Tabs.Content>
-			{/if}
-		</div>
+
+				{#if submitMany}
+					<Tabs.Content value="recap" class="outline-none" data-testid="embed-recap-pane">
+						{#if submissions.length > 0}
+							<TimelineSubmissions {submissions} open={true} />
+						{/if}
+						{#if !address.provisionalJob && address.jobInstanceId}
+							<ManySubmitHistory
+								submit="many"
+								submissionCount={submissions.length}
+								request={recapRequest}
+								data-testid="embed-many-submit-history"
+							/>
+						{/if}
+					</Tabs.Content>
+				{/if}
+			</div>
+		{/if}
 	</Tabs.Root>
 </div>
