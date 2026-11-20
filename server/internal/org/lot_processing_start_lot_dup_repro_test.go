@@ -52,7 +52,7 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 
 func TestMutateRejectsDuplicateJobInstance(t *testing.T) {
 	domain := EmptyDomain()
-	domain.JobInstances = []JobInstance{{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto: CO-261029-1"}}
+	domain.JobInstances = []JobInstance{{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto CO-261029-1"}}
 	_, err := Mutate(domain, MutateRequest{
 		UserID:         "ada",
 		JobID:          "lot_processing",
@@ -60,7 +60,7 @@ func TestMutateRejectsDuplicateJobInstance(t *testing.T) {
 		JobInstanceID:  "CO-261029-1",
 		Timestamp:      "2026-10-30T12:00:00Z",
 		Facts:          map[string]any{"lotId": "CO-261029-1"},
-		NewJobInstance: &JobInstance{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto: CO-261029-1"},
+		NewJobInstance: &JobInstance{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto CO-261029-1"},
 	})
 	var me MutateError
 	if err == nil || !asMutateError(err, &me) || me.Kind != "duplicate-job-instance" {

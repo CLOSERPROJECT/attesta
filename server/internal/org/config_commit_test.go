@@ -68,7 +68,7 @@ func TestCommitStartLotLabelFromConfigExpr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantLabel := "Lotto: " + loadID
+	wantLabel := "Lotto " + loadID
 	var label string
 	for _, inst := range result.Domain.JobInstances {
 		if inst.JobID == "lot_processing" && inst.ID == loadID {

@@ -26,9 +26,9 @@ func TestFeragameProjectWorklistTwoTrucksIsolateLots(t *testing.T) {
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T-A", Label: "T-A"},
 		{JobID: "intake", ID: "T-B", Label: "T-B"},
-		{JobID: "lot_processing", ID: "L-A1", Label: "Lotto: L-A1"},
-		{JobID: "lot_processing", ID: "L-A2", Label: "Lotto: L-A2"},
-		{JobID: "lot_processing", ID: "L-B1", Label: "Lotto: L-B1"},
+		{JobID: "lot_processing", ID: "L-A1", Label: "Lotto L-A1"},
+		{JobID: "lot_processing", ID: "L-A2", Label: "Lotto L-A2"},
+		{JobID: "lot_processing", ID: "L-B1", Label: "Lotto L-B1"},
 	}
 
 	wlA := ProjectWorklist(cfg, domain, op, "T-A")

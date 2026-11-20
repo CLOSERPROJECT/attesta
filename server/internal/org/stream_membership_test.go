@@ -103,8 +103,8 @@ func TestJobInstanceBelongsToStreamEachRows(t *testing.T) {
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T-A", Label: "Truck A"},
 		{JobID: "intake", ID: "T-B", Label: "Truck B"},
-		{JobID: "lot_processing", ID: "L-A1", Label: "Lotto: L-A1"},
-		{JobID: "lot_processing", ID: "L-B1", Label: "Lotto: L-B1"},
+		{JobID: "lot_processing", ID: "L-A1", Label: "Lotto L-A1"},
+		{JobID: "lot_processing", ID: "L-B1", Label: "Lotto L-B1"},
 	}
 
 	if !JobInstanceBelongsToStream(cfg, domain, "lot_processing", "L-A1", "T-A") {

@@ -44,7 +44,7 @@ describe('worklist helpers', () => {
 					instances: [
 						{
 							id: 'CO-1',
-							label: 'Lotto: CO-1',
+							label: 'Lotto CO-1',
 							tasks: { startLot: 'done', markProgress: 'available' }
 						}
 					]

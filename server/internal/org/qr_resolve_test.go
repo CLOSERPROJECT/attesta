@@ -114,7 +114,7 @@ func TestResolveQRCrossTruckReturnsOtherStreamInstance(t *testing.T) {
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T-A", Label: "T-A"},
 		{JobID: "intake", ID: "T-B", Label: "T-B"},
-		{JobID: "lot_processing", ID: "L-B1", Label: "Lotto: L-B1"},
+		{JobID: "lot_processing", ID: "L-B1", Label: "Lotto L-B1"},
 	}
 	domain.Submissions = []Submission{
 		sub("lot_processing", "startLot", "L-B1"),

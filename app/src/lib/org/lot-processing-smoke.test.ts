@@ -166,7 +166,7 @@ describe('lot_processing Commit smoke (session + Worklist + leaf many-submit)', 
 							{
 								jobId: 'lot_processing',
 								id: req.jobInstanceId,
-								label: `Lotto: ${req.jobInstanceId}`
+								label: `Lotto ${req.jobInstanceId}`
 							}
 						],
 						submissions: [

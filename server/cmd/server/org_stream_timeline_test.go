@@ -50,7 +50,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	domain := org.EmptyDomain()
 	domain.JobInstances = []org.JobInstance{
 		{JobID: "intake", ID: "T1", Label: "T1"},
-		{JobID: "lot_processing", ID: "L-open", Label: "Lotto: L-open"},
+		{JobID: "lot_processing", ID: "L-open", Label: "Lotto L-open"},
 	}
 	domain.Submissions = []org.Submission{
 		{JobID: "intake", TaskID: "arrive", JobInstanceID: "T1", Timestamp: "2026-11-19T10:00:00Z", UserID: "ops@test"},
@@ -70,14 +70,14 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 			JobID: "lot_processing", Title: "Lavorazione",
 			Rows: []org.StreamTimelineRow{
 				{
-					ID: "L-open", Label: "Lotto: L-open",
+					ID: "L-open", Label: "Lotto L-open",
 					Tasks: []org.StreamTimelineTask{
 						{ID: "startLot", Title: "Apri lotto", State: org.StreamSubstepDone},
 						{ID: "weigh", Title: "Pesa", State: org.StreamSubstepAvailable},
 					},
 				},
 				{
-					ID: "L-wait", Label: "Lotto: L-wait",
+					ID: "L-wait", Label: "Lotto L-wait",
 					Tasks: []org.StreamTimelineTask{
 						{
 							ID: "startLot", Title: "Apri lotto", State: org.StreamSubstepAvailable,
@@ -162,7 +162,7 @@ func TestStreamTimelineTemplateRendersEachRows(t *testing.T) {
 			},
 			Expanded: true,
 			Rows: []TimelineRowGroup{{
-				ID: "L-wait", Label: "Lotto: L-wait", Expanded: true,
+				ID: "L-wait", Label: "Lotto L-wait", Expanded: true,
 				Substeps: []TimelineSubstep{{
 					SubstepID:     "lot_processing/startLot",
 					Title:         "Apri lotto",
@@ -182,7 +182,7 @@ func TestStreamTimelineTemplateRendersEachRows(t *testing.T) {
 		`class="stream-timeline-rows"`,
 		`class="stream-timeline-row"`,
 		"Lavorazione ×2",
-		"Lotto: L-wait",
+		"Lotto L-wait",
 		"Linea occupata: lotto L-open",
 		`class="substep substep-locked"`,
 		`class="substep-accordion js-process-substep-panel"`,

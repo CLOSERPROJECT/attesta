@@ -73,7 +73,7 @@ const adminWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'available' }
 				}
 			]
@@ -115,7 +115,7 @@ const logisticWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'available' }
 				}
 			]
@@ -157,7 +157,7 @@ const lineWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'actionable' }
 				}
 			]
@@ -199,7 +199,7 @@ const allRolesWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'actionable' }
 				}
 			]
@@ -365,12 +365,12 @@ describe('worklist-home bands', () => {
 					instances: [
 						{
 							id: 'CO-1',
-							label: 'Lotto: CO-1',
+							label: 'Lotto CO-1',
 							tasks: { startLot: 'done', markProgress: 'available' }
 						},
 						{
 							id: 'CO-done',
-							label: 'Lotto: CO-done',
+							label: 'Lotto CO-done',
 							tasks: { startLot: 'done', markProgress: 'done' }
 						}
 					]
@@ -394,7 +394,7 @@ describe('worklist-home bands', () => {
 		expect(rows[1]).toMatchObject({
 			jobId: 'lot_processing',
 			jobInstanceId: 'CO-done',
-			instanceLabel: 'Lotto: CO-done',
+			instanceLabel: 'Lotto CO-done',
 			jobTitle: 'Lavorazione',
 			tasksDone: 2,
 			tasksTotal: 2

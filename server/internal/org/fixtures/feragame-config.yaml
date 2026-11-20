@@ -380,7 +380,7 @@ steps:
         startLabel: Apri lotto
         color: '#0284c7'
         instanceId: $.lotId
-        label: "'Lotto: ' & $.lotId"
+        label: "'Lotto ' & $.lotId"
         substeps:
             - id: startLot
               roles: [logistic]

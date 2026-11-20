@@ -28,7 +28,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T1", Label: "T1"},
-		{JobID: "lot_processing", ID: "L-open", Label: "Lotto: L-open"},
+		{JobID: "lot_processing", ID: "L-open", Label: "Lotto L-open"},
 	}
 	domain.Submissions = []Submission{
 		{JobID: "intake", TaskID: "arrive", JobInstanceID: "T1", Timestamp: "2026-11-19T10:00:00Z", UserID: "ops@test"},
@@ -48,14 +48,14 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 			JobID: "lot_processing", Title: "Lavorazione",
 			Rows: []StreamTimelineRow{
 				{
-					ID: "L-open", Label: "Lotto: L-open",
+					ID: "L-open", Label: "Lotto L-open",
 					Tasks: []StreamTimelineTask{
 						{ID: "startLot", Title: "Apri lotto", State: StreamSubstepDone},
 						{ID: "weigh", Title: "Pesa", State: StreamSubstepAvailable},
 					},
 				},
 				{
-					ID: "L-wait", Label: "Lotto: L-wait",
+					ID: "L-wait", Label: "Lotto L-wait",
 					Tasks: []StreamTimelineTask{
 						{ID: "startLot", Title: "Apri lotto", State: StreamSubstepAvailable},
 						{ID: "weigh", Title: "Pesa", State: StreamSubstepLocked},

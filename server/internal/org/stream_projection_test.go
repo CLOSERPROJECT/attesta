@@ -28,7 +28,7 @@ func streamProjectionCfg() OrgConfig {
 	cfg.Jobs.Values["intake"] = intake
 	lp := cfg.Jobs.Values["lot_processing"].(Job)
 	lp.Title = "Lavorazione"
-	lp.Label = "'Lotto: ' & $.lotId"
+	lp.Label = "'Lotto ' & $.lotId"
 	cfg.Jobs.Values["lot_processing"] = lp
 	return cfg
 }
@@ -107,7 +107,7 @@ func TestListStreamInstancesDoneWhenAnchorAndEachFinished(t *testing.T) {
 	}
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T1", Label: "T1"},
-		{JobID: "lot_processing", ID: "L1", Label: "Lotto: L1"},
+		{JobID: "lot_processing", ID: "L1", Label: "Lotto L1"},
 	}
 	domain.Submissions = []Submission{
 		sub("intake", "arrive", "T1"),
@@ -187,7 +187,7 @@ func TestProjectStreamTimelineOnceAndEachNotYetStarted(t *testing.T) {
 		if row.Finished {
 			t.Fatalf("row %s should not be finished", row.ID)
 		}
-		wantLabel := "Lotto: " + row.ID
+		wantLabel := "Lotto " + row.ID
 		if row.Label != wantLabel {
 			t.Fatalf("label = %q, want %q", row.Label, wantLabel)
 		}
@@ -227,7 +227,7 @@ func TestProjectStreamTimelineNotYetStartedShowsBlockedReason(t *testing.T) {
 	}
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T-A", Label: "T-A"},
-		{JobID: "lot_processing", ID: "L-open", Label: "Lotto: L-open"},
+		{JobID: "lot_processing", ID: "L-open", Label: "Lotto L-open"},
 	}
 	domain.Submissions = []Submission{
 		sub("intake", "arrive", "T-A"),
@@ -324,7 +324,7 @@ func TestProjectStreamTimelineExistingEachRowFinished(t *testing.T) {
 	}
 	domain.JobInstances = []JobInstance{
 		{JobID: "intake", ID: "T1", Label: "T1"},
-		{JobID: "lot_processing", ID: "L1", Label: "Lotto: L1"},
+		{JobID: "lot_processing", ID: "L1", Label: "Lotto L1"},
 	}
 	domain.Submissions = []Submission{
 		sub("intake", "arrive", "T1"),
@@ -338,7 +338,7 @@ func TestProjectStreamTimelineExistingEachRowFinished(t *testing.T) {
 	if row.ID != "L1" || !row.Finished {
 		t.Fatalf("row = %#v", row)
 	}
-	if row.Label != "Lotto: L1" {
+	if row.Label != "Lotto L1" {
 		t.Fatalf("label = %q", row.Label)
 	}
 	if row.Tasks[0].State != StreamSubstepDone || row.Tasks[2].State != StreamSubstepDone {
