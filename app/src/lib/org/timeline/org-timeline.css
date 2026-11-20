@@ -9,14 +9,41 @@
 @import '../../../../../web/src/styles/components/stream-timeline.css';
 @import '../../../../../web/src/styles/components/substep-shell.css';
 
+/*
+ * Board elevation (darkest → lightest): 0 page, 1 step groups, 2 steps/instances,
+ * 3 substeps/tasks, 4 tabs. Padding is left-only on chrome; forms keep right pad.
+ */
 .org-timeline-page {
+	--org-elev-0: var(--muted);
+	--org-elev-1: var(--background);
+	--org-elev-2: color-mix(in srgb, #fff 45%, var(--background));
+	--org-elev-3: color-mix(in srgb, #fff 72%, var(--background));
+	--org-elev-4: #fff;
+	--org-pad-l: var(--space-3);
+	/* Chevron column: same right edge + slot width at every nest level. */
+	--org-chevron-pad: var(--space-3);
+	--org-chevron-slot: 1.25rem;
+
 	min-width: 0;
 	max-width: 80rem;
 	margin-inline: auto;
+	background: var(--org-elev-0);
+	padding-block: var(--space-3);
+	padding-inline: 0;
+}
+
+.org-timeline-toolbar {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--space-3);
+	padding: var(--space-3) var(--org-pad-l);
+	margin-bottom: var(--space-3);
 }
 
 .org-timeline-header {
-	margin-bottom: var(--space-4);
+	min-width: 0;
+	flex: 1;
 }
 
 .org-timeline-header-stream {
@@ -42,7 +69,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
-	margin-bottom: var(--space-3);
+	flex-shrink: 0;
 }
 
 .stream-show-all-filter-label {
@@ -71,17 +98,21 @@
 }
 
 .stream-show-all-filter-root.is-actionable-only
-	.substep:not([data-org-actionable='true']) {
+	.substep:not([data-org-actionable='true']):not([data-board-focused='true']) {
 	display: none;
 }
 
 .stream-show-all-filter-root.is-actionable-only
-	.stream-timeline-row:not(:has(.substep[data-org-actionable='true'])) {
+	.stream-timeline-row:not(
+		:has(.substep[data-org-actionable='true'], .substep[data-board-focused='true'])
+	) {
 	display: none;
 }
 
 .stream-show-all-filter-root.is-actionable-only
-	.stream-timeline-step:not(:has(.substep[data-org-actionable='true'])) {
+	.stream-timeline-step:not(
+		:has(.substep[data-org-actionable='true'], .substep[data-board-focused='true'])
+	) {
 	display: none;
 }
 
@@ -93,4 +124,134 @@
 .substep-org-body {
 	display: grid;
 	gap: var(--space-2);
+}
+
+/* --- Elevation surfaces (scoped; Formata /my keeps shared component defaults) --- */
+
+.org-timeline-page .stream-timeline-step {
+	background: var(--org-elev-1);
+	border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.org-timeline-page .stream-timeline-step[open] > .stream-timeline-step-summary {
+	background: var(--org-elev-1);
+}
+
+.org-timeline-page .stream-timeline-row-accordion {
+	background: var(--org-elev-2);
+	border-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.org-timeline-page .substep,
+.org-timeline-page .substep-available,
+.org-timeline-page .substep-active,
+.org-timeline-page .substep-done,
+.org-timeline-page .substep-locked,
+.org-timeline-page .substep-skipped {
+	background: var(--org-elev-3);
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-list'],
+.org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
+	background: var(--org-elev-4);
+}
+
+/* --- Left nest; chevrons share one absolute column from each row’s right edge --- */
+
+.org-timeline-page .stream-timeline-step-summary,
+.org-timeline-page .stream-timeline-row-summary,
+.org-timeline-page .substep-accordion-summary,
+.org-timeline-page .substep-card-link,
+.org-timeline-page .substep-embed-host > .substep-accordion-summary {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding-block: var(--space-3);
+	padding-left: var(--org-pad-l);
+	/* Reserve slot so status/title never sit under the chevron */
+	padding-right: calc(var(--org-chevron-pad) + var(--org-chevron-slot));
+}
+
+.org-timeline-page .stream-timeline-step-chevron,
+.org-timeline-page .stream-timeline-row-chevron,
+.org-timeline-page .substep-accordion-chevron {
+	position: absolute;
+	top: 50%;
+	right: var(--org-chevron-pad);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--org-chevron-slot);
+	height: var(--org-chevron-slot);
+	margin: 0;
+	transform: translateY(-50%);
+	color: var(--secondary-foreground);
+}
+
+/* Keep rotate when open without losing vertical centering */
+.org-timeline-page .stream-timeline-step[open] > .stream-timeline-step-summary .stream-timeline-step-chevron,
+.org-timeline-page
+	.stream-timeline-row-accordion[open]
+	> .stream-timeline-row-summary
+	.stream-timeline-row-chevron,
+.org-timeline-page
+	.substep-accordion[open]
+	> .substep-accordion-summary
+	.substep-accordion-chevron,
+.org-timeline-page
+	.substep-embed-host[open]
+	> .substep-accordion-summary
+	.substep-accordion-chevron {
+	transform: translateY(-50%) rotate(180deg);
+	color: var(--foreground);
+}
+
+/* Status sits in the flex row; chevron is out of flow so AVAILABLE no longer shifts it */
+.org-timeline-page .substep-accordion-summary .status,
+.org-timeline-page .substep-card-link .status {
+	margin-left: auto;
+	margin-right: 0;
+}
+
+/* Nest: indent left, keep 100%−indent width so right edges match the parent */
+.org-timeline-page .stream-timeline-rows,
+.org-timeline-page .stream-timeline-substeps {
+	box-sizing: border-box;
+	width: calc(100% - var(--org-pad-l));
+	max-width: calc(100% - var(--org-pad-l));
+	margin-left: var(--org-pad-l);
+	margin-right: 0;
+	padding-block: var(--space-3);
+	padding-inline: 0;
+}
+
+.org-timeline-page .stream-timeline-row .stream-timeline-substeps {
+	padding-top: 0;
+}
+
+.org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
+	/* Form exception: keep right padding for field chrome */
+	padding: var(--space-3);
+}
+
+/* Tabs sit flush under the header; pane padding lives on embed-panel-body. */
+.substep-embed-host.substep-accordion[open] > .substep-accordion-summary,
+.substep-embed-host[open] > .substep-accordion-summary {
+	margin-bottom: 0;
+	border-bottom: none;
+}
+
+.substep[data-board-focused='true'] {
+	outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
+	outline-offset: 1px;
+}
+
+@media (--sm-down) {
+	.org-timeline-page .stream-timeline-rows,
+	.org-timeline-page .stream-timeline-substeps {
+		width: calc(100% - var(--org-pad-l));
+		margin-left: var(--org-pad-l);
+		padding-inline: 0;
+	}
 }

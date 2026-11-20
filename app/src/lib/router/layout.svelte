@@ -160,7 +160,7 @@
 	</div>
 </nav>
 
-<main class="p-4">
+<main>
 	{@render children()}
 </main>
 
