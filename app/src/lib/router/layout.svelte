@@ -96,80 +96,82 @@
 	});
 </script>
 
-<nav
-	class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 text-sm"
-	data-testid="org-nav"
->
-	<div class="flex min-w-0 items-center gap-2">
-		{#if place.showBack}
-			<Button
-				type="button"
-				variant="outline"
-				size="icon"
-				aria-label={m.nav_back()}
-				data-testid="nav-back"
-				onclick={() => navigateOrgTarget(place.backTarget)}
-			>
-				<ArrowLeft class="size-4" />
-			</Button>
-		{:else}
-			<span
-				class={buttonVariants({ variant: 'outline', size: 'icon' })}
-				data-testid="nav-home-mark"
-			>
-				<img src={attestaMark} alt={m.brand_attesta()} class="size-5" />
-			</span>
-		{/if}
-
-		<div class="min-w-0 text-left" data-testid="nav-place">
-			{#if place.jobTitleLine}
-				<p class="truncate text-xs text-zinc-500" data-testid="nav-place-job-title">
-					{place.jobTitleLine}
-				</p>
+<div class="flex min-h-svh flex-col">
+	<nav
+		class="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 text-sm"
+		data-testid="org-nav"
+	>
+		<div class="flex min-w-0 items-center gap-2">
+			{#if place.showBack}
+				<Button
+					type="button"
+					variant="outline"
+					size="icon"
+					aria-label={m.nav_back()}
+					data-testid="nav-back"
+					onclick={() => navigateOrgTarget(place.backTarget)}
+				>
+					<ArrowLeft class="size-4" />
+				</Button>
+			{:else}
+				<span
+					class={buttonVariants({ variant: 'outline', size: 'icon' })}
+					data-testid="nav-home-mark"
+				>
+					<img src={attestaMark} alt={m.brand_attesta()} class="size-5" />
+				</span>
 			{/if}
-			<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
-				{place.primaryLabel}
-			</p>
-		</div>
-	</div>
 
-	<div class="flex shrink-0 items-center gap-2">
-		{#if roles.length > 0}
-			<div class="hidden flex-wrap justify-end gap-1 md:flex" data-testid="nav-roles">
-				{#each roles as role (role)}
-					<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
-				{/each}
+			<div class="min-w-0 text-left" data-testid="nav-place">
+				{#if place.jobTitleLine}
+					<p class="truncate text-xs text-zinc-500" data-testid="nav-place-job-title">
+						{place.jobTitleLine}
+					</p>
+				{/if}
+				<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
+					{place.primaryLabel}
+				</p>
 			</div>
-		{/if}
-		{#if coords.stream}
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				aria-label={m.nav_scan()}
-				data-testid="nav-scan"
-				disabled={scanBusy}
-				onclick={() => {
-					scanOpen = true;
-				}}
-			>
-				<Scan class="size-4" />
-				{m.nav_scan()}
-			</Button>
-		{/if}
-	</div>
-</nav>
+		</div>
 
-<main>
-	{@render children()}
-</main>
+		<div class="flex shrink-0 items-center gap-2">
+			{#if roles.length > 0}
+				<div class="hidden flex-wrap justify-end gap-1 md:flex" data-testid="nav-roles">
+					{#each roles as role (role)}
+						<Badge variant="outline" data-testid="nav-role-chip">{role}</Badge>
+					{/each}
+				</div>
+			{/if}
+			{#if coords.stream}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					aria-label={m.nav_scan()}
+					data-testid="nav-scan"
+					disabled={scanBusy}
+					onclick={() => {
+						scanOpen = true;
+					}}
+				>
+					<Scan class="size-4" />
+					{m.nav_scan()}
+				</Button>
+			{/if}
+		</div>
+	</nav>
 
-<ScanDialog
-	open={scanOpen}
-	busy={scanBusy}
-	onOpenChange={(next) => {
-		scanOpen = next;
-	}}
-	onScan={handleRaw}
-/>
-<OrgToast />
+	<main class="flex min-h-0 flex-1 flex-col">
+		{@render children()}
+	</main>
+
+	<ScanDialog
+		open={scanOpen}
+		busy={scanBusy}
+		onOpenChange={(next) => {
+			scanOpen = next;
+		}}
+		onScan={handleRaw}
+	/>
+	<OrgToast />
+</div>

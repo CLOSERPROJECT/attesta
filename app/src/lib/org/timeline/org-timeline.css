@@ -10,22 +10,26 @@
 @import '../../../../../web/src/styles/components/substep-shell.css';
 
 /*
- * Board elevation: 0 page, 1 step groups, 2 steps/instances, 3 substeps/tasks, 4 tabs.
- * Light = slate 300→200→100→50→white (darkest → lightest). Dark inverts under .dark.
+ * Board elevation: 0 page, 1 steps, 2 rows/instances, 3 substeps + tabs (shared top).
+ * Light = slate 300→200→100→50. Dark inverts under .dark.
  * Padding is left-only on chrome; forms keep right pad.
  */
 .org-timeline-page {
 	--org-elev-0: #cbd5e1; /* slate-300 */
 	--org-elev-1: #e2e8f0; /* slate-200 */
 	--org-elev-2: #f1f5f9; /* slate-100 */
-	--org-elev-3: #f8fafc; /* slate-50 */
-	--org-elev-4: #ffffff;
+	--org-elev-3: #f8fafc; /* slate-50 — highest; substeps and tabs share */
 	--org-pad-l: var(--space-3);
 	/* Chevron column: same right edge + slot width at every nest level. */
 	--org-chevron-pad: var(--space-3);
 	--org-chevron-slot: 1.25rem;
 
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
 	min-width: 0;
+	min-height: 0;
+	width: 100%;
 	max-width: 80rem;
 	margin-inline: auto;
 	background: var(--org-elev-0);
@@ -33,18 +37,17 @@
 	padding-inline: 0;
 }
 
-/* Dark: elev-0 page chrome → elev-4 lifted surface (slate 950→600). */
+/* Dark: elev-0 page chrome → elev-3 lifted surface (slate 950→700). */
 :is(.dark *) .org-timeline-page {
 	--org-elev-0: #020617; /* slate-950 */
 	--org-elev-1: #0f172a; /* slate-900 */
 	--org-elev-2: #1e293b; /* slate-800 */
-	--org-elev-3: #334155; /* slate-700 */
-	--org-elev-4: #475569; /* slate-600 */
+	--org-elev-3: #334155; /* slate-700 — highest; substeps and tabs share */
 }
 
 .org-timeline-toolbar {
 	display: flex;
-	align-items: flex-end;
+	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-3);
 	padding: var(--space-3) var(--org-pad-l);
@@ -56,14 +59,8 @@
 	flex: 1;
 }
 
-.org-timeline-header-stream {
-	margin: 0;
-	font-size: var(--text-xs);
-	color: var(--secondary-foreground);
-}
-
 .org-timeline-header-label {
-	margin: var(--space-1) 0 0;
+	margin: 0;
 	font-size: var(--text-lg);
 	font-weight: var(--font-semibold);
 	color: var(--foreground);
@@ -80,31 +77,7 @@
 	align-items: center;
 	justify-content: flex-end;
 	flex-shrink: 0;
-}
-
-.stream-show-all-filter-label {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	font-size: var(--text-sm);
-	color: var(--secondary-foreground);
-	cursor: pointer;
-	user-select: none;
-	background-color: var(--background);
-	border: 1px solid var(--border);
-	border-radius: var(--space-2);
-	padding: var(--space-1) var(--space-2);
-	padding-right: var(--space-3);
-}
-
-.stream-show-all-filter-label input[type='checkbox'] {
-	accent-color: var(--primary);
-}
-
-.stream-show-all-filter-label:hover,
-.stream-show-all-filter-label:has(input[type='checkbox']:checked) {
-	background-color: var(--success-muted);
-	border-color: var(--primary);
+	gap: var(--space-2);
 }
 
 .stream-show-all-filter-root.is-actionable-only
@@ -163,11 +136,13 @@
 .org-timeline-page .substep-skipped {
 	background: var(--org-elev-3);
 	border-width: 1px 1px 1px 6px;
+	/* Match surface so status colors from Formata do not show; left bar reserved for hover. */
+	border-color: var(--org-elev-3);
 }
 
 .org-timeline-page .substep-embed [data-slot='tabs-list'],
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
-	background: var(--org-elev-4);
+	background: var(--org-elev-3);
 }
 
 /*
@@ -204,11 +179,11 @@
 	gap: var(--space-2);
 	min-width: 0;
 	flex: 1 1 auto;
+	font-family: var(--font-mono);
 }
 
 .org-timeline-page .timeline-header-index {
 	flex-shrink: 0;
-	font-family: var(--font-mono);
 	font-size: var(--text-sm);
 	font-weight: 500;
 	font-variant-numeric: tabular-nums;
