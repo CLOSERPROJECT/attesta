@@ -3,6 +3,7 @@
 
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import { displayStepTitle, outlineLetter } from './outline-label.js';
+	import { streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
@@ -24,6 +25,8 @@
 	const substeps = $derived(step.substeps ?? []);
 	const mark = $derived(step.stepId);
 	const title = $derived(displayStepTitle(step.title));
+	const status = $derived(step.status);
+	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
 
 	let open = $state(Boolean(step.expanded));
 	$effect(() => {
@@ -39,7 +42,15 @@
 		id={summaryDomId}
 		aria-labelledby={summaryDomId}
 	>
-		<TimelineHeaderLine {mark} {title} />
+		{#if status}
+			<TimelineHeaderLine {mark} {title}>
+				{#snippet trail()}
+					<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+				{/snippet}
+			</TimelineHeaderLine>
+		{:else}
+			<TimelineHeaderLine {mark} {title} />
+		{/if}
 	</Collapsible.Trigger>
 	<Collapsible.Content>
 		{#if rows.length > 0}

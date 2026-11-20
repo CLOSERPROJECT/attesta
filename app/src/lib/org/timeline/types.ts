@@ -22,6 +22,8 @@ export type TimelineRow = {
 	id: string;
 	label: string;
 	expanded: boolean;
+	status?: string;
+	statusLabel?: string;
 	substeps: TimelineSubstep[];
 };
 
@@ -30,6 +32,8 @@ export type TimelineStep = {
 	title: string;
 	substepCount: number;
 	expanded: boolean;
+	status?: string;
+	statusLabel?: string;
 	substeps?: TimelineSubstep[];
 	rows?: TimelineRow[];
 };

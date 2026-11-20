@@ -294,28 +294,29 @@
 	flex-shrink: 0;
 }
 
-.org-timeline-page .substep-available .timeline-header-trail .status {
+.org-timeline-page .timeline-header-trail .status[data-status='available'] {
 	color: var(--stream-available);
 	background-color: color-mix(in srgb, var(--stream-available) 12%, transparent);
 }
 
-.org-timeline-page .substep-active .timeline-header-trail .status {
+.org-timeline-page .timeline-header-trail .status[data-status='pending'],
+.org-timeline-page .timeline-header-trail .status[data-status='active'] {
 	color: var(--stream-active);
 	background-color: color-mix(in srgb, var(--stream-active) 12%, transparent);
 }
 
-.org-timeline-page .substep-done .timeline-header-trail .status,
-.org-timeline-page .substep-locked .timeline-header-trail .status {
+.org-timeline-page .timeline-header-trail .status[data-status='done'],
+.org-timeline-page .timeline-header-trail .status[data-status='locked'] {
 	color: var(--stream-done);
 	background-color: color-mix(in srgb, var(--stream-done) 12%, transparent);
 }
 
-.org-timeline-page .substep-terminated .timeline-header-trail .status {
+.org-timeline-page .timeline-header-trail .status[data-status='terminated'] {
 	color: var(--stream-terminated);
 	background-color: color-mix(in srgb, var(--stream-terminated) 12%, transparent);
 }
 
-.org-timeline-page .substep-skipped .timeline-header-trail .status {
+.org-timeline-page .timeline-header-trail .status[data-status='skipped'] {
 	color: var(--secondary-foreground);
 	background-color: color-mix(in srgb, var(--secondary-foreground) 10%, transparent);
 }

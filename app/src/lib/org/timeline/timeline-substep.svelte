@@ -10,6 +10,7 @@
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import { taskAddressKey } from '../task-address.js';
+	import { streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubmissions from './timeline-submissions.svelte';
 	import type { TimelineSubstep } from './types.js';
@@ -29,9 +30,10 @@
 
 	const domId = $derived(substep.substepId.replaceAll('.', '-'));
 	const headingId = $derived(`substep-${domId}-heading`);
-	const statusLabel = $derived(substep.statusLabel || substep.status);
+	const status = $derived(substep.status);
+	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
 	const submissions = $derived(substep.submissions ?? []);
-	const statusClass = $derived(substep.status ? `substep-${substep.status}` : '');
+	const statusClass = $derived(status ? `substep-${status}` : '');
 
 	const parsed = $derived(
 		substep.orgActionable && substep.href
@@ -94,11 +96,15 @@
 				data-state={embedOpen ? 'open' : 'closed'}
 				onclick={toggleEmbed}
 			>
-				<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
-					{#snippet trail()}
-						<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
-					{/snippet}
-				</TimelineHeaderLine>
+				{#if status}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
+						{#snippet trail()}
+							<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+						{/snippet}
+					</TimelineHeaderLine>
+				{:else}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
+				{/if}
 				<ChevronDownIcon
 					data-slot="accordion-trigger-icon"
 					class={cn('pointer-events-none shrink-0', embedOpen && 'hidden')}
@@ -134,11 +140,15 @@
 			bind:open={detailsOpen}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
-				<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
-					{#snippet trail()}
-						<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
-					{/snippet}
-				</TimelineHeaderLine>
+				{#if status}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
+						{#snippet trail()}
+							<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+						{/snippet}
+					</TimelineHeaderLine>
+				{:else}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
+				{/if}
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div class="substep-details">
