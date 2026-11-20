@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
+	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import { displayStepTitle, outlineLetter } from './outline-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
@@ -15,6 +16,8 @@
 
 	let { step, stream = '', instance = '' }: Props = $props();
 
+	const nestCollapse = getBoardNestCollapse();
+
 	const stepDomId = $derived(`stream-timeline-step-${step.stepId}`);
 	const summaryDomId = $derived(`${stepDomId}-summary`);
 	const rows = $derived(step.rows ?? []);
@@ -23,6 +26,11 @@
 	const title = $derived(displayStepTitle(step.title));
 
 	let open = $state(Boolean(step.expanded));
+	$effect(() => {
+		const e = nestCollapse.epoch;
+		if (e === 0) return;
+		open = false;
+	});
 </script>
 
 <Collapsible.Root class="stream-timeline-step" id={stepDomId} bind:open>

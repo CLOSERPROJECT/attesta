@@ -27,12 +27,21 @@
 		orgMyStreamDashboardPath
 	} from '../../router/navigate-target.js';
 	import { navigate } from '../../router/index.js';
+	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
+	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
+	import { Checkbox } from '#lib/shadcn/ui/checkbox/index.js';
+	import { Label } from '#lib/shadcn/ui/label/index.js';
+	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
 	import { boardEmbedOpen } from './board-embed-open.svelte.js';
 	import {
 		boardFormCache,
 		type BoardFormEntry
 	} from './board-form-cache.svelte.js';
+	import {
+		BoardNestCollapse,
+		setBoardNestCollapse
+	} from './board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from './embedded-task-panel.svelte';
 	import {
 		addressFromBoardTask,
@@ -66,6 +75,9 @@
 	};
 
 	let { stream, instance = '', play = false }: Props = $props();
+
+	const nestCollapse = new BoardNestCollapse();
+	setBoardNestCollapse(nestCollapse);
 
 	const timelinePort = createHttpTimelinePort();
 
@@ -167,6 +179,15 @@
 	function clearFocus() {
 		focus = null;
 		syncFocusToUrl(null);
+	}
+
+	function collapseAllNests() {
+		nestCollapse.collapseAll();
+		if (view) {
+			boardEmbedOpen.closeAll(actionableAddressesFromTimeline(view, { showAll: true }));
+		}
+		if (playAddress) boardEmbedOpen.setOpen(playAddress, false);
+		if (orphanFocus) boardEmbedOpen.setOpen(orphanFocus, false);
 	}
 
 	function getEntry(addr: TaskAddress): BoardFormEntry | undefined {
@@ -509,26 +530,37 @@
 	{:else}
 		<div class="org-timeline-toolbar" data-testid="instance-chrome">
 			<header class="org-timeline-header">
-				<p class="org-timeline-header-stream" data-testid="instance-chrome-stream">
-					{streamTitle || stream}
-				</p>
-				<p class="org-timeline-header-label" data-testid="instance-chrome-label">
-					{view?.label || instance}
-				</p>
+				<span class="timeline-header-line">
+					<span class="timeline-header-index" data-testid="instance-chrome-stream">
+						{streamTitle || stream}
+					</span>
+					<span class="timeline-header-title" data-testid="instance-chrome-label">
+						{view?.label || instance}
+					</span>
+				</span>
 			</header>
 			{#if view}
 				<div class="stream-show-all-filter">
-					<label class="stream-show-all-filter-label">
-						<input
-							type="checkbox"
-							class="js-show-all-filter"
-							checked={showAll}
-							onchange={(e) => {
-								showAll = e.currentTarget.checked;
-							}}
+					<Label
+						class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}
+					>
+						<Checkbox
+							class="js-show-all-filter border-foreground/35 bg-background shadow-none"
+							bind:checked={showAll}
+							data-testid="show-all-filter"
 						/>
-						<span>Show all</span>
-					</label>
+						{m.show_all()}
+					</Label>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						data-testid="collapse-all"
+						onclick={collapseAllNests}
+					>
+						<ChevronsDownUpIcon data-icon="inline-start" />
+						{m.collapse_all()}
+					</Button>
 				</div>
 			{/if}
 		</div>

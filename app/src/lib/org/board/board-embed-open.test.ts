@@ -37,4 +37,17 @@ describe('BoardEmbedOpen', () => {
 		store.setOpen(a, true);
 		expect(Object.keys(store.closed)).toHaveLength(0);
 	});
+
+	test('closeAll marks every address closed', () => {
+		const store = new BoardEmbedOpen();
+		const a = addr('weigh');
+		const b = addr('nir');
+		store.closeAll([a, b]);
+		expect(store.isOpen(a)).toBe(false);
+		expect(store.isOpen(b)).toBe(false);
+		store.closeAll([a]);
+		expect(Object.keys(store.closed).sort()).toEqual(
+			[taskAddressKey(a), taskAddressKey(b)].sort()
+		);
+	});
 });

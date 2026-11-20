@@ -36,6 +36,19 @@ export class BoardEmbedOpen {
 		if (Object.keys(this.closed).length === 0) return;
 		this.closed = {};
 	}
+
+	/** Mark every address closed (collapse-all). */
+	closeAll(addrs: Iterable<TaskAddress>): void {
+		const next = { ...this.closed };
+		let changed = false;
+		for (const addr of addrs) {
+			const key = taskAddressKey(addr);
+			if (key in next) continue;
+			next[key] = true;
+			changed = true;
+		}
+		if (changed) this.closed = next;
+	}
 }
 
 /** Process-wide so Play→instance remount keeps user-collapsed embeds. */

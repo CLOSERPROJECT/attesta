@@ -6,6 +6,7 @@
 
 	import { getBoardEmbed } from '../board/board-context.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
+	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import { taskAddressKey } from '../task-address.js';
@@ -24,6 +25,7 @@
 	let { substep, mark, stream = '', instance = '' }: Props = $props();
 
 	const board = getBoardEmbed();
+	const nestCollapse = getBoardNestCollapse();
 
 	const domId = $derived(substep.substepId.replaceAll('.', '-'));
 	const headingId = $derived(`substep-${domId}-heading`);
@@ -53,6 +55,11 @@
 	const embedOpen = $derived(address ? board.isEmbedOpen(address) : false);
 
 	let detailsOpen = $state(false);
+	$effect(() => {
+		const e = nestCollapse.epoch;
+		if (e === 0) return;
+		detailsOpen = false;
+	});
 
 	function toggleEmbed() {
 		if (!address) return;

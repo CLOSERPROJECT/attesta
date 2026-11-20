@@ -56,6 +56,8 @@
 	"scan_switched_instance": "Sei passato a un altro camion",
 	"back_to_timeline": "Torna alla timeline",
 	"back_to_stream_dashboard": "Torna alla dashboard",
+	"show_all": "Mostra tutto",
+	"collapse_all": "Comprimi tutto",
 	"qr_resolve_failed": "Risoluzione QR non riuscita",
 	"org_domain_load_failed": "caricamento dominio org non riuscito ({status})",
 	"org_timeline_load_failed": "caricamento timeline org non riuscito ({status})",

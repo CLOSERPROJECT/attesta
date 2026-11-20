@@ -56,6 +56,8 @@
 	"scan_switched_instance": "Switched to another truck",
 	"back_to_timeline": "Back to timeline",
 	"back_to_stream_dashboard": "Back to dashboard",
+	"show_all": "Show all",
+	"collapse_all": "Collapse all",
 	"qr_resolve_failed": "QR resolve failed",
 	"org_domain_load_failed": "org domain load failed ({status})",
 	"org_timeline_load_failed": "org timeline load failed ({status})",
