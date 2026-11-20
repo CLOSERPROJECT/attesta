@@ -196,7 +196,45 @@
 	opacity: 1;
 }
 
-/* --- Left nest; Lucide chevrons share one absolute column from each row’s right edge --- */
+/* --- One-line headers; Lucide chevrons share one absolute column from each row’s right edge --- */
+
+.org-timeline-page .timeline-header-line {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.org-timeline-page .timeline-header-lead {
+	flex-shrink: 0;
+}
+
+.org-timeline-page .timeline-header-title {
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--foreground);
+}
+
+.org-timeline-page .timeline-header-trail {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	margin-left: auto;
+}
+
+.org-timeline-page .timeline-header-count {
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--muted-foreground);
+	font-variant-numeric: tabular-nums;
+}
 
 .org-timeline-page .stream-timeline-step-summary,
 .org-timeline-page .stream-timeline-row-summary,
@@ -207,7 +245,8 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	padding-block: var(--space-3);
+	min-height: 2.75rem;
+	padding-block: var(--space-2);
 	padding-left: var(--org-pad-l);
 	padding-right: calc(var(--org-chevron-pad) + var(--org-chevron-slot));
 	border-radius: 0;
@@ -227,11 +266,10 @@
 	color: var(--muted-foreground);
 }
 
-/* Status sits in the flex row; chevron is out of flow so AVAILABLE no longer shifts it */
-.org-timeline-page .substep-accordion-summary .status,
-.org-timeline-page .substep-card-link .status {
-	margin-left: auto;
-	margin-right: 0;
+/* Status lives in timeline-header-trail; keep chip from wrapping the line */
+.org-timeline-page .timeline-header-trail .status {
+	margin: 0;
+	white-space: nowrap;
 }
 
 /* Nest: indent left, keep 100%−indent width so right edges match the parent */

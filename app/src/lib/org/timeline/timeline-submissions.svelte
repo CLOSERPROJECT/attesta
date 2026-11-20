@@ -5,17 +5,13 @@
 
 	type Props = {
 		submissions: TimelineSubmission[];
-		/** Match /my: open nested panel when parent status is done. */
+		/** Initial open when parent status is done (mount only). */
 		open?: boolean;
 	};
 
 	let { submissions, open: openProp = false }: Props = $props();
 
-	let open = $state(false);
-
-	$effect.pre(() => {
-		if (openProp) open = true;
-	});
+	let open = $state(Boolean(openProp));
 </script>
 
 <Collapsible.Root class="substep-org-submissions" bind:open>

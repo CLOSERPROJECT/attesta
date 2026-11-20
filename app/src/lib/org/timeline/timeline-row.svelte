@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
+	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
 	import type { TimelineRow } from './types.js';
 
@@ -12,11 +13,7 @@
 
 	let { row, stream = '', instance = '' }: Props = $props();
 
-	let open = $state(false);
-
-	$effect.pre(() => {
-		if (row.expanded) open = true;
-	});
+	let open = $state(Boolean(row.expanded));
 </script>
 
 <Collapsible.Root
@@ -25,7 +22,7 @@
 	bind:open
 >
 	<Collapsible.Trigger class="stream-timeline-row-summary w-full items-center hover:no-underline">
-		<span class="stream-timeline-row-label">{row.label}</span>
+		<TimelineHeaderLine title={row.label} />
 	</Collapsible.Trigger>
 	<Collapsible.Content>
 		<ul class="stream-timeline-substeps">

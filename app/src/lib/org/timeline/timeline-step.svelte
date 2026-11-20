@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
+	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
 	import type { TimelineStep } from './types.js';
@@ -18,11 +19,7 @@
 	const rows = $derived(step.rows ?? []);
 	const substeps = $derived(step.substeps ?? []);
 
-	let open = $state(false);
-
-	$effect.pre(() => {
-		if (step.expanded) open = true;
-	});
+	let open = $state(Boolean(step.expanded));
 </script>
 
 <Collapsible.Root class="stream-timeline-step" id={stepDomId} bind:open>
@@ -31,17 +28,13 @@
 		id={summaryDomId}
 		aria-labelledby={summaryDomId}
 	>
-		<div class="stream-step-summary-main">
-			<span class="pill pill-step-number pill-panel">{step.stepId}</span>
-			<span class="stream-step-summary-copy">
-				<span class="stream-step-summary-title">{step.title}</span>
-				{#if step.substepCount}
-					<div class="stream-step-summary-meta">
-						<span class="stream-step-summary-meta-item">{step.substepCount}</span>
-					</div>
+		<TimelineHeaderLine lead={step.stepId} title={step.title}>
+			{#snippet trail()}
+				{#if step.substepCount > 0}
+					<span class="timeline-header-count">{step.substepCount}</span>
 				{/if}
-			</span>
-		</div>
+			{/snippet}
+		</TimelineHeaderLine>
 	</Collapsible.Trigger>
 	<Collapsible.Content>
 		{#if rows.length > 0}

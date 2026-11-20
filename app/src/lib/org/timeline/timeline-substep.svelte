@@ -1,11 +1,15 @@
 <script lang="ts">
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
+	import { cn } from '#lib/shadcn/utils.js';
 
 	import { getBoardEmbed } from '../board/board-context.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import { taskAddressKey } from '../task-address.js';
+	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubmissions from './timeline-submissions.svelte';
 	import type { TimelineSubstep } from './types.js';
 
@@ -20,6 +24,7 @@
 	const board = getBoardEmbed();
 
 	const domId = $derived(substep.substepId.replaceAll('.', '-'));
+	const headingId = $derived(`substep-${domId}-heading`);
 	const statusLabel = $derived(substep.statusLabel || substep.status);
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(substep.status ? `substep-${substep.status}` : '');
@@ -31,37 +36,26 @@
 	);
 	const address = $derived(parsed?.address ?? null);
 	const embed = $derived(!!address);
-	const focusHint = $derived.by(() => {
+	const focused = $derived.by(() => {
 		const f = board.focus;
 		if (!f) return false;
 		if (address) return board.isFocused(address);
-		const id = substep.substepId;
-		return id === `${f.jobId}.${f.taskId}`;
+		return substep.substepId === `${f.jobId}.${f.taskId}`;
 	});
-	const focused = $derived(focusHint);
 	const entry = $derived.by(() => {
 		void boardFormCache.entries;
 		if (!address) return undefined;
 		return boardFormCache.get(taskAddressKey(address));
 	});
 	const stayedOutcome = $derived(address ? board.stayedFor(address) : null);
+	const embedOpen = $derived(address ? board.isEmbedOpen(address) : false);
 
-	let embedOpen = $state(true);
 	let detailsOpen = $state(false);
-	let wasFocused = $state(false);
 
-	// Rising edge only — `if (focused) open=true` re-fires when focus identity churns and fights close.
-	$effect.pre(() => {
-		if (focused && !wasFocused) {
-			embedOpen = true;
-			detailsOpen = true;
-		}
-		wasFocused = focused;
-	});
-
-	function onEmbedOpenChange(next: boolean) {
-		embedOpen = next;
-		if (next && address) board.setFocus(address);
+	function toggleEmbed() {
+		if (!address) return;
+		const next = board.toggleEmbedOpen(address);
+		if (next) board.setFocus(address);
 	}
 </script>
 
@@ -71,28 +65,40 @@
 	data-board-focused={focused ? 'true' : undefined}
 >
 	{#if embed && address}
-		<Collapsible.Root
+		<div
 			class="substep-accordion js-process-substep-panel substep-embed-host"
 			data-substep-id={substep.substepId}
 			data-testid="actionable-embed"
-			aria-labelledby={`substep-${domId}-heading`}
-			open={embedOpen}
-			onOpenChange={onEmbedOpenChange}
+			data-state={embedOpen ? 'open' : 'closed'}
+			data-slot="collapsible"
+			aria-labelledby={headingId}
 		>
-			<Collapsible.Trigger
-				class="substep-accordion-summary substep-card-link w-full items-center border-0 bg-transparent text-left hover:no-underline"
+			<button
+				type="button"
+				class={cn(
+					'group/accordion-trigger substep-accordion-summary substep-card-link relative flex w-full flex-1 items-center justify-between border-0 bg-transparent text-left text-sm font-medium outline-none hover:no-underline',
+					'**:data-[slot=accordion-trigger-icon]:text-muted-foreground **:data-[slot=accordion-trigger-icon]:size-4'
+				)}
+				aria-expanded={embedOpen}
 				aria-controls={`substep-${domId}-embed`}
+				data-slot="collapsible-trigger"
+				data-state={embedOpen ? 'open' : 'closed'}
+				onclick={toggleEmbed}
 			>
-				<div class="substep-summary-main">
-					<span class="pill pill-panel">{substep.substepId}</span>
-					<div class="substep-title">
-						<span class="substep-title-heading" id={`substep-${domId}-heading`}>
-							{substep.title}
-						</span>
-					</div>
-				</div>
-				<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
-			</Collapsible.Trigger>
+				<TimelineHeaderLine lead={substep.substepId} title={substep.title} titleId={headingId}>
+					{#snippet trail()}
+						<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
+					{/snippet}
+				</TimelineHeaderLine>
+				<ChevronDownIcon
+					data-slot="accordion-trigger-icon"
+					class={cn('pointer-events-none shrink-0', embedOpen && 'hidden')}
+				/>
+				<ChevronUpIcon
+					data-slot="accordion-trigger-icon"
+					class={cn('pointer-events-none shrink-0', !embedOpen && 'hidden')}
+				/>
+			</button>
 			<div id={`substep-${domId}-embed`}>
 				<EmbeddedTaskPanel
 					{address}
@@ -103,31 +109,27 @@
 					play={!!board.play}
 					stayedOutcome={stayedOutcome}
 					open={embedOpen}
-					onOpenChange={onEmbedOpenChange}
+					onOpenChange={(next) => board.setEmbedOpen(address, next)}
 					onFocus={() => board.setFocus(address)}
 					onCommitted={(outcome) => board.onCommitted(address, outcome)}
 					onContinue={() => board.onContinue(address)}
 				/>
 			</div>
-		</Collapsible.Root>
+		</div>
 	{:else}
 		<Collapsible.Root
 			class="substep-accordion js-process-substep-panel"
 			data-substep-id={substep.substepId}
 			data-testid={focused ? 'focused-substep' : undefined}
-			aria-labelledby={`substep-${domId}-heading`}
+			aria-labelledby={headingId}
 			bind:open={detailsOpen}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
-				<div class="substep-summary-main">
-					<span class="pill pill-panel">{substep.substepId}</span>
-					<div class="substep-title">
-						<span class="substep-title-heading" id={`substep-${domId}-heading`}>
-							{substep.title}
-						</span>
-					</div>
-				</div>
-				<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
+				<TimelineHeaderLine lead={substep.substepId} title={substep.title} titleId={headingId}>
+					{#snippet trail()}
+						<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
+					{/snippet}
+				</TimelineHeaderLine>
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div class="substep-details">
