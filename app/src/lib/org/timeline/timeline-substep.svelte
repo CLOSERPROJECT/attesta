@@ -1,10 +1,11 @@
 <script lang="ts">
+	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
+
 	import { getBoardEmbed } from '../board/board-context.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import { taskAddressKey } from '../task-address.js';
-	import TimelineChevron from './timeline-chevron.svelte';
 	import TimelineSubmissions from './timeline-submissions.svelte';
 	import type { TimelineSubstep } from './types.js';
 
@@ -34,7 +35,6 @@
 		const f = board.focus;
 		if (!f) return false;
 		if (address) return board.isFocused(address);
-		// Deep-link focus onto locked/done cards (substepId ≈ jobId.taskId).
 		const id = substep.substepId;
 		return id === `${f.jobId}.${f.taskId}`;
 	});
@@ -47,16 +47,21 @@
 	const stayedOutcome = $derived(address ? board.stayedFor(address) : null);
 
 	let embedOpen = $state(true);
+	let detailsOpen = $state(false);
+	let wasFocused = $state(false);
 
-	// Open when board focus lands here; do not reopen on blur (user may have collapsed).
-	$effect(() => {
-		if (focused) embedOpen = true;
+	// Rising edge only — `if (focused) open=true` re-fires when focus identity churns and fights close.
+	$effect.pre(() => {
+		if (focused && !wasFocused) {
+			embedOpen = true;
+			detailsOpen = true;
+		}
+		wasFocused = focused;
 	});
 
-	function toggleEmbed() {
-		if (!address) return;
-		embedOpen = !embedOpen;
-		board.setFocus(address);
+	function onEmbedOpenChange(next: boolean) {
+		embedOpen = next;
+		if (next && address) board.setFocus(address);
 	}
 </script>
 
@@ -66,19 +71,17 @@
 	data-board-focused={focused ? 'true' : undefined}
 >
 	{#if embed && address}
-		<div
+		<Collapsible.Root
 			class="substep-accordion js-process-substep-panel substep-embed-host"
 			data-substep-id={substep.substepId}
 			data-testid="actionable-embed"
 			aria-labelledby={`substep-${domId}-heading`}
-			open={embedOpen ? true : undefined}
+			open={embedOpen}
+			onOpenChange={onEmbedOpenChange}
 		>
-			<button
-				type="button"
-				class="substep-accordion-summary substep-card-link w-full border-0 bg-transparent text-left"
-				aria-expanded={embedOpen}
+			<Collapsible.Trigger
+				class="substep-accordion-summary substep-card-link w-full items-center border-0 bg-transparent text-left hover:no-underline"
 				aria-controls={`substep-${domId}-embed`}
-				onclick={toggleEmbed}
 			>
 				<div class="substep-summary-main">
 					<span class="pill pill-panel">{substep.substepId}</span>
@@ -89,10 +92,7 @@
 					</div>
 				</div>
 				<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
-				<span class="substep-accordion-chevron" aria-hidden="true">
-					<TimelineChevron />
-				</span>
-			</button>
+			</Collapsible.Trigger>
 			<div id={`substep-${domId}-embed`}>
 				<EmbeddedTaskPanel
 					{address}
@@ -102,22 +102,23 @@
 					{focused}
 					play={!!board.play}
 					stayedOutcome={stayedOutcome}
-					bind:open={embedOpen}
+					open={embedOpen}
+					onOpenChange={onEmbedOpenChange}
 					onFocus={() => board.setFocus(address)}
 					onCommitted={(outcome) => board.onCommitted(address, outcome)}
 					onContinue={() => board.onContinue(address)}
 				/>
 			</div>
-		</div>
+		</Collapsible.Root>
 	{:else}
-		<details
+		<Collapsible.Root
 			class="substep-accordion js-process-substep-panel"
 			data-substep-id={substep.substepId}
 			data-testid={focused ? 'focused-substep' : undefined}
 			aria-labelledby={`substep-${domId}-heading`}
-			open={focused || undefined}
+			bind:open={detailsOpen}
 		>
-			<summary class="substep-accordion-summary">
+			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
 				<div class="substep-summary-main">
 					<span class="pill pill-panel">{substep.substepId}</span>
 					<div class="substep-title">
@@ -127,29 +128,28 @@
 					</div>
 				</div>
 				<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
-				<span class="substep-accordion-chevron" aria-hidden="true">
-					<TimelineChevron />
-				</span>
-			</summary>
-			<div class="substep-details">
-				{#if substep.blockedReason || submissions.length > 0}
-					<div class="substep-org-body">
-						{#if substep.blockedReason}
-							<p
-								class="muted u-m-0 u-pre-line"
-								data-testid="task-blocked-reason"
-							>
-								{substep.blockedReason}
-							</p>
-						{/if}
-						{#if submissions.length > 0}
-							<TimelineSubmissions {submissions} open={substep.status === 'done'} />
-						{/if}
-					</div>
-				{:else}
-					<p class="muted">No data form configured for this substep</p>
-				{/if}
-			</div>
-		</details>
+			</Collapsible.Trigger>
+			<Collapsible.Content>
+				<div class="substep-details">
+					{#if substep.blockedReason || submissions.length > 0}
+						<div class="substep-org-body">
+							{#if substep.blockedReason}
+								<p
+									class="muted u-m-0 u-pre-line"
+									data-testid="task-blocked-reason"
+								>
+									{substep.blockedReason}
+								</p>
+							{/if}
+							{#if submissions.length > 0}
+								<TimelineSubmissions {submissions} open={substep.status === 'done'} />
+							{/if}
+						</div>
+					{:else}
+						<p class="muted">No data form configured for this substep</p>
+					{/if}
+				</div>
+			</Collapsible.Content>
+		</Collapsible.Root>
 	{/if}
 </li>

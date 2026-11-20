@@ -25,6 +25,7 @@
 		stayedOutcome?: CommitOutcome | null;
 		open?: boolean;
 		tab?: Tab;
+		onOpenChange?: (open: boolean) => void;
 		onCommitted?: (outcome: CommitOutcome) => void;
 		onContinue?: () => void;
 		onFocus?: () => void;
@@ -39,8 +40,9 @@
 		play = false,
 		disabled = false,
 		stayedOutcome = null,
-		open = $bindable(true),
+		open = true,
 		tab = $bindable<Tab>('form'),
+		onOpenChange,
 		onCommitted,
 		onContinue,
 		onFocus
@@ -60,7 +62,7 @@
 
 	function selectTab(next: Tab) {
 		tab = next;
-		open = true;
+		onOpenChange?.(true);
 		if (next === 'form') onFocus?.();
 	}
 </script>
