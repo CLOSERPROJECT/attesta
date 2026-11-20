@@ -10,16 +10,15 @@
 @import '../../../../../web/src/styles/components/substep-shell.css';
 
 /*
- * Board elevation: 0 page, 1 steps, 2 rows/instances, 3 substeps + tabs (shared top).
- * Light: 300→200→100→white.
- * Dark: 950→800→700→500 under .dark.
- * Padding is left-only on chrome; forms keep right pad.
+ * Board elevation: elev-0 = light Attesta green page; ladder is steps → rows → substeps.
+ * Light: primary mixed into white. Dark: primary into slate lifts.
+ * Mobile: block pad only. ≥640px: stream container pads on all sides.
  */
 .org-timeline-page {
-	--org-elev-0: #cbd5e1; /* slate-300 */
-	--org-elev-1: #e2e8f0; /* slate-200 — steps */
-	--org-elev-2: #f1f5f9; /* slate-100 — rows/instances */
-	--org-elev-3: #ffffff; /* white — substeps + tabs */
+	--org-elev-0: color-mix(in srgb, var(--primary) 9%, #ffffff); /* page — light Attesta green */
+	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #ffffff); /* steps */
+	--org-elev-2: color-mix(in srgb, var(--primary) 8%, #ffffff); /* rows/instances */
+	--org-elev-3: #ffffff; /* substeps + tabs */
 	--org-pad-l: var(--space-3);
 	/* Chevron column: same right edge + slot width at every nest level. */
 	--org-chevron-pad: var(--space-3);
@@ -38,12 +37,19 @@
 	padding-inline: 0;
 }
 
-/* Dark: elev-0 page chrome → elev-3 lifted surface (wider jumps). */
+/* App Vite/Tailwind path does not expand @custom-media; use a plain query. */
+@media (width >= 640px) {
+	.org-timeline-page {
+		padding: var(--space-3);
+	}
+}
+
+/* Dark: page + ladder lift toward --primary. */
 :is(.dark *) .org-timeline-page {
-	--org-elev-0: #020617; /* slate-950 */
-	--org-elev-1: #1e293b; /* slate-800 — steps */
-	--org-elev-2: #334155; /* slate-700 — rows/instances */
-	--org-elev-3: #64748b; /* slate-500 — substeps + tabs */
+	--org-elev-0: color-mix(in srgb, var(--primary) 8%, #0f172a);
+	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #1e293b);
+	--org-elev-2: color-mix(in srgb, var(--primary) 12%, #334155);
+	--org-elev-3: color-mix(in srgb, var(--primary) 10%, #475569);
 }
 
 .org-timeline-toolbar {
@@ -112,9 +118,12 @@
 
 /* --- Elevation surfaces (scoped; Formata /my keeps shared component defaults) --- */
 
+/*
+ * Nest box: all sides match fill at rest (6px left is an invisible hover reserve).
+ * Hover recolors the full border to primary.
+ */
 .org-timeline-page .stream-timeline-step {
 	background: var(--org-elev-1);
-	/* Reserve 6px left at rest so hover only recolors (no layout shift). */
 	border-width: 1px 1px 1px 6px;
 	border-color: var(--org-elev-1);
 }
@@ -241,7 +250,7 @@
 	gap: var(--space-2);
 	min-width: 0;
 	flex: 1 1 auto;
-	font-family: var(--font-mono);
+	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
 }
 
 .org-timeline-page .timeline-header-index {
@@ -412,51 +421,7 @@
 	padding: var(--space-3);
 }
 
-/*
- * Open headers: bottom border = layer behind (parent elev).
- * Content: top padding under that hairline.
- */
-.org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
-	border-bottom: 1px solid var(--org-elev-0);
-}
-
-.org-timeline-page .stream-timeline-row-accordion[data-state='open'] > .stream-timeline-row-summary {
-	border-bottom: 1px solid var(--org-elev-1);
-}
-
-/* Substep under instance → elev-2; under step (no rows) → elev-1 */
-.org-timeline-page
-	.stream-timeline-row
-	.stream-timeline-substeps
-	> .substep
-	.substep-accordion[data-state='open']
-	> .substep-accordion-summary,
-.org-timeline-page
-	.stream-timeline-row
-	.stream-timeline-substeps
-	> .substep
-	.substep-embed-host[data-state='open']
-	> .substep-accordion-summary {
-	border-bottom: 1px solid var(--org-elev-2);
-}
-
-.org-timeline-page
-	.stream-timeline-step
-	> [data-slot='collapsible-content']
-	> .stream-timeline-substeps
-	> .substep
-	.substep-accordion[data-state='open']
-	> .substep-accordion-summary,
-.org-timeline-page
-	.stream-timeline-step
-	> [data-slot='collapsible-content']
-	> .stream-timeline-substeps
-	> .substep
-	.substep-embed-host[data-state='open']
-	> .substep-accordion-summary {
-	border-bottom: 1px solid var(--org-elev-1);
-}
-
+/* Open nest: space under the header before children (no hairline — card edges already outline). */
 .org-timeline-page .stream-timeline-step[data-state='open'] > [data-slot='collapsible-content'],
 .org-timeline-page
 	.stream-timeline-row-accordion[data-state='open']
@@ -485,7 +450,7 @@
 	margin-left: auto;
 }
 
-@media (--sm-down) {
+@media (width < 640px) {
 	.org-timeline-page .stream-timeline-rows,
 	.org-timeline-page .stream-timeline-substeps {
 		width: calc(100% - var(--org-pad-l));
@@ -494,7 +459,7 @@
 	}
 }
 
-@media (--md-down) {
+@media (width < 768px) {
 	.org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
 		position: sticky;
 		top: 0;
