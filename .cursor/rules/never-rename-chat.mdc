@@ -1,0 +1,13 @@
+---
+description: Never rename the chat tab; only the user renames
+alwaysApply: true
+---
+
+# Never rename the chat
+
+Do **not** call `rename_chat` (or otherwise change the conversation / chat tab title).
+
+- Not on handoff pickup, topic shifts, commits, or “helpful” labeling.
+- Only rename if the user **explicitly** asks to rename this chat in that message.
+
+The user owns the tab title.

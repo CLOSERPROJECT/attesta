@@ -1,0 +1,26 @@
+---
+description: Subagent workspace — match current practice; never steal the parent chat root
+alwaysApply: true
+---
+
+# Subagent workspace
+
+When spawning a subagent, **check the current context / practice for this session** (handoff, dispatch wiki, parent brief). Do not invent a worktree by default.
+
+## Same root (context-saving subagent)
+
+If the intent is only to offload work or save parent context—and practice is “work in this checkout”—spawn the child **in the same workspace root and branch**. No worktree. No `move_agent_to_root`.
+
+## Isolated worktree (when that is the practice)
+
+If practice is parallel implementers / non-interfering fix branches (e.g. review coordinator dispatching onto `feat/…` via Cursor worktrees under `~/.cursor/worktrees/attesta/<id>/`):
+
+- Child works in **its** worktree only.
+- **Never** call `move_agent_to_root` in a way that remounts the **parent** chat onto that worktree (session steal). Prefer isolation that does not remount the parent.
+- Never `attesta/.worktrees/`.
+- If the parent is remounted by mistake: reclaim the primary checkout + correct branch immediately.
+
+## Do not
+
+- Force a worktree when the parent only wanted an in-session helper.
+- Remount the user’s review/coordinator chat to a child’s branch or folder.
