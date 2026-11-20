@@ -43,6 +43,41 @@ func TestHandleLoadScopedToStreamInstance(t *testing.T) {
 	}
 }
 
+func TestHandleTimelineScopedToStreamInstance(t *testing.T) {
+	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
+	truckA := commitTruckArrive(t, c)
+	_ = commitLotRegister(t, c, truckA, registerLotValue())
+
+	h := &API{
+		DomainLoader: loader,
+		Gate: func(http.ResponseWriter, *http.Request) (OperatorIdentity, bool) {
+			return adminOp(), true
+		},
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/api/org/timeline?stream=recycling&instance="+truckA, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var got TimelineView
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Stream != "recycling" || got.Instance != truckA {
+		t.Fatalf("scope = %#v", got)
+	}
+	if len(got.Steps) == 0 {
+		t.Fatalf("expected steps, got %#v", got)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/api/org/timeline?stream=recycling&instance=missing-truck", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing instance = %d, want 404", rec.Code)
+	}
+}
+
 func TestHandleTaskFormPlayWithoutInstance(t *testing.T) {
 	_, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	h := &API{

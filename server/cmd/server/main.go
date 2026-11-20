@@ -2552,6 +2552,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.Handle("/api/org/commit", orgHTTP)
 	mux.Handle("/api/org/qr-resolve", orgHTTP)
 	mux.Handle("/api/org/streams", orgHTTP)
+	mux.Handle("/api/org/timeline", orgHTTP)
 	mux.Handle("/api/org/artifacts/", orgHTTP)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)
@@ -5982,52 +5983,12 @@ func (s *Server) handleOrgProcessPage(w http.ResponseWriter, r *http.Request, us
 			return
 		}
 	}
-	op := org.OperatorIdentity{
-		UserID: accountActorID(user),
-		Org:    scope.Org,
-		Roles:  append([]string(nil), user.RoleSlugs...),
-	}
-	summaries := org.ListStreamInstances(orgCfg, domain, op)
-	var summary *org.StreamInstanceSummary
-	for i := range summaries {
-		if summaries[i].ID == instanceID {
-			summary = &summaries[i]
-			break
-		}
-	}
-	if summary == nil {
+	if !org.StreamInstanceExists(orgCfg, domain, instanceID) {
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
-	timeline := org.ProjectStreamTimeline(orgCfg, domain, op, instanceID)
-	steps := buildOrgTimelineSteps(orgCfg, domain, timeline, cfg.OrgStreamKey, instanceID)
-	status := summary.Status
-	if status == "" {
-		status = processStatusActive
-	}
-	view := ProcessPageView{
-		PageBase:     s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
-		Breadcrumbs:  buildProcessBreadcrumbs(workflowKey, cfg.Workflow.Name, summary.Label, instanceID),
-		ProcessID:    instanceID,
-		InstanceName: strings.TrimSpace(summary.Label),
-		Status:       status,
-		StatusLabel:  processStatusLabel(status),
-		LiveUpdates:  false,
-		Detail: StreamInstanceDetailView{
-			WorkflowKey:    workflowKey,
-			WorkflowPath:   streamPath(workflowKey),
-			ProcessID:      instanceID,
-			CurrentUser:    actorFromAccountUser(user, workflowKey),
-			ProcessDone:    status == org.StreamInstanceDone,
-			Timeline:       steps,
-			ShowMineFilter: false,
-			ShowAllFilter:  true,
-			CanTerminate:   false,
-		},
-	}
-	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	// One Org timeline surface: SPA instance home (templates remain for Formata).
+	http.Redirect(w, r, org.AppOrgInstancePath(cfg.OrgStreamKey, instanceID), http.StatusFound)
 }
 
 func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string) ProcessPageView {

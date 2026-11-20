@@ -58,11 +58,66 @@ func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleQrResolve(w, r)
 	case path == "/api/org/streams":
 		h.handleStreams(w, r)
+	case path == "/api/org/timeline":
+		h.handleTimeline(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
 		h.handleArtifact(w, r, strings.TrimPrefix(path, ArtifactProxyPathPrefix))
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.Gate == nil || h.DomainLoader == nil {
+		http.Error(w, "org timeline not configured", http.StatusInternalServerError)
+		return
+	}
+	op, ok := h.Gate(w, r)
+	if !ok {
+		return
+	}
+	orgID := strings.TrimSpace(op.Org)
+	if orgID == "" {
+		http.Error(w, "organization required", http.StatusForbidden)
+		return
+	}
+	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
+	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
+	if streamKey == "" || instanceID == "" {
+		http.Error(w, "stream and instance required", http.StatusBadRequest)
+		return
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), orgID, streamKey, h.DomainLoader.Configs)
+	if !ok {
+		return
+	}
+	if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+		return
+	}
+
+	domain := EmptyDomain()
+	if h.DomainLoader.Domains != nil {
+		if loaded, domainErr := h.DomainLoader.Domains.Get(r.Context(), scope); domainErr == nil {
+			domain = loaded
+		} else if !errors.Is(domainErr, ErrNotFound) {
+			http.Error(w, "failed to load timeline", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	view := BuildOrgTimelineView(cfg, domain, op, scope.Stream, instanceID)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method == http.MethodHead {
+		return
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(view)
 }
 
 func (h *API) handleStreams(w http.ResponseWriter, r *http.Request) {

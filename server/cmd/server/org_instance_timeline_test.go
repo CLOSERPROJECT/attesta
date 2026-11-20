@@ -3,15 +3,13 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
+func TestOrgInstanceTimelineRedirectsToSPAHome(t *testing.T) {
 	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
 	server := &Server{
 		authorizer:  fakeAuthorizer{},
@@ -31,96 +29,17 @@ func TestOrgInstanceTimelineRendersEachGroupSeedAndBlockedReason(t *testing.T) {
 	})
 
 	truckID := arriveIntakeTruck(t, server, sessionID)
-	livingCommit(t, server, sessionID, "stream=recycling&instance="+truckID,
-		`{"taskPath":"intake/register","jobInstanceId":"`+truckID+`","value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-CO","palletCount":1,"truckWeightAfter":900,"notes":""}}`)
-	livingCommit(t, server, sessionID, "stream=recycling&instance="+truckID,
-		`{"taskPath":"intake/register","jobInstanceId":"`+truckID+`","value":{"client":"DA","wasteCode":"160214","numeroFir":"FIR-DA","palletCount":1,"truckWeightAfter":800,"notes":""}}`)
-
-	domain, err := server.orgDomains.Get(t.Context(), org.FeragameScope())
-	if err != nil {
-		t.Fatal(err)
-	}
-	var lotIDs []string
-	for id, facts := range domain.Kind("lot") {
-		if truck, _ := facts["truckId"].(string); truck == truckID {
-			lotIDs = append(lotIDs, id)
-		}
-	}
-	if len(lotIDs) != 2 {
-		t.Fatalf("want 2 lots on truck, got %#v", lotIDs)
-	}
-	openLot, waitLot := lotIDs[0], lotIDs[1]
-	livingCommit(t, server, sessionID, "stream=recycling&instance="+truckID,
-		`{"taskPath":"lot_processing/startLot","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"lotId":"`+openLot+`"}}`)
 
 	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-recycling/instance/"+truckID, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleMyRoutes(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusFound {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
-	body := rec.Body.String()
-
-	if !strings.Contains(body, "Lavorazione ×2") {
-		t.Fatalf("expected each group title Lavorazione ×2, got:\n%s", body)
-	}
-	if !strings.Contains(body, "Ingresso") {
-		t.Fatalf("expected once step title Ingresso, got:\n%s", body)
-	}
-	if !strings.Contains(body, "Lotto: "+waitLot) {
-		t.Fatalf("expected waiting row label, got:\n%s", body)
-	}
-
-	seedHref := `/app/recycling/i/` + truckID + `/lot_processing/new/startLot?seed.lotId=` + waitLot
-	if strings.Contains(body, `href="`+seedHref+`"`) {
-		t.Fatalf("locked wait-lot start must not be a form link until available, got seed href in:\n%s", body)
-	}
-	openTaskHref := `/app/recycling/i/` + truckID + `/lot_processing/` + openLot + `/`
-	if !strings.Contains(body, openTaskHref) {
-		t.Fatalf("expected open-lot task link containing %q, got:\n%s", openTaskHref, body)
-	}
-
-	wantBlocked := "Linea occupata: lotto " + openLot
-	if !strings.Contains(body, wantBlocked) {
-		t.Fatalf("expected blockedReason %q, got:\n%s", wantBlocked, body)
-	}
-	if !strings.Contains(body, `class="substep substep-locked"`) {
-		t.Fatalf("expected locked substep class, got:\n%s", body)
-	}
-	if !strings.Contains(body, `class="substep substep-done"`) && !strings.Contains(body, `class="substep substep-available"`) {
-		t.Fatalf("expected done/available substep states, got:\n%s", body)
-	}
-
-	if strings.Contains(body, "End stream") || strings.Contains(body, "terminate-process-dialog") {
-		t.Fatalf("Org instance must hide terminate, got:\n%s", body)
-	}
-	if strings.Contains(body, `data-live-updates="1"`) || !strings.Contains(body, `data-live-updates="0"`) {
-		t.Fatalf("Org instance must disable live updates for EventSource gate, got:\n%s", body)
-	}
-	if strings.Contains(body, "js-mine-filter") || strings.Contains(body, "My tasks") {
-		t.Fatalf("Org instance must hide mine filter, got:\n%s", body)
-	}
-	if !strings.Contains(body, "js-show-all-filter") || !strings.Contains(body, "Show all") {
-		t.Fatalf("Org instance must show Show all filter, got:\n%s", body)
-	}
-	if !strings.Contains(body, `data-org-actionable="true"`) {
-		t.Fatalf("expected data-org-actionable on act-now substeps, got:\n%s", body)
-	}
-	if !strings.Contains(body, "js-show-all-filter-root") || !strings.Contains(body, "is-actionable-only") {
-		t.Fatalf("expected actionable-only filter root, got:\n%s", body)
-	}
-	if !strings.Contains(body, "Submissions (") {
-		t.Fatalf("expected submissions under accordion when count >= 1, got:\n%s", body)
-	}
-	if !strings.Contains(body, `class="substep-card-link"`) {
-		t.Fatalf("expected available Org tasks as card links, got:\n%s", body)
-	}
-	if strings.Contains(body, "Open in /app") {
-		t.Fatalf("Org instance must not render Open in /app, got:\n%s", body)
-	}
-	if strings.Contains(body, "js-open-substep-override") || strings.Contains(body, "/override") {
-		t.Fatalf("Org instance must hide Formata override affordances, got:\n%s", body)
+	wantLoc := "/app/recycling/i/" + truckID
+	if loc := rec.Header().Get("Location"); loc != wantLoc {
+		t.Fatalf("Location = %q, want %q", loc, wantLoc)
 	}
 }
 
