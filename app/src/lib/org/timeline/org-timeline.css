@@ -278,6 +278,27 @@
 	white-space: nowrap;
 }
 
+/*
+ * Sibling gaps (innermost → outer): form 1px, then +4 each level up
+ * form → substeps/tasks → rows/instances → steps.
+ */
+.org-timeline-page .substep-org-body,
+.org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
+	gap: 1px;
+}
+
+.org-timeline-page .stream-timeline-substeps {
+	gap: 5px;
+}
+
+.org-timeline-page .stream-timeline-rows {
+	gap: 9px;
+}
+
+.org-timeline-page .stream-timeline-list {
+	gap: 13px;
+}
+
 /* Nest: indent left, keep 100%−indent width so right edges match the parent */
 .org-timeline-page .stream-timeline-rows,
 .org-timeline-page .stream-timeline-substeps {
