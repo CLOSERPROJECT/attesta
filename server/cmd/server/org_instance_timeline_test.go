@@ -6,17 +6,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestOrgInstanceTimelineRedirectsToSPAHome(t *testing.T) {
 	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
 	server := &Server{
-		authorizer:  fakeAuthorizer{},
-		store:       NewMemoryStore(),
-		tmpl:        parseTestTemplates(t),
-		enforceAuth: true,
-		now:         func() time.Time { return now },
+		authorizer:    fakeAuthorizer{},
+		orgAuthorizer: org.AllowAllAuthorizer{},
+		store:         NewMemoryStore(),
+		tmpl:          parseTestTemplates(t),
+		enforceAuth:   true,
+		now:           func() time.Time { return now },
 	}
 	seedOrgDemo(t, server)
 
@@ -46,11 +48,12 @@ func TestOrgInstanceTimelineRedirectsToSPAHome(t *testing.T) {
 func TestOrgInstanceTimelineMutationsAndEventsNotFound(t *testing.T) {
 	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
 	server := &Server{
-		authorizer:  fakeAuthorizer{},
-		store:       NewMemoryStore(),
-		tmpl:        parseTestTemplates(t),
-		enforceAuth: true,
-		now:         func() time.Time { return now },
+		authorizer:    fakeAuthorizer{},
+		orgAuthorizer: org.AllowAllAuthorizer{},
+		store:         NewMemoryStore(),
+		tmpl:          parseTestTemplates(t),
+		enforceAuth:   true,
+		now:           func() time.Time { return now },
 	}
 	seedOrgDemo(t, server)
 	sessionID := "org-instance-mutations"
