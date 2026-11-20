@@ -25,6 +25,8 @@
 	"toast_dismiss": "Close",
 	"loading_recap": "Loading recap…",
 	"could_not_load_recap": "Could not load recap",
+	"embed_tab_form": "Form",
+	"embed_tab_recap": "Recap",
 	"submission_count_one": "{count} submission",
 	"submission_count_many": "{count} submissions",
 	"form_unavailable": "Form unavailable",

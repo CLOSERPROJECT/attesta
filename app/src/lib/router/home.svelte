@@ -1,5 +1,5 @@
 <script lang="ts">
-	import OrgTimeline from '../org/timeline/org-timeline.svelte';
+	import OrgBoard from '../org/board/org-board.svelte';
 	import { orgRouteCoordsFromPath } from '../org/nav-place.js';
 	import { route } from './index.js';
 
@@ -9,7 +9,7 @@
 </script>
 
 {#if stream && instance}
-	<OrgTimeline {stream} {instance} />
+	<OrgBoard {stream} {instance} />
 {:else}
 	<p class="text-sm text-zinc-500" data-testid="org-home-missing">Missing stream or instance.</p>
 {/if}

@@ -5,9 +5,11 @@
 
 	type Props = {
 		step: TimelineStep;
+		stream?: string;
+		instance?: string;
 	};
 
-	let { step }: Props = $props();
+	let { step, stream = '', instance = '' }: Props = $props();
 
 	const stepDomId = $derived(`stream-timeline-step-${step.stepId}`);
 	const summaryDomId = $derived(`${stepDomId}-summary`);
@@ -49,7 +51,7 @@
 						</summary>
 						<ul class="stream-timeline-substeps">
 							{#each row.substeps as sub (sub.substepId)}
-								<TimelineSubstep substep={sub} />
+								<TimelineSubstep substep={sub} {stream} {instance} />
 							{/each}
 						</ul>
 					</details>
@@ -59,7 +61,7 @@
 	{:else}
 		<ul class="stream-timeline-substeps">
 			{#each substeps as sub (sub.substepId)}
-				<TimelineSubstep substep={sub} />
+				<TimelineSubstep substep={sub} {stream} {instance} />
 			{/each}
 		</ul>
 	{/if}

@@ -25,6 +25,8 @@
 	"toast_dismiss": "Chiudi",
 	"loading_recap": "Caricamento riepilogo…",
 	"could_not_load_recap": "Impossibile caricare il riepilogo",
+	"embed_tab_form": "Modulo",
+	"embed_tab_recap": "Riepilogo",
 	"submission_count_one": "{count} invio",
 	"submission_count_many": "{count} invii",
 	"form_unavailable": "Modulo non disponibile",

@@ -47,7 +47,7 @@ describe('hrefOrgTarget', () => {
 		);
 	});
 
-	test('task target keeps stream instance prefix', () => {
+	test('task target is board soft-focus ?task=', () => {
 		expect(
 			hrefOrgTarget({
 				kind: 'task',
@@ -57,6 +57,8 @@ describe('hrefOrgTarget', () => {
 				jobInstanceId: '261102-1',
 				taskId: 'register'
 			})
-		).toBe('/app/recycling/i/261102-1/intake/261102-1/register');
+		).toBe(
+			'/app/recycling/i/261102-1?task=intake%2F261102-1%2Fregister'
+		);
 	});
 });

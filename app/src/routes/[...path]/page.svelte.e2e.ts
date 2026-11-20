@@ -160,42 +160,42 @@ async function stubOrgApis(page: Page) {
 	});
 }
 
-test('instance route renders SPA timeline home', async ({ page }) => {
+test('instance route renders SPA timeline board with embedded form', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(homePath);
 	await expect(page).toHaveURL(homePath);
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
 	await expect(page.getByTestId('instance-chrome-label')).toHaveText('Camion A');
 	await expect(page.locator('.js-show-all-filter')).toBeVisible();
-	await expect(page.locator('.substep-card-link')).toBeVisible();
+	await expect(page.getByTestId('actionable-embed')).toBeVisible();
+	await expect(page.getByTestId('task-register')).toBeVisible();
+	await expect(page.locator('.substep-card-link[href]')).toHaveCount(0);
 });
 
-test('Can start (each Job) → nav-back → timeline', async ({ page }) => {
+test('Can start deep link soft-lands on board with focus', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`${homePath}/lot_processing/new/startLot`);
-	await expect(page.getByTestId('task-route')).toBeVisible();
-	await expect(page.getByTestId('task-startLot')).toBeVisible();
-	await expect(page.getByTestId('nav-back')).toBeVisible();
-	await page.getByTestId('nav-back').click();
-	await expect(page).toHaveURL(homePath);
+	await expect(page).toHaveURL(new RegExp(`${homePath}\\?task=`));
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
+	await expect(page.getByTestId('task-startLot')).toBeVisible();
 });
 
-test('act-now task → nav-back → timeline', async ({ page }) => {
+test('act-now deep link soft-lands on board embed', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`${homePath}/intake/${instance}/register`);
-	await expect(page.getByTestId('task-route')).toBeVisible();
-	await expect(page.getByTestId('task-register')).toBeVisible();
-	await expect(page.getByTestId('nav-back')).toBeVisible();
-	await page.getByTestId('nav-back').click();
-	await expect(page).toHaveURL(homePath);
+	await expect(page).toHaveURL(
+		new RegExp(`${homePath}\\?task=intake%2F${instance}%2Fregister`)
+	);
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
+	await expect(page.getByTestId('task-register')).toBeVisible();
+	await expect(page.getByTestId('embedded-task-panel')).toBeVisible();
 });
 
-test('unavailable Task shows blockedReason', async ({ page }) => {
+test('unavailable Task shows blockedReason on board', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`${homePath}/intake/${instance}/palletWeight`);
-	await expect(page.getByTestId('task-route')).toBeVisible();
+	await expect(page).toHaveURL(new RegExp(`${homePath}\\?task=`));
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
 	await expect(page.getByTestId('task-blocked-reason')).toHaveText(
 		'Linea occupata: lotto L2 (camion T-B)'
 	);
@@ -230,18 +230,20 @@ test('unauthorized Task URL redirects to instance timeline', async ({ page }) =>
 		});
 	});
 	await page.goto(`${homePath}/intake/${instance}/palletWeight`);
-	await expect(page).toHaveURL(homePath);
+	await expect(page).toHaveURL(new RegExp(`${homePath}(\\?|$)`));
+	await expect(page).not.toHaveURL(/palletWeight/);
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
 test('unknown Task instance redirects to instance timeline', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`${homePath}/intake/missing/register`);
-	await expect(page).toHaveURL(homePath);
+	await expect(page).toHaveURL(new RegExp(`${homePath}(\\?|$)`));
+	await expect(page).not.toHaveURL(/missing/);
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
-test('Play route shows stream chrome', async ({ page }) => {
+test('Play route shows stream chrome and embed', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`/app/${stream}/new`);
 	await expect(page.getByTestId('play-route')).toBeVisible();
@@ -260,16 +262,67 @@ test('Play route shows stream chrome', async ({ page }) => {
 	await expect(page.getByTestId('task-register')).toBeVisible();
 });
 
+test('Play Commit soft-navs to instance board without task route', async ({ page }) => {
+	await stubOrgApis(page);
+	let taskFormHits = 0;
+	await page.unroute('**/api/org/task-form**');
+	await page.route('**/api/org/task-form**', async (route) => {
+		taskFormHits += 1;
+		const url = new URL(route.request().url());
+		const taskId = url.searchParams.get('taskId') ?? 'register';
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				...registerBundle,
+				jobId: url.searchParams.get('jobId') ?? 'intake',
+				taskId,
+				jobInstanceId: '',
+				title: taskId === 'register' ? 'Registrazione' : taskId
+			})
+		});
+	});
+	await page.route('**/api/org/commit**', async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				ok: true,
+				jobInstanceId: instance,
+				navigation: 'home',
+				continueNavigation: null,
+				nextTaskFormBundle: null,
+				httpLinks: [],
+				httpErrors: [],
+				worklist: homeLoad.worklist
+			})
+		});
+	});
+	await page.goto(`/app/${stream}/new`);
+	await expect(page.getByTestId('play-route')).toBeVisible();
+	await expect(page.getByTestId('task-register')).toBeVisible();
+	const hitsBefore = taskFormHits;
+	await page.locator('form button[type=submit]').click();
+	await expect(page).toHaveURL(new RegExp(`/app/${stream}/i/${instance}`));
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
+	await expect(page.getByTestId('actionable-embed')).toBeVisible();
+	// Soft-nav must not bounce through a dedicated task route.
+	await expect(page).not.toHaveURL(new RegExp(`/i/${instance}/intake/`));
+	expect(taskFormHits).toBeGreaterThanOrEqual(hitsBefore);
+});
+
 test('start Task seed.* is stripped from the URL', async ({ page }) => {
 	await stubOrgApis(page);
 	// Provisional start needs Worklist canStart (intake is suppressed on instance scope).
 	await page.goto(
 		`${homePath}/lot_processing/new/startLot?seed.lotId=L-wait&keep=1`
 	);
-	await expect(page.getByTestId('task-route')).toBeVisible();
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
 	await expect(page).toHaveURL(
 		new RegExp(
-			`/app/${stream}/i/${instance}/lot_processing/new/startLot\\?keep=1$`
+			`/app/${stream}/i/${instance}\\?.*task=lot_processing%2Fnew%2FstartLot`
 		)
 	);
+	expect(page.url()).not.toContain('seed.lotId');
+	expect(page.url()).toContain('keep=1');
 });
