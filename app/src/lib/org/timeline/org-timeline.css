@@ -11,14 +11,15 @@
 
 /*
  * Board elevation: 0 page, 1 steps, 2 rows/instances, 3 substeps + tabs (shared top).
- * Light = slate 300→200→100→50. Dark inverts under .dark.
+ * Light: 300→200→100→white.
+ * Dark: 950→800→700→500 under .dark.
  * Padding is left-only on chrome; forms keep right pad.
  */
 .org-timeline-page {
 	--org-elev-0: #cbd5e1; /* slate-300 */
-	--org-elev-1: #e2e8f0; /* slate-200 */
-	--org-elev-2: #f1f5f9; /* slate-100 */
-	--org-elev-3: #f8fafc; /* slate-50 — highest; substeps and tabs share */
+	--org-elev-1: #e2e8f0; /* slate-200 — steps */
+	--org-elev-2: #f1f5f9; /* slate-100 — rows/instances */
+	--org-elev-3: #ffffff; /* white — substeps + tabs */
 	--org-pad-l: var(--space-3);
 	/* Chevron column: same right edge + slot width at every nest level. */
 	--org-chevron-pad: var(--space-3);
@@ -37,12 +38,12 @@
 	padding-inline: 0;
 }
 
-/* Dark: elev-0 page chrome → elev-3 lifted surface (slate 950→700). */
+/* Dark: elev-0 page chrome → elev-3 lifted surface (wider jumps). */
 :is(.dark *) .org-timeline-page {
 	--org-elev-0: #020617; /* slate-950 */
-	--org-elev-1: #0f172a; /* slate-900 */
-	--org-elev-2: #1e293b; /* slate-800 */
-	--org-elev-3: #334155; /* slate-700 — highest; substeps and tabs share */
+	--org-elev-1: #1e293b; /* slate-800 — steps */
+	--org-elev-2: #334155; /* slate-700 — rows/instances */
+	--org-elev-3: #64748b; /* slate-500 — substeps + tabs */
 }
 
 .org-timeline-toolbar {
@@ -115,7 +116,7 @@
 	background: var(--org-elev-1);
 	/* Reserve 6px left at rest so hover only recolors (no layout shift). */
 	border-width: 1px 1px 1px 6px;
-	border-color: color-mix(in srgb, var(--border) 80%, transparent);
+	border-color: var(--org-elev-1);
 }
 
 .org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
@@ -125,7 +126,7 @@
 .org-timeline-page .stream-timeline-row-accordion {
 	background: var(--org-elev-2);
 	border-width: 1px 1px 1px 6px;
-	border-color: color-mix(in srgb, var(--border) 70%, transparent);
+	border-color: var(--org-elev-2);
 }
 
 .org-timeline-page .substep,
@@ -136,8 +137,19 @@
 .org-timeline-page .substep-skipped {
 	background: var(--org-elev-3);
 	border-width: 1px 1px 1px 6px;
-	/* Match surface so status colors from Formata do not show; left bar reserved for hover. */
 	border-color: var(--org-elev-3);
+	border-radius: var(--radius) 0 0 var(--radius);
+}
+
+/* Flush siblings: top edge uses instance elev so a hairline shows between tasks. */
+.org-timeline-page .stream-timeline-substeps > .substep + .substep {
+	border-top-color: var(--org-elev-2);
+}
+
+/* Hairline must not cover the primary hover edge (self or previous sibling). */
+.org-timeline-page .stream-timeline-substeps > .substep + .substep:hover,
+.org-timeline-page .stream-timeline-substeps > .substep:hover + .substep {
+	border-top-color: var(--primary);
 }
 
 .org-timeline-page .substep-embed [data-slot='tabs-list'],
@@ -254,8 +266,7 @@
 }
 
 /*
- * Sibling gaps (innermost → outer): form 1px, then +4 each level up
- * form → substeps/tasks → rows/instances → steps.
+ * Sibling gaps: form 1px, substeps flush, rows/instances 13px, steps 17px.
  */
 .org-timeline-page .substep-org-body,
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
@@ -263,15 +274,15 @@
 }
 
 .org-timeline-page .stream-timeline-substeps {
-	gap: 5px;
+	gap: 0;
 }
 
 .org-timeline-page .stream-timeline-rows {
-	gap: 9px;
+	gap: 13px;
 }
 
 .org-timeline-page .stream-timeline-list {
-	gap: 13px;
+	gap: 17px;
 }
 
 /* Nest: indent left, keep 100%−indent width so right edges match the parent */
