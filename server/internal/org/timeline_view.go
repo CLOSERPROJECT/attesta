@@ -30,16 +30,20 @@ type TimelineSubstepDTO struct {
 
 // TimelineRowDTO is one each-step row under a timeline step.
 type TimelineRowDTO struct {
-	ID       string               `json:"id"`
-	Label    string               `json:"label"`
-	Expanded bool                 `json:"expanded"`
-	Substeps []TimelineSubstepDTO `json:"substeps"`
+	ID          string               `json:"id"`
+	Label       string               `json:"label"`
+	Status      string               `json:"status,omitempty"`
+	StatusLabel string               `json:"statusLabel,omitempty"`
+	Expanded    bool                 `json:"expanded"`
+	Substeps    []TimelineSubstepDTO `json:"substeps"`
 }
 
 // TimelineStepDTO is one blueprint step in the enriched Org timeline.
 type TimelineStepDTO struct {
 	StepID       string               `json:"stepId"`
 	Title        string               `json:"title"`
+	Status       string               `json:"status,omitempty"`
+	StatusLabel  string               `json:"statusLabel,omitempty"`
 	SubstepCount int                  `json:"substepCount"`
 	Expanded     bool                 `json:"expanded"`
 	Substeps     []TimelineSubstepDTO `json:"substeps,omitempty"`
@@ -105,8 +109,16 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 			if i == 0 || anyOrgRowExpanded(tlStep.Rows) {
 				tlStep.Expanded = true
 			}
+			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromRows(tlStep.Rows)); ok {
+				tlStep.Status = string(status)
+				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
+			}
 		} else {
 			tlStep.Substeps = buildOrgTimelineTaskSubsteps(job, step.JobID, streamInstanceID, step.Tasks, streamKey, streamInstanceID, false, "", domain)
+			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(tlStep.Substeps)); ok {
+				tlStep.Status = string(status)
+				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
+			}
 		}
 		out = append(out, tlStep)
 	}
@@ -137,9 +149,71 @@ func buildOrgTimelineRows(job Job, step StreamTimelineStep, domain Domain, strea
 			Expanded: !row.Finished,
 			Substeps: buildOrgTimelineTaskSubsteps(job, step.JobID, row.ID, row.Tasks, streamKey, streamInstanceID, !exists, seedField, domain),
 		}
+		if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(group.Substeps)); ok {
+			group.Status = string(status)
+			group.StatusLabel = timelineStatusLabel(group.Status)
+		}
 		rows = append(rows, group)
 	}
 	return rows
+}
+
+// aggregateStreamSubstepStates rolls up child states attention-first: available → pending → locked → done.
+// ok is false when states is empty (no status / omit chip).
+func aggregateStreamSubstepStates(states []StreamSubstepState) (StreamSubstepState, bool) {
+	if len(states) == 0 {
+		return "", false
+	}
+	hasPending := false
+	hasLocked := false
+	allDone := true
+	for _, s := range states {
+		switch s {
+		case StreamSubstepAvailable:
+			return StreamSubstepAvailable, true
+		case StreamSubstepPending:
+			hasPending = true
+			allDone = false
+		case StreamSubstepLocked:
+			hasLocked = true
+			allDone = false
+		case StreamSubstepDone:
+		default:
+			allDone = false
+		}
+	}
+	switch {
+	case hasPending:
+		return StreamSubstepPending, true
+	case hasLocked:
+		return StreamSubstepLocked, true
+	case allDone:
+		return StreamSubstepDone, true
+	default:
+		return "", false
+	}
+}
+
+func timelineChildStatusesFromSubsteps(substeps []TimelineSubstepDTO) []StreamSubstepState {
+	out := make([]StreamSubstepState, 0, len(substeps))
+	for _, sub := range substeps {
+		if sub.Status == "" {
+			continue
+		}
+		out = append(out, StreamSubstepState(sub.Status))
+	}
+	return out
+}
+
+func timelineChildStatusesFromRows(rows []TimelineRowDTO) []StreamSubstepState {
+	out := make([]StreamSubstepState, 0, len(rows))
+	for _, row := range rows {
+		if row.Status == "" {
+			continue
+		}
+		out = append(out, StreamSubstepState(row.Status))
+	}
+	return out
 }
 
 func buildOrgTimelineTaskSubsteps(job Job, jobID, jobInstanceID string, tasks []StreamTimelineTask, streamKey, streamInstanceID string, provisional bool, seedField string, domain Domain) []TimelineSubstepDTO {

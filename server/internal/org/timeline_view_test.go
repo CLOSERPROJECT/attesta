@@ -110,6 +110,190 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	}
 }
 
+func TestBuildOrgTimelineStepsStatusRollup(t *testing.T) {
+	cfg := OrgConfig{
+		Jobs: OrderedObject{
+			Keys: []string{"once_mixed", "once_done", "each_action", "each_done", "each_empty", "each_finished"},
+			Values: map[string]any{
+				"once_mixed": Job{
+					Title: "Once mixed",
+					Tasks: []TaskConfig{
+						{"id": "a", "title": "A"},
+						{"id": "b", "title": "B"},
+					},
+				},
+				"once_done": Job{
+					Title: "Once done",
+					Tasks: []TaskConfig{
+						{"id": "a", "title": "A"},
+						{"id": "b", "title": "B"},
+					},
+				},
+				"each_action": Job{
+					Title:      "Each action",
+					InstanceID: "$.lotId",
+					Tasks: []TaskConfig{
+						{"id": "start", "title": "Start"},
+						{"id": "weigh", "title": "Weigh", "submit": "many"},
+					},
+				},
+				"each_done": Job{
+					Title:      "Each done",
+					InstanceID: "$.lotId",
+					Tasks: []TaskConfig{
+						{"id": "start", "title": "Start"},
+						{"id": "weigh", "title": "Weigh", "submit": "many"},
+					},
+				},
+				"each_empty": Job{
+					Title:      "Each empty",
+					InstanceID: "$.lotId",
+					Tasks: []TaskConfig{
+						{"id": "start", "title": "Start"},
+					},
+				},
+				"each_finished": Job{
+					Title:      "Each finished",
+					InstanceID: "$.lotId",
+					Tasks: []TaskConfig{
+						{"id": "start", "title": "Start"},
+						{"id": "weigh", "title": "Weigh", "submit": "many"},
+					},
+				},
+			},
+		},
+	}
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{
+		{JobID: "once_mixed", ID: "T1"},
+		{JobID: "once_done", ID: "T1"},
+		{JobID: "each_action", ID: "L1"},
+		{JobID: "each_done", ID: "L1"},
+		{JobID: "each_finished", ID: "L1"},
+	}
+	timeline := StreamTimeline{Steps: []StreamTimelineStep{
+		{
+			JobID: "once_mixed", Title: "Once mixed",
+			Tasks: []StreamTimelineTask{
+				{ID: "a", Title: "A", State: StreamSubstepDone},
+				{ID: "b", Title: "B", State: StreamSubstepAvailable},
+			},
+		},
+		{
+			JobID: "once_done", Title: "Once done",
+			Tasks: []StreamTimelineTask{
+				{ID: "a", Title: "A", State: StreamSubstepDone},
+				{ID: "b", Title: "B", State: StreamSubstepDone},
+			},
+		},
+		{
+			JobID: "each_action", Title: "Each action",
+			Rows: []StreamTimelineRow{
+				{
+					ID: "L1", Label: "L1",
+					Tasks: []StreamTimelineTask{
+						{ID: "start", Title: "Start", State: StreamSubstepDone},
+						{ID: "weigh", Title: "Weigh", State: StreamSubstepAvailable},
+					},
+				},
+				{
+					ID: "L2", Label: "L2",
+					Tasks: []StreamTimelineTask{
+						{ID: "start", Title: "Start", State: StreamSubstepDone},
+						{ID: "weigh", Title: "Weigh", State: StreamSubstepDone},
+					},
+				},
+			},
+		},
+		{
+			JobID: "each_done", Title: "Each done",
+			Rows: []StreamTimelineRow{
+				{
+					ID: "L1", Label: "L1", Finished: true,
+					Tasks: []StreamTimelineTask{
+						{ID: "start", Title: "Start", State: StreamSubstepDone},
+						{ID: "weigh", Title: "Weigh", State: StreamSubstepDone},
+					},
+				},
+			},
+		},
+		{
+			JobID: "each_empty", Title: "Each empty",
+			Rows: []StreamTimelineRow{},
+		},
+		{
+			JobID: "each_finished", Title: "Each finished",
+			Rows: []StreamTimelineRow{
+				{
+					ID: "L1", Label: "L1", Finished: true,
+					Tasks: []StreamTimelineTask{
+						{ID: "start", Title: "Start", State: StreamSubstepDone},
+						{ID: "weigh", Title: "Weigh", State: StreamSubstepAvailable},
+					},
+				},
+			},
+		},
+	}}
+
+	steps := BuildOrgTimelineSteps(cfg, domain, timeline, "recycling", "T1")
+	if len(steps) != 6 {
+		t.Fatalf("steps = %#v", steps)
+	}
+
+	if steps[0].Status != string(StreamSubstepAvailable) {
+		t.Fatalf("once-step mixed → available, got %q", steps[0].Status)
+	}
+	if steps[1].Status != string(StreamSubstepDone) {
+		t.Fatalf("all done → done, got %q", steps[1].Status)
+	}
+	if steps[2].Status != string(StreamSubstepAvailable) {
+		t.Fatalf("each-step one actionable row → available, got %q", steps[2].Status)
+	}
+	if steps[2].Rows[0].Status != string(StreamSubstepAvailable) {
+		t.Fatalf("actionable row status = %q", steps[2].Rows[0].Status)
+	}
+	if steps[3].Status != string(StreamSubstepDone) {
+		t.Fatalf("each-step all rows done → done, got %q", steps[3].Status)
+	}
+	if steps[3].Rows[0].Status != string(StreamSubstepDone) {
+		t.Fatalf("done row status = %q", steps[3].Rows[0].Status)
+	}
+	if steps[4].Status != "" || steps[4].StatusLabel != "" {
+		t.Fatalf("each-step 0 rows → empty status, got status=%q label=%q", steps[4].Status, steps[4].StatusLabel)
+	}
+	if steps[5].Rows[0].Status != string(StreamSubstepAvailable) {
+		t.Fatalf("finished-ish row still with available child → available, got %q", steps[5].Rows[0].Status)
+	}
+	if steps[5].Status != string(StreamSubstepAvailable) {
+		t.Fatalf("finished-ish step rollup → available, got %q", steps[5].Status)
+	}
+	if steps[0].StatusLabel != string(StreamSubstepAvailable) {
+		t.Fatalf("StatusLabel parity = %q", steps[0].StatusLabel)
+	}
+}
+
+func TestTimelineAggregateStreamSubstepStates(t *testing.T) {
+	if _, ok := aggregateStreamSubstepStates(nil); ok {
+		t.Fatal("empty must omit")
+	}
+	got, ok := aggregateStreamSubstepStates([]StreamSubstepState{StreamSubstepDone, StreamSubstepAvailable, StreamSubstepLocked})
+	if !ok || got != StreamSubstepAvailable {
+		t.Fatalf("attention-first available = %q ok=%v", got, ok)
+	}
+	got, ok = aggregateStreamSubstepStates([]StreamSubstepState{StreamSubstepLocked, StreamSubstepPending})
+	if !ok || got != StreamSubstepPending {
+		t.Fatalf("pending over locked = %q ok=%v", got, ok)
+	}
+	got, ok = aggregateStreamSubstepStates([]StreamSubstepState{StreamSubstepDone, StreamSubstepLocked})
+	if !ok || got != StreamSubstepLocked {
+		t.Fatalf("locked over done = %q ok=%v", got, ok)
+	}
+	got, ok = aggregateStreamSubstepStates([]StreamSubstepState{StreamSubstepDone, StreamSubstepDone})
+	if !ok || got != StreamSubstepDone {
+		t.Fatalf("all done = %q ok=%v", got, ok)
+	}
+}
+
 func TestOrgTimelineSubmissionsSkipsEmpty(t *testing.T) {
 	if got := OrgTimelineSubmissions(EmptyDomain(), "intake", "T1", "arrive"); got != nil {
 		t.Fatalf("empty = %#v", got)
