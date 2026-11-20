@@ -141,20 +141,75 @@
 	border-radius: var(--radius) 0 0 var(--radius);
 }
 
-/* Flush siblings: top edge uses instance elev so a hairline shows between tasks. */
+/*
+ * Flush siblings: 4px separator via shadow (not border), so hover keeps a uniform 1px primary edge.
+ * Clear shadow on the hovered item and the next sibling so it does not cover that edge.
+ */
 .org-timeline-page .stream-timeline-substeps > .substep + .substep {
-	border-top-color: var(--org-elev-2);
+	box-shadow: 0 -4px 0 0 var(--org-elev-2);
 }
 
-/* Hairline must not cover the primary hover edge (self or previous sibling). */
 .org-timeline-page .stream-timeline-substeps > .substep + .substep:hover,
 .org-timeline-page .stream-timeline-substeps > .substep:hover + .substep {
-	border-top-color: var(--primary);
+	box-shadow: none;
 }
 
-.org-timeline-page .substep-embed [data-slot='tabs-list'],
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
 	background: var(--org-elev-3);
+}
+
+/* Embed Form/Recap: compact right-aligned segmented control (bordered list, no underline) */
+.org-timeline-page .substep-embed [data-slot='tabs-list'].embed-tabs-list {
+	/* Match embed-panel-body left pad so the control lines up with the form. */
+	margin-left: var(--space-3);
+	margin-right: auto;
+	width: auto;
+	height: auto;
+	min-width: 0;
+	flex-shrink: 0;
+	gap: var(--space-1);
+	padding: var(--space-1);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--org-elev-3);
+	justify-content: flex-start;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger {
+	flex: 0 0 auto;
+	height: auto;
+	min-height: 0;
+	gap: calc(var(--space-1) * 0.75);
+	padding: calc(var(--space-1) * 0.75) var(--space-2);
+	border: none;
+	border-radius: calc(var(--radius) * 0.75);
+	box-shadow: none;
+	background: transparent;
+	color: var(--foreground);
+	justify-content: center;
+	text-align: center;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger svg {
+	width: 0.875rem;
+	height: 0.875rem;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger::after {
+	content: none;
+	display: none;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger:hover {
+	background: color-mix(in srgb, var(--foreground) 6%, transparent);
+	color: var(--foreground);
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger[data-state='active'],
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger[data-active] {
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--foreground);
+	box-shadow: none;
 }
 
 /*
@@ -305,10 +360,14 @@
 	background-color: color-mix(in srgb, var(--stream-active) 12%, transparent);
 }
 
-.org-timeline-page .timeline-header-trail .status[data-status='done'],
-.org-timeline-page .timeline-header-trail .status[data-status='locked'] {
+.org-timeline-page .timeline-header-trail .status[data-status='done'] {
 	color: var(--stream-done);
 	background-color: color-mix(in srgb, var(--stream-done) 12%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='locked'] {
+	color: color-mix(in srgb, var(--stream-done) 70%, var(--foreground));
+	background-color: color-mix(in srgb, var(--stream-done) 28%, transparent);
 }
 
 .org-timeline-page .timeline-header-trail .status[data-status='terminated'] {

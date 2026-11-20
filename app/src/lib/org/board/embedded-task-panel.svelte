@@ -1,7 +1,8 @@
 <script lang="ts">
+	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
+	import HistoryIcon from '@lucide/svelte/icons/history';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Tabs from '#lib/shadcn/ui/tabs/index.js';
-	import { cn } from '#lib/shadcn/utils.js';
 	import * as m from '#lib/paraglide/messages.js';
 
 	import type { CommitOutcome } from '../commit-port.js';
@@ -79,27 +80,27 @@
 		{#if open}
 			<Tabs.List
 				variant="line"
-				class={cn(
-					'flex h-auto w-full min-w-0 shrink-0 rounded-none border-b border-border p-0'
-				)}
+				class="embed-tabs-list"
 				data-testid={submitMany ? 'embed-form-recap-tabs' : undefined}
 				aria-label={submitMany ? undefined : m.embed_tab_form()}
 			>
 				<Tabs.Trigger
 					value="form"
-					class="h-auto min-h-9 flex-1 justify-center rounded-none px-0 py-2 text-center shadow-none hover:bg-black/5 hover:text-foreground"
+					class="embed-tabs-trigger"
 					data-testid="embed-tab-form"
 					onclick={() => selectTab('form')}
 				>
+					<ClipboardListIcon data-icon="inline-start" aria-hidden="true" />
 					{m.embed_tab_form()}
 				</Tabs.Trigger>
 				{#if submitMany}
 					<Tabs.Trigger
 						value="recap"
-						class="h-auto min-h-9 flex-1 justify-center rounded-none px-0 py-2 text-center shadow-none hover:bg-black/5 hover:text-foreground"
+						class="embed-tabs-trigger"
 						data-testid="embed-tab-recap"
 						onclick={() => selectTab('recap')}
 					>
+						<HistoryIcon data-icon="inline-start" aria-hidden="true" />
 						{m.embed_tab_recap()}
 					</Tabs.Trigger>
 				{/if}
