@@ -141,19 +141,6 @@
 	border-radius: var(--radius) 0 0 var(--radius);
 }
 
-/*
- * Flush siblings: 4px separator via shadow (not border), so hover keeps a uniform 1px primary edge.
- * Clear shadow on the hovered item and the next sibling so it does not cover that edge.
- */
-.org-timeline-page .stream-timeline-substeps > .substep + .substep {
-	box-shadow: 0 -4px 0 0 var(--org-elev-2);
-}
-
-.org-timeline-page .stream-timeline-substeps > .substep + .substep:hover,
-.org-timeline-page .stream-timeline-substeps > .substep:hover + .substep {
-	box-shadow: none;
-}
-
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
 	background: var(--org-elev-3);
 }
@@ -213,16 +200,15 @@
 }
 
 /*
- * Nest hover: recolor only (widths fixed above). :has() so only the hovered nest paints.
+ * Nest hover: recolor only. Child list :hover (incl. gaps) suppresses the parent nest
+ * so pointer travel across gap does not flash the instance/step.
  */
-.org-timeline-page .stream-timeline-step:hover:not(
-	:has(.stream-timeline-row-accordion:hover, .substep:hover)
-) {
+.org-timeline-page .stream-timeline-step:hover:not(:has(.stream-timeline-rows:hover, .stream-timeline-substeps:hover)) {
 	background: var(--org-elev-1);
 	border-color: var(--primary);
 }
 
-.org-timeline-page .stream-timeline-row-accordion:hover:not(:has(.substep:hover)) {
+.org-timeline-page .stream-timeline-row-accordion:hover:not(:has(.stream-timeline-substeps:hover)) {
 	background: var(--org-elev-2);
 	border-color: var(--primary);
 }
@@ -231,11 +217,20 @@
 .org-timeline-page .substep-available:hover,
 .org-timeline-page .substep-active:hover,
 .org-timeline-page .substep-done:hover,
-.org-timeline-page .substep-locked:hover,
 .org-timeline-page .substep-skipped:hover {
 	background: var(--org-elev-3);
 	border-color: var(--primary);
 	opacity: 1;
+}
+
+/* Locked: white elev (undo Formata card opacity); no primary hover — mark + title only. */
+.org-timeline-page .substep-locked {
+	opacity: 1;
+}
+
+.org-timeline-page .substep-locked .timeline-header-index,
+.org-timeline-page .substep-locked .timeline-header-title {
+	opacity: 0.4;
 }
 
 /* --- One-line headers; Lucide chevrons share one absolute column from each row’s right edge --- */
@@ -381,7 +376,8 @@
 }
 
 /*
- * Sibling gaps: form 1px, substeps flush, rows/instances 13px, steps 17px.
+ * Sibling gaps: form 1px, substeps 4px (instance elev shows through), rows 13px, steps 17px.
+ * Substep/row list boxes catch pointer in the gap so parent nest hover stays off.
  */
 .org-timeline-page .substep-org-body,
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
@@ -389,7 +385,7 @@
 }
 
 .org-timeline-page .stream-timeline-substeps {
-	gap: 0;
+	gap: 4px;
 }
 
 .org-timeline-page .stream-timeline-rows {
