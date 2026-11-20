@@ -293,28 +293,69 @@
 	max-width: calc(100% - var(--org-pad-l));
 	margin-left: var(--org-pad-l);
 	margin-right: 0;
-	padding-block: var(--space-3);
+	padding-block: 0;
 	padding-inline: 0;
-}
-
-.org-timeline-page .stream-timeline-row .stream-timeline-substeps {
-	padding-top: 0;
 }
 
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
 	padding: var(--space-3);
 }
 
-/* Open chrome: border under header (embed keeps tabs flush — no margin/border) */
-.org-timeline-page .substep-accordion[data-state='open'] > .substep-accordion-summary:not(.substep-card-link) {
-	margin: 0 0 var(--space-3);
-	border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+/*
+ * Open headers: bottom border = layer behind (parent elev).
+ * Content: top padding under that hairline.
+ */
+.org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
+	border-bottom: 1px solid var(--org-elev-0);
 }
 
-.substep-embed-host.substep-accordion[data-state='open'] > .substep-accordion-summary,
-.substep-embed-host[data-state='open'] > .substep-accordion-summary {
-	margin-bottom: 0;
-	border-bottom: none;
+.org-timeline-page .stream-timeline-row-accordion[data-state='open'] > .stream-timeline-row-summary {
+	border-bottom: 1px solid var(--org-elev-1);
+}
+
+/* Substep under instance → elev-2; under step (no rows) → elev-1 */
+.org-timeline-page
+	.stream-timeline-row
+	.stream-timeline-substeps
+	> .substep
+	.substep-accordion[data-state='open']
+	> .substep-accordion-summary,
+.org-timeline-page
+	.stream-timeline-row
+	.stream-timeline-substeps
+	> .substep
+	.substep-embed-host[data-state='open']
+	> .substep-accordion-summary {
+	border-bottom: 1px solid var(--org-elev-2);
+}
+
+.org-timeline-page
+	.stream-timeline-step
+	> [data-slot='collapsible-content']
+	> .stream-timeline-substeps
+	> .substep
+	.substep-accordion[data-state='open']
+	> .substep-accordion-summary,
+.org-timeline-page
+	.stream-timeline-step
+	> [data-slot='collapsible-content']
+	> .stream-timeline-substeps
+	> .substep
+	.substep-embed-host[data-state='open']
+	> .substep-accordion-summary {
+	border-bottom: 1px solid var(--org-elev-1);
+}
+
+.org-timeline-page .stream-timeline-step[data-state='open'] > [data-slot='collapsible-content'],
+.org-timeline-page
+	.stream-timeline-row-accordion[data-state='open']
+	> [data-slot='collapsible-content'],
+.org-timeline-page .substep-accordion[data-state='open'] > [data-slot='collapsible-content'],
+.org-timeline-page
+	.substep-embed-host[data-state='open']
+	> .substep-accordion-summary
+	+ div {
+	padding-top: var(--space-3);
 }
 
 /* Submissions trigger: Accordion-like muted text + Lucide via Collapsible.Trigger */
