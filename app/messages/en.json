@@ -56,6 +56,7 @@
 	"back_to_stream_dashboard": "Back to dashboard",
 	"qr_resolve_failed": "QR resolve failed",
 	"org_domain_load_failed": "org domain load failed ({status})",
+	"org_timeline_load_failed": "org timeline load failed ({status})",
 	"org_commit_failed": "org commit failed ({status})",
 	"org_qr_resolve_failed": "org qr-resolve failed ({status})",
 	"org_task_form_failed": "org task-form failed ({status})",

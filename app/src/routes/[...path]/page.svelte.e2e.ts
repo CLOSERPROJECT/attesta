@@ -3,7 +3,38 @@ import { expect, test, type Page } from '@playwright/test';
 const stream = 'recycling';
 const instance = 'NIR-1';
 const homePath = `/app/${stream}/i/${instance}`;
-const timelinePath = `/my/streams/org-${stream}/instance/${instance}`;
+
+const timelineStub = {
+	stream,
+	instance,
+	label: 'Camion A',
+	status: 'active',
+	steps: [
+		{
+			stepId: '1',
+			title: 'Ingresso',
+			substepCount: 2,
+			expanded: true,
+			substeps: [
+				{
+					substepId: 'intake.register',
+					title: 'Registrazione',
+					status: 'available',
+					statusLabel: 'available',
+					orgActionable: true,
+					href: `${homePath}/intake/${instance}/register`
+				},
+				{
+					substepId: 'intake.palletWeight',
+					title: 'Peso pallet',
+					status: 'locked',
+					statusLabel: 'locked',
+					blockedReason: 'Linea occupata: lotto L2 (camion T-B)'
+				}
+			]
+		}
+	]
+};
 
 const homeLoad = {
 	org: 'feragame',
@@ -88,6 +119,13 @@ async function stubOrgApis(page: Page) {
 			body: JSON.stringify(homeLoad)
 		});
 	});
+	await page.route('**/api/org/timeline**', async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify(timelineStub)
+		});
+	});
 	await page.route('**/api/org/task-form**', async (route) => {
 		const url = new URL(route.request().url());
 		const jobId = url.searchParams.get('jobId') ?? 'intake';
@@ -122,10 +160,14 @@ async function stubOrgApis(page: Page) {
 	});
 }
 
-test('instance route redirects to /my instance timeline', async ({ page }) => {
+test('instance route renders SPA timeline home', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(homePath);
-	await expect(page).toHaveURL(timelinePath);
+	await expect(page).toHaveURL(homePath);
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
+	await expect(page.getByTestId('instance-chrome-label')).toHaveText('Camion A');
+	await expect(page.locator('.js-show-all-filter')).toBeVisible();
+	await expect(page.locator('.substep-card-link')).toBeVisible();
 });
 
 test('Can start (each Job) → nav-back → timeline', async ({ page }) => {
@@ -135,7 +177,8 @@ test('Can start (each Job) → nav-back → timeline', async ({ page }) => {
 	await expect(page.getByTestId('task-startLot')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
-	await expect(page).toHaveURL(timelinePath);
+	await expect(page).toHaveURL(homePath);
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
 test('act-now task → nav-back → timeline', async ({ page }) => {
@@ -145,7 +188,8 @@ test('act-now task → nav-back → timeline', async ({ page }) => {
 	await expect(page.getByTestId('task-register')).toBeVisible();
 	await expect(page.getByTestId('nav-back')).toBeVisible();
 	await page.getByTestId('nav-back').click();
-	await expect(page).toHaveURL(timelinePath);
+	await expect(page).toHaveURL(homePath);
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
 test('unavailable Task shows blockedReason', async ({ page }) => {
@@ -159,7 +203,7 @@ test('unavailable Task shows blockedReason', async ({ page }) => {
 
 test('unauthorized Task URL redirects to instance timeline', async ({ page }) => {
 	await stubOrgApis(page);
-	// available (other role) → not unavailable → redirect home → timeline
+	// available (other role) → not unavailable → redirect home → SPA timeline
 	const loadOtherRole = {
 		...homeLoad,
 		worklist: {
@@ -186,13 +230,15 @@ test('unauthorized Task URL redirects to instance timeline', async ({ page }) =>
 		});
 	});
 	await page.goto(`${homePath}/intake/${instance}/palletWeight`);
-	await expect(page).toHaveURL(timelinePath);
+	await expect(page).toHaveURL(homePath);
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
 test('unknown Task instance redirects to instance timeline', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(`${homePath}/intake/missing/register`);
-	await expect(page).toHaveURL(timelinePath);
+	await expect(page).toHaveURL(homePath);
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
 test('Play route shows stream chrome', async ({ page }) => {
@@ -216,9 +262,14 @@ test('Play route shows stream chrome', async ({ page }) => {
 
 test('start Task seed.* is stripped from the URL', async ({ page }) => {
 	await stubOrgApis(page);
-	await page.goto(`${homePath}/intake/new/register?seed.lotId=L-wait&keep=1`);
+	// Provisional start needs Worklist canStart (intake is suppressed on instance scope).
+	await page.goto(
+		`${homePath}/lot_processing/new/startLot?seed.lotId=L-wait&keep=1`
+	);
 	await expect(page.getByTestId('task-route')).toBeVisible();
 	await expect(page).toHaveURL(
-		new RegExp(`/app/${stream}/i/${instance}/intake/new/register\\?keep=1$`)
+		new RegExp(
+			`/app/${stream}/i/${instance}/lot_processing/new/startLot\\?keep=1$`
+		)
 	);
 });

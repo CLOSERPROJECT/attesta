@@ -6,10 +6,7 @@
 	import { p } from '../router/index.js';
 	import { hrefOrgTarget } from '../router/navigate-target.js';
 	import { draftAddressForTask } from './drafts.js';
-	import {
-		orgMyInstancePath,
-		streamInstanceLabel
-	} from './nav-place.js';
+	import { streamInstanceLabel } from './nav-place.js';
 	import { orgSession } from './org-app.svelte.js';
 	import ManySubmitHistory from './many-submit-history.svelte';
 	import { fetchStreamTitle } from './stream-meta.js';
@@ -49,7 +46,6 @@
 	const instanceLabel = $derived(
 		streamInstanceLabel(orgSession.result?.worklist, instance) || instance
 	);
-	const timelineHref = $derived(orgMyInstancePath(stream, instance));
 	const titleText = $derived(streamTitle || stream);
 
 	function rowHasDirtyDraft(row: Extract<ActNowRow, { kind: 'task' }>): boolean {
@@ -69,16 +65,6 @@
 		<p class="text-lg font-semibold text-zinc-900" data-testid="instance-chrome-label">
 			{instanceLabel}
 		</p>
-		<a
-			href={timelineHref}
-			class="inline-block text-sm text-zinc-600 underline-offset-2 hover:underline"
-			data-testid="instance-chrome-timeline"
-			data-sveltekit-reload
-			rel="external"
-			target="_self"
-		>
-			{m.back_to_timeline()}
-		</a>
 	</header>
 
 	{#if !orgSession.result && orgSession.loading}

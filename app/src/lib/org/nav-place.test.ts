@@ -156,10 +156,8 @@ describe('§6 Routes table (pathname after /app base strip)', () => {
 		expect(orgPathSegments('/recycling/i/T1/')).toEqual(['recycling', 'i', 'T1']);
 	});
 
-	test('orgMyInstancePath is /my timeline for stream instance', () => {
-		expect(orgMyInstancePath('recycling', 'T1')).toBe(
-			'/my/streams/org-recycling/instance/T1'
-		);
+	test('orgMyInstancePath is SPA instance home', () => {
+		expect(orgMyInstancePath('recycling', 'T1')).toBe('/recycling/i/T1');
 	});
 
 	test('streamInstanceLabel reads anchor instance label from Worklist', () => {

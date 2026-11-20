@@ -23,9 +23,9 @@ export function orgMyDashboardPath(stream: string): string {
 	return `/my/streams/org-${stream}/`;
 }
 
-/** `/my` instance timeline for an Org stream instance. */
+/** SPA instance home (timeline). Legacy /my Org instance URLs redirect here. */
 export function orgMyInstancePath(stream: string, instance: string): string {
-	return `/my/streams/org-${stream}/instance/${instance}`;
+	return `/${stream}/i/${instance}`;
 }
 
 /** Anchor / stream-instance label from the filtered Worklist (truck id). */

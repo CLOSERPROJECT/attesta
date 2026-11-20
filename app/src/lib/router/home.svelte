@@ -1,19 +1,15 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
+	import OrgTimeline from '../org/timeline/org-timeline.svelte';
 	import { orgRouteCoordsFromPath } from '../org/nav-place.js';
 	import { route } from './index.js';
-	import { orgMyInstanceTimelinePath } from './navigate-target.js';
 
 	const coords = $derived(orgRouteCoordsFromPath({ pathname: route.pathname }));
-
-	onMount(() => {
-		if (coords.stream && coords.instance) {
-			window.location.replace(orgMyInstanceTimelinePath(coords.stream, coords.instance));
-		} else {
-			window.location.replace('/my');
-		}
-	});
+	const stream = $derived(coords.stream);
+	const instance = $derived(coords.instance);
 </script>
 
-<p class="text-sm text-zinc-500" data-testid="org-home-redirect">Redirecting…</p>
+{#if stream && instance}
+	<OrgTimeline {stream} {instance} />
+{:else}
+	<p class="text-sm text-zinc-500" data-testid="org-home-missing">Missing stream or instance.</p>
+{/if}

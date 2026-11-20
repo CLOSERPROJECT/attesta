@@ -11,6 +11,10 @@ const orgFixturesDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
 	'../server/internal/org/fixtures'
 );
+const attestaStylesDir = path.resolve(
+	path.dirname(fileURLToPath(import.meta.url)),
+	'../web/src/styles'
+);
 
 export default defineConfig({
 	plugins: [
@@ -52,7 +56,7 @@ export default defineConfig({
 			host: process.env.VITE_HMR_HOST || 'localhost'
 		},
 		fs: {
-			allow: [orgFixturesDir]
+			allow: [orgFixturesDir, attestaStylesDir]
 		}
 	},
 	preview: {

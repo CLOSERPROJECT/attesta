@@ -33,8 +33,8 @@ function asScope(stream: string, instance: string): StreamNavScope {
 
 /**
  * Post-Commit SPA decision from server `navigation` only (ADR-0006).
- * Stay is never inferred from HTTP links. `home` is remapped to the /my
- * instance timeline by navigate-target (not instance Worklist).
+ * Stay is never inferred from HTTP links. `home` is SPA instance timeline
+ * (`/:stream/i/:instance`) via navigate-target.
  */
 export function resolveCommitFollowUp(
 	navigation: CommitNavigation,

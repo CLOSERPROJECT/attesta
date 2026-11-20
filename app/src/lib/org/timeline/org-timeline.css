@@ -1,0 +1,96 @@
+/* Org SPA timeline — reuse Attesta /my process chrome (tokens + components). */
+@import '../../../../../web/src/styles/breakpoints.css';
+@import '../../../../../web/src/styles/tokens.css';
+@import '../../../../../web/src/styles/role-palette.css';
+@import '../../../../../web/src/styles/utilities.css';
+@import '../../../../../web/src/styles/components/shared.css';
+@import '../../../../../web/src/styles/components/empty-state.css';
+@import '../../../../../web/src/styles/components/stream-step-summary.css';
+@import '../../../../../web/src/styles/components/stream-timeline.css';
+@import '../../../../../web/src/styles/components/substep-shell.css';
+
+.org-timeline-page {
+	min-width: 0;
+	max-width: 80rem;
+	margin-inline: auto;
+}
+
+.org-timeline-header {
+	margin-bottom: var(--space-4);
+}
+
+.org-timeline-header-stream {
+	margin: 0;
+	font-size: var(--text-xs);
+	color: var(--secondary-foreground);
+}
+
+.org-timeline-header-label {
+	margin: var(--space-1) 0 0;
+	font-size: var(--text-lg);
+	font-weight: var(--font-semibold);
+	color: var(--foreground);
+}
+
+.process-stream-block {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.stream-show-all-filter {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	margin-bottom: var(--space-3);
+}
+
+.stream-show-all-filter-label {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-sm);
+	color: var(--secondary-foreground);
+	cursor: pointer;
+	user-select: none;
+	background-color: var(--background);
+	border: 1px solid var(--border);
+	border-radius: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	padding-right: var(--space-3);
+}
+
+.stream-show-all-filter-label input[type='checkbox'] {
+	accent-color: var(--primary);
+}
+
+.stream-show-all-filter-label:hover,
+.stream-show-all-filter-label:has(input[type='checkbox']:checked) {
+	background-color: var(--success-muted);
+	border-color: var(--primary);
+}
+
+.stream-show-all-filter-root.is-actionable-only
+	.substep:not([data-org-actionable='true']) {
+	display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only
+	.stream-timeline-row:not(:has(.substep[data-org-actionable='true'])) {
+	display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only
+	.stream-timeline-step:not(:has(.substep[data-org-actionable='true'])) {
+	display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only.is-actionable-only-empty
+	.stream-timeline-list {
+	display: none;
+}
+
+.substep-org-body {
+	display: grid;
+	gap: var(--space-2);
+}

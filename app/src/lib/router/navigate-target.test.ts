@@ -15,7 +15,8 @@ vi.mock('./index.js', () => ({
 import {
 	hrefOrgTarget,
 	orgMyInstanceTimelinePath,
-	orgMyStreamDashboardPath
+	orgMyStreamDashboardPath,
+	orgSpaInstanceHomePath
 } from './navigate-target.js';
 
 describe('hrefOrgTarget', () => {
@@ -30,16 +31,19 @@ describe('hrefOrgTarget', () => {
 		expect(orgMyStreamDashboardPath('recycling')).toBe('/my/streams/org-recycling/');
 	});
 
-	test('home target is /my instance timeline', () => {
+	test('home target is SPA instance timeline', () => {
 		expect(
 			hrefOrgTarget({
 				kind: 'home',
 				stream: 'recycling',
 				instance: '261102-1'
 			})
-		).toBe('/my/streams/org-recycling/instance/261102-1');
+		).toBe('/app/recycling/i/261102-1');
+		expect(orgSpaInstanceHomePath('recycling', '261102-1')).toBe(
+			'/app/recycling/i/261102-1'
+		);
 		expect(orgMyInstanceTimelinePath('recycling', '261102-1')).toBe(
-			'/my/streams/org-recycling/instance/261102-1'
+			'/app/recycling/i/261102-1'
 		);
 	});
 

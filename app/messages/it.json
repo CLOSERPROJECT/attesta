@@ -56,6 +56,7 @@
 	"back_to_stream_dashboard": "Torna alla dashboard",
 	"qr_resolve_failed": "Risoluzione QR non riuscita",
 	"org_domain_load_failed": "caricamento dominio org non riuscito ({status})",
+	"org_timeline_load_failed": "caricamento timeline org non riuscito ({status})",
 	"org_commit_failed": "commit org non riuscito ({status})",
 	"org_qr_resolve_failed": "risoluzione qr org non riuscita ({status})",
 	"org_task_form_failed": "caricamento modulo task non riuscito ({status})",

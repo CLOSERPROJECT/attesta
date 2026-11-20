@@ -6,9 +6,16 @@ export function orgMyStreamDashboardPath(stream: string): string {
 	return `/my/streams/org-${stream}/`;
 }
 
-/** Org catalog instance timeline — Commit `home` and instance route land here. */
+/** SPA instance home (timeline). Prefer this over legacy /my Org instance URLs. */
+export function orgSpaInstanceHomePath(stream: string, instance: string): string {
+	return p('/:stream/i/:instance', {
+		params: { stream, instance }
+	});
+}
+
+/** @deprecated Use orgSpaInstanceHomePath — kept for call sites that still name /my. */
 export function orgMyInstanceTimelinePath(stream: string, instance: string): string {
-	return `/my/streams/org-${stream}/instance/${instance}`;
+	return orgSpaInstanceHomePath(stream, instance);
 }
 
 /** Resolve ADR-0006 / ADR-0014 target to an href for `<a>` / Button `href` navigation. */
@@ -20,7 +27,7 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 		return orgMyStreamDashboardPath(target.stream);
 	}
 	if (target.kind === 'home') {
-		return orgMyInstanceTimelinePath(target.stream, target.instance);
+		return orgSpaInstanceHomePath(target.stream, target.instance);
 	}
 	return p('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 		params: {
@@ -35,12 +42,20 @@ export function hrefOrgTarget(target: PostCommitTarget): string {
 
 /** Programmatic navigate; return value is for `throw` inside sv-router hooks. */
 export function navigateOrgTargetAsync(target: PostCommitTarget): Promise<unknown> {
-	if (target.kind === 'my' || target.kind === 'myStream' || target.kind === 'home') {
+	if (target.kind === 'my' || target.kind === 'myStream') {
 		const href = hrefOrgTarget(target);
 		if (typeof window !== 'undefined') {
 			window.location.assign(href);
 		}
 		return Promise.resolve();
+	}
+	if (target.kind === 'home') {
+		return navigate('/:stream/i/:instance', {
+			params: {
+				stream: target.stream,
+				instance: target.instance
+			}
+		});
 	}
 	return navigate('/:stream/i/:instance/:jobId/:jobInstanceId/:taskId', {
 		params: {
