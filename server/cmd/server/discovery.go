@@ -53,30 +53,40 @@ func (s *Server) listDiscoveryStreams(ctx context.Context, user *AccountUser) ([
 	if orgSlug == "" {
 		return nil, nil
 	}
-	catalog, err := s.workflowCatalog()
-	if err != nil {
-		// Home chrome should still render when the catalog is unloadable.
-		return nil, nil
-	}
 
 	var startable, rest []StreamDiscoveryItem
-	for _, key := range sortedWorkflowKeys(catalog) {
-		cfg := catalog[key]
-		if !streamInvolvesOrg(cfg, orgSlug) {
-			continue
+	catalog, err := s.workflowCatalog()
+	if err == nil {
+		for _, key := range sortedWorkflowKeys(catalog) {
+			cfg := catalog[key]
+			if !streamInvolvesOrg(cfg, orgSlug) {
+				continue
+			}
+			canStart := streamIsStartable(user, cfg)
+			item := StreamDiscoveryItem{
+				WorkflowKey:     key,
+				WorkflowName:    strings.TrimSpace(cfg.Workflow.Name),
+				Description:     normalizeOptionalText(cfg.Workflow.Description),
+				CategorySlug:    strings.TrimSpace(cfg.Workflow.CategorySlug),
+				SubCategorySlug: strings.TrimSpace(cfg.Workflow.SubCategorySlug),
+				Href:            streamPath(key) + "/",
+				Startable:       canStart,
+			}
+			if canStart {
+				item.StartAction = streamPath(key) + "/instance/start"
+				startable = append(startable, item)
+				continue
+			}
+			rest = append(rest, item)
 		}
-		canStart := streamIsStartable(user, cfg)
-		item := StreamDiscoveryItem{
-			WorkflowKey:     key,
-			WorkflowName:    strings.TrimSpace(cfg.Workflow.Name),
-			Description:     normalizeOptionalText(cfg.Workflow.Description),
-			CategorySlug:    strings.TrimSpace(cfg.Workflow.CategorySlug),
-			SubCategorySlug: strings.TrimSpace(cfg.Workflow.SubCategorySlug),
-			Href:            streamPath(key) + "/",
-			Startable:       canStart,
-		}
-		if canStart {
-			item.StartAction = streamPath(key) + "/instance/start"
+	}
+	// Home chrome still renders when the Formata catalog is unloadable; Org streams are independent.
+	orgItems, orgErr := s.listOrgDiscoveryStreams(ctx, user)
+	if orgErr != nil {
+		return nil, orgErr
+	}
+	for _, item := range orgItems {
+		if item.Startable {
 			startable = append(startable, item)
 			continue
 		}

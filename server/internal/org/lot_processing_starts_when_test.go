@@ -13,7 +13,7 @@ func TestFixtureLotProcessingHasNoStartsWhen(t *testing.T) {
 	if !lp.Repeatable {
 		t.Fatal("lot_processing must stay repeatable")
 	}
-	want := []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot"}
+	want := []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot", "lock"}
 	got := OrderedTaskIDs(lp.Tasks)
 	if len(got) != len(want) {
 		t.Fatalf("lot_processing tasks = %v", got)
@@ -38,12 +38,13 @@ func TestCommitStartLotViaCerbosAfterIntake(t *testing.T) {
 	defer pdp.Close()
 
 	c, _, _ := testTaskCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		t.Fatal(err)

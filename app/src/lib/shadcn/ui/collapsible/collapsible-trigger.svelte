@@ -1,0 +1,33 @@
+<script lang="ts">
+	import { Collapsible as CollapsiblePrimitive } from "bits-ui";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
+	import { cn, type WithoutChild } from "#lib/shadcn/utils.js";
+
+	let {
+		ref = $bindable(null),
+		class: className,
+		children,
+		...restProps
+	}: WithoutChild<CollapsiblePrimitive.TriggerProps> = $props();
+</script>
+
+<CollapsiblePrimitive.Trigger
+	bind:ref
+	data-slot="collapsible-trigger"
+	class={cn(
+		"focus-visible:ring-ring/50 focus-visible:border-ring focus-visible:after:border-ring **:data-[slot=accordion-trigger-icon]:text-muted-foreground rounded-md text-left text-sm font-medium hover:underline focus-visible:ring-3 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent transition-all outline-none disabled:pointer-events-none disabled:opacity-50",
+		className
+	)}
+	{...restProps}
+>
+	{@render children?.()}
+	<ChevronDownIcon
+		data-slot="accordion-trigger-icon"
+		class="pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden"
+	/>
+	<ChevronUpIcon
+		data-slot="accordion-trigger-icon"
+		class="pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline"
+	/>
+</CollapsiblePrimitive.Trigger>

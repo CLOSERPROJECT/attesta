@@ -1,6 +1,7 @@
 import type { TaskFormBundle } from './form/task-form-bundle.js';
+import type { StreamScope } from './stream-scope.js';
 
-export type TaskFormRequest = {
+export type TaskFormRequest = StreamScope & {
 	jobId: string;
 	taskId: string;
 	/** Empty / omitted = provisional start; wire may also send `new`. */

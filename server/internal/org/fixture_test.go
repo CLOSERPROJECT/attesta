@@ -70,17 +70,20 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !hasStatus {
 		t.Fatalf("lot.fields = %#v, want status", lotFieldList)
 	}
-	if cfg.Jobs.Len() != 3 {
+	if cfg.Jobs.Len() != 2 {
 		t.Fatalf("jobs len = %d, keys=%v", cfg.Jobs.Len(), cfg.Jobs.Keys)
 	}
-	if got := cfg.Jobs.Keys; len(got) != 3 || got[0] != "intake" || got[1] != "lot_processing" || got[2] != "passport" {
-		t.Fatalf("job order = %v, want [intake lot_processing passport]", got)
+	if got := cfg.Jobs.Keys; len(got) != 2 || got[0] != "intake" || got[1] != "lot_processing" {
+		t.Fatalf("job order = %v, want [intake lot_processing]", got)
 	}
 	if _, ok := cfg.Jobs.Get("workingDay"); ok {
 		t.Fatal("workingDay Job must be dropped")
 	}
 	if _, ok := cfg.Jobs.Get("line"); ok {
 		t.Fatal("line Job must be renamed to lot_processing")
+	}
+	if _, ok := cfg.Jobs.Get("passport"); ok {
+		t.Fatal("passport Job must be folded into lot_processing")
 	}
 	if cfg.DPP == nil || cfg.DPP.Subject.Entity != "lot" {
 		t.Fatalf("passport.subject = %#v", cfg.DPP)
@@ -92,29 +95,6 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	for _, rejected := range []string{"workingDay", "shift", "Giornata", "Turno"} {
 		if strings.Contains(snap, rejected) {
 			t.Fatalf("passport.snapshot must omit %q", rejected)
-		}
-	}
-	passportJob, ok := cfg.Jobs.Get("passport")
-	if !ok {
-		t.Fatal("missing passport Job")
-	}
-	pj := passportJob.(Job)
-	if !pj.Repeatable || pj.Title != "Verifica dati e DPP" || pj.StartLabel != "Emetti DPP" || pj.InstanceID != "$.lotId" {
-		t.Fatalf("passport Job = %#v", pj)
-	}
-	wantPassportTasks := []string{"select", "lock"}
-	if got := OrderedTaskIDs(pj.Tasks); strings.Join(got, ",") != strings.Join(wantPassportTasks, ",") {
-		t.Fatalf("passport tasks = %v", got)
-	}
-	lock, ok := TaskByID(pj.Tasks, "lock")
-	if !ok || !taskOnSubmitDPP(map[string]any(lock)) {
-		t.Fatalf("lock onSubmit.passport = %#v", lock)
-	}
-	for _, id := range wantPassportTasks {
-		task, _ := TaskByID(pj.Tasks, id)
-		roles, _ := task["roles"].([]any)
-		if len(roles) != 1 || roles[0] != "administration" {
-			t.Fatalf("passport/%s roles = %#v, want [administration]", id, task["roles"])
 		}
 	}
 
@@ -133,8 +113,8 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if !okArrive {
 		t.Fatal("truckArrive missing")
 	}
-	if rw, _ := truckArrive["readyWhen"].(string); !strings.Contains(rw, "checkedTruckWeight") {
-		t.Fatalf("truckArrive.readyWhen = %#v, want prior-truck weightCheck gate", truckArrive["readyWhen"])
+	if _, has := truckArrive["readyWhen"]; has {
+		t.Fatalf("truckArrive must omit serialising readyWhen, got %#v", truckArrive["readyWhen"])
 	}
 	wantIntakeTasks := []string{"truckArrive", "register", "weightCheck"}
 	if got := OrderedTaskIDs(intake.Tasks); strings.Join(got, ",") != strings.Join(wantIntakeTasks, ",") {
@@ -194,7 +174,7 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if lp.StartsWhen != nil {
 		t.Fatalf("lot_processing must not have startsWhen, got %#v", lp.StartsWhen)
 	}
-	wantLPTasks := []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot"}
+	wantLPTasks := []string{"startLot", "weigh", "markProgress", "containerReg", "closeLot", "lock"}
 	if got := OrderedTaskIDs(lp.Tasks); strings.Join(got, ",") != strings.Join(wantLPTasks, ",") {
 		t.Fatalf("lot_processing tasks = %v", got)
 	}
@@ -212,6 +192,30 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 			t.Fatalf("lot_processing.%s must omit unlockFrom, got %#v", id, task["unlockFrom"])
 		}
 	}
+	lock, ok := TaskByID(lp.Tasks, "lock")
+	if !ok || !taskOnSubmitDPP(map[string]any(lock)) {
+		t.Fatalf("lock onSubmit.passport = %#v", lock)
+	}
+	if title, _ := lock["title"].(string); title != "Verifica dati e DPP" {
+		t.Fatalf("lock title = %#v, want Verifica dati e DPP", lock["title"])
+	}
+	lockRW, _ := lock["readyWhen"].(string)
+	if strings.Contains(lockRW, "select") || strings.Contains(lockRW, "passport") {
+		t.Fatalf("lock readyWhen must not gate on passport/select: %q", lockRW)
+	}
+	if !strings.Contains(lockRW, "fullyProcessed") || !strings.Contains(lockRW, "locked") {
+		t.Fatalf("lock readyWhen = %q, want fullyProcessed + not locked", lockRW)
+	}
+	lockRoles, _ := lock["roles"].([]any)
+	if len(lockRoles) != 1 || lockRoles[0] != "administration" {
+		t.Fatalf("lot_processing/lock roles = %#v, want [administration]", lock["roles"])
+	}
+	if taskSubmitMany(lock) {
+		t.Fatalf("lock submit = %#v, want once (default)", lock["submit"])
+	}
+	if _, has := lock["onCommit"]; has {
+		t.Fatalf("lot_processing/lock must omit onCommit (default advance), got %#v", lock["onCommit"])
+	}
 	for _, id := range []string{"weigh", "markProgress", "containerReg", "closeLot"} {
 		task, _ := TaskByID(lp.Tasks, id)
 		if !taskSubmitMany(task) {
@@ -226,6 +230,19 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	startRW, _ := startLot["readyWhen"].(string)
 	if !strings.Contains(startRW, `status = "open"`) || !strings.Contains(startRW, "fullyProcessed") {
 		t.Fatalf("startLot.readyWhen = %q, want one-open-lot exclusivity", startRW)
+	}
+	if !strings.Contains(startRW, "truckId = $stream.id") {
+		t.Fatalf("startLot.readyWhen = %q, want truckId = $stream.id (per-truck line-busy)", startRW)
+	}
+	startReads, _ := startLot["reads"].(map[string]any)
+	startLots, _ := startReads["lots"].(map[string]any)
+	startWhere, _ := startLots["where"].(string)
+	if !strings.Contains(startWhere, "truckId = $stream.id") {
+		t.Fatalf("startLot.reads.lots.where = %q, want truckId = $stream.id", startWhere)
+	}
+	startBR, _ := startLot["blockedReason"].(string)
+	if !strings.Contains(startBR, "Linea occupata") {
+		t.Fatalf("startLot.blockedReason = %q, want Linea occupata", startBR)
 	}
 	weigh, _ := TaskByID(lp.Tasks, "weigh")
 	weighRoles, _ := weigh["roles"].([]any)
@@ -283,18 +300,45 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatal("lineLoad group must not remain on lot_processing")
 	}
 
+	if cfg.Stream == nil || cfg.Stream.Key != "recycling" || cfg.Stream.Instance.Job != "intake" {
+		t.Fatalf("stream = %#v, want recycling/intake", cfg.Stream)
+	}
+	if cfg.Stream.CategorySlug != "recycling-and-recovery" || cfg.Stream.SubCategorySlug != "flat-screen-displays" {
+		t.Fatalf("stream category = %#v", cfg.Stream)
+	}
+	if len(cfg.Stream.Steps) != 2 || cfg.Stream.Steps[1].Each == nil || cfg.Stream.Steps[1].Each.Entity != "lot" {
+		t.Fatalf("stream.steps = %#v", cfg.Stream.Steps)
+	}
+
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	body := string(raw)
-	for _, rejected := range []string{`"steps"`, `"substeps"`, `"stepId"`, `"substepId"`, `/api/runs`, `RunStore`, `LoadRunPort`} {
+	// stream.steps is authored; Job tree must speak jobs/tasks (not substeps).
+	for _, rejected := range []string{`"substeps"`, `"stepId"`, `"substepId"`, `/api/runs`, `RunStore`, `LoadRunPort`} {
 		if strings.Contains(body, rejected) {
 			t.Fatalf("serialized config still contains rejected token %q", rejected)
 		}
 	}
 	if !strings.Contains(body, `"jobs"`) || !strings.Contains(body, `"tasks"`) {
 		t.Fatalf("serialized config missing jobs/tasks: %s", body[:min(200, len(body))])
+	}
+}
+
+func TestLoadSecondStreamConfigFixture(t *testing.T) {
+	cfg, err := LoadSecondStreamConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Stream == nil || cfg.Stream.Key != "other" {
+		t.Fatalf("stream = %#v, want key other", cfg.Stream)
+	}
+	if cfg.Org != "second-org" {
+		t.Fatalf("org = %q", cfg.Org)
+	}
+	if _, ok := cfg.Jobs.Get("work"); !ok {
+		t.Fatal("missing work job")
 	}
 }
 
@@ -325,14 +369,14 @@ func TestSeedFixtureConfigStoreSetsActiveVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, err := store.ActiveVersion(t.Context(), cfg.Org)
+	version, err := store.ActiveVersion(t.Context(), mustScope(t, cfg))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if version != DefaultFixtureVersion {
 		t.Fatalf("active = %q", version)
 	}
-	got, err := store.Get(t.Context(), cfg.Org, version)
+	got, err := store.Get(t.Context(), mustScope(t, cfg), version)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,10 +15,12 @@ const sample: LoadResult = {
 	taskFormBundles: []
 };
 
+const scope = { stream: 'recycling', instance: 'T-1' };
+
 describe('HttpLoadDomainPort', () => {
-	test('GET /api/org/domain returns LoadResult (no run id)', async () => {
+	test('GET /api/org/domain sends stream and instance', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe('/api/org/domain');
+			expect(String(input)).toBe('/api/org/domain?stream=recycling&instance=T-1');
 			expect(init?.method).toBe('GET');
 			expect(init?.credentials).toBe('include');
 			return new Response(JSON.stringify(sample), {
@@ -28,7 +30,7 @@ describe('HttpLoadDomainPort', () => {
 		});
 
 		const port = createHttpLoadDomainPort({ fetch: fetchFn, baseUrl: '' });
-		const got = await port.load();
+		const got = await port.load(scope);
 		expect(got.org).toBe('feragame');
 		expect(got.activeConfigVersion).toBe('1');
 		expect(got.configId).toBe('feragame-config');
@@ -41,14 +43,16 @@ describe('HttpLoadDomainPort', () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			const url = String(input);
 			expect(url).not.toContain('/api/runs');
-			expect(url).toBe('https://host.example/api/org/domain');
+			expect(url).toBe(
+				'https://host.example/api/org/domain?stream=recycling&instance=T-1'
+			);
 			return new Response(JSON.stringify(sample), { status: 200 });
 		});
 		const port = createHttpLoadDomainPort({
 			fetch: fetchFn,
 			baseUrl: 'https://host.example'
 		});
-		await port.load();
+		await port.load(scope);
 	});
 
 	test('non-OK response becomes LoadDomainError', async () => {
@@ -56,7 +60,7 @@ describe('HttpLoadDomainPort', () => {
 			async () => new Response('organization required', { status: 403 })
 		);
 		const port = createHttpLoadDomainPort({ fetch: fetchFn });
-		await expect(port.load()).rejects.toBeInstanceOf(LoadDomainError);
-		await expect(port.load()).rejects.toMatchObject({ status: 403 });
+		await expect(port.load(scope)).rejects.toBeInstanceOf(LoadDomainError);
+		await expect(port.load(scope)).rejects.toMatchObject({ status: 403 });
 	});
 });

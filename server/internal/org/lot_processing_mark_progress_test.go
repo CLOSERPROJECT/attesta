@@ -53,7 +53,7 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 	_ = commitStartLot(t, c, loadID)
 
 	cfg := mustActiveConfig(t, c)
-	wl := ProjectWorklist(cfg, mustDomain(t, c), adminOp())
+	wl := projectWorklistUnfiltered(cfg, mustDomain(t, c), adminOp())
 	inst, _ := worklistInstance(worklistMustJob(t, wl, "lot_processing"), loadID)
 	if inst.Tasks["markProgress"] != TaskStatusUnavailable {
 		t.Fatalf("markProgress before weigh = %q, want unavailable", inst.Tasks["markProgress"])
@@ -62,11 +62,11 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 		t.Fatalf("unweighed rows = %#v, want none", rows)
 	}
 
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: loadID,
 		Value: map[string]any{
@@ -81,7 +81,7 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 		t.Fatalf("unweighed markProgress err = %v", err)
 	}
 
-	domain, err := domains.Get(t.Context(), "feragame")
+	domain, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 	if len(rows) != 1 || rows[0] != loadID+".1" {
 		t.Fatalf("rows after one weigh = %#v, want only %s.1", rows, loadID)
 	}
-	afterWeigh := ProjectWorklist(cfg, weighted, adminOp())
+	afterWeigh := projectWorklistUnfiltered(cfg, weighted, adminOp())
 	inst, _ = worklistInstance(worklistMustJob(t, afterWeigh, "lot_processing"), loadID)
 	if inst.Tasks["markProgress"] != TaskStatusActionable {
 		t.Fatalf("markProgress after one weigh = %q, want actionable", inst.Tasks["markProgress"])
@@ -117,12 +117,12 @@ func TestCommitMarkProgressDeniesUnweighedPallets(t *testing.T) {
 func TestCommitMarkProgressRejectsEmptyBatch(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	_, lotID := seedLotReadyAfterWeigh(t, c)
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value:         map[string]any{"progress": map[string]any{}},
@@ -135,7 +135,7 @@ func TestCommitMarkProgressRejectsEmptyBatch(t *testing.T) {
 		t.Fatalf("message = %q", ce.Message)
 	}
 
-	domain, err := domains.Get(t.Context(), "feragame")
+	domain, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestCommitMarkProgressAllowsMultiple(t *testing.T) {
 	if marks != 2 {
 		t.Fatalf("markProgress submissions = %d, want 2", marks)
 	}
-	wl := ProjectWorklist(mustActiveConfig(t, c), second.Domain, adminOp())
+	wl := projectWorklistUnfiltered(mustActiveConfig(t, c), second.Domain, adminOp())
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "lot_processing"), lotID)
 	if !ok {
 		t.Fatal("missing lot_processing instance")

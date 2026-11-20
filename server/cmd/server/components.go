@@ -34,6 +34,8 @@ type StartStreamInstanceView struct {
 	StartAction string
 	ReturnPath  string
 	CardTrigger bool
+	// Direct skips the name dialog (Org Play → POST then redirect to /app/{stream}/new).
+	Direct bool
 }
 
 // ManagedPublicStreamCardView wraps a public stream card with optional /my management actions.
@@ -50,6 +52,7 @@ type ManagedPublicStreamCardView struct {
 	Startable         bool
 	StartAction       string
 	ReturnPath        string
+	StartDirect       bool
 }
 
 // StreamTaxonomyOptionView is one option in a taxonomy filter select.
@@ -350,22 +353,34 @@ func substepShellDisplay(sub TimelineSubstep) SubstepShellDisplay {
 	}
 }
 
+// TimelineSubmissionView is one Domain Submission summary under an Org timeline accordion.
+type TimelineSubmissionView struct {
+	Timestamp      string
+	TimestampHuman string
+	UserID         string
+}
+
 // TimelineSubstep is one row in the stream timeline accordion.
 // Shell chrome reads from Body via substepShellDisplay; summary Status/Done* fields
 // remain for nil-body fallbacks and legacy builders until fully removed.
 type TimelineSubstep struct {
-	SubstepID   string
-	Title       string
-	Selected    bool
-	ViewerOwned bool
-	Body        *SubstepBodyView
-	Palette     string
-	Status      string
-	StatusLabel string
-	DoneBy      string
-	DoneRole    string
-	DoneAt      string
-	DoneAtISO   string
+	SubstepID     string
+	Title         string
+	Selected      bool
+	ViewerOwned   bool
+	OrgActionable bool // Org act-now (available); Formata leaves false
+	SubmitMany    bool // Org submit: many; Formata leaves false
+	Body          *SubstepBodyView
+	Palette       string
+	Status        string
+	StatusLabel   string
+	DoneBy        string
+	DoneRole      string
+	DoneAt        string
+	DoneAtISO     string
+	BlockedReason string
+	Href          string // Org /app Task link when set; Formata leaves empty
+	Submissions   []TimelineSubmissionView
 }
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.
@@ -374,6 +389,7 @@ type TimelineStep struct {
 	OrgSlug  string
 	Expanded bool
 	Substeps []TimelineSubstep
+	Rows     []TimelineRowGroup // Org each-steps; empty for Formata / once steps
 }
 
 // StreamTimelineView is the view model for templates/components/stream_timeline.html.
@@ -419,6 +435,7 @@ type StreamInstanceDetailView struct {
 	Error             string
 	Timeline          []TimelineStep
 	ShowMineFilter    bool
+	ShowAllFilter     bool // Org: actionable-only default + Show all checkbox
 	HideStatus        bool
 	DPPURL            string
 	DPPGS1            string

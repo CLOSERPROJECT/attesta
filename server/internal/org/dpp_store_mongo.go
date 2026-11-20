@@ -14,7 +14,7 @@ const collectionOrgDPPs = "org_dpps"
 
 var _ DPPStore = (*MongoDPPStore)(nil)
 
-// MongoDPPStore persists DPPs in MongoDB (one doc per org+subject).
+// MongoDPPStore persists DPPs in MongoDB (one doc per org+stream+subject).
 type MongoDPPStore struct {
 	db *mongo.Database
 }
@@ -26,6 +26,7 @@ func NewMongoDPPStore(db *mongo.Database) *MongoDPPStore {
 type mongoDPPDoc struct {
 	ID            string         `bson:"_id"`
 	Org           string         `bson:"org"`
+	Stream        string         `bson:"stream"`
 	SubjectID     string         `bson:"subjectId"`
 	GTIN          string         `bson:"gtin"`
 	Lot           string         `bson:"lot"`
@@ -42,8 +43,8 @@ func (s *MongoDPPStore) coll() *mongo.Collection {
 	return s.db.Collection(collectionOrgDPPs)
 }
 
-func (s *MongoDPPStore) Get(ctx context.Context, org, subjectID string) (DPPRecord, error) {
-	key, err := passportStoreKey(org, subjectID)
+func (s *MongoDPPStore) Get(ctx context.Context, scope Scope, subjectID string) (DPPRecord, error) {
+	key, err := passportStoreKey(scope, subjectID)
 	if err != nil {
 		return DPPRecord{}, ErrNotFound
 	}
@@ -77,13 +78,28 @@ func (s *MongoDPPStore) GetByIdentity(ctx context.Context, gtin, lot, serial str
 }
 
 func (s *MongoDPPStore) Create(ctx context.Context, record DPPRecord) error {
-	key, err := passportStoreKey(record.Org, record.SubjectID)
+	scope, err := Scope{Org: record.Org, Stream: record.Stream}.Normalize()
 	if err != nil {
 		return err
 	}
+	key, err := passportStoreKey(scope, record.SubjectID)
+	if err != nil {
+		return err
+	}
+	gtin := strings.TrimSpace(record.GTIN)
+	lot := strings.TrimSpace(record.Lot)
+	serial := strings.TrimSpace(record.Serial)
+	if gtin != "" && lot != "" && serial != "" {
+		if _, err := s.GetByIdentity(ctx, gtin, lot, serial); err == nil {
+			return ErrDPPExists
+		} else if !errors.Is(err, ErrNotFound) {
+			return err
+		}
+	}
 	doc := mongoDPPDoc{
 		ID:            key,
-		Org:           strings.TrimSpace(record.Org),
+		Org:           scope.Org,
+		Stream:        scope.Stream,
 		SubjectID:     strings.TrimSpace(record.SubjectID),
 		GTIN:          record.GTIN,
 		Lot:           record.Lot,
@@ -123,6 +139,7 @@ func (s *MongoDPPStore) DeleteByOrg(ctx context.Context, org string) error {
 func dppFromMongoDoc(doc mongoDPPDoc) DPPRecord {
 	return DPPRecord{
 		Org:           doc.Org,
+		Stream:        doc.Stream,
 		SubjectID:     doc.SubjectID,
 		GTIN:          doc.GTIN,
 		Lot:           doc.Lot,

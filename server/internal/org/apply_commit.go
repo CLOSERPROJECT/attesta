@@ -43,9 +43,10 @@ func applyConfigCommit(
 	jobID := ref.JobID
 	taskID := ref.TaskID
 
+	stream := streamBindingFrom(cfg, ResolveStreamInstanceID(cfg, domain, jobID, jobInstanceID))
 	var rowIDs []string
 	if needsRowProjection(task) {
-		ids, err := rowIDsForTask(domain, jobID, task, jobInstanceID, cfg.Catalogs)
+		ids, err := rowIDsForTask(domain, jobID, task, jobInstanceID, cfg.Catalogs, stream)
 		if err != nil {
 			return appliedCommit{}, &CommitError{Kind: "prep", Message: err.Error()}
 		}
@@ -67,6 +68,7 @@ func applyConfigCommit(
 		Allowed:       EntityKindsFromConfig(cfg),
 		Catalogs:      cfg.Catalogs,
 		Today:         today,
+		Stream:        stream,
 	})
 	if err != nil {
 		return appliedCommit{}, mapApplyCommitError(err)

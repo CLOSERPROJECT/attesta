@@ -5,20 +5,22 @@ import (
 	"strings"
 )
 
-// OrgAppBaseURL is the Living SPA origin: PUBLIC_BASE_URL (trim trailing /) + "/app".
-// Empty when PUBLIC_BASE_URL is unset. Bound as $qrEndpoint for onSubmit.http.
-func OrgAppBaseURL() string {
+// OrgAppBaseURL is the Living SPA stream entry: PUBLIC_BASE_URL (trim trailing /)
+// + "/app/{stream}". Empty when PUBLIC_BASE_URL or stream is unset. Bound as
+// $qrEndpoint for onSubmit.http so cold scans land in the right stream.
+func OrgAppBaseURL(stream string) string {
 	base := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL"))
-	if base == "" {
+	stream = strings.TrimSpace(stream)
+	if base == "" || stream == "" {
 		return ""
 	}
-	return strings.TrimRight(base, "/") + "/app"
+	return strings.TrimRight(base, "/") + "/app/" + stream
 }
 
-// SubmitBindingsFromEnv builds ops JSONata vars for onSubmit.http (e.g. $qrEndpoint).
+// SubmitBindingsForStream builds ops JSONata vars for onSubmit.http (e.g. $qrEndpoint).
 // Nil when nothing to inject.
-func SubmitBindingsFromEnv() ExprBindings {
-	if ep := OrgAppBaseURL(); ep != "" {
+func SubmitBindingsForStream(stream string) ExprBindings {
+	if ep := OrgAppBaseURL(stream); ep != "" {
 		return ExprBindings{"qrEndpoint": ep}
 	}
 	return nil

@@ -23,21 +23,32 @@
 	import { formatSubmitValidationError } from './form/submit-validation.js';
 
 	type Props = {
+		stream: string;
+		/** Stream instance; omit / empty for Play. */
+		instance?: string;
 		jobId: string;
 		taskId: string;
 		/** Empty string = provisional start (first Task / mint). */
 		jobInstanceId: string;
 		bundle: TaskFormBundle;
 		disabled?: boolean;
+		/** Play provisional Start (mint.startingNew). */
+		provisionalJob?: boolean;
+		/** Play route (`/{stream}/new`); same mint law as provisionalJob. */
+		play?: boolean;
 		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
 	let {
+		stream,
+		instance = '',
 		jobId,
 		taskId,
 		jobInstanceId,
 		bundle,
 		disabled = false,
+		provisionalJob = false,
+		play = false,
 		onCommitted
 	}: Props = $props();
 
@@ -90,10 +101,13 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		if (orgSession.committing) return;
 		submitError = null;
-		const mint = isProvisionalJobInstance(jobInstanceId)
-			? ({ kind: 'startingNew' } as const)
-			: ({ kind: 'none' } as const);
+		const mint =
+			play || provisionalJob || isProvisionalJobInstance(jobInstanceId)
+				? ({ kind: 'startingNew' } as const)
+				: ({ kind: 'none' } as const);
 		const outcome = await orgSession.commit({
+			stream,
+			instance: instance || undefined,
 			taskPath: path,
 			jobInstanceId: normalizeJobInstanceId(jobInstanceId),
 			value,

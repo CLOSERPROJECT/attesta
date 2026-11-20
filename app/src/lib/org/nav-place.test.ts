@@ -3,9 +3,16 @@ import { describe, expect, test } from 'vitest';
 import * as m from '#lib/paraglide/messages.js';
 
 import {
-	orgRouteCoordsFromPath,
 	navPlaceKindFromRoute,
-	resolveNavPlace
+	orgHomePath,
+	orgMyDashboardPath,
+	orgMyInstancePath,
+	orgPathSegments,
+	orgPlayPath,
+	orgRouteCoordsFromPath,
+	orgTaskPath,
+	resolveNavPlace,
+	streamInstanceLabel
 } from './nav-place.js';
 import type { Worklist } from './types.js';
 
@@ -29,66 +36,143 @@ const worklist: Worklist = {
 					tasks: { register: 'actionable', palletWeight: 'unavailable' }
 				}
 			]
-		},
-		{
-			jobId: 'untitled',
-			canStart: true,
-			repeatable: false,
-			taskIds: ['only'],
-			tasks: [{ id: 'only', title: 'Solo', roles: ['administration'] }],
-			instances: [
-				{
-					id: 'u1',
-					label: 'U-1',
-					tasks: { only: 'actionable' }
-				}
-			]
 		}
 	]
 };
 
-describe('navPlaceKindFromRoute', () => {
-	test('pathname / → home', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/' })).toBe('home');
+describe('§6 Routes table (pathname after /app base strip)', () => {
+	test('/app → app-root (redirect to /my)', () => {
+		expect(navPlaceKindFromRoute({ pathname: '/' })).toBe('app-root');
+		expect(navPlaceKindFromRoute({ pathname: '' })).toBe('app-root');
+		expect(orgRouteCoordsFromPath({ pathname: '/' })).toEqual({
+			stream: '',
+			instance: '',
+			jobId: '',
+			jobInstanceId: '',
+			taskId: ''
+		});
 	});
 
-	test('trailing slash on root still → home', () => {
-		// stripBase('/app/') yields '/'; a leftover '//' must not become overview
-		expect(navPlaceKindFromRoute({ pathname: '//' })).toBe('home');
+	test('/app/{stream} → stream (cold scan or dashboard redirect)', () => {
+		expect(navPlaceKindFromRoute({ pathname: '/recycling' })).toBe('stream');
+		expect(navPlaceKindFromRoute({ pathname: '/recycling/' })).toBe('stream');
+		expect(orgRouteCoordsFromPath({ pathname: '/recycling' })).toEqual({
+			stream: 'recycling',
+			instance: '',
+			jobId: '',
+			jobInstanceId: '',
+			taskId: ''
+		});
+		expect(orgMyDashboardPath('recycling')).toBe('/my/streams/org-recycling/');
 	});
 
-	test('empty pathname → home', () => {
-		expect(navPlaceKindFromRoute({ pathname: '' })).toBe('home');
+	test('/app/{stream}/new → play (anchor start Task)', () => {
+		expect(navPlaceKindFromRoute({ pathname: '/recycling/new' })).toBe('play');
+		expect(orgRouteCoordsFromPath({ pathname: '/recycling/new' })).toEqual({
+			stream: 'recycling',
+			instance: '',
+			jobId: '',
+			jobInstanceId: '',
+			taskId: ''
+		});
+		expect(orgPlayPath('recycling')).toBe('/recycling/new');
 	});
 
-	test('pathname /archive → archive (not a Job id)', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/archive' })).toBe('archive');
-		expect(navPlaceKindFromRoute({ pathname: '/archive/' })).toBe('archive');
+	test('/app/{stream}/i/{instance} → home (instance Worklist)', () => {
+		expect(navPlaceKindFromRoute({ pathname: '/recycling/i/T1' })).toBe('home');
+		expect(orgRouteCoordsFromPath({ pathname: '/recycling/i/T1' })).toEqual({
+			stream: 'recycling',
+			instance: 'T1',
+			jobId: '',
+			jobInstanceId: '',
+			taskId: ''
+		});
+		expect(orgHomePath('recycling', 'T1')).toBe('/recycling/i/T1');
 	});
 
-	test('3 path segments → task', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2/register' })).toBe('task');
-	});
-
-	test('2 path segments → overview', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2' })).toBe('overview');
-	});
-
-	test('2-segment overview ignores stale taskId in URL params (pathname only)', () => {
-		// Regression: sv-router may keep taskId after leaving a task route.
-		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-261102-NO-1' })).toBe(
-			'overview'
+	test('/app/{stream}/i/{instance}/{job}/{jobInstance}/{task} → task', () => {
+		expect(
+			navPlaceKindFromRoute({
+				pathname: '/recycling/i/T1/intake/NIR-2/register'
+			})
+		).toBe('task');
+		expect(
+			orgRouteCoordsFromPath({
+				pathname: '/recycling/i/T1/intake/NIR-2/register'
+			})
+		).toEqual({
+			stream: 'recycling',
+			instance: 'T1',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-2',
+			taskId: 'register'
+		});
+		expect(orgTaskPath('recycling', 'T1', 'intake', 'NIR-2', 'register')).toBe(
+			'/recycling/i/T1/intake/NIR-2/register'
 		);
 	});
 
-	test('trailing slash on overview still → overview', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2/' })).toBe('overview');
+	test('provisional Task under instance uses new sentinel', () => {
+		expect(
+			orgRouteCoordsFromPath({
+				pathname: '/recycling/i/T1/lot_processing/new/startLot'
+			})
+		).toEqual({
+			stream: 'recycling',
+			instance: 'T1',
+			jobId: 'lot_processing',
+			jobInstanceId: 'new',
+			taskId: 'startLot'
+		});
+		expect(
+			navPlaceKindFromRoute({
+				pathname: '/recycling/i/T1/lot_processing/new/startLot'
+			})
+		).toBe('task');
 	});
 
-	test('home: Home label, no back, no job title line', () => {
+	test('no archive or overview place kinds', () => {
+		// Legacy /archive and /{job}/{instance} shapes are not place kinds anymore.
+		expect(navPlaceKindFromRoute({ pathname: '/archive' })).not.toBe('archive');
+		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2' })).toBe('app-root');
+		const kinds = [
+			navPlaceKindFromRoute({ pathname: '/' }),
+			navPlaceKindFromRoute({ pathname: '/recycling' }),
+			navPlaceKindFromRoute({ pathname: '/recycling/new' }),
+			navPlaceKindFromRoute({ pathname: '/recycling/i/T1' }),
+			navPlaceKindFromRoute({ pathname: '/recycling/i/T1/intake/a/b' }),
+			navPlaceKindFromRoute({ pathname: '/archive' }),
+			navPlaceKindFromRoute({ pathname: '/intake/NIR-2' })
+		];
+		expect(kinds).not.toContain('archive');
+		expect(kinds).not.toContain('overview');
+	});
+
+	test('trailing slash on root still → app-root', () => {
+		expect(navPlaceKindFromRoute({ pathname: '//' })).toBe('app-root');
+	});
+
+	test('orgPathSegments strips trailing slash', () => {
+		expect(orgPathSegments('/recycling/i/T1/')).toEqual(['recycling', 'i', 'T1']);
+	});
+
+	test('orgMyInstancePath is SPA instance home', () => {
+		expect(orgMyInstancePath('recycling', 'T1')).toBe('/recycling/i/T1');
+	});
+
+	test('streamInstanceLabel reads anchor instance label from Worklist', () => {
+		expect(streamInstanceLabel(worklist, 'NIR-2')).toBe('Camion B');
+		expect(streamInstanceLabel(worklist, 'missing')).toBe('missing');
+	});
+});
+
+describe('resolveNavPlace', () => {
+	test('home: Home label, no back, instance home target', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'home',
+				stream: 'recycling',
+				instance: 'T1',
 				jobId: '',
 				jobInstanceId: '',
 				taskId: '',
@@ -97,65 +181,18 @@ describe('navPlaceKindFromRoute', () => {
 			})
 		).toEqual({
 			showBack: false,
-			backTarget: { kind: 'home' },
+			backTarget: { kind: 'home', stream: 'recycling', instance: 'T1' },
 			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		});
 	});
 
-	test('archive: Archive label, back home, no job title line', () => {
+	test('play: task-like chrome, back to my stream dashboard', () => {
 		expect(
 			resolveNavPlace({
-				kind: 'archive',
-				jobId: '',
-				jobInstanceId: '',
-				taskId: '',
-				provisionalJob: false,
-				worklist
-			})
-		).toEqual({
-			showBack: true,
-			backTarget: { kind: 'home' },
-			primaryLabel: m.archive(),
-			jobTitleLine: null
-		});
-	});
-
-	test('overview: instance label only (no ·), back home, authored job title', () => {
-		expect(
-			resolveNavPlace({
-				kind: 'overview',
-				jobId: 'intake',
-				jobInstanceId: 'NIR-2',
-				taskId: 'register',
-				provisionalJob: false,
-				worklist
-			})
-		).toEqual({
-			showBack: true,
-			backTarget: { kind: 'home' },
-			primaryLabel: 'Camion B',
-			jobTitleLine: 'Camion'
-		});
-	});
-
-	test('overview: omits job title line when Job.title missing (never raw id)', () => {
-		expect(
-			resolveNavPlace({
-				kind: 'overview',
-				jobId: 'untitled',
-				jobInstanceId: 'u1',
-				taskId: '',
-				provisionalJob: false,
-				worklist
-			}).jobTitleLine
-		).toBeNull();
-	});
-
-	test('task provisional Job: task title only, back home', () => {
-		expect(
-			resolveNavPlace({
-				kind: 'task',
+				kind: 'play',
+				stream: 'recycling',
+				instance: '',
 				jobId: 'intake',
 				jobInstanceId: '',
 				taskId: 'register',
@@ -164,16 +201,38 @@ describe('navPlaceKindFromRoute', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'home' },
+			backTarget: { kind: 'myStream', stream: 'recycling' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion'
 		});
 	});
 
-	test('task minted: job · instance muted, task primary, back home', () => {
+	test('task provisional Job: task title only, back instance home', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
+				stream: 'recycling',
+				instance: 'T1',
+				jobId: 'intake',
+				jobInstanceId: '',
+				taskId: 'register',
+				provisionalJob: true,
+				worklist
+			})
+		).toEqual({
+			showBack: true,
+			backTarget: { kind: 'home', stream: 'recycling', instance: 'T1' },
+			primaryLabel: 'Registrazione',
+			jobTitleLine: 'Camion'
+		});
+	});
+
+	test('task minted: job · instance muted, task primary, back instance home', () => {
+		expect(
+			resolveNavPlace({
+				kind: 'task',
+				stream: 'recycling',
+				instance: 'NIR-2',
 				jobId: 'intake',
 				jobInstanceId: 'NIR-2',
 				taskId: 'register',
@@ -182,7 +241,7 @@ describe('navPlaceKindFromRoute', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'home' },
+			backTarget: { kind: 'home', stream: 'recycling', instance: 'NIR-2' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion · Camion B'
 		});
@@ -192,6 +251,8 @@ describe('navPlaceKindFromRoute', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
+				stream: 'recycling',
+				instance: 'T1',
 				jobId: 'intake',
 				jobInstanceId: '',
 				taskId: 'unknownTask',
@@ -216,12 +277,20 @@ describe('navPlaceKindFromRoute', () => {
 							roles: ['administration']
 						}
 					],
-					instances: []
+					instances: [
+						{
+							id: 'NIR-1',
+							label: 'NIR-1',
+							tasks: { codiceFir: 'actionable' }
+						}
+					]
 				}
 			]
 		};
 		const place = resolveNavPlace({
 			kind: 'task',
+			stream: 'recycling',
+			instance: 'NIR-1',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-1',
 			taskId: 'codiceFir',
@@ -230,43 +299,5 @@ describe('navPlaceKindFromRoute', () => {
 		});
 		expect(place.primaryLabel).toBe('codiceFir');
 		expect(place.jobTitleLine).toBe('NIR-1');
-	});
-});
-
-describe('orgRouteCoordsFromPath', () => {
-	test('flat Can-start 3-seg Task coords', () => {
-		expect(orgRouteCoordsFromPath({ pathname: '/intake/new/truckArrive' })).toEqual({
-			jobId: 'intake',
-			jobInstanceId: 'new',
-			taskId: 'truckArrive'
-		});
-	});
-
-	test('flat minted 3-seg Task coords', () => {
-		expect(
-			orgRouteCoordsFromPath({ pathname: '/intake/261102-1st-2/weightCheck' })
-		).toEqual({
-			jobId: 'intake',
-			jobInstanceId: '261102-1st-2',
-			taskId: 'weightCheck'
-		});
-	});
-
-	test('legacy 5-seg nested group path is rejected', () => {
-		expect(
-			orgRouteCoordsFromPath({ pathname: '/intake/NIR-2/lots/new/register' })
-		).toEqual({
-			jobId: '',
-			jobInstanceId: '',
-			taskId: ''
-		});
-	});
-
-	test('2-seg overview clears task coords', () => {
-		expect(orgRouteCoordsFromPath({ pathname: '/intake/NIR-2' })).toEqual({
-			jobId: 'intake',
-			jobInstanceId: 'NIR-2',
-			taskId: ''
-		});
 	});
 });

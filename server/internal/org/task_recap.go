@@ -36,14 +36,14 @@ type TaskRecapList struct {
 // Unknown address or no matching Submissions → ErrNotFound.
 func (l *DomainLoader) LoadTaskRecap(
 	ctx context.Context,
-	org string,
+	scope Scope,
 	addr SubmissionAddress,
 ) (TaskRecapList, error) {
-	org = strings.TrimSpace(org)
-	addr = addr.normalized()
-	if org == "" {
-		return TaskRecapList{}, fmt.Errorf("org: org required")
+	scope, err := scope.Normalize()
+	if err != nil {
+		return TaskRecapList{}, err
 	}
+	addr = addr.normalized()
 	if !addr.valid() {
 		return TaskRecapList{}, fmt.Errorf("org: submission address required")
 	}
@@ -51,7 +51,7 @@ func (l *DomainLoader) LoadTaskRecap(
 		return TaskRecapList{}, fmt.Errorf("org: stores required")
 	}
 
-	domain, err := l.Domains.Get(ctx, org)
+	domain, err := l.Domains.Get(ctx, scope)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return TaskRecapList{}, ErrNotFound
@@ -67,7 +67,7 @@ func (l *DomainLoader) LoadTaskRecap(
 		return matched[i].Timestamp < matched[j].Timestamp
 	})
 
-	titles := l.factTitlesFromConfig(ctx, org, addr)
+	titles := l.factTitlesFromConfig(ctx, scope, addr)
 	items := make([]TaskRecap, 0, len(matched))
 	for _, sub := range matched {
 		recap := TaskRecap{
@@ -80,7 +80,7 @@ func (l *DomainLoader) LoadTaskRecap(
 			Titles:        titles,
 		}
 		if l.LinkStore != nil {
-			links, err := l.LinkStore.Get(ctx, org, addr, sub.Timestamp)
+			links, err := l.LinkStore.Get(ctx, scope, addr, sub.Timestamp)
 			if err != nil && !errors.Is(err, ErrNotFound) {
 				return TaskRecapList{}, err
 			}
@@ -95,15 +95,15 @@ func (l *DomainLoader) LoadTaskRecap(
 
 // factTitlesFromConfig reads property titles from the Active Org Config leaf
 // schema. Missing config / unknown path → nil (SPA falls back to keys).
-func (l *DomainLoader) factTitlesFromConfig(ctx context.Context, org string, addr SubmissionAddress) map[string]string {
+func (l *DomainLoader) factTitlesFromConfig(ctx context.Context, scope Scope, addr SubmissionAddress) map[string]string {
 	if l.Configs == nil {
 		return nil
 	}
-	version, err := l.Configs.ActiveVersion(ctx, org)
+	version, err := l.Configs.ActiveVersion(ctx, scope)
 	if err != nil {
 		return nil
 	}
-	cfg, err := l.Configs.Get(ctx, org, version)
+	cfg, err := l.Configs.Get(ctx, scope, version)
 	if err != nil {
 		return nil
 	}

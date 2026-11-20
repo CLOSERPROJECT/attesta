@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,7 +15,7 @@ import (
 
 const (
 	collectionOrgDomains      = "org_domains"
-	collectionOrgConfigs   = "org_configs"
+	collectionOrgConfigs      = "org_configs"
 	collectionOrgActiveConfig = "org_active_config"
 )
 
@@ -25,7 +26,7 @@ var (
 	_ ConfigStore = (*MongoConfigStore)(nil)
 )
 
-// MongoDomainStore persists Domain documents in MongoDB (one per org).
+// MongoDomainStore persists Domain documents in MongoDB (one per org+stream).
 type MongoDomainStore struct {
 	db *mongo.Database
 }
@@ -35,7 +36,9 @@ func NewMongoDomainStore(db *mongo.Database) *MongoDomainStore {
 }
 
 type mongoDomainDoc struct {
-	Org          string                               `bson:"_id"`
+	ID           string                               `bson:"_id"`
+	Org          string                               `bson:"org"`
+	Stream       string                               `bson:"stream"`
 	Entities     map[string]map[string]map[string]any `bson:"entities"`
 	Submissions  []mongoSubmissionDoc                 `bson:"submissions"`
 	JobInstances []JobInstance                        `bson:"jobInstances"`
@@ -57,21 +60,21 @@ func (s *MongoDomainStore) coll() *mongo.Collection {
 	return s.db.Collection(collectionOrgDomains)
 }
 
-func (s *MongoDomainStore) Get(ctx context.Context, org string) (Domain, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
+func (s *MongoDomainStore) Get(ctx context.Context, scope Scope) (Domain, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
 		return EmptyDomain(), ErrNotFound
 	}
-	doc, err := s.find(ctx, org)
+	doc, err := s.find(ctx, scope)
 	if err != nil {
 		return EmptyDomain(), err
 	}
 	return domainFromMongoDoc(doc), nil
 }
 
-func (s *MongoDomainStore) find(ctx context.Context, org string) (mongoDomainDoc, error) {
+func (s *MongoDomainStore) find(ctx context.Context, scope Scope) (mongoDomainDoc, error) {
 	var doc mongoDomainDoc
-	err := s.coll().FindOne(ctx, bson.M{"_id": org}).Decode(&doc)
+	err := s.coll().FindOne(ctx, bson.M{"_id": scopeKey(scope)}).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return mongoDomainDoc{}, ErrNotFound
 	}
@@ -81,25 +84,25 @@ func (s *MongoDomainStore) find(ctx context.Context, org string) (mongoDomainDoc
 	return doc, nil
 }
 
-func (s *MongoDomainStore) Put(ctx context.Context, org string, domain Domain) error {
-	org = strings.TrimSpace(org)
-	if org == "" {
-		return fmt.Errorf("org mongo domain put: org required")
+func (s *MongoDomainStore) Put(ctx context.Context, scope Scope, domain Domain) error {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return fmt.Errorf("org mongo domain put: %w", err)
 	}
-	_, err := s.coll().UpdateOne(ctx, bson.M{"_id": org}, domainWriteUpdate(org, domain), options.Update().SetUpsert(true))
+	_, err = s.coll().UpdateOne(ctx, bson.M{"_id": scopeKey(scope)}, domainWriteUpdate(scope, domain), options.Update().SetUpsert(true))
 	if err != nil {
 		return fmt.Errorf("org mongo domain put: %w", err)
 	}
 	return nil
 }
 
-func (s *MongoDomainStore) Update(ctx context.Context, org string, fn func(Domain) (Domain, error)) (Domain, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
-		return Domain{}, fmt.Errorf("org mongo domain update: org required")
+func (s *MongoDomainStore) Update(ctx context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return Domain{}, fmt.Errorf("org mongo domain update: %w", err)
 	}
 	for range maxDomainUpdateAttempts {
-		doc, err := s.find(ctx, org)
+		doc, err := s.find(ctx, scope)
 		missing := errors.Is(err, ErrNotFound)
 		if err != nil && !missing {
 			return Domain{}, err
@@ -113,7 +116,7 @@ func (s *MongoDomainStore) Update(ctx context.Context, org string, fn func(Domai
 			return Domain{}, err
 		}
 		// Upsert only when the doc was missing: a concurrent insert then trips the _id unique index.
-		res, err := s.coll().UpdateOne(ctx, domainRevisionFilter(org, doc.Revision), domainWriteUpdate(org, next), options.Update().SetUpsert(missing))
+		res, err := s.coll().UpdateOne(ctx, domainRevisionFilter(scope, doc.Revision), domainWriteUpdate(scope, next), options.Update().SetUpsert(missing))
 		if mongo.IsDuplicateKeyError(err) {
 			continue
 		}
@@ -130,17 +133,20 @@ func (s *MongoDomainStore) Update(ctx context.Context, org string, fn func(Domai
 
 // domainRevisionFilter treats a missing revision field (docs written before
 // revisions existed) as revision 0.
-func domainRevisionFilter(org string, revision int64) bson.M {
+func domainRevisionFilter(scope Scope, revision int64) bson.M {
+	id := scopeKey(scope)
 	if revision == 0 {
-		return bson.M{"_id": org, "revision": bson.M{"$in": bson.A{int64(0), nil}}}
+		return bson.M{"_id": id, "revision": bson.M{"$in": bson.A{int64(0), nil}}}
 	}
-	return bson.M{"_id": org, "revision": revision}
+	return bson.M{"_id": id, "revision": revision}
 }
 
-func domainWriteUpdate(org string, domain Domain) bson.M {
-	doc := domainToMongoDoc(org, domain)
+func domainWriteUpdate(scope Scope, domain Domain) bson.M {
+	doc := domainToMongoDoc(scope, domain)
 	return bson.M{
 		"$set": bson.M{
+			"org":          doc.Org,
+			"stream":       doc.Stream,
 			"entities":     doc.Entities,
 			"submissions":  doc.Submissions,
 			"jobInstances": doc.JobInstances,
@@ -161,12 +167,15 @@ func NewMongoConfigStore(db *mongo.Database) *MongoConfigStore {
 type mongoOrgConfigDoc struct {
 	ID      string `bson:"_id"`
 	Org     string `bson:"org"`
+	Stream  string `bson:"stream"`
 	Version string `bson:"version"`
 	Payload []byte `bson:"payload"`
 }
 
 type mongoActiveConfigDoc struct {
-	Org     string `bson:"_id"`
+	ID      string `bson:"_id"`
+	Org     string `bson:"org"`
+	Stream  string `bson:"stream"`
 	Version string `bson:"version"`
 }
 
@@ -178,14 +187,17 @@ func (s *MongoConfigStore) active() *mongo.Collection {
 	return s.db.Collection(collectionOrgActiveConfig)
 }
 
-func (s *MongoConfigStore) Get(ctx context.Context, org, version string) (OrgConfig, error) {
-	org = strings.TrimSpace(org)
+func (s *MongoConfigStore) Get(ctx context.Context, scope Scope, version string) (OrgConfig, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return OrgConfig{}, ErrNotFound
+	}
 	version = strings.TrimSpace(version)
-	if org == "" || version == "" {
+	if version == "" {
 		return OrgConfig{}, ErrNotFound
 	}
 	var doc mongoOrgConfigDoc
-	err := s.configs().FindOne(ctx, bson.M{"_id": configKey(org, version)}).Decode(&doc)
+	err = s.configs().FindOne(ctx, bson.M{"_id": configKey(scope, version)}).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return OrgConfig{}, ErrNotFound
 	}
@@ -197,26 +209,40 @@ func (s *MongoConfigStore) Get(ctx context.Context, org, version string) (OrgCon
 		return OrgConfig{}, fmt.Errorf("org mongo config decode: %w", err)
 	}
 	normalizeOrgConfigJobs(&cfg)
-	cfg.Org = org
+	cfg.Org = scope.Org
 	cfg.Version = version
+	if cfg.Stream == nil {
+		cfg.Stream = &StreamConfig{Key: scope.Stream}
+	} else {
+		cfg.Stream.Key = scope.Stream
+	}
 	return cfg, nil
 }
 
-func (s *MongoConfigStore) Put(ctx context.Context, org, version string, cfg OrgConfig) error {
-	org = strings.TrimSpace(org)
-	version = strings.TrimSpace(version)
-	if org == "" || version == "" {
-		return fmt.Errorf("org mongo config put: org and version required")
+func (s *MongoConfigStore) Put(ctx context.Context, scope Scope, version string, cfg OrgConfig) error {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return fmt.Errorf("org mongo config put: %w", err)
 	}
-	cfg.Org = org
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return fmt.Errorf("org mongo config put: org, stream and version required")
+	}
+	cfg.Org = scope.Org
 	cfg.Version = version
+	if cfg.Stream == nil {
+		cfg.Stream = &StreamConfig{Key: scope.Stream}
+	} else {
+		cfg.Stream.Key = scope.Stream
+	}
 	payload, err := json.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("org mongo config encode: %w", err)
 	}
 	doc := mongoOrgConfigDoc{
-		ID:      configKey(org, version),
-		Org:     org,
+		ID:      configKey(scope, version),
+		Org:     scope.Org,
+		Stream:  scope.Stream,
 		Version: version,
 		Payload: payload,
 	}
@@ -227,13 +253,13 @@ func (s *MongoConfigStore) Put(ctx context.Context, org, version string, cfg Org
 	return nil
 }
 
-func (s *MongoConfigStore) ActiveVersion(ctx context.Context, org string) (string, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
+func (s *MongoConfigStore) ActiveVersion(ctx context.Context, scope Scope) (string, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
 		return "", ErrNotFound
 	}
 	var doc mongoActiveConfigDoc
-	err := s.active().FindOne(ctx, bson.M{"_id": org}).Decode(&doc)
+	err = s.active().FindOne(ctx, bson.M{"_id": scopeKey(scope)}).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return "", ErrNotFound
 	}
@@ -246,31 +272,70 @@ func (s *MongoConfigStore) ActiveVersion(ctx context.Context, org string) (strin
 	return doc.Version, nil
 }
 
-func (s *MongoConfigStore) SetActiveVersion(ctx context.Context, org, version string) error {
-	org = strings.TrimSpace(org)
-	version = strings.TrimSpace(version)
-	if org == "" || version == "" {
-		return fmt.Errorf("org mongo active set: org and version required")
+func (s *MongoConfigStore) SetActiveVersion(ctx context.Context, scope Scope, version string) error {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return fmt.Errorf("org mongo active set: %w", err)
 	}
-	err := s.configs().FindOne(ctx, bson.M{"_id": configKey(org, version)}).Err()
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return fmt.Errorf("org mongo active set: org, stream and version required")
+	}
+	err = s.configs().FindOne(ctx, bson.M{"_id": configKey(scope, version)}).Err()
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("org mongo active set: lookup: %w", err)
 	}
-	doc := mongoActiveConfigDoc{Org: org, Version: version}
-	_, err = s.active().ReplaceOne(ctx, bson.M{"_id": org}, doc, options.Replace().SetUpsert(true))
+	doc := mongoActiveConfigDoc{
+		ID:      scopeKey(scope),
+		Org:     scope.Org,
+		Stream:  scope.Stream,
+		Version: version,
+	}
+	_, err = s.active().ReplaceOne(ctx, bson.M{"_id": doc.ID}, doc, options.Replace().SetUpsert(true))
 	if err != nil {
 		return fmt.Errorf("org mongo active set: %w", err)
 	}
 	return nil
 }
 
-func domainToMongoDoc(org string, domain Domain) mongoDomainDoc {
+func (s *MongoConfigStore) ListStreams(ctx context.Context, org string) ([]string, error) {
+	org = strings.TrimSpace(org)
+	if org == "" {
+		return nil, fmt.Errorf("org: org required")
+	}
+	cur, err := s.active().Find(ctx, bson.M{"org": org})
+	if err != nil {
+		return nil, fmt.Errorf("org mongo list streams: %w", err)
+	}
+	defer cur.Close(ctx)
+	out := make([]string, 0)
+	for cur.Next(ctx) {
+		var doc mongoActiveConfigDoc
+		if err := cur.Decode(&doc); err != nil {
+			return nil, fmt.Errorf("org mongo list streams: decode: %w", err)
+		}
+		stream := strings.TrimSpace(doc.Stream)
+		if stream == "" || strings.TrimSpace(doc.Version) == "" {
+			continue
+		}
+		out = append(out, stream)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, fmt.Errorf("org mongo list streams: %w", err)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func domainToMongoDoc(scope Scope, domain Domain) mongoDomainDoc {
 	ensureEntities(&domain)
 	doc := mongoDomainDoc{
-		Org:          org,
+		ID:           scopeKey(scope),
+		Org:          scope.Org,
+		Stream:       scope.Stream,
 		Entities:     make(map[string]map[string]map[string]any, len(domain.Entities)),
 		Submissions:  encodeSubmissions(domain.Submissions),
 		JobInstances: append([]JobInstance(nil), domain.JobInstances...),

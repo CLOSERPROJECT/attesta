@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -35,10 +36,10 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 		IDsTouched: []string{"NIR-1"},
 	}}
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "NIR-1", Label: "L"}}
-	if err := domains.Put(ctx, org, domain); err != nil {
+	if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, domain); err != nil {
 		t.Fatal(err)
 	}
-	got, err := domains.Get(ctx, org)
+	got, err := domains.Get(ctx, Scope{Org: org, Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,13 +66,13 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 		Jobs:    newOrderedObject(),
 	}
 	cfg.Jobs.Set("intake", map[string]any{"repeatable": true})
-	if err := configs.Put(ctx, org, "v1", cfg); err != nil {
+	if err := configs.Put(ctx, Scope{Org: org, Stream: "main"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(ctx, org, "v1"); err != nil {
+	if err := configs.SetActiveVersion(ctx, Scope{Org: org, Stream: "main"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := configs.Get(ctx, org, "v1")
+	loaded, err := configs.Get(ctx, Scope{Org: org, Stream: "main"}, "v1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,17 +86,17 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	if _, typed := intakeVal.(Job); !typed {
 		t.Fatalf("Get should normalize Job, got %T", intakeVal)
 	}
-	active, err := configs.ActiveVersion(ctx, org)
+	active, err := configs.ActiveVersion(ctx, Scope{Org: org, Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if active != "v1" {
 		t.Fatalf("active = %q", active)
 	}
-	if err := configs.SetActiveVersion(ctx, org, "missing"); !errors.Is(err, ErrNotFound) {
+	if err := configs.SetActiveVersion(ctx, Scope{Org: org, Stream: "main"}, "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("set active missing: %v", err)
 	}
-	if _, err := domains.Get(ctx, "no-such-org"); !errors.Is(err, ErrNotFound) {
+	if _, err := domains.Get(ctx, Scope{Org: "no-such-org", Stream: "main"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing domain: %v", err)
 	}
 }
@@ -107,7 +108,7 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 
 	domains := NewMongoDomainStore(db)
 	configs := NewMongoConfigStore(db)
-	if err := domains.Put(ctx, org, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
+	if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadFeragameConfigFixture()
@@ -115,31 +116,31 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.Org = org
-	if err := configs.Put(ctx, org, cfg.Version, cfg); err != nil {
+	if err := configs.Put(ctx, Scope{Org: org, Stream: "main"}, cfg.Version, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(ctx, org, cfg.Version); err != nil {
+	if err := configs.SetActiveVersion(ctx, Scope{Org: org, Stream: "main"}, cfg.Version); err != nil {
 		t.Fatal(err)
 	}
 
 	// New store handles on the same DB simulate process restart with shared cluster.
 	domains2 := NewMongoDomainStore(db)
 	configs2 := NewMongoConfigStore(db)
-	got, err := domains2.Get(ctx, org)
+	got, err := domains2.Get(ctx, Scope{Org: org, Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Kind("lot")["L1"]["client"] != "NO" {
 		t.Fatalf("domain after reconnect = %#v", got)
 	}
-	active, err := configs2.ActiveVersion(ctx, org)
+	active, err := configs2.ActiveVersion(ctx, Scope{Org: org, Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if active != cfg.Version {
 		t.Fatalf("active = %q", active)
 	}
-	loaded, err := configs2.Get(ctx, org, cfg.Version)
+	loaded, err := configs2.Get(ctx, Scope{Org: org, Stream: "main"}, cfg.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,27 +170,30 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := domains.Put(ctx, cfg.Org, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
+	if err := domains.Put(ctx, Scope{Org: cfg.Org, Stream: cfg.Stream.Key}, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
 		t.Fatal(err)
 	}
 	seeded, err := SeedDemo(ctx, domains, configs, SeedOptions{WipeDomain: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := domains.Get(ctx, seeded.Org)
+	got, err := domains.Get(ctx, Scope{Org: seeded.Org, Stream: seeded.Stream.Key})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := got.Kind("truck")[SeedTruckID]; !ok {
-		t.Fatalf("demo truck missing after wipe+seed: %#v", got.Kind("truck"))
+		t.Fatalf("demo truck A missing after wipe+seed: %#v", got.Kind("truck"))
 	}
-	if got.Kind("lot")[SeedLoadCOID] == nil || got.Kind("lot")[SeedLoadDAID] == nil {
+	if _, ok := got.Kind("truck")[SeedTruckBID]; !ok {
+		t.Fatalf("demo truck B missing after wipe+seed: %#v", got.Kind("truck"))
+	}
+	if got.Kind("lot")[SeedLoadCOID] == nil || got.Kind("lot")[SeedLoadDAID] == nil || got.Kind("lot")[SeedTruckBLotID] == nil {
 		t.Fatalf("demo loads missing after wipe+seed: %#v", got.Kind("lot"))
 	}
 	if len(got.Submissions) < 8 {
 		t.Fatalf("demo submissions = %#v", got.Submissions)
 	}
-	active, err := configs.ActiveVersion(ctx, seeded.Org)
+	active, err := configs.ActiveVersion(ctx, Scope{Org: seeded.Org, Stream: seeded.Stream.Key})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,14 +222,14 @@ func TestMongoDomainUpdateConcurrentAppendsAllLand(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := domains.Update(ctx, org, appendSubmission(string(rune('a'+i)))); err != nil {
+			if _, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, appendSubmission(string(rune('a'+i)))); err != nil {
 				t.Error(err)
 			}
 		}()
 	}
 	wg.Wait()
 
-	got, err := domains.Get(ctx, org)
+	got, err := domains.Get(ctx, Scope{Org: org, Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,10 +242,13 @@ func TestMongoDomainUpdateLegacyDocWithoutRevision(t *testing.T) {
 	db := livingTestMongoDB(t)
 	ctx := t.Context()
 	domains := NewMongoDomainStore(db)
-	org := "mongo-update-legacy"
+	scope := Scope{Org: "mongo-update-legacy", Stream: "main"}
+	id := scopeKey(scope)
 
 	_, err := db.Collection(collectionOrgDomains).InsertOne(ctx, bson.M{
-		"_id":          org,
+		"_id":          id,
+		"org":          scope.Org,
+		"stream":       scope.Stream,
 		"entities":     bson.M{"lot": bson.M{"L1": bson.M{"client": "NO"}}},
 		"submissions":  bson.A{},
 		"jobInstances": bson.A{},
@@ -249,12 +256,12 @@ func TestMongoDomainUpdateLegacyDocWithoutRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"a", "b"} {
-		if _, err := domains.Update(ctx, org, appendSubmission(id)); err != nil {
+	for _, sid := range []string{"a", "b"} {
+		if _, err := domains.Update(ctx, scope, appendSubmission(sid)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	got, err := domains.Get(ctx, org)
+	got, err := domains.Get(ctx, scope)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +271,7 @@ func TestMongoDomainUpdateLegacyDocWithoutRevision(t *testing.T) {
 	var raw struct {
 		Revision int64 `bson:"revision"`
 	}
-	if err := db.Collection(collectionOrgDomains).FindOne(ctx, bson.M{"_id": org}).Decode(&raw); err != nil {
+	if err := db.Collection(collectionOrgDomains).FindOne(ctx, bson.M{"_id": id}).Decode(&raw); err != nil {
 		t.Fatal(err)
 	}
 	if raw.Revision != 2 {
@@ -278,15 +285,15 @@ func TestMongoDomainPutBumpsRevisionSoStaleUpdateRetries(t *testing.T) {
 	domains := NewMongoDomainStore(db)
 	org := "mongo-update-stale"
 
-	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+	if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
 	calls := 0
-	_, err := domains.Update(ctx, org, func(d Domain) (Domain, error) {
+	_, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, func(d Domain) (Domain, error) {
 		calls++
 		if calls == 1 {
 			// Lands between this Update's read and its conditional write.
-			if err := domains.Put(ctx, org, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
+			if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -298,7 +305,7 @@ func TestMongoDomainPutBumpsRevisionSoStaleUpdateRetries(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("fn calls = %d, want 2 (stale attempt retried)", calls)
 	}
-	got, err := domains.Get(ctx, org)
+	got, err := domains.Get(ctx, Scope{Org: org, Stream: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,17 +320,154 @@ func TestMongoDomainUpdateConflictWhenRetriesExhausted(t *testing.T) {
 	domains := NewMongoDomainStore(db)
 	org := "mongo-update-exhausted"
 
-	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+	if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
-	_, err := domains.Update(ctx, org, func(d Domain) (Domain, error) {
-		if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+	_, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, func(d Domain) (Domain, error) {
+		if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, EmptyDomain()); err != nil {
 			t.Fatal(err)
 		}
 		return d, nil
 	})
 	if !errors.Is(err, ErrDomainConflict) {
 		t.Fatalf("err = %v, want ErrDomainConflict", err)
+	}
+}
+
+func TestMongoStreamsOfOneOrgKeepSeparateDomainsAndActiveVersions(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	domains := NewMongoDomainStore(db)
+	configs := NewMongoConfigStore(db)
+
+	recycling, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := LoadSecondStreamConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	org := "mongo-two-streams-" + t.Name()
+	recycling.Org = org
+	other.Org = org
+	recycling.Version = "recycle-v1"
+	other.Version = "other-v1"
+
+	scopeA, err := ScopeFromConfig(recycling)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scopeB, err := ScopeFromConfig(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.Put(ctx, scopeA, recycling.Version, recycling); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.Put(ctx, scopeB, other.Version, other); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.SetActiveVersion(ctx, scopeA, recycling.Version); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.SetActiveVersion(ctx, scopeB, other.Version); err != nil {
+		t.Fatal(err)
+	}
+	if err := domains.Put(ctx, scopeA, domainFromKinds(map[string]EntityMap{"truck": {"T-A": {"mark": "a"}}})); err != nil {
+		t.Fatal(err)
+	}
+	if err := domains.Put(ctx, scopeB, domainFromKinds(map[string]EntityMap{"item": {"I-B": {"mark": "b"}}})); err != nil {
+		t.Fatal(err)
+	}
+
+	streams, err := configs.ListStreams(ctx, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantStreams := []string{scopeA.Stream, scopeB.Stream}
+	slices.Sort(wantStreams)
+	if !slices.Equal(streams, wantStreams) {
+		t.Fatalf("ListStreams = %v, want %v", streams, wantStreams)
+	}
+	activeA, err := configs.ActiveVersion(ctx, scopeA)
+	if err != nil || activeA != recycling.Version {
+		t.Fatalf("active A = %q err=%v", activeA, err)
+	}
+	activeB, err := configs.ActiveVersion(ctx, scopeB)
+	if err != nil || activeB != other.Version {
+		t.Fatalf("active B = %q err=%v", activeB, err)
+	}
+	gotA, err := domains.Get(ctx, scopeA)
+	if err != nil || gotA.Kind("truck")["T-A"]["mark"] != "a" || len(gotA.Kind("item")) != 0 {
+		t.Fatalf("domain A = %#v err=%v", gotA, err)
+	}
+	gotB, err := domains.Get(ctx, scopeB)
+	if err != nil || gotB.Kind("item")["I-B"]["mark"] != "b" || len(gotB.Kind("truck")) != 0 {
+		t.Fatalf("domain B = %#v err=%v", gotB, err)
+	}
+}
+
+func TestMongoStreamsOfOneOrgKeepSeparateDPPsAndLinks(t *testing.T) {
+	db := livingTestMongoDB(t)
+	ctx := t.Context()
+	passports := NewMongoDPPStore(db)
+	links := NewMongoLinkStore(db)
+
+	scopeA := Scope{Org: "mongo-dpp-" + t.Name(), Stream: "recycling"}
+	scopeB := Scope{Org: scopeA.Org, Stream: "other"}
+	addr := SubmissionAddress{JobID: "intake", JobInstanceID: "T1", TaskID: "register"}
+	ts := "2026-11-19T12:00:00.000000000Z"
+
+	if err := passports.Create(ctx, DPPRecord{
+		Org: scopeA.Org, Stream: scopeA.Stream, SubjectID: "L-A",
+		GTIN: "09506000134352", Lot: "LOT-A", Serial: "L-A",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/a",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := passports.Create(ctx, DPPRecord{
+		Org: scopeB.Org, Stream: scopeB.Stream, SubjectID: "L-A",
+		GTIN: "09506000134352", Lot: "LOT-B", Serial: "L-A",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/b",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gotA, err := passports.Get(ctx, scopeA, "L-A")
+	if err != nil || gotA.Lot != "LOT-A" || gotA.Stream != scopeA.Stream {
+		t.Fatalf("passport A = %#v err=%v", gotA, err)
+	}
+	gotB, err := passports.Get(ctx, scopeB, "L-A")
+	if err != nil || gotB.Lot != "LOT-B" || gotB.Stream != scopeB.Stream {
+		t.Fatalf("passport B = %#v err=%v", gotB, err)
+	}
+
+	dup := DPPRecord{
+		Org: scopeB.Org, Stream: scopeB.Stream, SubjectID: "L-dup",
+		GTIN: "09506000134352", Lot: "LOT-A", Serial: "L-A",
+		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/dup",
+	}
+	if err := passports.Create(ctx, dup); !errors.Is(err, ErrDPPExists) {
+		t.Fatalf("cross-stream identity = %v, want ErrDPPExists", err)
+	}
+	byID, err := passports.GetByIdentity(ctx, "09506000134352", "LOT-A", "L-A")
+	if err != nil || byID.Stream != scopeA.Stream {
+		t.Fatalf("GetByIdentity = %#v err=%v", byID, err)
+	}
+
+	if err := links.Put(ctx, scopeA, addr, ts, []HttpLinkItem{{Label: "A", URL: "blob:a", Action: HttpActionLink}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := links.Put(ctx, scopeB, addr, ts, []HttpLinkItem{{Label: "B", URL: "blob:b", Action: HttpActionDownload, Filename: "b.csv"}}); err != nil {
+		t.Fatal(err)
+	}
+	storedA, err := links.Get(ctx, scopeA, addr, ts)
+	if err != nil || len(storedA) != 1 || storedA[0].URL != "blob:a" {
+		t.Fatalf("links A = %#v err=%v", storedA, err)
+	}
+	storedB, err := links.Get(ctx, scopeB, addr, ts)
+	if err != nil || len(storedB) != 1 || storedB[0].Filename != "b.csv" {
+		t.Fatalf("links B = %#v err=%v", storedB, err)
 	}
 }
 
@@ -352,6 +496,8 @@ func livingTestMongoDB(t *testing.T) *mongo.Database {
 		_ = db.Collection(collectionOrgDomains).Drop(context.Background())
 		_ = db.Collection(collectionOrgConfigs).Drop(context.Background())
 		_ = db.Collection(collectionOrgActiveConfig).Drop(context.Background())
+		_ = db.Collection(collectionOrgDPPs).Drop(context.Background())
+		_ = db.Collection(collectionOrgSubmissionLinks).Drop(context.Background())
 	})
 	return db
 }

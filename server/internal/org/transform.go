@@ -73,6 +73,8 @@ type RunTransformInput struct {
 	Catalogs      map[string]any
 	// Today is calendar YYYY-MM-DD ($today) for plant date-stamp mint exprs.
 	Today string
+	// Stream binds $stream for transform exprs (nil ⇒ unbound).
+	Stream *streamBinding
 }
 
 type RunTransformResult struct {
@@ -157,11 +159,22 @@ func requireEntitySet(m map[string]any, allowed map[string]struct{}, op string) 
 	return EntityType(entityRaw), set, nil
 }
 
+// streamBinding is the Org stream evaluation context ($stream.key / $stream.id).
+// Nil or empty Key leaves $stream unbound. Empty ID omits id (Play / pre-instance).
+type streamBinding struct {
+	Key string
+	ID  string
+}
+
 func domainBindings(domain Domain, jobInstanceID string, catalogs map[string]any) ExprBindings {
-	return domainBindingsWithToday(domain, jobInstanceID, catalogs, "")
+	return domainBindingsWith(domain, jobInstanceID, catalogs, "", nil)
 }
 
 func domainBindingsWithToday(domain Domain, jobInstanceID string, catalogs map[string]any, today string) ExprBindings {
+	return domainBindingsWith(domain, jobInstanceID, catalogs, today, nil)
+}
+
+func domainBindingsWith(domain Domain, jobInstanceID string, catalogs map[string]any, today string, stream *streamBinding) ExprBindings {
 	entityMaps := domain.EntityMaps()
 	domainBag := make(map[string]any, len(entityMaps)+1)
 	for kind, m := range entityMaps {
@@ -183,7 +196,19 @@ func domainBindingsWithToday(domain Domain, jobInstanceID string, catalogs map[s
 	if today != "" {
 		bindings["today"] = today
 	}
+	bindStream(bindings, stream)
 	return bindings
+}
+
+func bindStream(bindings ExprBindings, stream *streamBinding) {
+	if stream == nil || stream.Key == "" {
+		return
+	}
+	s := map[string]any{"key": stream.Key}
+	if stream.ID != "" {
+		s["id"] = stream.ID
+	}
+	bindings["stream"] = s
 }
 
 func catalogsBag(catalogs map[string]any) map[string]any {
@@ -297,7 +322,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 	workingFacts := any(input.Facts)
 
 	for _, op := range parsed {
-		bindings := mergeBindings(domainBindingsWithToday(working, input.JobInstanceID, input.Catalogs, input.Today), aliases)
+		bindings := mergeBindings(domainBindingsWith(working, input.JobInstanceID, input.Catalogs, input.Today, input.Stream), aliases)
 
 		switch o := op.(type) {
 		case transformBindOp:
@@ -374,7 +399,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			}
 			for index := 0; index < count; index++ {
 				// Refresh $domain each iteration so count/id exprs see prior mints.
-				loopBindings := mergeBindings(domainBindingsWithToday(working, input.JobInstanceID, input.Catalogs, input.Today), aliases)
+				loopBindings := mergeBindings(domainBindingsWith(working, input.JobInstanceID, input.Catalogs, input.Today, input.Stream), aliases)
 				loopBindings["index"] = index
 				idGot, err := evalScalar(o.ID, workingFacts, loopBindings)
 				if err != nil {
@@ -405,7 +430,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			Ops:           ops,
 			UserID:        input.UserID,
 		},
-		Bindings: mergeBindings(domainBindingsWithToday(working, input.JobInstanceID, input.Catalogs, input.Today), aliases),
+		Bindings: mergeBindings(domainBindingsWith(working, input.JobInstanceID, input.Catalogs, input.Today, input.Stream), aliases),
 	}, nil
 }
 

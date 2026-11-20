@@ -12,7 +12,7 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	provisional, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "")
+	provisional, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "intake", "truckArrive", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 		t.Fatalf("provisional = %s", bundleAddress(provisional))
 	}
 
-	viaNew, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "truckArrive", "new")
+	viaNew, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "intake", "truckArrive", "new")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	}
 
 	truckID := commitTruckArrive(t, c)
-	spawn, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID)
+	spawn, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "intake", "register", truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID := commitTruckArrive(t, c)
 
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "intake", "register", truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,12 +52,12 @@ func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
 		t.Fatalf("addressed = %s", bundleAddress(bundle))
 	}
 
-	loaded, err := loader.Load(t.Context(), "feragame", admin)
+	loaded, err := loader.Load(t.Context(), FeragameScope(), admin)
 	if err != nil {
 		t.Fatal(err)
 	}
 	loaded.TaskFormBundles = nil
-	again, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "register", truckID)
+	again, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "intake", "register", truckID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,13 +72,13 @@ func TestLoadTaskBundleDeniesRoleOutsideBoardScope(t *testing.T) {
 	_ = commitStartLot(t, c, loadID)
 
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	_, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID)
+	_, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "lot_processing", "weigh", loadID)
 	if !errors.Is(err, ErrTaskBundleForbidden) {
 		t.Fatalf("admin weigh err = %v, want forbidden", err)
 	}
 
 	lineOp := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
-	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID)
+	bundle, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), lineOp, "lot_processing", "weigh", loadID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?jobId=intake&taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("provisional status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -111,17 +111,17 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?jobId=intake&taskId=truckArrive&jobInstanceId=new", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive&jobInstanceId=new", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("new provisional = %d", rec.Code)
 	}
 
-	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)
+	truckID, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	_ = commitStartLot(t, c, loadID)
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
+		"/api/org/task-form?stream=recycling&instance="+truckID+"&jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("admin weigh = %d, want 403", rec.Code)
 	}
@@ -134,13 +134,13 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	lineH.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
+		"/api/org/task-form?stream=recycling&instance="+truckID+"&jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("line weigh = %d body=%s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&taskId=truckArrive", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("missing jobId = %d", rec.Code)
 	}
@@ -150,7 +150,7 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	arrive, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	arrive, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err != nil {
@@ -162,7 +162,7 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 		t.Fatalf("after arrive Navigation = %q", arrive.Navigation)
 	}
 
-	lot, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	lot, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
@@ -181,7 +181,7 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 		t.Fatalf("after lot ContinueNavigation = %q, want task (weightCheck)", lot.ContinueNavigation)
 	}
 
-	done, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+	done, err := c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
@@ -194,7 +194,7 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 
 	_ = commitStartLot(t, c, loadID)
 	lineOp := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
-	pw, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
+	pw, err := c.Commit(t.Context(), FeragameScope(), lineOp, CommitRequest{
 		TaskPath:      "lot_processing/weigh",
 		JobInstanceID: loadID,
 		Value:         weighValue(loadID+".1", 11),

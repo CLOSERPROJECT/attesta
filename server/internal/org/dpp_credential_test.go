@@ -47,7 +47,7 @@ func TestBuildDPPCredentialFromRecord(t *testing.T) {
 func TestMemoryPassportStoreGetByIdentity(t *testing.T) {
 	store := NewMemoryDPPStore()
 	rec := DPPRecord{
-		Org: "synth", SubjectID: "W1", GTIN: "09506000134352",
+		Org: "synth", Stream: "synth", SubjectID: "W1", GTIN: "09506000134352",
 		Lot: "L1", Serial: "W1", Snapshot: map[string]any{"n": 1}, IssuedAt: "t",
 		DigitalLink: untp.URL("09506000134352", "L1", "W1"),
 	}

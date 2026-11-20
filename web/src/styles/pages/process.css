@@ -57,6 +57,58 @@
   display: none;
 }
 
+.stream-show-all-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: var(--space-3);
+}
+
+.stream-show-all-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--secondary-foreground);
+  cursor: pointer;
+  user-select: none;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  padding-right: var(--space-3);
+}
+
+.stream-show-all-filter-label input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
+.stream-show-all-filter-label:hover,
+.stream-show-all-filter-label:has(input[type="checkbox"]:checked) {
+  background-color: var(--success-muted);
+  border-color: var(--border-primary);
+}
+
+.stream-show-all-filter-root.is-actionable-only
+  .substep:not([data-org-actionable="true"]) {
+  display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only
+  .stream-timeline-row:not(:has(.substep[data-org-actionable="true"])) {
+  display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only
+  .stream-timeline-step:not(:has(.substep[data-org-actionable="true"])) {
+  display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only.is-actionable-only-empty
+  .stream-timeline-list {
+  display: none;
+}
+
 /* Process ID under page-header title (process page only) */
 .process-header-meta {
   display: inline-flex;

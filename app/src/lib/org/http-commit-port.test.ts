@@ -105,9 +105,11 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.worklist.jobs[0].instances[0].submissionCounts).toEqual({ repeat: 2 });
 	});
 
-	test('POST /api/org/commit with taskPath + jobInstanceId + value + mint', async () => {
+	test('POST /api/org/commit sends stream + instance query with body', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe('/api/org/commit');
+			expect(String(input)).toBe(
+				'/api/org/commit?stream=recycling&instance=261102-1'
+			);
 			expect(init?.method).toBe('POST');
 			expect(init?.credentials).toBe('include');
 			expect(JSON.parse(String(init?.body))).toEqual({
@@ -124,6 +126,8 @@ describe('HttpCommitDomainPort', () => {
 
 		const port = createHttpCommitDomainPort({ fetch: fetchFn, baseUrl: '' });
 		const got = await port.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-261019-NO-1',
 			value: { client: 'NO', palletCount: 1 },
@@ -158,6 +162,8 @@ describe('HttpCommitDomainPort', () => {
 		);
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		const got = await port.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/codiceFir',
 			jobInstanceId: 'NIR-261019-NO-1',
 			value: { codiceFir: 'FIR-1' },
@@ -186,6 +192,8 @@ describe('HttpCommitDomainPort', () => {
 		);
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		const got = await port.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/lots/lots-1/register',
 			jobInstanceId: 'T1',
 			value: { lotId: 'L1' },
@@ -195,12 +203,13 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.continueNavigation).toBe('home');
 	});
 
-	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {
-		const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+	test('Play startingNew sends stream without instance', async () => {
+		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+			expect(String(input)).toBe('/api/org/commit?stream=recycling');
 			expect(JSON.parse(String(init?.body))).toEqual({
-				taskPath: 'intake/register',
+				taskPath: 'intake/truckArrive',
 				jobInstanceId: '',
-				value: { client: 'NO' },
+				value: { plate: 'AB' },
 				mint: { kind: 'startingNew' }
 			});
 			return new Response(JSON.stringify(sampleResult), {
@@ -210,9 +219,10 @@ describe('HttpCommitDomainPort', () => {
 		});
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		await port.commit({
-			taskPath: 'intake/register',
+			stream: 'recycling',
+			taskPath: 'intake/truckArrive',
 			jobInstanceId: '',
-			value: { client: 'NO' },
+			value: { plate: 'AB' },
 			mint: { kind: 'startingNew' }
 		});
 	});
@@ -221,7 +231,9 @@ describe('HttpCommitDomainPort', () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			const url = String(input);
 			expect(url).not.toContain('/api/runs');
-			expect(url).toBe('https://host.example/api/org/commit');
+			expect(url).toBe(
+				'https://host.example/api/org/commit?stream=recycling&instance=261102-1'
+			);
 			return new Response(JSON.stringify(sampleResult), { status: 200 });
 		});
 		const port = createHttpCommitDomainPort({
@@ -229,6 +241,8 @@ describe('HttpCommitDomainPort', () => {
 			baseUrl: 'https://host.example'
 		});
 		await port.commit({
+			stream: 'recycling',
+			instance: '261102-1',
 			taskPath: 'intake/codiceFir',
 			jobInstanceId: 'NIR-261019-NO-1',
 			value: { codiceFir: 'FIR-1' }
@@ -240,6 +254,8 @@ describe('HttpCommitDomainPort', () => {
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		await expect(
 			port.commit({
+				stream: 'recycling',
+				instance: 'x',
 				taskPath: 'intake/register',
 				jobInstanceId: 'x',
 				value: {}
@@ -247,6 +263,8 @@ describe('HttpCommitDomainPort', () => {
 		).rejects.toBeInstanceOf(CommitDomainError);
 		await expect(
 			port.commit({
+				stream: 'recycling',
+				instance: 'x',
 				taskPath: 'intake/register',
 				jobInstanceId: 'x',
 				value: {}

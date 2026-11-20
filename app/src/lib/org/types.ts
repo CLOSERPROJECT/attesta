@@ -61,6 +61,10 @@ export type WorklistInstance = {
 	 * Overview many-submit chrome reads this without calling recap.
 	 */
 	submissionCounts?: Record<string, number>;
+	/** Server: every submit: once Task done (many ignored). */
+	finished?: boolean;
+	/** Server: blockedReason text for unavailable leaves only. */
+	blockedReasons?: Record<string, string>;
 };
 
 export type TaskStatus = 'unavailable' | 'available' | 'actionable' | 'done';

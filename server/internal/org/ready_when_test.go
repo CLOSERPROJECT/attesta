@@ -62,10 +62,10 @@ func committerWithReadyWhen(t *testing.T, taskID, readyWhen string, auth Authori
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	cfg.Version = DefaultFixtureVersion
-	if err := configs.Put(t.Context(), "feragame", cfg.Version, cfg); err != nil {
+	if err := configs.Put(t.Context(), FeragameScope(), cfg.Version, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "feragame", cfg.Version); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), FeragameScope(), cfg.Version); err != nil {
 		t.Fatal(err)
 	}
 	if auth == nil {
@@ -86,12 +86,12 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	c, domains := committerWithReadyWhen(t, "weightCheck", "false", NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
-	before, err := domains.Get(t.Context(), "feragame")
+	before, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})
@@ -99,7 +99,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("readyWhen false should deny via Cerbos: %v", err)
 	}
-	after, err := domains.Get(t.Context(), "feragame")
+	after, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestCommitWeightCheckAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})

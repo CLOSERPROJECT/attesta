@@ -67,6 +67,7 @@ func (a *CerbosAuthorizer) AllowCommit(ctx context.Context, q AuthorizeCommit) (
 		resourceID,
 		map[string]any{
 			"orgSlug":      strings.TrimSpace(q.Org),
+			"stream":       strings.TrimSpace(q.Stream),
 			"taskPath":     strings.TrimSpace(q.TaskPath),
 			"jobId":        strings.TrimSpace(q.JobID),
 			"taskId":       strings.TrimSpace(q.TaskID),

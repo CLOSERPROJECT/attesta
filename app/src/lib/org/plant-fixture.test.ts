@@ -15,14 +15,11 @@ function taskRoles(jobId: string, taskId: string): string[] {
 describe('feragame plant fixture ($org-fixtures)', () => {
 	const config = loadFeragameConfig(feragameConfigYaml);
 
-	test('exactly three Jobs: intake, lot_processing, passport', () => {
-		expect(Object.keys(config.jobs).sort()).toEqual([
-			'intake',
-			'lot_processing',
-			'passport'
-		]);
+	test('exactly two Jobs: intake, lot_processing', () => {
+		expect(Object.keys(config.jobs).sort()).toEqual(['intake', 'lot_processing']);
 		expect(config.jobs).not.toHaveProperty('line');
 		expect(config.jobs).not.toHaveProperty('workingDay');
+		expect(config.jobs).not.toHaveProperty('passport');
 	});
 
 	test('lot_processing Task inventory matches LOCKED', () => {
@@ -31,7 +28,8 @@ describe('feragame plant fixture ($org-fixtures)', () => {
 			'weigh',
 			'markProgress',
 			'containerReg',
-			'closeLot'
+			'closeLot',
+			'lock'
 		]);
 		expect(config.jobs.lot_processing.tasks.map((t) => t.id)).not.toContain('openTurno');
 		expect(config.jobs.lot_processing.tasks.map((t) => t.id)).not.toContain('closeTurno');
@@ -49,20 +47,34 @@ describe('feragame plant fixture ($org-fixtures)', () => {
 		expect(taskRoles('lot_processing', 'markProgress')).toEqual(['line']);
 		expect(taskRoles('lot_processing', 'containerReg')).toEqual(['logistic']);
 		expect(taskRoles('lot_processing', 'closeLot')).toEqual(['logistic']);
-
-		expect(taskRoles('passport', 'select')).toEqual(['administration']);
-		expect(taskRoles('passport', 'lock')).toEqual(['administration']);
+		expect(taskRoles('lot_processing', 'lock')).toEqual(['administration']);
 	});
 
-	test('intake and passport readyWhen fold sibling gates into Domain', () => {
+	test('intake and lot_processing/lock readyWhen fold sibling gates into Domain', () => {
 		const register = taskConfig(config.jobs.intake, 'register')!;
 		const weightCheck = taskConfig(config.jobs.intake, 'weightCheck')!;
-		const lock = taskConfig(config.jobs.passport, 'lock')!;
+		const lock = taskConfig(config.jobs.lot_processing, 'lock')!;
 		expect(String(register.readyWhen)).toContain('truckArrive');
 		expect(String(register.readyWhen)).toContain('weightCheck');
 		expect(String(weightCheck.readyWhen)).toContain('truckArrive');
 		expect(String(weightCheck.readyWhen)).toContain('lot');
-		expect(String(lock.readyWhen)).toContain('select');
+		expect(String(lock.readyWhen)).not.toContain('select');
 		expect(String(lock.readyWhen)).toContain('fullyProcessed');
+		expect(String(lock.readyWhen)).toContain('locked');
+		expect(lock.title).toBe('Verifica dati e DPP');
+	});
+
+	test('parallel trucks: truckArrive open; startLot scopes lots + Linea occupata', () => {
+		const arrive = taskConfig(config.jobs.intake, 'truckArrive')!;
+		expect(arrive.readyWhen).toBeUndefined();
+		const startLot = taskConfig(config.jobs.lot_processing, 'startLot')!;
+		expect(String(startLot.readyWhen)).toContain('truckId = $stream.id');
+		const lotsWhere = String((startLot.reads as { lots?: { where?: string } })?.lots?.where ?? '');
+		expect(lotsWhere).toContain('truckId = $stream.id');
+		expect(String(startLot.blockedReason)).toContain('Linea occupata');
+		expect(String(startLot.blockedReason)).toContain('truckId = $stream.id');
+		const register = taskConfig(config.jobs.intake, 'register')!;
+		const http = (register.onSubmit as { http?: { body?: string }[] })?.http ?? [];
+		expect(http.some((op) => String(op.body).includes('$qrEndpoint'))).toBe(true);
 	});
 });

@@ -7,12 +7,14 @@ import (
 	"sync"
 )
 
-// DPPStore persists issued DPPs keyed by org + subject.
+// DPPStore persists issued DPPs keyed by (org, stream, subject).
 type DPPStore interface {
-	Get(ctx context.Context, org, subjectID string) (DPPRecord, error)
+	Get(ctx context.Context, scope Scope, subjectID string) (DPPRecord, error)
 	// GetByIdentity resolves a public Digital Link (gtin/lot/serial) to a locked Passport.
+	// Identity lookup is global across streams so the shared Digital Link stays public.
 	GetByIdentity(ctx context.Context, gtin, lot, serial string) (DPPRecord, error)
-	// Create inserts once; returns ErrDPPExists when the subject is already locked.
+	// Create inserts once; returns ErrDPPExists when the subject is already locked in
+	// this stream, or when the identity is already issued in any stream (fail closed).
 	Create(ctx context.Context, record DPPRecord) error
 	// DeleteByOrg removes every Passport for org (seed --replace / Domain rebuild).
 	DeleteByOrg(ctx context.Context, org string) error
@@ -22,25 +24,28 @@ var _ DPPStore = (*MemoryDPPStore)(nil)
 
 // MemoryDPPStore is an in-memory DPPStore.
 type MemoryDPPStore struct {
-	mu     sync.RWMutex
-	byKey  map[string]DPPRecord
+	mu    sync.RWMutex
+	byKey map[string]DPPRecord
 }
 
 func NewMemoryDPPStore() *MemoryDPPStore {
 	return &MemoryDPPStore{byKey: map[string]DPPRecord{}}
 }
 
-func passportStoreKey(org, subjectID string) (string, error) {
-	org = strings.TrimSpace(org)
-	subjectID = strings.TrimSpace(subjectID)
-	if org == "" || subjectID == "" {
-		return "", fmt.Errorf("org: passport store key requires org and subject id")
+func passportStoreKey(scope Scope, subjectID string) (string, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return "", err
 	}
-	return org + "\x00" + subjectID, nil
+	subjectID = strings.TrimSpace(subjectID)
+	if subjectID == "" {
+		return "", fmt.Errorf("org: passport store key requires subject id")
+	}
+	return scope.Org + "\x00" + scope.Stream + "\x00" + subjectID, nil
 }
 
-func (s *MemoryDPPStore) Get(_ context.Context, org, subjectID string) (DPPRecord, error) {
-	key, err := passportStoreKey(org, subjectID)
+func (s *MemoryDPPStore) Get(_ context.Context, scope Scope, subjectID string) (DPPRecord, error) {
+	key, err := passportStoreKey(scope, subjectID)
 	if err != nil {
 		return DPPRecord{}, ErrNotFound
 	}
@@ -71,16 +76,31 @@ func (s *MemoryDPPStore) GetByIdentity(_ context.Context, gtin, lot, serial stri
 }
 
 func (s *MemoryDPPStore) Create(_ context.Context, record DPPRecord) error {
-	key, err := passportStoreKey(record.Org, record.SubjectID)
+	scope, err := Scope{Org: record.Org, Stream: record.Stream}.Normalize()
 	if err != nil {
 		return err
 	}
+	key, err := passportStoreKey(scope, record.SubjectID)
+	if err != nil {
+		return err
+	}
+	gtin := strings.TrimSpace(record.GTIN)
+	lot := strings.TrimSpace(record.Lot)
+	serial := strings.TrimSpace(record.Serial)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.byKey[key]; exists {
 		return ErrDPPExists
 	}
-	record.Org = strings.TrimSpace(record.Org)
+	if gtin != "" && lot != "" && serial != "" {
+		for _, rec := range s.byKey {
+			if rec.GTIN == gtin && rec.Lot == lot && rec.Serial == serial {
+				return ErrDPPExists
+			}
+		}
+	}
+	record.Org = scope.Org
+	record.Stream = scope.Stream
 	record.SubjectID = strings.TrimSpace(record.SubjectID)
 	s.byKey[key] = clonePassportRecord(record)
 	return nil

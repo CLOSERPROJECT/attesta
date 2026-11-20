@@ -6,29 +6,30 @@ How Attesta’s seams connect. Vocabulary layers: [`GLOSSARY-MAP.md`](../GLOSSAR
 
 | Surface | UI | Runtime law | HTTP |
 | --- | --- | --- | --- |
-| **Stream** (`/my`) | Go templates + HTMX + `web/` | Formata Streams in Mongo (catalog); on-disk `server/config/` is seed/template only | `server/cmd/server` |
-| **Org** (`/app`) | SvelteKit `app/` | Active Org Config + Domain | `app/` → `/api/org/*` → `server/internal/org` |
+| **`/my`** | Go templates + HTMX + `web/` | Formata Streams in Mongo (catalog), **and** Org-backed streams via `server/internal/org` (Active Config + Domain) | `server/cmd/server` |
+| **`/app`** | SvelteKit `app/` | Active Org Config + Domain, scoped to one **Org stream instance** | `app/` → `/api/org/*` → `server/internal/org` |
 
-**Org ↛ Stream:** `/app` does not load Streams or Stream instances. Org Config ≠ Stream blueprint. Shared membership (Organization, Affiliation, roles) gates both; see root [`GLOSSARY.md`](../GLOSSARY.md).
+`/my` is the affiliated landing: Stream discovery, Org-backed stream dashboards, and Formata stream chrome. `/app` is the instance-scoped operator Worklist for an Org stream instance ([ADR-0014](adr/0014-org-config-as-stream.md)). Shared membership (Organization, Affiliation, roles) gates both; see root [`GLOSSARY.md`](../GLOSSARY.md).
 
-Platform admin (`/admin`) and public home (`/`) stay on the Stream shell. They are not the Org Worklist.
+Platform admin (`/admin`) and public home (`/`) stay on the `/my` shell. They are not the Org Worklist.
 
 ## Shell → Org executor → SPA
 
 ```text
 browser
-  ├─ /my/…          → cmd/server (Stream HTMX)
-  ├─ /app/…         → cmd/server handleAppSPA → app/ build (or APP_DEV_SERVER)
+  ├─ /my/…          → cmd/server (Formata Streams + Org-backed stream catalog/dashboard/timeline
+  │                      via org package: ListStreams, instances, ProjectStreamTimeline)
+  ├─ /app/{stream}/… → cmd/server handleAppSPA → app/ build (or APP_DEV_SERVER)
   │                      └─ fetch /api/org/… → org.API (Gate = verified session
-  │                           → OperatorIdentity from Affiliation)
+  │                           → OperatorIdentity from Affiliation; stream + instance scope)
   │                           └─ Load / Commit / QR / artifacts
   ├─ /admin/…       → cmd/server (platform admin; Cerbos platform_admin)
   └─ /01/…/10/…/21/… → cmd/server Digital Link (Org DPP first, else Stream)
 ```
 
-- **`cmd/server`** is the process shell: mux, Appwrite session, Stream handlers, mounts `org.API`, serves `/app`.
-- **`server/internal/org`** is the Org **dumb executor**: evaluates Active Config against Domain (Worklist projection, Commit, passport mint, HttpPort). Plant open/close law lives in Config, not in Go or `app/` branches.
-- **`app/`** is a dumb client: Draft is browser-local (ADR-0009); Domain writes only happen through Commit on `/api/org`.
+- **`cmd/server`** is the process shell: mux, Appwrite session, `/my` handlers (Formata and Org-backed), mounts `org.API`, serves `/app`.
+- **`server/internal/org`** is the Org **dumb executor**: evaluates Active Config against Domain (Worklist projection, Commit, passport mint, HttpPort, stream instance/timeline projection). Plant open/close law lives in Config, not in Go or `app/` branches.
+- **`app/`** is a dumb client: Draft is browser-local (ADR-0009); Domain writes only happen through Commit on `/api/org`. Routes are scoped to one Org stream instance.
 
 ## Shared infrastructure seams
 
@@ -36,10 +37,13 @@ browser
 Appwrite ──session / teams / membership──► both /my and /app+/api/org
 Cerbos   ──one PDP, split policies──────► Stream (substep, formata, org_admin, …)
                                          Org   (resource task / action commit)
-Mongo    ──one DB, split collections────► Stream: processes, formata_*, GridFS
+Mongo    ──one DB, split collections────► Formata: processes, formata_*, GridFS
                                          Org:    org_domains, org_configs,
                                                  org_active_config, org_dpps,
                                                  org_submission_links
+                                                 (keys include stream; Active
+                                                  Config and Domain are per
+                                                  (org, stream))
 ```
 
 Progress / entity keys with `.` are stored as `_` and normalized on read (same rule on Stream Process and Org Domain — see [`AGENTS.md`](../AGENTS.md)).
@@ -50,15 +54,15 @@ Organization role slugs (Appwrite) should align with Config role slugs where Cer
 
 ```text
 Seed / prepare
-  ├─ Formata catalog (+ demo Stream instances)  → Stream runtime
-  └─ Org Active Config + Domain (+ identity)    → Org runtime
+  ├─ Formata catalog (+ demo Stream instances)  → Formata /my runtime
+  └─ Org Active Config + Domain per stream (+ identity) → Org runtime
          ▲
-         │ authored plant payload (e.g. Feragame YAML)
+         │ authored plant payload (e.g. Feragame YAML with stream section)
          │ platform gates / onCommit / transforms → docs/agents/org-config-authoring.md
 ```
 
-- Empty Formata catalog fails closed on the production path (no disk-YAML fallback for live Streams).
-- Org Active Config pins the Config version Domain is evaluated against.
+- Empty Formata catalog fails closed on the production path (no disk-YAML fallback for live Formata Streams).
+- Org Active Config pins the Config version Domain is evaluated against, per **Org stream**.
 - Feragame is one Organization’s Config/Domain **payload**, not platform ADR law.
 
 ## Dual passport, one Digital Link
@@ -78,7 +82,7 @@ Org hit: Org HTML/credential/linkset; Stream-only extras (`/events`, process att
 ## Adjacent seams (not the executor)
 
 - **HttpPort** — Config-declared side effects after Commit; env sidecar (`ORG_HTTP_*`); artifact bytes via `/api/org/artifacts/` (ADR-0010). Not the passport issue path.
-- **Org-admin / Formata** under `/my/…` — shared membership + Cerbos `org_admin_console` / `formata_builder` on the Stream shell; still not `/app`.
+- **Org-admin / Formata** under `/my/…` — shared membership + Cerbos `org_admin_console` / `formata_builder` on the `/my` shell; still not `/app`.
 
 ## Where to go next
 

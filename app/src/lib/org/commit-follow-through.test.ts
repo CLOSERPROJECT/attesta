@@ -9,6 +9,9 @@ import {
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { normalizeTaskAddress } from './task-address.js';
 
+const stream = 'recycling';
+const truck = '261102-1';
+
 const nextBundle: TaskFormBundle = {
 	jobId: 'intake',
 	taskId: 'codiceFir',
@@ -31,13 +34,17 @@ const sameAddressBundle: TaskFormBundle = {
 };
 
 const current = normalizeTaskAddress({
+	stream,
+	instance: truck,
 	jobId: 'intake',
 	jobInstanceId: 'NIR-1',
 	taskId: 'register'
 });
 
+const homeTarget = { kind: 'home' as const, stream, instance: truck };
+
 describe('decideCommitFollowThrough', () => {
-	test('stay parks; other destinations navigate', () => {
+	test('stay parks; other destinations navigate with stream prefix', () => {
 		expect(
 			decideCommitFollowThrough(
 				{
@@ -58,7 +65,7 @@ describe('decideCommitFollowThrough', () => {
 				},
 				current
 			)
-		).toEqual({ kind: 'navigate', target: { kind: 'home' } });
+		).toEqual({ kind: 'navigate', target: homeTarget });
 
 		expect(
 			decideCommitFollowThrough(
@@ -67,16 +74,34 @@ describe('decideCommitFollowThrough', () => {
 					jobInstanceId: 'NIR-advance',
 					nextTaskFormBundle: nextBundle
 				},
-				{ jobId: 'intake' }
+				{ stream, instance: truck, jobId: 'intake' }
 			)
 		).toEqual({
 			kind: 'navigate',
 			target: {
 				kind: 'task',
+				stream,
+				instance: truck,
 				jobId: 'intake',
 				jobInstanceId: 'NIR-advance',
 				taskId: 'codiceFir'
 			}
+		});
+	});
+
+	test('Play Commit (empty instance) navigates to minted home target', () => {
+		expect(
+			decideCommitFollowThrough(
+				{
+					navigation: 'home',
+					jobInstanceId: '261102-2',
+					nextTaskFormBundle: null
+				},
+				{ stream, instance: '', jobId: 'intake' }
+			)
+		).toEqual({
+			kind: 'navigate',
+			target: { kind: 'home', stream, instance: '261102-2' }
 		});
 	});
 });
@@ -109,6 +134,8 @@ describe('decideContinueFollowThrough', () => {
 			kind: 'navigate',
 			target: {
 				kind: 'task',
+				stream,
+				instance: truck,
 				jobId: 'intake',
 				jobInstanceId: 'NIR-advance',
 				taskId: 'codiceFir'
@@ -116,7 +143,7 @@ describe('decideContinueFollowThrough', () => {
 		});
 	});
 
-	test('home Continue → navigate home', () => {
+	test('home Continue → navigate home target', () => {
 		expect(
 			decideContinueFollowThrough(
 				{
@@ -126,10 +153,10 @@ describe('decideContinueFollowThrough', () => {
 				},
 				current
 			)
-		).toEqual({ kind: 'navigate', target: { kind: 'home' } });
+		).toEqual({ kind: 'navigate', target: homeTarget });
 	});
 
-	test('null continueNavigation defaults to home', () => {
+	test('null continueNavigation defaults to home target', () => {
 		expect(
 			decideContinueFollowThrough(
 				{
@@ -139,7 +166,7 @@ describe('decideContinueFollowThrough', () => {
 				},
 				current
 			)
-		).toEqual({ kind: 'navigate', target: { kind: 'home' } });
+		).toEqual({ kind: 'navigate', target: homeTarget });
 	});
 });
 
@@ -148,11 +175,11 @@ describe('apply follow-through', () => {
 		const clearLinksStay = vi.fn();
 		const navigate = vi.fn();
 		applyCommitFollowThrough(
-			{ kind: 'navigate', target: { kind: 'home' } },
+			{ kind: 'navigate', target: homeTarget },
 			{ clearLinksStay, navigate }
 		);
 		expect(clearLinksStay).toHaveBeenCalledOnce();
-		expect(navigate).toHaveBeenCalledWith({ kind: 'home' });
+		expect(navigate).toHaveBeenCalledWith(homeTarget);
 	});
 
 	test('Continue reload clears links then reloads', async () => {
@@ -173,11 +200,11 @@ describe('apply follow-through', () => {
 		const navigate = vi.fn();
 		const reload = vi.fn(async () => undefined);
 		await applyContinueFollowThrough(
-			{ kind: 'navigate', target: { kind: 'home' } },
+			{ kind: 'navigate', target: homeTarget },
 			{ clearLinksStay, navigate, reload }
 		);
 		expect(clearLinksStay).toHaveBeenCalledOnce();
-		expect(navigate).toHaveBeenCalledWith({ kind: 'home' });
+		expect(navigate).toHaveBeenCalledWith(homeTarget);
 		expect(reload).not.toHaveBeenCalled();
 	});
 });

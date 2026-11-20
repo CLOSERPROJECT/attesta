@@ -1,7 +1,8 @@
+import type { StreamScope } from './stream-scope.js';
 import type { LoadResult } from './types.js';
 
 export type LoadDomainPort = {
-	load(): Promise<LoadResult>;
+	load(scope: StreamScope & { instance: string }): Promise<LoadResult>;
 };
 
 export class LoadDomainError extends Error {

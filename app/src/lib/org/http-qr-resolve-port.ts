@@ -5,6 +5,7 @@ import {
 	QrResolveHttpError,
 	type QrResolvePort
 } from './qr-resolve-port.js';
+import { streamScopeQuery } from './stream-scope.js';
 
 export type HttpQrResolvePortOptions = {
 	fetch?: typeof fetch;
@@ -19,8 +20,12 @@ export function createHttpQrResolvePort(
 	const base = options.baseUrl ?? '';
 
 	return {
-		async resolve(raw) {
-			const res = await fetchFn(`${base}/api/org/qr-resolve`, {
+		async resolve(raw, scope) {
+			const qs = streamScopeQuery({
+				stream: scope.stream,
+				instance: scope.instance
+			});
+			const res = await fetchFn(`${base}/api/org/qr-resolve?${qs}`, {
 				method: 'POST',
 				credentials: 'include',
 				headers: {

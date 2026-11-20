@@ -12,7 +12,11 @@ type projectedForm struct {
 	Columns  *FormColumns
 }
 
-func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInstanceLabel string, catalogs map[string]any) (projectedForm, error) {
+func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInstanceLabel string, catalogs map[string]any, stream ...*streamBinding) (projectedForm, error) {
+	var streamRef *streamBinding
+	if len(stream) > 0 {
+		streamRef = stream[0]
+	}
 	schemaRaw, _ := task["schema"].(map[string]any)
 	if schemaRaw == nil {
 		schemaRaw = map[string]any{"type": "object", "properties": map[string]any{}}
@@ -55,7 +59,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			if err != nil {
 				return projectedForm{}, err
 			}
-			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel, catalogs)
+			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel, catalogs, streamRef)
 			if err != nil {
 				return projectedForm{}, err
 			}
@@ -102,7 +106,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			if err != nil {
 				return projectedForm{}, err
 			}
-			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel, catalogs)
+			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel, catalogs, streamRef)
 			if err != nil {
 				return projectedForm{}, err
 			}

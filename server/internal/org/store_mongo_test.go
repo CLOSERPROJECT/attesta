@@ -28,10 +28,10 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 	if domains == nil {
 		t.Fatal("NewMongoDomainStore")
 	}
-	if _, err := domains.Get(context.Background(), "  "); !errors.Is(err, ErrNotFound) {
+	if _, err := domains.Get(context.Background(), Scope{}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("empty org get = %v", err)
 	}
-	if err := domains.Put(context.Background(), "", EmptyDomain()); err == nil {
+	if err := domains.Put(context.Background(), Scope{}, EmptyDomain()); err == nil {
 		t.Fatal("empty org put")
 	}
 
@@ -39,30 +39,30 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 	if configs == nil {
 		t.Fatal("NewMongoConfigStore")
 	}
-	if _, err := configs.Get(context.Background(), "", "v1"); !errors.Is(err, ErrNotFound) {
+	if _, err := configs.Get(context.Background(), Scope{Stream: "main"}, "v1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("empty config get = %v", err)
 	}
-	if _, err := configs.Get(context.Background(), "org", ""); !errors.Is(err, ErrNotFound) {
+	if _, err := configs.Get(context.Background(), Scope{Org: "org", Stream: "main"}, ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("empty version get = %v", err)
 	}
-	if err := configs.Put(context.Background(), "org", "", OrgConfig{}); err == nil {
+	if err := configs.Put(context.Background(), Scope{Org: "org", Stream: "main"}, "", OrgConfig{}); err == nil {
 		t.Fatal("empty version put")
 	}
-	if err := configs.Put(context.Background(), "", "v1", OrgConfig{}); err == nil {
+	if err := configs.Put(context.Background(), Scope{Stream: "main"}, "v1", OrgConfig{}); err == nil {
 		t.Fatal("empty org put")
 	}
-	if _, err := configs.ActiveVersion(context.Background(), " "); !errors.Is(err, ErrNotFound) {
+	if _, err := configs.ActiveVersion(context.Background(), Scope{}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("empty active = %v", err)
 	}
-	if err := configs.SetActiveVersion(context.Background(), "org", ""); err == nil {
+	if err := configs.SetActiveVersion(context.Background(), Scope{Org: "org", Stream: "main"}, ""); err == nil {
 		t.Fatal("empty set active")
 	}
-	if err := configs.SetActiveVersion(context.Background(), "", "v1"); err == nil {
+	if err := configs.SetActiveVersion(context.Background(), Scope{Stream: "main"}, "v1"); err == nil {
 		t.Fatal("empty org set active")
 	}
 
 	domain := domainFromKinds(map[string]EntityMap{
-		"lot": {"a.b": {"k.v": 1}},
+		"lot":    {"a.b": {"k.v": 1}},
 		"kind.x": {"id.1": {"f.g": true}},
 		"nil":    nil,
 	})
@@ -72,7 +72,7 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 		IDsTouched: []string{"a.b"},
 	}}
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "a.b", Label: "L"}}
-	doc := domainToMongoDoc("org", domain)
+	doc := domainToMongoDoc(Scope{Org: "org", Stream: "main"}, domain)
 	if doc.Org != "org" || doc.Entities["lot"]["a_b"]["k_v"] != 1 {
 		t.Fatalf("encode load = %#v", doc.Entities)
 	}
@@ -96,7 +96,7 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 		t.Fatalf("decode submissions = %#v", got.Submissions)
 	}
 
-	emptyDoc := domainToMongoDoc("org", Domain{})
+	emptyDoc := domainToMongoDoc(Scope{Org: "org", Stream: "main"}, Domain{})
 	empty := domainFromMongoDoc(emptyDoc)
 	if empty.Submissions == nil || empty.JobInstances == nil {
 		t.Fatalf("empty decode nils: %#v", empty)

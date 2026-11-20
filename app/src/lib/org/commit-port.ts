@@ -1,9 +1,10 @@
+import type { StreamScope } from './stream-scope.js';
 import type { TaskFormBundle, Worklist } from './types.js';
 
 /** Commit wire mint knob (omit → none on server). */
 export type CommitMint = { kind: 'none' } | { kind: 'startingNew' };
 
-export type CommitRequest = {
+export type CommitRequest = StreamScope & {
 	taskPath: string;
 	/** Empty only with mint.startingNew; never send `_new` on the wire. */
 	jobInstanceId: string;
