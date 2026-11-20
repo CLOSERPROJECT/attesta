@@ -5,19 +5,17 @@
 		/** Stable id for aria / heading target. */
 		titleId?: string;
 		title: string;
-		/** Leading id chip (step number, task id). */
-		lead?: string;
-		/** Trailing muted meta (count) or status chip. */
+		/** Hierarchical outline mark: 2, 2A, 2A.1 */
+		mark: string;
+		/** Trailing status chip (tasks). */
 		trail?: Snippet;
 	};
 
-	let { titleId, title, lead, trail }: Props = $props();
+	let { titleId, title, mark, trail }: Props = $props();
 </script>
 
 <span class="timeline-header-line">
-	{#if lead}
-		<span class="pill pill-panel timeline-header-lead">{lead}</span>
-	{/if}
+	<span class="timeline-header-index">{mark}</span>
 	<span class="timeline-header-title" id={titleId}>{title}</span>
 	{#if trail}
 		<span class="timeline-header-trail">

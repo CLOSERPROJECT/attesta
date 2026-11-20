@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
+	import { displayStepTitle, outlineLetter } from './outline-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
@@ -18,6 +19,8 @@
 	const summaryDomId = $derived(`${stepDomId}-summary`);
 	const rows = $derived(step.rows ?? []);
 	const substeps = $derived(step.substeps ?? []);
+	const mark = $derived(step.stepId);
+	const title = $derived(displayStepTitle(step.title));
 
 	let open = $state(Boolean(step.expanded));
 </script>
@@ -28,27 +31,31 @@
 		id={summaryDomId}
 		aria-labelledby={summaryDomId}
 	>
-		<TimelineHeaderLine lead={step.stepId} title={step.title}>
-			{#snippet trail()}
-				{#if step.substepCount > 0}
-					<span class="timeline-header-count">{step.substepCount}</span>
-				{/if}
-			{/snippet}
-		</TimelineHeaderLine>
+		<TimelineHeaderLine {mark} {title} />
 	</Collapsible.Trigger>
 	<Collapsible.Content>
 		{#if rows.length > 0}
 			<ul class="stream-timeline-rows">
-				{#each rows as row (row.id)}
+				{#each rows as row, i (row.id)}
 					<li class="stream-timeline-row">
-						<TimelineRow {row} {stream} {instance} />
+						<TimelineRow
+							{row}
+							mark={`${mark}${outlineLetter(i)}`}
+							{stream}
+							{instance}
+						/>
 					</li>
 				{/each}
 			</ul>
 		{:else}
 			<ul class="stream-timeline-substeps">
-				{#each substeps as sub (sub.substepId)}
-					<TimelineSubstep substep={sub} {stream} {instance} />
+				{#each substeps as sub, i (sub.substepId)}
+					<TimelineSubstep
+						substep={sub}
+						mark={`${mark}.${i + 1}`}
+						{stream}
+						{instance}
+					/>
 				{/each}
 			</ul>
 		{/if}

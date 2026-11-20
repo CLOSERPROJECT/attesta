@@ -7,11 +7,13 @@
 
 	type Props = {
 		row: TimelineRow;
+		/** Hierarchical mark from parent step, e.g. 2A. */
+		mark: string;
 		stream?: string;
 		instance?: string;
 	};
 
-	let { row, stream = '', instance = '' }: Props = $props();
+	let { row, mark, stream = '', instance = '' }: Props = $props();
 
 	let open = $state(Boolean(row.expanded));
 </script>
@@ -22,12 +24,17 @@
 	bind:open
 >
 	<Collapsible.Trigger class="stream-timeline-row-summary w-full items-center hover:no-underline">
-		<TimelineHeaderLine title={row.label} />
+		<TimelineHeaderLine {mark} title={row.label} />
 	</Collapsible.Trigger>
 	<Collapsible.Content>
 		<ul class="stream-timeline-substeps">
-			{#each row.substeps as sub (sub.substepId)}
-				<TimelineSubstep substep={sub} {stream} {instance} />
+			{#each row.substeps as sub, i (sub.substepId)}
+				<TimelineSubstep
+					substep={sub}
+					mark={`${mark}.${i + 1}`}
+					{stream}
+					{instance}
+				/>
 			{/each}
 		</ul>
 	</Collapsible.Content>

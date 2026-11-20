@@ -15,11 +15,13 @@
 
 	type Props = {
 		substep: TimelineSubstep;
+		/** Hierarchical outline mark, e.g. 2A.1 or 2.1. */
+		mark: string;
 		stream?: string;
 		instance?: string;
 	};
 
-	let { substep, stream = '', instance = '' }: Props = $props();
+	let { substep, mark, stream = '', instance = '' }: Props = $props();
 
 	const board = getBoardEmbed();
 
@@ -85,7 +87,7 @@
 				data-state={embedOpen ? 'open' : 'closed'}
 				onclick={toggleEmbed}
 			>
-				<TimelineHeaderLine lead={substep.substepId} title={substep.title} titleId={headingId}>
+				<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
 					{#snippet trail()}
 						<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
 					{/snippet}
@@ -125,7 +127,7 @@
 			bind:open={detailsOpen}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
-				<TimelineHeaderLine lead={substep.substepId} title={substep.title} titleId={headingId}>
+				<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
 					{#snippet trail()}
 						<span class="status" aria-label={`Status: ${statusLabel}`}>{statusLabel}</span>
 					{/snippet}

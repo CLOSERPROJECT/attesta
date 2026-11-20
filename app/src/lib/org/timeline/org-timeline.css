@@ -206,8 +206,14 @@
 	flex: 1 1 auto;
 }
 
-.org-timeline-page .timeline-header-lead {
+.org-timeline-page .timeline-header-index {
 	flex-shrink: 0;
+	font-family: var(--font-mono);
+	font-size: var(--text-sm);
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.25;
+	color: var(--secondary-foreground);
 }
 
 .org-timeline-page .timeline-header-title {
