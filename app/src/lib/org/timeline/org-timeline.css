@@ -220,6 +220,8 @@
 	align-items: center;
 	flex-shrink: 0;
 	margin-left: auto;
+	/* Clear the absolute chevron column. */
+	margin-right: var(--space-2);
 }
 
 .org-timeline-page .timeline-header-count {
@@ -259,10 +261,63 @@
 	color: var(--muted-foreground);
 }
 
-/* Status lives in timeline-header-trail; keep chip from wrapping the line */
+/* Status: soft tint + dot (quieter than Formata bordered pills) */
 .org-timeline-page .timeline-header-trail .status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	box-sizing: border-box;
+	/* Fits longest label ("terminated"); override header mono. */
+	width: 5.75rem;
+	gap: 0.35em;
 	margin: 0;
+	padding: 0.2rem 0.35rem;
+	border: none;
+	border-radius: var(--radius);
+	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	text-transform: none;
+	line-height: 1.25;
 	white-space: nowrap;
+	color: var(--secondary-foreground);
+	background-color: color-mix(in srgb, var(--secondary-foreground) 10%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status::before {
+	content: '';
+	width: 0.375rem;
+	height: 0.375rem;
+	border-radius: 999px;
+	background: currentColor;
+	flex-shrink: 0;
+}
+
+.org-timeline-page .substep-available .timeline-header-trail .status {
+	color: var(--stream-available);
+	background-color: color-mix(in srgb, var(--stream-available) 12%, transparent);
+}
+
+.org-timeline-page .substep-active .timeline-header-trail .status {
+	color: var(--stream-active);
+	background-color: color-mix(in srgb, var(--stream-active) 12%, transparent);
+}
+
+.org-timeline-page .substep-done .timeline-header-trail .status,
+.org-timeline-page .substep-locked .timeline-header-trail .status {
+	color: var(--stream-done);
+	background-color: color-mix(in srgb, var(--stream-done) 12%, transparent);
+}
+
+.org-timeline-page .substep-terminated .timeline-header-trail .status {
+	color: var(--stream-terminated);
+	background-color: color-mix(in srgb, var(--stream-terminated) 12%, transparent);
+}
+
+.org-timeline-page .substep-skipped .timeline-header-trail .status {
+	color: var(--secondary-foreground);
+	background-color: color-mix(in srgb, var(--secondary-foreground) 10%, transparent);
 }
 
 /*
