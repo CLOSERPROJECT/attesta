@@ -65,6 +65,15 @@ function addressKey(addr: TaskAddress): string {
 	return `${addr.jobId}|${addr.jobInstanceId}|${addr.taskId}|${addr.provisionalJob}`;
 }
 
+function focusEquals(a: BoardTaskFocus | null, b: BoardTaskFocus | null): boolean {
+	if (a == null || b == null) return a === b;
+	return (
+		a.jobId === b.jobId &&
+		a.jobInstanceId === b.jobInstanceId &&
+		a.taskId === b.taskId
+	);
+}
+
 /** Org-actionable Task addresses from the timeline projection (optional Show-all). */
 export function actionableAddressesFromTimeline(
 	view: TimelineView,
@@ -315,10 +324,16 @@ export class BoardTimelineModel {
 		this.#syncUrl(null);
 	}
 
-	/** URL deep-link: select and open body (user navigated to the task). */
+	/**
+	 * URL deep-link: adopt selection from `?task=`.
+	 * Opens the body only when the focus *changes* — re-running the URL sync
+	 * must not undo a user collapse while the same `?task=` stays in the bar.
+	 */
 	setFocusFromUrl(focus: BoardTaskFocus): void {
+		const unchanged = focusEquals(this.selection, focus);
 		this.selection = focus;
 		this.#syncUrl(focus);
+		if (unchanged) return;
 		const addr = addressFromBoardTask(this.stream, this.instance, focus);
 		this.#embed.setOpen(addr, true);
 	}

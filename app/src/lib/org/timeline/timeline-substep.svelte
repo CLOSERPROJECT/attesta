@@ -64,6 +64,7 @@
 	function toggleEmbed() {
 		if (!address) return;
 		const next = timelineModel.toggleBody(address);
+		// Closing must not select — select() always re-opens the body.
 		if (next) timelineModel.select(address);
 	}
 </script>

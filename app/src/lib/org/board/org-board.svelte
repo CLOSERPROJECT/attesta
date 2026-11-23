@@ -405,22 +405,27 @@
 		};
 	});
 
-	// URL → selection (deep link opens body); Play keeps start selected.
+	// URL → selection (opens body only when focus changes — see setFocusFromUrl).
 	$effect(() => {
 		const fromUrl = focusFromUrl;
 		if (fromUrl) {
 			model.setFocusFromUrl(fromUrl);
 			return;
 		}
-		if (play && model.playAddress) {
+		if (play && model.playAddress && !model.isSelected(model.playAddress)) {
 			model.select(model.playAddress);
 		}
 	});
 
-	// Orphan chrome is the task itself — open that embed.
+	// Orphan chrome: open once when the orphan address appears (not on every re-run).
 	$effect(() => {
 		const orphan = model.orphanFocus;
-		if (orphan) model.setBodyOpen(orphan, true);
+		if (!orphan) return;
+		const key = taskAddressKey(orphan);
+		untrack(() => {
+			if (!model.isBodyOpen(orphan)) model.setBodyOpen(orphan, true);
+		});
+		void key;
 	});
 
 	// After shell paint: preload actionable (+ play start already enqueued).

@@ -243,4 +243,19 @@ describe('BoardTimelineModel visibility', () => {
 		expect(model.selection).toEqual(focusDA);
 		expect(model.isBodyOpen(addrDA())).toBe(true);
 	});
+
+	test('setFocusFromUrl same focus does not reopen after user collapse', () => {
+		const syncUrl = vi.fn();
+		const embed = new BoardEmbedOpen();
+		const model = new BoardTimelineModel({ syncUrl, embedOpen: embed });
+		model.setScope(stream, instance);
+		model.setView(multiLotView());
+		model.setFocusFromUrl(focusDA);
+		expect(model.isBodyOpen(addrDA())).toBe(true);
+		model.setBodyOpen(addrDA(), false);
+		expect(model.isBodyOpen(addrDA())).toBe(false);
+		model.setFocusFromUrl({ ...focusDA });
+		expect(model.isBodyOpen(addrDA())).toBe(false);
+		expect(model.selection).toEqual(focusDA);
+	});
 });
