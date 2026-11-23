@@ -44,6 +44,14 @@ export function firstActionableAddress(
 	return actionableAddressesFromTimeline(view)[0] ?? null;
 }
 
+/** Auto-open candidate: only when the board has exactly one actionable Task. */
+export function soleActionableAddress(
+	view: TimelineView
+): TaskAddress | null {
+	const addrs = actionableAddressesFromTimeline(view);
+	return addrs.length === 1 ? addrs[0] : null;
+}
+
 /** True when the board already has a card for this Task (any status). */
 export function addressVisibleOnTimeline(
 	view: TimelineView,

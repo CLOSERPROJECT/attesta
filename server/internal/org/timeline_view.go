@@ -100,15 +100,13 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 			StepID:       fmt.Sprintf("%d", i+1),
 			Title:        title,
 			SubstepCount: len(step.Tasks),
-			Expanded:     i == 0,
+			// Board load: expand every step/row; substep bodies stay client-collapsed.
+			Expanded: true,
 		}
 		if len(step.Rows) > 0 {
 			tlStep.Title = fmt.Sprintf("%s ×%d", title, len(step.Rows))
 			tlStep.SubstepCount = len(step.Rows)
 			tlStep.Rows = buildOrgTimelineRows(job, step, domain, streamKey, streamInstanceID)
-			if i == 0 || anyOrgRowExpanded(tlStep.Rows) {
-				tlStep.Expanded = true
-			}
 			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromRows(tlStep.Rows)); ok {
 				tlStep.Status = string(status)
 				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
@@ -125,15 +123,6 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 	return out
 }
 
-func anyOrgRowExpanded(rows []TimelineRowDTO) bool {
-	for _, row := range rows {
-		if row.Expanded {
-			return true
-		}
-	}
-	return false
-}
-
 func buildOrgTimelineRows(job Job, step StreamTimelineStep, domain Domain, streamKey, streamInstanceID string) []TimelineRowDTO {
 	seedField := orgJobSeedField(job)
 	rows := make([]TimelineRowDTO, 0, len(step.Rows))
@@ -146,7 +135,7 @@ func buildOrgTimelineRows(job Job, step StreamTimelineStep, domain Domain, strea
 		group := TimelineRowDTO{
 			ID:       row.ID,
 			Label:    label,
-			Expanded: !row.Finished,
+			Expanded: true,
 			Substeps: buildOrgTimelineTaskSubsteps(job, step.JobID, row.ID, row.Tasks, streamKey, streamInstanceID, !exists, seedField, domain),
 		}
 		if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(group.Substeps)); ok {

@@ -10,7 +10,7 @@ export type BoardEmbedApi = {
 	focus: BoardTaskFocus | null;
 	isFocused: (addr: TaskAddress) => boolean;
 	setFocus: (addr: TaskAddress) => void;
-	/** Embed panel open; default true until user collapses. */
+	/** Embed panel open; default closed until focus / Play / user expands. */
 	isEmbedOpen: (addr: TaskAddress) => boolean;
 	setEmbedOpen: (addr: TaskAddress, open: boolean) => void;
 	toggleEmbedOpen: (addr: TaskAddress) => boolean;

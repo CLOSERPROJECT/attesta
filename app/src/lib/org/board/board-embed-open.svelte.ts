@@ -2,28 +2,28 @@ import { taskAddressKey, type TaskAddress } from '../task-address.js';
 
 /**
  * Address-keyed embed open state for the Org board.
- * Default open (actionable embeds); only closed keys are stored.
- * setFocus / Continue force-open by clearing the closed flag — no effects.
+ * Default closed on load (nests expand; substep bodies stay collapsed).
+ * Only open keys are stored. setFocus / Continue / Play force-open — no effects.
  */
 export class BoardEmbedOpen {
-	/** Reactive: keys present here are collapsed. */
-	closed = $state.raw<Record<string, true>>({});
+	/** Reactive: keys present here are expanded. */
+	opened = $state.raw<Record<string, true>>({});
 
 	isOpen(addr: TaskAddress): boolean {
-		return this.closed[taskAddressKey(addr)] !== true;
+		return this.opened[taskAddressKey(addr)] === true;
 	}
 
 	setOpen(addr: TaskAddress, open: boolean): void {
 		const key = taskAddressKey(addr);
 		if (open) {
-			if (!(key in this.closed)) return;
-			const next = { ...this.closed };
-			delete next[key];
-			this.closed = next;
+			if (key in this.opened) return;
+			this.opened = { ...this.opened, [key]: true };
 			return;
 		}
-		if (key in this.closed) return;
-		this.closed = { ...this.closed, [key]: true };
+		if (!(key in this.opened)) return;
+		const next = { ...this.opened };
+		delete next[key];
+		this.opened = next;
 	}
 
 	toggle(addr: TaskAddress): boolean {
@@ -33,23 +33,23 @@ export class BoardEmbedOpen {
 	}
 
 	clear(): void {
-		if (Object.keys(this.closed).length === 0) return;
-		this.closed = {};
+		if (Object.keys(this.opened).length === 0) return;
+		this.opened = {};
 	}
 
-	/** Mark every address closed (collapse-all). */
+	/** Collapse every listed address (ignore unknown keys). */
 	closeAll(addrs: Iterable<TaskAddress>): void {
-		const next = { ...this.closed };
+		const next = { ...this.opened };
 		let changed = false;
 		for (const addr of addrs) {
 			const key = taskAddressKey(addr);
-			if (key in next) continue;
-			next[key] = true;
+			if (!(key in next)) continue;
+			delete next[key];
 			changed = true;
 		}
-		if (changed) this.closed = next;
+		if (changed) this.opened = next;
 	}
 }
 
-/** Process-wide so Play→instance remount keeps user-collapsed embeds. */
+/** Process-wide so Play→instance remount keeps user-expanded embeds. */
 export const boardEmbedOpen = new BoardEmbedOpen();

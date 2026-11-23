@@ -55,7 +55,7 @@
 	import {
 		actionableAddressesFromTimeline,
 		addressVisibleOnTimeline,
-		firstActionableAddress
+		soleActionableAddress
 	} from './timeline-actionable.js';
 	import { resolveTaskDeepLink } from '../worklist-nav.js';
 
@@ -154,7 +154,7 @@
 	}
 
 	function isEmbedOpen(addr: TaskAddress): boolean {
-		void boardEmbedOpen.closed;
+		void boardEmbedOpen.opened;
 		return boardEmbedOpen.isOpen(addr);
 	}
 
@@ -441,6 +441,14 @@
 		}
 	});
 
+	// Play / orphan chrome is the task itself — open that embed (timeline substeps stay closed).
+	$effect(() => {
+		if (playAddress) boardEmbedOpen.setOpen(playAddress, true);
+	});
+	$effect(() => {
+		if (orphanFocus) boardEmbedOpen.setOpen(orphanFocus, true);
+	});
+
 	// After shell paint: preload actionable (+ play start already enqueued).
 	$effect(() => {
 		if (!shellPainted || loading) return;
@@ -460,13 +468,15 @@
 		if (addrs.length === 0) return;
 		boardFormCache.enqueue(addrs);
 
-		// Prefer URL focus; else first actionable / play (unless gate just denied).
+		// Prefer URL focus; else Play; else sole actionable only (multi → stay on bare board).
 		if (!focusFromUrl && !focus && !suppressAutoFocus) {
-			const first = playAddress ?? (view ? firstActionableAddress(view) : null);
-			if (first) {
-				focus = boardTaskFromAddress(first);
+			if (playAddress) {
+				focus = boardTaskFromAddress(playAddress);
 				syncFocusToUrl(focus);
+				return;
 			}
+			const sole = view ? soleActionableAddress(view) : null;
+			if (sole) setFocus(sole);
 		}
 	});
 

@@ -160,10 +160,12 @@ async function stubOrgApis(page: Page) {
 	});
 }
 
-test('instance route renders SPA timeline board with embedded form', async ({ page }) => {
+test('instance route auto-opens sole actionable and soft-focuses URL', async ({ page }) => {
 	await stubOrgApis(page);
 	await page.goto(homePath);
-	await expect(page).toHaveURL(homePath);
+	await expect(page).toHaveURL(
+		new RegExp(`${homePath}\\?task=intake%2F${instance}%2Fregister`)
+	);
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
 	await expect(page.getByTestId('instance-chrome-label')).toHaveText('Camion A');
 	await expect(page.locator('.js-show-all-filter')).toBeVisible();
