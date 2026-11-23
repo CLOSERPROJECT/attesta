@@ -623,31 +623,23 @@
 
 		{#if view}
 			<div class="process-stream-block">
-				<div
-					class={[
-						'js-show-all-filter-root stream-show-all-filter-root',
-						!showAll && 'is-actionable-only',
-						actionableOnlyEmpty && 'is-actionable-only-empty'
-					]}
-				>
-					<div
-						class={[
-							'stream-show-all-filter-empty rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground',
-							actionableOnlyEmpty
-								? 'flex flex-col items-center justify-center'
-								: 'hidden'
-						]}
-					>
-						<p class="m-0 text-xs font-medium leading-5 text-muted-foreground">No matching tasks</p>
-						<p class="m-0 text-xs leading-4 text-muted-foreground">
-							Turn on Show all to see the full stream timeline.
-						</p>
-					</div>
-					<div class="stream-timeline-list">
-						{#each view.steps as step (step.stepId)}
-							<TimelineStep {step} {stream} {instance} />
-						{/each}
-					</div>
+				<div class="js-show-all-filter-root stream-show-all-filter-root">
+					{#if actionableOnlyEmpty}
+						<div
+							class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground"
+						>
+							<p class="m-0 text-xs font-medium leading-5 text-muted-foreground">No matching tasks</p>
+							<p class="m-0 text-xs leading-4 text-muted-foreground">
+								Turn on Show all to see the full stream timeline.
+							</p>
+						</div>
+					{:else}
+						<div class="stream-timeline-list">
+							{#each view.steps as step (step.stepId)}
+								<TimelineStep {step} {stream} {instance} {showAll} />
+							{/each}
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}

@@ -160,30 +160,6 @@
 	gap: calc(var(--spacing) * 2);
 }
 
-.stream-show-all-filter-root.is-actionable-only
-	.substep:not([data-org-actionable='true']):not([data-board-focused='true']) {
-	display: none;
-}
-
-.stream-show-all-filter-root.is-actionable-only
-	.stream-timeline-row:not(
-		:has(.substep[data-org-actionable='true'], .substep[data-board-focused='true'])
-	) {
-	display: none;
-}
-
-.stream-show-all-filter-root.is-actionable-only
-	.stream-timeline-step:not(
-		:has(.substep[data-org-actionable='true'], .substep[data-board-focused='true'])
-	) {
-	display: none;
-}
-
-.stream-show-all-filter-root.is-actionable-only.is-actionable-only-empty
-	.stream-timeline-list {
-	display: none;
-}
-
 .substep-org-body {
 	display: grid;
 	gap: calc(var(--spacing) * 2);

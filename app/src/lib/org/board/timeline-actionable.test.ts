@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import type { TimelineView } from '../timeline/types.js';
+import type { TimelineSubstep, TimelineView } from '../timeline/types.js';
 import {
 	firstActionableAddress,
-	soleActionableAddress
+	soleActionableAddress,
+	timelineSubstepShown
 } from './timeline-actionable.js';
 
 const base = {
@@ -61,5 +62,59 @@ describe('soleActionableAddress', () => {
 		]);
 		expect(soleActionableAddress(many)).toBeNull();
 		expect(firstActionableAddress(many)?.taskId).toBe('register');
+	});
+});
+
+describe('timelineSubstepShown', () => {
+	const stream = 'recycling';
+	const instance = '261102-1';
+	const lockedOtherLot: TimelineSubstep = {
+		substepId: 'lot_processing.weigh',
+		title: 'Pesa',
+		status: 'locked',
+		orgActionable: false,
+		href: `/app/${stream}/i/${instance}/lot_processing/CO-1/weigh`
+	};
+	const lockedFocusedLot: TimelineSubstep = {
+		...lockedOtherLot,
+		href: `/app/${stream}/i/${instance}/lot_processing/DA-1/weigh`
+	};
+	const actionable: TimelineSubstep = {
+		...lockedFocusedLot,
+		status: 'available',
+		orgActionable: true
+	};
+	const focusDA = {
+		jobId: 'lot_processing',
+		jobInstanceId: 'DA-1',
+		taskId: 'weigh'
+	} as const;
+
+	test('showAll and orgActionable; focus is instance-scoped', () => {
+		expect(timelineSubstepShown(lockedOtherLot, { showAll: true })).toBe(true);
+		expect(timelineSubstepShown(lockedOtherLot, { showAll: false })).toBe(false);
+		expect(timelineSubstepShown(actionable, { showAll: false })).toBe(true);
+		expect(
+			timelineSubstepShown(lockedFocusedLot, {
+				showAll: false,
+				focus: focusDA,
+				stream,
+				instance
+			})
+		).toBe(true);
+		expect(
+			timelineSubstepShown(lockedOtherLot, {
+				showAll: false,
+				focus: focusDA,
+				stream,
+				instance
+			})
+		).toBe(false);
+		expect(
+			timelineSubstepShown(
+				{ ...lockedOtherLot, href: undefined },
+				{ showAll: false, focus: focusDA, stream, instance }
+			)
+		).toBe(false);
 	});
 });

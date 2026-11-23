@@ -1,6 +1,10 @@
 import type { TaskAddress } from '../task-address.js';
 import type { TimelineSubstep, TimelineView } from '../timeline/types.js';
-import { parseTaskHref } from './board-url.js';
+import {
+	focusMatchesAddress,
+	parseTaskHref,
+	type BoardTaskFocus
+} from './board-url.js';
 
 function walkSubsteps(view: TimelineView): TimelineSubstep[] {
 	const out: TimelineSubstep[] = [];
@@ -52,14 +56,33 @@ export function soleActionableAddress(
 	return addrs.length === 1 ? addrs[0] : null;
 }
 
-/** True when the board already has a card for this Task (any status). */
+export type TimelineShowFilter = {
+	showAll: boolean;
+	focus?: BoardTaskFocus | null;
+	stream?: string;
+	instance?: string;
+};
+
+/** Whether a substep card belongs on the board under Show all / actionable-only. */
+export function timelineSubstepShown(
+	sub: TimelineSubstep,
+	opts: TimelineShowFilter
+): boolean {
+	if (opts.showAll) return true;
+	if (sub.orgActionable) return true;
+	const focus = opts.focus;
+	if (!focus || !sub.href || opts.stream == null) return false;
+	// Instance-aware only — substepId is jobId.taskId and collides across lot rows.
+	const parsed = parseTaskHref(sub.href, opts.stream, opts.instance ?? '');
+	return parsed ? focusMatchesAddress(focus, parsed.address) : false;
+}
+
+/** True when the board already has a card for this Task (instance-scoped). */
 export function addressVisibleOnTimeline(
 	view: TimelineView,
 	addr: TaskAddress
 ): boolean {
-	const needle = `${addr.jobId}.${addr.taskId}`;
 	for (const sub of walkSubsteps(view)) {
-		if (sub.substepId === needle) return true;
 		if (!sub.href) continue;
 		const parsed = parseTaskHref(sub.href, view.stream, view.instance);
 		if (

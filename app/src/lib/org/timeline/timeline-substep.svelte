@@ -36,17 +36,13 @@
 	const statusClass = $derived(status ? `substep-${status}` : '');
 
 	const parsed = $derived(
-		substep.orgActionable && substep.href
-			? parseTaskHref(substep.href, stream, instance)
-			: null
+		substep.href ? parseTaskHref(substep.href, stream, instance) : null
 	);
 	const address = $derived(parsed?.address ?? null);
-	const embed = $derived(!!address);
+	const embed = $derived(!!(substep.orgActionable && address));
 	const focused = $derived.by(() => {
-		const f = board.focus;
-		if (!f) return false;
-		if (address) return board.isFocused(address);
-		return substep.substepId === `${f.jobId}.${f.taskId}`;
+		if (!address) return false;
+		return board.isFocused(address);
 	});
 	const entry = $derived.by(() => {
 		void boardFormCache.entries;
@@ -71,7 +67,7 @@
 </script>
 
 <li
-	class={['substep', statusClass].filter(Boolean).join(' ')}
+	class={['substep', statusClass]}
 	data-org-actionable={substep.orgActionable ? 'true' : undefined}
 	data-board-focused={focused ? 'true' : undefined}
 >
