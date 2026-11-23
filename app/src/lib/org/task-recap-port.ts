@@ -14,6 +14,8 @@ export type TaskRecap = {
 	taskId: string;
 	timestamp: string;
 	userId: string;
+	/** Human-facing actor; legacy rows may omit and fall back to userId. */
+	userName?: string;
 	facts: Record<string, unknown>;
 	/** Authored schema property titles keyed by fact key; missing → use key. */
 	titles?: Record<string, string>;

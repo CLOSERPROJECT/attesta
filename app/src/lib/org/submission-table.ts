@@ -17,6 +17,16 @@ export function formatSubmissionTimestamp(
 	}).format(date);
 }
 
+/** Prefer human-facing userName; fall back to userId. */
+export function formatSubmissionUser(
+	item: Pick<TaskRecap, 'userName' | 'userId'>
+): string {
+	const name = item.userName?.trim();
+	if (name) return name;
+	const id = item.userId?.trim();
+	return id || '—';
+}
+
 /** Stable fact-key union: walk items in order, append unseen keys. */
 export function unionFactKeys(items: readonly TaskRecap[]): string[] {
 	const keys: string[] = [];

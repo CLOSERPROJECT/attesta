@@ -18,6 +18,8 @@ type Submission struct {
 	JobInstanceID string         `json:"jobInstanceId,omitempty"`
 	Timestamp     string         `json:"timestamp"`
 	UserID        string         `json:"userId"`
+	// UserName is the human-facing actor label at Commit (email / display name).
+	UserName      string         `json:"userName,omitempty"`
 	Facts         map[string]any `json:"facts"`
 	IDsTouched    []string       `json:"idsTouched"`
 }

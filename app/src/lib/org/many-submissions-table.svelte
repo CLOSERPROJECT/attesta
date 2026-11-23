@@ -3,6 +3,7 @@
 	import {
 		factTitle,
 		formatSubmissionTimestamp,
+		formatSubmissionUser,
 		unionFactKeys
 	} from './submission-table.js';
 	import type { TaskRecap } from './task-recap-port.js';
@@ -44,7 +45,9 @@
 						<td class="px-2 py-2 text-zinc-900">
 							{formatSubmissionTimestamp(item.timestamp)}
 						</td>
-						<td class="px-2 py-2 text-zinc-900">{item.userId || '—'}</td>
+						<td class="px-2 py-2 text-zinc-900">
+							{formatSubmissionUser(item)}
+						</td>
 						<td class="px-2 py-2">
 							{#if item.links.length > 0}
 								<HttpLinkStrip items={item.links} />

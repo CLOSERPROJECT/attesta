@@ -1,6 +1,9 @@
 <script lang="ts">
 	import HttpLinkStrip from './form/http-link-strip.svelte';
-	import { formatSubmissionTimestamp } from './submission-table.js';
+	import {
+		formatSubmissionTimestamp,
+		formatSubmissionUser
+	} from './submission-table.js';
 	import type { TaskRecap } from './task-recap-port.js';
 	import { formatFactValue } from './worklist-overview.js';
 
@@ -16,6 +19,7 @@
 	);
 	const titles = $derived(item.titles ?? {});
 	const timestamp = $derived(formatSubmissionTimestamp(item.timestamp));
+	const user = $derived(formatSubmissionUser(item));
 </script>
 
 <div class="space-y-3" data-testid={testId}>
@@ -35,7 +39,7 @@
 			</tr>
 			<tr class="border-b border-zinc-100 last:border-0">
 				<th class="py-2 pr-3 text-left font-medium text-zinc-600">User</th>
-				<td class="py-2 text-zinc-900">{item.userId || '—'}</td>
+				<td class="py-2 text-zinc-900">{user}</td>
 			</tr>
 		</tbody>
 	</table>

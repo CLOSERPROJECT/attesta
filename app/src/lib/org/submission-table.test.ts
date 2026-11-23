@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
 	factTitle,
 	formatSubmissionTimestamp,
+	formatSubmissionUser,
 	unionFactKeys
 } from './submission-table.js';
 import type { TaskRecap } from './task-recap-port.js';
@@ -35,6 +36,12 @@ describe('submission-table helpers', () => {
 	test('formatSubmissionTimestamp empty and invalid', () => {
 		expect(formatSubmissionTimestamp('')).toBe('—');
 		expect(formatSubmissionTimestamp('not-a-date')).toBe('not-a-date');
+	});
+
+	test('formatSubmissionUser prefers userName over userId', () => {
+		expect(formatSubmissionUser({ userId: 'id-1', userName: 'Ada' })).toBe('Ada');
+		expect(formatSubmissionUser({ userId: 'id-1' })).toBe('id-1');
+		expect(formatSubmissionUser({ userId: '', userName: '' })).toBe('—');
 	});
 
 	test('unionFactKeys walks items in order and appends unseen keys', () => {

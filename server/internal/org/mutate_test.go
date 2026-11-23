@@ -39,6 +39,7 @@ func TestMutateUnknownOpEmptyUserAndPatchKind(t *testing.T) {
 func TestMutateMintsAndAppendsSubmission(t *testing.T) {
 	got, err := Mutate(EmptyDomain(), MutateRequest{
 		UserID:        "ada",
+		UserName:      "Ada Lovelace",
 		JobID:         "intake",
 		TaskID:        "register",
 		JobInstanceID: "load-1",
@@ -61,6 +62,9 @@ func TestMutateMintsAndAppendsSubmission(t *testing.T) {
 	}
 	if got.Submissions[0].JobID != "intake" || got.Submissions[0].JobInstanceID != "load-1" {
 		t.Fatalf("submission keys = %#v", got.Submissions[0])
+	}
+	if got.Submissions[0].UserName != "Ada Lovelace" {
+		t.Fatalf("userName = %#v", got.Submissions[0].UserName)
 	}
 	if len(got.JobInstances) != 1 || got.JobInstances[0].ID != "load-1" {
 		t.Fatalf("jobInstances = %#v", got.JobInstances)

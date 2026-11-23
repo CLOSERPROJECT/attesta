@@ -64,6 +64,7 @@ function parseTaskRecap(raw: unknown): TaskRecap {
 		taskId: typeof body.taskId === 'string' ? body.taskId : '',
 		timestamp: typeof body.timestamp === 'string' ? body.timestamp : '',
 		userId: typeof body.userId === 'string' ? body.userId : '',
+		userName: typeof body.userName === 'string' ? body.userName : undefined,
 		facts,
 		titles,
 		links

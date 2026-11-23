@@ -52,6 +52,7 @@ type mongoSubmissionDoc struct {
 	JobInstanceID string         `bson:"jobInstanceId,omitempty"`
 	Timestamp     string         `bson:"timestamp"`
 	UserID        string         `bson:"userId"`
+	UserName      string         `bson:"userName,omitempty"`
 	Facts         map[string]any `bson:"facts"`
 	IDsTouched    []string       `bson:"idsTouched"`
 }
@@ -405,6 +406,7 @@ func encodeSubmissions(in []Submission) []mongoSubmissionDoc {
 			JobInstanceID: s.JobInstanceID,
 			Timestamp:     s.Timestamp,
 			UserID:        s.UserID,
+			UserName:      s.UserName,
 			Facts:         encodeStringKeyedMap(s.Facts),
 			IDsTouched:    append([]string(nil), s.IDsTouched...),
 		}
@@ -424,6 +426,7 @@ func decodeSubmissions(in []mongoSubmissionDoc) []Submission {
 			JobInstanceID: s.JobInstanceID,
 			Timestamp:     s.Timestamp,
 			UserID:        s.UserID,
+			UserName:      s.UserName,
 			Facts:         decodeStringKeyedMap(s.Facts),
 			IDsTouched:    append([]string(nil), s.IDsTouched...),
 		}

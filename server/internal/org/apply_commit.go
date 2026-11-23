@@ -34,7 +34,7 @@ func applyConfigCommit(
 	job Job,
 	task map[string]any,
 	ref TaskPathRef,
-	jobInstanceID, userID string,
+	jobInstanceID, userID, userName string,
 	value map[string]any,
 	transform any,
 	ts, today string,
@@ -77,6 +77,7 @@ func applyConfigCommit(
 	req := run.Request
 	req.Timestamp = ts
 	req.UserID = userID
+	req.UserName = userName
 
 	resultInstanceID := jobInstanceID
 	if mintKind == MintKindStartingNew {

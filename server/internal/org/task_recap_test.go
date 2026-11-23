@@ -26,6 +26,9 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	if recap.UserID != "ada" || recap.Timestamp == "" {
 		t.Fatalf("actor/time = %#v", recap)
 	}
+	if recap.UserName != "ada" {
+		t.Fatalf("userName = %#v (want UserID fallback)", recap.UserName)
+	}
 	if recap.Facts["truckWeight"] != 1000.0 {
 		t.Fatalf("facts = %#v", recap.Facts)
 	}

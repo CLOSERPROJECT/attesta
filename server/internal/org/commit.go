@@ -222,7 +222,11 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 		if !allowed {
 			return Domain{}, &CommitError{Kind: "unauthorized"}
 		}
-		applied, err = applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, today, mintKind)
+		userName := strings.TrimSpace(op.DisplayName)
+		if userName == "" {
+			userName = strings.TrimSpace(op.UserID)
+		}
+		applied, err = applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, userName, req.Value, transform, ts, today, mintKind)
 		if err != nil {
 			return Domain{}, err
 		}
