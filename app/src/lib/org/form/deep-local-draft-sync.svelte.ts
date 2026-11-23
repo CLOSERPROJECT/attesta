@@ -49,8 +49,8 @@ export function probeSyncDeepLocalArrayAdd(
 			setDraft(next);
 		});
 		mutate = () => {
-			local.polvereDiVetro = [];
-			(local.polvereDiVetro as Record<string, unknown>[]).push({ weight: 12 });
+			local.rows = [];
+			(local.rows as Record<string, unknown>[]).push({ weight: 12 });
 		};
 	});
 	flushSync();
@@ -74,7 +74,7 @@ export function probeSyncDeepLocalWholeAssign(
 		});
 		// Mimic createConfigForm setter: local = next only (effect writes Draft)
 		assign = () => {
-			local = { sourceLotId: 'x', polvereDiVetro: [{ weight: 1 }] };
+			local = { material: 'polvereDiVetro', weight: 1 };
 		};
 	});
 	flushSync();

@@ -322,11 +322,16 @@ describe('lot_processing Commit smoke (session + Worklist + leaf many-submit)', 
 				await session.commit({
 					taskPath: 'lot_processing/containerReg',
 					jobInstanceId: loadId,
-					value: {
-						sourceLotId: loadId,
-						polvereDiVetro: [{ weight: 120 }],
-						plastica: [{ weight: 40 }]
-					}
+					value: { material: 'polvereDiVetro', weight: 120 }
+				})
+			)?.jobInstanceId
+		).toBe(loadId);
+		expect(
+			(
+				await session.commit({
+					taskPath: 'lot_processing/containerReg',
+					jobInstanceId: loadId,
+					value: { material: 'plastica', weight: 40 }
 				})
 			)?.jobInstanceId
 		).toBe(loadId);
@@ -337,6 +342,7 @@ describe('lot_processing Commit smoke (session + Worklist + leaf many-submit)', 
 		expect(lotSubs.map((s) => s.taskId)).toEqual([
 			'startLot',
 			'markProgress',
+			'containerReg',
 			'containerReg'
 		]);
 		expect(Object.keys(domain.container)).toHaveLength(2);

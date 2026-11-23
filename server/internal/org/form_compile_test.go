@@ -2,6 +2,60 @@ package org
 
 import "testing"
 
+func TestMergeChromeHideIfNullStamp(t *testing.T) {
+	chromeRaw := map[string]any{
+		"shown": map[string]any{
+			"kind": "readonly",
+			"expr": "1",
+			"title": "Shown",
+		},
+		"hidden": map[string]any{
+			"kind":       "readonly",
+			"expr":       "1",
+			"title":      "Hidden",
+			"hideIfNull": true,
+		},
+		"explicitFalse": map[string]any{
+			"kind":       "readonly",
+			"expr":       "1",
+			"title":      "False",
+			"hideIfNull": false,
+		},
+	}
+	rules := readChromeRules(map[string]any{"chrome": chromeRaw})
+	byID := make(map[string]ChromeRule, len(rules))
+	for _, r := range rules {
+		byID[r.ID] = r
+	}
+	if !byID["hidden"].HideIfNull {
+		t.Fatal("hidden rule must read hideIfNull: true")
+	}
+	if byID["shown"].HideIfNull || byID["explicitFalse"].HideIfNull {
+		t.Fatalf("shown/explicitFalse must be false; got shown=%v explicitFalse=%v",
+			byID["shown"].HideIfNull, byID["explicitFalse"].HideIfNull)
+	}
+
+	_, ui := mergeChromeIntoSchemas(map[string]any{}, map[string]any{}, rules, chromeRaw)
+	for _, id := range []string{"shown", "explicitFalse"} {
+		field, _ := ui[id].(map[string]any)
+		opts, _ := field["ui:options"].(map[string]any)
+		if _, ok := opts["hideIfNull"]; ok {
+			t.Fatalf("%s ui:options must omit hideIfNull; got %#v", id, opts)
+		}
+		if opts["chromeId"] != id {
+			t.Fatalf("%s chromeId = %#v", id, opts["chromeId"])
+		}
+	}
+	hidden, _ := ui["hidden"].(map[string]any)
+	opts, _ := hidden["ui:options"].(map[string]any)
+	if opts["hideIfNull"] != true {
+		t.Fatalf("hidden ui:options.hideIfNull = %#v, want true", opts["hideIfNull"])
+	}
+	if opts["chromeId"] != "hidden" {
+		t.Fatalf("hidden chromeId = %#v", opts["chromeId"])
+	}
+}
+
 func placeholderFromFieldUI(fieldUi map[string]any) string {
 	if fieldUi == nil {
 		return ""

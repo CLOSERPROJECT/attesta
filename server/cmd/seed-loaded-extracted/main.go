@@ -105,18 +105,17 @@ func main() {
 	res := commit(c, logOp, org.CommitRequest{
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: loadID,
-		Value: map[string]any{
-			"sourceLotId": loadID,
-			"polvereDiVetro": []any{
-				map[string]any{"weight": 80.0},
-			},
-			"plastica": []any{
-				map[string]any{"weight": 40.0},
-			},
-			"alluminio": []any{
-				map[string]any{"weight": 25.0},
-			},
-		},
+		Value:         map[string]any{"material": "polvereDiVetro", "weight": 80.0},
+	})
+	res = commit(c, logOp, org.CommitRequest{
+		TaskPath:      "lot_processing/containerReg",
+		JobInstanceID: loadID,
+		Value:         map[string]any{"material": "plastica", "weight": 40.0},
+	})
+	res = commit(c, logOp, org.CommitRequest{
+		TaskPath:      "lot_processing/containerReg",
+		JobInstanceID: loadID,
+		Value:         map[string]any{"material": "alluminio", "weight": 25.0},
 	})
 
 	// Second intake parked at weightCheck (flat dataReport smoke).

@@ -23,6 +23,7 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 		after, _ := entry["after"].(string)
 		before, _ := entry["before"].(string)
 		title, _ := entry["title"].(string)
+		hideIfNull, _ := entry["hideIfNull"].(bool)
 		switch kind {
 		case "readonly":
 			expr, _ := entry["expr"].(string)
@@ -32,6 +33,7 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 			out = append(out, ChromeRule{
 				ID: id, Kind: kind, Expr: expr,
 				Title: title, Before: before, After: after,
+				HideIfNull: hideIfNull,
 			})
 		case "dataReport":
 			expr, _ := entry["expr"].(string)
@@ -41,6 +43,7 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 			out = append(out, ChromeRule{
 				ID: id, Kind: kind, Expr: expr,
 				Title: title, Before: before, After: after,
+				HideIfNull: hideIfNull,
 			})
 		}
 	}
@@ -176,13 +179,17 @@ func mergeChromeIntoSchemas(
 		if !ok {
 			continue
 		}
+		opts := map[string]any{
+			"chromeId": c.ID,
+		}
+		if c.HideIfNull {
+			opts["hideIfNull"] = true
+		}
 		uiSchema[c.ID] = map[string]any{
 			"ui:components": map[string]any{
 				"stringField": sf,
 			},
-			"ui:options": map[string]any{
-				"chromeId": c.ID,
-			},
+			"ui:options": opts,
 		}
 	}
 	return schema, uiSchema

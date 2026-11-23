@@ -276,6 +276,23 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 			t.Fatal("enumReads.sourceLotId must be removed")
 		}
 	}
+	schema, _ := containerReg["schema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	if _, has := props["polvereDiVetro"]; has {
+		t.Fatal("containerReg schema must not use material arrays")
+	}
+	if _, has := props["material"]; !has {
+		t.Fatal("containerReg schema must expose flat material")
+	}
+	derived, _ := containerReg["derived"].(map[string]any)
+	if _, has := derived["continuesContainerId"]; !has {
+		t.Fatal("containerReg.derived.continuesContainerId missing")
+	}
+	chrome, _ := containerReg["chrome"].(map[string]any)
+	prior, _ := chrome["priorWeight"].(map[string]any)
+	if prior == nil || prior["hideIfNull"] != true {
+		t.Fatalf("containerReg.chrome.priorWeight hideIfNull = %#v", prior)
+	}
 	transform, _ := containerReg["onSubmit"].(map[string]any)
 	rawOps, _ := transform["transform"].([]any)
 	var sawInstanceBind bool
