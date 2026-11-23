@@ -1,0 +1,361 @@
+import { createContext } from 'svelte';
+
+import type { TaskAddress } from '../task-address.js';
+import { outlineLetter } from '../timeline/outline-label.js';
+import type {
+	TimelineRow,
+	TimelineStep,
+	TimelineSubstep,
+	TimelineView
+} from '../timeline/types.js';
+import {
+	addressFromBoardTask,
+	boardTaskFromAddress,
+	focusMatchesAddress,
+	parseTaskHref,
+	type BoardTaskFocus
+} from './board-url.js';
+import {
+	BoardEmbedOpen,
+	boardEmbedOpen
+} from './board-embed-open.svelte.js';
+
+export type VisibleSub = {
+	sub: TimelineSubstep;
+	mark: string;
+	address: TaskAddress | null;
+};
+
+export type VisibleRow = {
+	row: TimelineRow;
+	mark: string;
+	substeps: VisibleSub[];
+};
+
+export type VisibleStep = {
+	step: TimelineStep;
+	mark: string;
+	rows?: VisibleRow[];
+	substeps?: VisibleSub[];
+};
+
+export type TimelineShowFilter = {
+	showAll: boolean;
+	focus?: BoardTaskFocus | null;
+	stream?: string;
+	instance?: string;
+};
+
+function walkSubsteps(view: TimelineView): TimelineSubstep[] {
+	const out: TimelineSubstep[] = [];
+	for (const step of view.steps) {
+		for (const sub of step.substeps ?? []) {
+			out.push(sub);
+		}
+		for (const row of step.rows ?? []) {
+			for (const sub of row.substeps) {
+				out.push(sub);
+			}
+		}
+	}
+	return out;
+}
+
+function addressKey(addr: TaskAddress): string {
+	return `${addr.jobId}|${addr.jobInstanceId}|${addr.taskId}|${addr.provisionalJob}`;
+}
+
+/** Org-actionable Task addresses from the timeline projection (optional Show-all). */
+export function actionableAddressesFromTimeline(
+	view: TimelineView,
+	_opts: { showAll?: boolean } = {}
+): TaskAddress[] {
+	const out: TaskAddress[] = [];
+	const seen = new Set<string>();
+	for (const sub of walkSubsteps(view)) {
+		if (!sub.orgActionable || !sub.href) continue;
+		const parsed = parseTaskHref(sub.href, view.stream, view.instance);
+		if (!parsed) continue;
+		const key = addressKey(parsed.address);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(parsed.address);
+	}
+	return out;
+}
+
+export function firstActionableAddress(
+	view: TimelineView
+): TaskAddress | null {
+	return actionableAddressesFromTimeline(view)[0] ?? null;
+}
+
+/** Auto-open candidate: only when the board has exactly one actionable Task. */
+export function soleActionableAddress(
+	view: TimelineView
+): TaskAddress | null {
+	const addrs = actionableAddressesFromTimeline(view);
+	return addrs.length === 1 ? addrs[0] : null;
+}
+
+/** Whether a substep card belongs on the board under Show all / actionable-only. */
+export function timelineSubstepShown(
+	sub: TimelineSubstep,
+	opts: TimelineShowFilter
+): boolean {
+	if (opts.showAll) return true;
+	if (sub.orgActionable) return true;
+	const focus = opts.focus;
+	if (!focus || !sub.href || opts.stream == null) return false;
+	// Instance-aware only — substepId is jobId.taskId and collides across lot rows.
+	const parsed = parseTaskHref(sub.href, opts.stream, opts.instance ?? '');
+	return parsed ? focusMatchesAddress(focus, parsed.address) : false;
+}
+
+/** True when the board already has a card for this Task (instance-scoped). */
+export function addressVisibleOnTimeline(
+	view: TimelineView,
+	addr: TaskAddress
+): boolean {
+	for (const sub of walkSubsteps(view)) {
+		if (!sub.href) continue;
+		const parsed = parseTaskHref(sub.href, view.stream, view.instance);
+		if (
+			parsed &&
+			parsed.address.jobId === addr.jobId &&
+			parsed.address.taskId === addr.taskId &&
+			parsed.address.jobInstanceId === addr.jobInstanceId
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function parseSubAddress(
+	sub: TimelineSubstep,
+	stream: string,
+	instance: string
+): TaskAddress | null {
+	if (!sub.href) return null;
+	return parseTaskHref(sub.href, stream, instance)?.address ?? null;
+}
+
+/** Project the filtered outline with marks keyed to original indices (stable). */
+export function projectVisibleSteps(
+	view: TimelineView,
+	opts: TimelineShowFilter
+): VisibleStep[] {
+	const stream = opts.stream ?? view.stream;
+	const instance = opts.instance ?? view.instance;
+	const out: VisibleStep[] = [];
+
+	for (const step of view.steps) {
+		const stepMark = step.stepId;
+		const rows = step.rows ?? [];
+		if (rows.length > 0) {
+			const visibleRows: VisibleRow[] = [];
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i]!;
+				const rowMark = `${stepMark}${outlineLetter(i)}`;
+				const substeps: VisibleSub[] = [];
+				for (let j = 0; j < row.substeps.length; j++) {
+					const sub = row.substeps[j]!;
+					if (!timelineSubstepShown(sub, opts)) continue;
+					substeps.push({
+						sub,
+						mark: `${rowMark}.${j + 1}`,
+						address: parseSubAddress(sub, stream, instance)
+					});
+				}
+				if (substeps.length === 0) continue;
+				visibleRows.push({ row, mark: rowMark, substeps });
+			}
+			if (visibleRows.length === 0) continue;
+			out.push({ step, mark: stepMark, rows: visibleRows });
+			continue;
+		}
+
+		const subs = step.substeps ?? [];
+		const substeps: VisibleSub[] = [];
+		for (let i = 0; i < subs.length; i++) {
+			const sub = subs[i]!;
+			if (!timelineSubstepShown(sub, opts)) continue;
+			substeps.push({
+				sub,
+				mark: `${stepMark}.${i + 1}`,
+				address: parseSubAddress(sub, stream, instance)
+			});
+		}
+		if (substeps.length === 0) continue;
+		out.push({ step, mark: stepMark, substeps });
+	}
+
+	return out;
+}
+
+export type BoardTimelineModelOptions = {
+	syncUrl: (focus: BoardTaskFocus | null) => void;
+	embedOpen?: BoardEmbedOpen;
+};
+
+/**
+ * Board timeline visibility + selection + embed-open policy.
+ * Identity is TaskAddress / BoardTaskFocus only — never substepId alone.
+ * Nest collapse stays outside this module.
+ */
+export class BoardTimelineModel {
+	#syncUrl: (focus: BoardTaskFocus | null) => void;
+	#embed: BoardEmbedOpen;
+
+	view = $state.raw<TimelineView | null>(null);
+	showAll = $state(false);
+	stream = $state('');
+	instance = $state('');
+	play = $state(false);
+	playAddress = $state.raw<TaskAddress | null>(null);
+	selection = $state.raw<BoardTaskFocus | null>(null);
+
+	constructor(opts: BoardTimelineModelOptions) {
+		this.#syncUrl = opts.syncUrl;
+		this.#embed = opts.embedOpen ?? boardEmbedOpen;
+	}
+
+	get visibleSteps(): VisibleStep[] {
+		const view = this.view;
+		if (!view) return [];
+		return projectVisibleSteps(view, {
+			showAll: this.showAll,
+			focus: this.selection,
+			stream: this.stream || view.stream,
+			instance: this.instance || view.instance
+		});
+	}
+
+	get actionableAddresses(): TaskAddress[] {
+		const view = this.view;
+		if (!view) return [];
+		return actionableAddressesFromTimeline(view, { showAll: this.showAll });
+	}
+
+	get soleActionable(): TaskAddress | null {
+		const view = this.view;
+		if (!view) return null;
+		return soleActionableAddress(view);
+	}
+
+	/** Actionable-only empty: no cards when filtering and nothing to do. */
+	get isEmpty(): boolean {
+		if (this.showAll || this.play) return false;
+		const view = this.view;
+		if (!view) return false;
+		return !walkSubsteps(view).some((s) => s.orgActionable);
+	}
+
+	isSelected(addr: TaskAddress): boolean {
+		return focusMatchesAddress(this.selection, addr);
+	}
+
+	isBodyOpen(addr: TaskAddress): boolean {
+		void this.#embed.opened;
+		return this.#embed.isOpen(addr);
+	}
+
+	addressVisible(addr: TaskAddress): boolean {
+		const view = this.view;
+		if (!view) return false;
+		return addressVisibleOnTimeline(view, addr);
+	}
+
+	/** Focused Task with no timeline card (e.g. provisional Can start). */
+	get orphanFocus(): TaskAddress | null {
+		const focus = this.selection;
+		if (!focus || this.play) return null;
+		const addr = addressFromBoardTask(this.stream, this.instance, focus);
+		if (
+			this.playAddress &&
+			addressKey(this.playAddress) === addressKey(addr)
+		) {
+			return null;
+		}
+		if (this.addressVisible(addr)) return null;
+		return addr;
+	}
+
+	setView(view: TimelineView | null): void {
+		this.view = view;
+	}
+
+	setShowAll(v: boolean): void {
+		this.showAll = v;
+	}
+
+	setPlay(play: boolean): void {
+		this.play = play;
+	}
+
+	setPlayAddress(addr: TaskAddress | null): void {
+		this.playAddress = addr;
+	}
+
+	setScope(stream: string, instance: string): void {
+		this.stream = stream;
+		this.instance = instance;
+	}
+
+	select(addr: TaskAddress): void {
+		const next = boardTaskFromAddress(addr);
+		this.selection = next;
+		this.#syncUrl(next);
+		this.#embed.setOpen(addr, true);
+	}
+
+	clearSelection(): void {
+		this.selection = null;
+		this.#syncUrl(null);
+	}
+
+	/** URL deep-link: select and open body (user navigated to the task). */
+	setFocusFromUrl(focus: BoardTaskFocus): void {
+		this.selection = focus;
+		this.#syncUrl(focus);
+		const addr = addressFromBoardTask(this.stream, this.instance, focus);
+		this.#embed.setOpen(addr, true);
+	}
+
+	setBodyOpen(addr: TaskAddress, open: boolean): void {
+		this.#embed.setOpen(addr, open);
+	}
+
+	toggleBody(addr: TaskAddress): boolean {
+		return this.#embed.toggle(addr);
+	}
+
+	collapseAllBodies(): void {
+		const view = this.view;
+		if (view) {
+			this.#embed.closeAll(
+				actionableAddressesFromTimeline(view, { showAll: true })
+			);
+		}
+		if (this.playAddress) this.#embed.setOpen(this.playAddress, false);
+		const orphan = this.orphanFocus;
+		if (orphan) this.#embed.setOpen(orphan, false);
+	}
+
+	/**
+	 * Bare load policy: Play → select+open; sole actionable → select+open; many → no selection.
+	 * Caller must skip when URL already carries focus.
+	 */
+	applyLoadPolicy(): void {
+		if (this.playAddress) {
+			this.select(this.playAddress);
+			return;
+		}
+		const sole = this.soleActionable;
+		if (sole) this.select(sole);
+	}
+}
+
+export const [getBoardTimelineModel, setBoardTimelineModel] =
+	createContext<BoardTimelineModel>();

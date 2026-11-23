@@ -33,7 +33,10 @@
 	import { Label } from '#lib/shadcn/ui/label/index.js';
 	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
-	import { boardEmbedOpen } from './board-embed-open.svelte.js';
+	import {
+		BoardTimelineModel,
+		setBoardTimelineModel
+	} from './board-timeline-model.svelte.js';
 	import {
 		boardFormCache,
 		type BoardFormEntry
@@ -52,11 +55,6 @@
 		parseBoardTaskParam,
 		type BoardTaskFocus
 	} from './board-url.js';
-	import {
-		actionableAddressesFromTimeline,
-		addressVisibleOnTimeline,
-		soleActionableAddress
-	} from './timeline-actionable.js';
 	import { resolveTaskDeepLink } from '../worklist-nav.js';
 
 	import '../timeline/org-timeline.css';
@@ -79,18 +77,28 @@
 	const nestCollapse = new BoardNestCollapse();
 	setBoardNestCollapse(nestCollapse);
 
+	function syncFocusToUrl(next: BoardTaskFocus | null) {
+		if (next) {
+			searchParams.set(BOARD_TASK_SEARCH_KEY, encodeBoardTaskParam(next), {
+				replace: true
+			});
+		} else if (searchParams.get(BOARD_TASK_SEARCH_KEY) != null) {
+			searchParams.delete(BOARD_TASK_SEARCH_KEY, undefined, { replace: true });
+		}
+	}
+
+	const model = new BoardTimelineModel({ syncUrl: syncFocusToUrl });
+	setBoardTimelineModel(model);
+
 	const timelinePort = createHttpTimelinePort();
 
 	let view = $state.raw<TimelineView | null>(null);
 	let error = $state('');
 	let loading = $state(true);
 	let streamTitle = $state('');
-	let showAll = $state(false);
 	let shellPainted = $state(false);
 	/** After a deep-link gate deny, do not auto-focus first actionable. */
 	let suppressAutoFocus = $state(false);
-
-	let playAddress = $state.raw<TaskAddress | null>(null);
 
 	/** Stay UI keyed by address. */
 	let stayedByKey = $state.raw<Record<string, CommitOutcome>>({});
@@ -102,82 +110,45 @@
 		return parseBoardTaskParam(raw == null ? null : String(raw));
 	});
 
-	let focus = $state.raw<BoardTaskFocus | null>(null);
-
-	const hasActionable = $derived(
-		!!view?.steps.some(
-			(step) =>
-				(step.substeps ?? []).some((s) => s.orgActionable) ||
-				(step.rows ?? []).some((row) => row.substeps.some((s) => s.orgActionable))
-		)
-	);
-	const actionableOnlyEmpty = $derived(!showAll && !hasActionable && !play);
-
 	const dashboardHref = $derived(orgMyStreamDashboardPath(stream));
 	const titleText = $derived(streamTitle || stream);
 	const cacheEntries = $derived(boardFormCache.entries);
 
 	const focusedAddress = $derived(
-		focus ? addressFromBoardTask(stream, instance, focus) : null
+		model.selection
+			? addressFromBoardTask(stream, instance, model.selection)
+			: null
 	);
 
-	/** Focused Task with no timeline card yet (e.g. provisional Can start). */
-	const orphanFocus = $derived.by(() => {
-		const addr = focusedAddress;
-		if (!addr || play) return null;
-		if (playAddress && taskAddressKey(playAddress) === taskAddressKey(addr)) {
-			return null;
-		}
-		if (view && addressVisibleOnTimeline(view, addr)) return null;
-		return addr;
+	const orphanFocus = $derived(model.orphanFocus);
+	const playAddress = $derived(model.playAddress);
+	const showAll = $derived(model.showAll);
+	const actionableOnlyEmpty = $derived(model.isEmpty);
+
+	$effect(() => {
+		model.setScope(stream, instance);
+		model.setPlay(play);
 	});
 
-	function syncFocusToUrl(next: BoardTaskFocus | null) {
-		if (next) {
-			searchParams.set(BOARD_TASK_SEARCH_KEY, encodeBoardTaskParam(next), {
-				replace: true
-			});
-		} else if (searchParams.get(BOARD_TASK_SEARCH_KEY) != null) {
-			searchParams.delete(BOARD_TASK_SEARCH_KEY, undefined, { replace: true });
-		}
-	}
+	$effect(() => {
+		model.setView(view);
+	});
 
 	function setFocus(addr: TaskAddress) {
-		const next = boardTaskFromAddress(addr);
-		focus = next;
-		syncFocusToUrl(next);
-		boardEmbedOpen.setOpen(addr, true);
+		model.select(addr);
 		const el = document.querySelector(
 			`[data-address-key="${CSS.escape(taskAddressKey(addr))}"]`
 		);
 		el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 	}
 
-	function isEmbedOpen(addr: TaskAddress): boolean {
-		void boardEmbedOpen.opened;
-		return boardEmbedOpen.isOpen(addr);
-	}
-
-	function setEmbedOpen(addr: TaskAddress, open: boolean): void {
-		boardEmbedOpen.setOpen(addr, open);
-	}
-
-	function toggleEmbedOpen(addr: TaskAddress): boolean {
-		return boardEmbedOpen.toggle(addr);
-	}
-
 	function clearFocus() {
-		focus = null;
-		syncFocusToUrl(null);
+		model.clearSelection();
 	}
 
 	function collapseAllNests() {
 		nestCollapse.collapseAll();
-		if (view) {
-			boardEmbedOpen.closeAll(actionableAddressesFromTimeline(view, { showAll: true }));
-		}
-		if (playAddress) boardEmbedOpen.setOpen(playAddress, false);
-		if (orphanFocus) boardEmbedOpen.setOpen(orphanFocus, false);
+		model.collapseAllBodies();
 	}
 
 	function getEntry(addr: TaskAddress): BoardFormEntry | undefined {
@@ -325,15 +296,21 @@
 	const boardApi: BoardEmbedApi = {
 		getEntry,
 		get focus() {
-			return focus;
+			return model.selection;
 		},
 		isFocused(addr) {
-			return focusMatchesAddress(focus, addr);
+			return model.isSelected(addr);
 		},
 		setFocus,
-		isEmbedOpen,
-		setEmbedOpen,
-		toggleEmbedOpen,
+		isEmbedOpen(addr) {
+			return model.isBodyOpen(addr);
+		},
+		setEmbedOpen(addr, open) {
+			model.setBodyOpen(addr, open);
+		},
+		toggleEmbedOpen(addr) {
+			return model.toggleBody(addr);
+		},
 		stayedFor,
 		onCommitted,
 		onContinue,
@@ -366,7 +343,7 @@
 			try {
 				if (isPlay) {
 					view = null;
-					playAddress = null;
+					model.setPlayAddress(null);
 					const res = await fetch('/api/org/streams', {
 						credentials: 'include',
 						headers: { Accept: 'application/json' },
@@ -396,14 +373,13 @@
 						jobInstanceId: '',
 						taskId: anchor.taskId
 					});
-					playAddress = addr;
+					model.setPlayAddress(addr);
 					boardFormCache.enqueue([addr]);
 					untrack(() => {
-						focus = boardTaskFromAddress(addr);
-						syncFocusToUrl(focus);
+						model.select(addr);
 					});
 				} else {
-					playAddress = null;
+					model.setPlayAddress(null);
 					const next = await timelinePort.load({ stream: s, instance: i });
 					if (cancelled) return;
 					view = next;
@@ -414,7 +390,7 @@
 			} catch (e: unknown) {
 				if (cancelled) return;
 				view = null;
-				playAddress = null;
+				model.setPlayAddress(null);
 				error =
 					e instanceof Error
 						? e.message
@@ -429,54 +405,45 @@
 		};
 	});
 
-	// URL → focus (deep link / soft focus).
+	// URL → selection (deep link opens body); Play keeps start selected.
 	$effect(() => {
 		const fromUrl = focusFromUrl;
 		if (fromUrl) {
-			focus = fromUrl;
+			model.setFocusFromUrl(fromUrl);
 			return;
 		}
-		if (play && playAddress) {
-			focus = boardTaskFromAddress(playAddress);
+		if (play && model.playAddress) {
+			model.select(model.playAddress);
 		}
 	});
 
-	// Play / orphan chrome is the task itself — open that embed (timeline substeps stay closed).
+	// Orphan chrome is the task itself — open that embed.
 	$effect(() => {
-		if (playAddress) boardEmbedOpen.setOpen(playAddress, true);
-	});
-	$effect(() => {
-		if (orphanFocus) boardEmbedOpen.setOpen(orphanFocus, true);
+		const orphan = model.orphanFocus;
+		if (orphan) model.setBodyOpen(orphan, true);
 	});
 
 	// After shell paint: preload actionable (+ play start already enqueued).
 	$effect(() => {
 		if (!shellPainted || loading) return;
 		void scopeKey;
-		void showAll;
-		void view;
-		void playAddress;
+		void model.showAll;
+		void model.view;
+		void model.playAddress;
+		void model.selection;
 
 		const addrs: TaskAddress[] = [];
-		if (playAddress) addrs.push(playAddress);
-		if (view) {
-			addrs.push(...actionableAddressesFromTimeline(view, { showAll }));
-		}
-		if (focus) {
-			addrs.push(addressFromBoardTask(stream, instance, focus));
+		if (model.playAddress) addrs.push(model.playAddress);
+		addrs.push(...model.actionableAddresses);
+		if (model.selection) {
+			addrs.push(addressFromBoardTask(stream, instance, model.selection));
 		}
 		if (addrs.length === 0) return;
 		boardFormCache.enqueue(addrs);
 
-		// Prefer URL focus; else Play; else sole actionable only (multi → stay on bare board).
-		if (!focusFromUrl && !focus && !suppressAutoFocus) {
-			if (playAddress) {
-				focus = boardTaskFromAddress(playAddress);
-				syncFocusToUrl(focus);
-				return;
-			}
-			const sole = view ? soleActionableAddress(view) : null;
-			if (sole) setFocus(sole);
+		// Prefer URL focus; else Play / sole actionable (multi → stay on bare board).
+		if (!focusFromUrl && !model.selection && !suppressAutoFocus) {
+			model.applyLoadPolicy();
 		}
 	});
 
@@ -546,7 +513,10 @@
 					>
 						<Checkbox
 							class="js-show-all-filter border-foreground/35 bg-background shadow-none"
-							bind:checked={showAll}
+							bind:checked={
+								() => model.showAll,
+								(v) => model.setShowAll(!!v)
+							}
 							data-testid="show-all-filter"
 						/>
 						{m.show_all()}
@@ -593,11 +563,11 @@
 				<EmbeddedTaskPanel
 					address={playAddress}
 					entry={getEntry(playAddress)}
-					focused={focusMatchesAddress(focus, playAddress)}
+					focused={focusMatchesAddress(model.selection, playAddress)}
 					play={true}
 					stayedOutcome={stayedFor(playAddress)}
-					open={isEmbedOpen(playAddress)}
-					onOpenChange={(next) => setEmbedOpen(playAddress!, next)}
+					open={model.isBodyOpen(playAddress)}
+					onOpenChange={(next) => model.setBodyOpen(playAddress!, next)}
 					onFocus={() => setFocus(playAddress!)}
 					onCommitted={(outcome) => onCommitted(playAddress!, outcome)}
 					onContinue={() => onContinue(playAddress!)}
@@ -612,8 +582,8 @@
 					entry={getEntry(orphanFocus)}
 					focused={true}
 					stayedOutcome={stayedFor(orphanFocus)}
-					open={isEmbedOpen(orphanFocus)}
-					onOpenChange={(next) => setEmbedOpen(orphanFocus, next)}
+					open={model.isBodyOpen(orphanFocus)}
+					onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
 					onFocus={() => setFocus(orphanFocus)}
 					onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
 					onContinue={() => onContinue(orphanFocus)}
@@ -635,8 +605,8 @@
 						</div>
 					{:else}
 						<div class="stream-timeline-list">
-							{#each view.steps as step (step.stepId)}
-								<TimelineStep {step} {stream} {instance} {showAll} />
+							{#each model.visibleSteps as vs (vs.step.stepId)}
+								<TimelineStep projected={vs} {stream} {instance} />
 							{/each}
 						</div>
 					{/if}

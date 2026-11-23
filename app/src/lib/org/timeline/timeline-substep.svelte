@@ -5,6 +5,7 @@
 	import { cn } from '#lib/shadcn/utils.js';
 
 	import { getBoardEmbed } from '../board/board-context.js';
+	import { getBoardTimelineModel } from '../board/board-timeline-model.svelte.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
@@ -26,6 +27,7 @@
 	let { substep, mark, stream = '', instance = '' }: Props = $props();
 
 	const board = getBoardEmbed();
+	const timelineModel = getBoardTimelineModel();
 	const nestCollapse = getBoardNestCollapse();
 
 	const domId = $derived(substep.substepId.replaceAll('.', '-'));
@@ -42,7 +44,7 @@
 	const embed = $derived(!!(substep.orgActionable && address));
 	const focused = $derived.by(() => {
 		if (!address) return false;
-		return board.isFocused(address);
+		return timelineModel.isSelected(address);
 	});
 	const entry = $derived.by(() => {
 		void boardFormCache.entries;
@@ -50,7 +52,7 @@
 		return boardFormCache.get(taskAddressKey(address));
 	});
 	const stayedOutcome = $derived(address ? board.stayedFor(address) : null);
-	const embedOpen = $derived(address ? board.isEmbedOpen(address) : false);
+	const embedOpen = $derived(address ? timelineModel.isBodyOpen(address) : false);
 
 	let detailsOpen = $state(false);
 	$effect(() => {
@@ -61,8 +63,8 @@
 
 	function toggleEmbed() {
 		if (!address) return;
-		const next = board.toggleEmbedOpen(address);
-		if (next) board.setFocus(address);
+		const next = timelineModel.toggleBody(address);
+		if (next) timelineModel.select(address);
 	}
 </script>
 
@@ -120,8 +122,8 @@
 					play={!!board.play}
 					stayedOutcome={stayedOutcome}
 					open={embedOpen}
-					onOpenChange={(next) => board.setEmbedOpen(address, next)}
-					onFocus={() => board.setFocus(address)}
+					onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}
+					onFocus={() => timelineModel.select(address)}
 					onCommitted={(outcome) => board.onCommitted(address, outcome)}
 					onContinue={() => board.onContinue(address)}
 				/>
