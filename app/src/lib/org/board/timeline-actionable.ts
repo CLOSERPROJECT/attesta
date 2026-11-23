@@ -5,6 +5,7 @@ export {
 	actionableAddressesFromTimeline,
 	addressVisibleOnTimeline,
 	firstActionableAddress,
+	recapAddressesFromTimeline,
 	soleActionableAddress,
 	timelineSubstepShown,
 	type TimelineShowFilter

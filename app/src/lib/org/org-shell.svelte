@@ -5,11 +5,13 @@
 
 	import { p } from '../router/index.js';
 	import { hrefOrgTarget } from '../router/navigate-target.js';
+	import { boardRecapCache } from './board/board-recap-cache.svelte.js';
+	import BoardManyRecap from './board/board-many-recap.svelte';
 	import { draftAddressForTask } from './drafts.js';
 	import { streamInstanceLabel } from './nav-place.js';
 	import { orgSession } from './org-app.svelte.js';
-	import ManySubmitHistory from './many-submit-history.svelte';
 	import { fetchStreamTitle } from './stream-meta.js';
+	import { normalizeTaskAddress, type TaskAddress } from './task-address.js';
 	import WorklistJobLine from './worklist-job-line.svelte';
 	import WorklistRow from './worklist-row.svelte';
 	import {
@@ -19,6 +21,10 @@
 		taskRouteInstanceSegment,
 		type ActNowRow
 	} from './worklist-home.js';
+	import {
+		manySubmitRecapNeedsFetch,
+		manySubmitRecapVisible
+	} from './worklist-overview.js';
 
 	type Props = {
 		stream: string;
@@ -47,6 +53,30 @@
 		streamInstanceLabel(orgSession.result?.worklist, instance) || instance
 	);
 	const titleText = $derived(streamTitle || stream);
+
+	function rowAddress(row: Extract<ActNowRow, { kind: 'task' }>): TaskAddress {
+		return normalizeTaskAddress({
+			stream,
+			instance,
+			jobId: row.jobId,
+			jobInstanceId: row.jobInstanceId,
+			taskId: row.taskId
+		});
+	}
+
+	$effect(() => {
+		const s = stream;
+		const i = instance;
+		const rows = actNow;
+		boardRecapCache.beginScope(`home|${s}|${i}`);
+		const addrs: TaskAddress[] = [];
+		for (const row of rows) {
+			if (row.kind !== 'task') continue;
+			if (!manySubmitRecapNeedsFetch(row.submit, row.submissionCount)) continue;
+			addrs.push(rowAddress(row));
+		}
+		if (addrs.length > 0) boardRecapCache.enqueue(addrs);
+	});
 
 	function rowHasDirtyDraft(row: Extract<ActNowRow, { kind: 'task' }>): boolean {
 		void drafts;
@@ -93,6 +123,7 @@
 				{#each actNow as row (actNowRowKey(row))}
 					<li>
 						{#if row.kind === 'task'}
+							{@const addr = rowAddress(row)}
 							<div class="flex flex-col gap-1">
 								<WorklistRow
 									data-testid="available-row"
@@ -117,18 +148,13 @@
 										progressTestId="available-progress"
 									/>
 								</WorklistRow>
-								<ManySubmitHistory
-									submit={row.submit}
-									submissionCount={row.submissionCount}
-									request={{
-										stream,
-										instance,
-										jobId: row.jobId,
-										jobInstanceId: row.jobInstanceId,
-										taskId: row.taskId
-									}}
-									data-testid="home-many-history"
-								/>
+								{#if manySubmitRecapVisible(row.submit)}
+									<BoardManyRecap
+										address={addr}
+										empty={!manySubmitRecapNeedsFetch(row.submit, row.submissionCount)}
+										data-testid="home-many-recap"
+									/>
+								{/if}
 							</div>
 						{:else}
 							<WorklistRow

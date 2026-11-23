@@ -2,8 +2,13 @@ import * as m from '#lib/paraglide/messages.js';
 
 import type { TaskStatus, TaskSubmit } from './types.js';
 
-/** Accordion under many-submit leaf when Load already reports N > 0. */
-export function manySubmitHistoryVisible(
+/** Home / embed many chrome when Config submit is many. */
+export function manySubmitRecapVisible(submit: TaskSubmit | undefined): boolean {
+	return submit === 'many';
+}
+
+/** Prefetch task-recap only when Load already reports N > 0. */
+export function manySubmitRecapNeedsFetch(
 	submit: TaskSubmit | undefined,
 	submissionCount: number | undefined
 ): boolean {

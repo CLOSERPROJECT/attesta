@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { TimelineSubstep, TimelineView } from '../timeline/types.js';
 import {
 	firstActionableAddress,
+	recapAddressesFromTimeline,
 	soleActionableAddress,
 	timelineSubstepShown
 } from './timeline-actionable.js';
@@ -62,6 +63,47 @@ describe('soleActionableAddress', () => {
 		]);
 		expect(soleActionableAddress(many)).toBeNull();
 		expect(firstActionableAddress(many)?.taskId).toBe('register');
+	});
+});
+
+describe('recapAddressesFromTimeline', () => {
+	test('includes submitMany and substeps with submissions', () => {
+		const view: TimelineView = {
+			...base,
+			steps: [
+				{
+					stepId: '1',
+					title: 'Step',
+					substepCount: 3,
+					expanded: true,
+					substeps: [
+						{
+							substepId: 'intake.register',
+							title: 'Register',
+							status: 'done',
+							href: '/app/recycling/i/261102-1/intake/261102-1/register',
+							submissions: [{ timestamp: '2024-01-01T00:00:00Z' }]
+						},
+						{
+							substepId: 'intake.photos',
+							title: 'Photos',
+							status: 'available',
+							orgActionable: true,
+							submitMany: true,
+							href: '/app/recycling/i/261102-1/intake/261102-1/photos'
+						},
+						{
+							substepId: 'intake.skip',
+							title: 'Skip',
+							status: 'available',
+							href: '/app/recycling/i/261102-1/intake/261102-1/skip'
+						}
+					]
+				}
+			]
+		};
+		const addrs = recapAddressesFromTimeline(view);
+		expect(addrs.map((a) => a.taskId).sort()).toEqual(['photos', 'register']);
 	});
 });
 

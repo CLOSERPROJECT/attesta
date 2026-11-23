@@ -35,12 +35,14 @@
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
 	import {
 		BoardTimelineModel,
+		recapAddressesFromTimeline,
 		setBoardTimelineModel
 	} from './board-timeline-model.svelte.js';
 	import {
 		boardFormCache,
 		type BoardFormEntry
 	} from './board-form-cache.svelte.js';
+	import { boardRecapCache } from './board-recap-cache.svelte.js';
 	import {
 		BoardNestCollapse,
 		setBoardNestCollapse
@@ -190,12 +192,20 @@
 		});
 	}
 
+	function refreshRecap(addr: TaskAddress) {
+		const key = taskAddressKey(addr);
+		boardRecapCache.invalidate(key);
+		boardRecapCache.enqueue([addr]);
+	}
+
 	function onCommitted(addr: TaskAddress, outcome: CommitOutcome) {
 		const decision = decideCommitFollowThrough(outcome, addr);
 		if (decision.kind === 'stay') {
 			stayedByKey = { ...stayedByKey, [taskAddressKey(addr)]: outcome };
+			refreshRecap(addr);
 			return;
 		}
+		refreshRecap(addr);
 
 		clearStay(addr);
 		const target = decision.target;
@@ -337,7 +347,9 @@
 		let cancelled = false;
 		loading = true;
 		error = '';
-		boardFormCache.beginScope(`${s}|${i}|${isPlay ? 'play' : 'home'}`);
+		const scope = `${s}|${i}|${isPlay ? 'play' : 'home'}`;
+		boardFormCache.beginScope(scope);
+		boardRecapCache.beginScope(scope);
 
 		void (async () => {
 			try {
@@ -443,8 +455,13 @@
 		if (model.selection) {
 			addrs.push(addressFromBoardTask(stream, instance, model.selection));
 		}
-		if (addrs.length === 0) return;
-		boardFormCache.enqueue(addrs);
+		if (addrs.length > 0) {
+			boardFormCache.enqueue(addrs);
+		}
+
+		if (view) {
+			boardRecapCache.enqueue(recapAddressesFromTimeline(view));
+		}
 
 		// Prefer URL focus; else Play / sole actionable (multi → stay on bare board).
 		if (!focusFromUrl && !model.selection && !suppressAutoFocus) {

@@ -7,13 +7,14 @@
 	import { getBoardEmbed } from '../board/board-context.js';
 	import { getBoardTimelineModel } from '../board/board-timeline-model.svelte.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
+	import BoardManyRecap from '../board/board-many-recap.svelte';
+	import BoardOnceRecap from '../board/board-once-recap.svelte';
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import { taskAddressKey } from '../task-address.js';
 	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
-	import TimelineSubmissions from './timeline-submissions.svelte';
 	import type { TimelineSubstep } from './types.js';
 
 	type Props = {
@@ -152,7 +153,7 @@
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div class="substep-details">
-					{#if substep.blockedReason || submissions.length > 0}
+					{#if substep.blockedReason || (submissions.length > 0 && address)}
 						<div class="substep-org-body">
 							{#if substep.blockedReason}
 								<p
@@ -162,8 +163,12 @@
 									{substep.blockedReason}
 								</p>
 							{/if}
-							{#if submissions.length > 0}
-								<TimelineSubmissions {submissions} open={substep.status === 'done'} />
+							{#if submissions.length > 0 && address}
+								{#if substep.submitMany}
+									<BoardManyRecap {address} data-testid="timeline-many-recap" />
+								{:else}
+									<BoardOnceRecap {address} data-testid="timeline-once-recap" />
+								{/if}
 							{/if}
 						</div>
 					{:else}

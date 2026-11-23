@@ -58,7 +58,7 @@ export type WorklistInstance = {
 	tasks: Record<string, TaskStatus>;
 	/**
 	 * Domain Submission N per flat leaf taskId. Omitted when empty.
-	 * Overview many-submit chrome reads this without calling recap.
+	 * Home many-recap empty vs fetch gate reads this without calling recap.
 	 */
 	submissionCounts?: Record<string, number>;
 	/** Server: every submit: once Task done (many ignored). */

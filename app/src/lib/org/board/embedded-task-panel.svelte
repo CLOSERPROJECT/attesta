@@ -6,11 +6,12 @@
 	import * as m from '#lib/paraglide/messages.js';
 
 	import type { CommitOutcome } from '../commit-port.js';
-	import ManySubmitHistory from '../many-submit-history.svelte';
 	import TaskForm from '../task-form.svelte';
 	import { taskAddressKey, type TaskAddress } from '../task-address.js';
 	import type { TimelineSubmission } from '../timeline/types.js';
-	import TimelineSubmissions from '../timeline/timeline-submissions.svelte';
+	import { boardRecapCache } from './board-recap-cache.svelte.js';
+	import BoardManyRecap from './board-many-recap.svelte';
+	import BoardOnceRecap from './board-once-recap.svelte';
 	import type { BoardFormEntry } from './board-form-cache.svelte.js';
 
 	type Tab = 'form' | 'recap';
@@ -53,13 +54,15 @@
 	const bundle = $derived(entry?.bundle ?? null);
 	const error = $derived(entry?.error ?? null);
 	const key = $derived(taskAddressKey(address));
-	const recapRequest = $derived({
-		stream: address.stream,
-		instance: address.instance || undefined,
-		jobId: address.jobId,
-		taskId: address.taskId,
-		jobInstanceId: address.provisionalJob ? 'new' : address.jobInstanceId
+	const recapEntry = $derived.by(() => {
+		void boardRecapCache.entries;
+		return boardRecapCache.get(key);
 	});
+	const showOnceRecap = $derived(
+		Boolean(stayedOutcome) ||
+			(recapEntry?.status === 'ready' && (recapEntry.items.length ?? 0) > 0)
+	);
+	const manyEmpty = $derived(submissions.length === 0 && !stayedOutcome);
 
 	function selectTab(next: Tab) {
 		tab = next;
@@ -141,20 +144,19 @@
 								</Button>
 							</div>
 						{/if}
+						{#if !submitMany && showOnceRecap}
+							<BoardOnceRecap {address} data-testid="embed-once-recap" />
+						{/if}
 					{/if}
 				</Tabs.Content>
 
 				{#if submitMany}
 					<Tabs.Content value="recap" class="outline-none" data-testid="embed-recap-pane">
-						{#if submissions.length > 0}
-							<TimelineSubmissions {submissions} open={true} />
-						{/if}
 						{#if !address.provisionalJob && address.jobInstanceId}
-							<ManySubmitHistory
-								submit="many"
-								submissionCount={submissions.length}
-								request={recapRequest}
-								data-testid="embed-many-submit-history"
+							<BoardManyRecap
+								{address}
+								empty={manyEmpty}
+								data-testid="embed-many-recap"
 							/>
 						{/if}
 					</Tabs.Content>

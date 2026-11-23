@@ -1,6 +1,6 @@
 import { createContext } from 'svelte';
 
-import type { TaskAddress } from '../task-address.js';
+import { taskAddressKey, type TaskAddress } from '../task-address.js';
 import { outlineLetter } from '../timeline/outline-label.js';
 import type {
 	TimelineRow,
@@ -86,6 +86,25 @@ export function actionableAddressesFromTimeline(
 		const parsed = parseTaskHref(sub.href, view.stream, view.instance);
 		if (!parsed) continue;
 		const key = addressKey(parsed.address);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(parsed.address);
+	}
+	return out;
+}
+
+/** Addresses that need progressive task-recap preload (many and/or known submissions). */
+export function recapAddressesFromTimeline(view: TimelineView): TaskAddress[] {
+	const out: TaskAddress[] = [];
+	const seen = new Set<string>();
+	for (const sub of walkSubsteps(view)) {
+		if (!sub.href) continue;
+		const hasMany = Boolean(sub.submitMany);
+		const hasSubs = (sub.submissions?.length ?? 0) > 0;
+		if (!hasMany && !hasSubs) continue;
+		const parsed = parseTaskHref(sub.href, view.stream, view.instance);
+		if (!parsed) continue;
+		const key = taskAddressKey(parsed.address);
 		if (seen.has(key)) continue;
 		seen.add(key);
 		out.push(parsed.address);
