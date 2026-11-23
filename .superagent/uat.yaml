@@ -1,0 +1,12 @@
+# PR-controlled UAT sandbox config (Superagent gate schema).
+# setup has network; start keeps the app up without network. Committed files are read-only in the sandbox.
+version: 1
+default_environment: local
+environments:
+  local:
+    type: local
+    setup: mise run uat:setup
+    start: mise run uat:start
+    ready: http://127.0.0.1:3000/
+    cleanup: mise run uat:cleanup
+
