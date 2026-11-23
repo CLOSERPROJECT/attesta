@@ -19,6 +19,10 @@ import {
 	BoardEmbedOpen,
 	boardEmbedOpen
 } from './board-embed-open.svelte.js';
+import {
+	BoardJustCompleted,
+	boardJustCompleted
+} from './board-just-completed.svelte.js';
 
 export type VisibleSub = {
 	sub: TimelineSubstep;
@@ -44,6 +48,8 @@ export type TimelineShowFilter = {
 	focus?: BoardTaskFocus | null;
 	stream?: string;
 	instance?: string;
+	/** Session-sticky just-completed matcher (pin store or test double). */
+	justCompleted?: { has(addr: TaskAddress): boolean } | null;
 };
 
 function walkSubsteps(view: TimelineView): TimelineSubstep[] {
@@ -133,11 +139,14 @@ export function timelineSubstepShown(
 ): boolean {
 	if (opts.showAll) return true;
 	if (sub.orgActionable) return true;
-	const focus = opts.focus;
-	if (!focus || !sub.href || opts.stream == null) return false;
+	if (!sub.href || opts.stream == null) return false;
 	// Instance-aware only — substepId is jobId.taskId and collides across lot rows.
 	const parsed = parseTaskHref(sub.href, opts.stream, opts.instance ?? '');
-	return parsed ? focusMatchesAddress(focus, parsed.address) : false;
+	if (!parsed) return false;
+	if (opts.focus && focusMatchesAddress(opts.focus, parsed.address)) {
+		return true;
+	}
+	return opts.justCompleted?.has(parsed.address) === true;
 }
 
 /** True when the board already has a card for this Task (instance-scoped). */
@@ -225,6 +234,7 @@ export function projectVisibleSteps(
 export type BoardTimelineModelOptions = {
 	syncUrl: (focus: BoardTaskFocus | null) => void;
 	embedOpen?: BoardEmbedOpen;
+	justCompleted?: BoardJustCompleted;
 };
 
 /**
@@ -235,6 +245,7 @@ export type BoardTimelineModelOptions = {
 export class BoardTimelineModel {
 	#syncUrl: (focus: BoardTaskFocus | null) => void;
 	#embed: BoardEmbedOpen;
+	#justCompleted: BoardJustCompleted;
 
 	view = $state.raw<TimelineView | null>(null);
 	showAll = $state(false);
@@ -245,16 +256,19 @@ export class BoardTimelineModel {
 	constructor(opts: BoardTimelineModelOptions) {
 		this.#syncUrl = opts.syncUrl;
 		this.#embed = opts.embedOpen ?? boardEmbedOpen;
+		this.#justCompleted = opts.justCompleted ?? boardJustCompleted;
 	}
 
 	get visibleSteps(): VisibleStep[] {
 		const view = this.view;
 		if (!view) return [];
+		void this.#justCompleted.get();
 		return projectVisibleSteps(view, {
 			showAll: this.showAll,
 			focus: this.selection,
 			stream: this.stream || view.stream,
-			instance: this.instance || view.instance
+			instance: this.instance || view.instance,
+			justCompleted: this.#justCompleted
 		});
 	}
 
@@ -270,12 +284,19 @@ export class BoardTimelineModel {
 		return soleActionableAddress(view);
 	}
 
-	/** Actionable-only empty: no cards when filtering and nothing to do. */
+	/** Available-only empty: no projected cards (actionable, focus, or pin). */
 	get isEmpty(): boolean {
 		if (this.showAll) return false;
-		const view = this.view;
-		if (!view) return false;
-		return !walkSubsteps(view).some((s) => s.orgActionable);
+		if (!this.view) return false;
+		return this.visibleSteps.length === 0;
+	}
+
+	pinJustCompleted(addr: TaskAddress, submissionId?: string): void {
+		this.#justCompleted.pin(addr, submissionId);
+	}
+
+	clearJustCompleted(): void {
+		this.#justCompleted.clear();
 	}
 
 	isSelected(addr: TaskAddress): boolean {
@@ -317,12 +338,14 @@ export class BoardTimelineModel {
 
 	select(addr: TaskAddress): void {
 		const next = boardTaskFromAddress(addr);
+		this.#justCompleted.onFocusChange(next, this.stream, this.instance);
 		this.selection = next;
 		this.#syncUrl(next);
 		this.#embed.setOpen(addr, true);
 	}
 
 	clearSelection(): void {
+		this.#justCompleted.onFocusChange(null, this.stream, this.instance);
 		this.selection = null;
 		this.#syncUrl(null);
 	}
@@ -334,6 +357,7 @@ export class BoardTimelineModel {
 	 */
 	setFocusFromUrl(focus: BoardTaskFocus): void {
 		const unchanged = focusEquals(this.selection, focus);
+		this.#justCompleted.onFocusChange(focus, this.stream, this.instance);
 		this.selection = focus;
 		this.#syncUrl(focus);
 		if (unchanged) return;
