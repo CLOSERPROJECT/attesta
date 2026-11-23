@@ -211,18 +211,18 @@
 	background: var(--org-elev-3);
 }
 
-/* Embed Form/Recap: compact right-aligned segmented control (bordered list, no underline) */
+/* Embed Form/Recap: compact segmented control in the substep header row */
 .org-timeline-page .substep-embed [data-slot='tabs-list'].embed-tabs-list {
-	/* Match embed-panel-body left pad so the control lines up with the form. */
-	margin-left: calc(var(--spacing) * 3);
-	margin-right: auto;
+	margin-left: calc(var(--spacing) * 2);
+	/* Clear the absolute chevron column (same idea as .timeline-header-trail). */
+	margin-right: calc(var(--spacing) * 2);
 	width: auto;
 	height: auto;
 	min-width: 0;
 	flex-shrink: 0;
 	gap: calc(var(--spacing) * 1);
-	padding: calc(var(--spacing) * 1);
-	border: 1px solid var(--border);
+	padding: 0;
+	border: none;
 	border-radius: var(--radius);
 	background: var(--org-elev-3);
 	justify-content: flex-start;
@@ -230,12 +230,13 @@
 
 .org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger {
 	flex: 0 0 auto;
-	height: auto;
-	min-height: 0;
-	gap: calc(var(--spacing) * 0.75);
-	padding: calc(var(--spacing) * 0.75) calc(var(--spacing) * 2);
+	/* Match default Button size (h-9 / gap-1.5 / px-2.5). */
+	height: calc(var(--spacing) * 9);
+	min-height: calc(var(--spacing) * 9);
+	gap: calc(var(--spacing) * 1.5);
+	padding: 0 calc(var(--spacing) * 2.5);
 	border: none;
-	border-radius: calc(var(--radius) * 0.75);
+	border-radius: var(--radius);
 	box-shadow: none;
 	background: transparent;
 	color: var(--foreground);
@@ -244,8 +245,8 @@
 }
 
 .org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger svg {
-	width: 0.875rem;
-	height: 0.875rem;
+	width: 1rem;
+	height: 1rem;
 }
 
 .org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger::after {
@@ -351,7 +352,7 @@
 .org-timeline-page .stream-timeline-row-summary,
 .org-timeline-page .substep-accordion-summary,
 .org-timeline-page .substep-card-link,
-.org-timeline-page .substep-embed-host > .substep-accordion-summary {
+.org-timeline-page .substep-embed-host .substep-accordion-summary {
 	position: relative;
 	display: flex;
 	align-items: center;
@@ -361,6 +362,15 @@
 	padding-left: var(--org-pad-l);
 	padding-right: calc(var(--org-chevron-pad) + var(--org-chevron-slot));
 	border-radius: 0;
+}
+
+/*
+ * Embed: Form|Recap tablist (2.25rem) mounts only when open. Keep the same
+ * border-box height collapsed so the header does not grow on expand.
+ * 2.25rem tablist + padding-block (spacing*2 each side).
+ */
+.org-timeline-page .substep-embed-host .substep-accordion-summary {
+	min-height: calc(2.25rem + var(--spacing) * 4);
 }
 
 /* Absolute column only — do not set display (would override Trigger’s hidden/shown Lucide pair). */
@@ -375,6 +385,25 @@
 	margin: 0 !important;
 	transform: translateY(-50%);
 	color: var(--muted-foreground);
+}
+
+/* Embed header: chevron is its own button (sibling of title + tablist), not inside the title trigger. */
+.org-timeline-page .substep-embed-chevron-trigger {
+	position: absolute;
+	top: 50%;
+	right: var(--org-chevron-pad);
+	width: var(--org-chevron-slot);
+	height: var(--org-chevron-slot);
+	margin: 0;
+	padding: 0;
+	transform: translateY(-50%);
+}
+
+.org-timeline-page .substep-embed-chevron-trigger [data-slot='accordion-trigger-icon'] {
+	position: static;
+	top: auto;
+	right: auto;
+	transform: none;
 }
 
 /* Status: soft tint + dot (quieter than Formata bordered pills) */
@@ -486,8 +515,8 @@
 .org-timeline-page .substep-accordion[data-state='open'] > [data-slot='collapsible-content'],
 .org-timeline-page
 	.substep-embed-host[data-state='open']
-	> .substep-accordion-summary
-	+ div {
+	.substep-accordion-summary
+	+ * {
 	padding-top: calc(var(--spacing) * 3);
 }
 
@@ -530,7 +559,8 @@
 		position: static;
 	}
 
-	.org-timeline-page .substep-accordion[data-state='open'] > .substep-accordion-summary {
+	.org-timeline-page .substep-accordion[data-state='open'] > .substep-accordion-summary,
+	.org-timeline-page .substep-embed-host[data-state='open'] .substep-accordion-summary {
 		position: sticky;
 		top: 0;
 		z-index: 10;
