@@ -221,7 +221,7 @@ function instanceLabelFromWorklist(
 
 /**
  * Place chrome DTO for org nav: label + back law only.
- * Back from Task → instance home; Play → `/my` stream dashboard.
+ * Back from Task → instance home. Play chrome matches home (board owns back to `/my` stream).
  */
 export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 	const {
@@ -262,11 +262,20 @@ export function resolveNavPlace(input: NavPlaceInput): NavPlaceChrome {
 		};
 	}
 
+	if (kind === 'play') {
+		return {
+			showBack: false,
+			backTarget: { kind: 'myStream', stream },
+			primaryLabel: m.fallback_home(),
+			jobTitleLine: null
+		};
+	}
+
 	const jobTitleLine = authoredJobTitle(worklist, jobId);
 	const taskTitle = taskTitleFromWorklist(worklist, jobId, taskId);
-	const backTarget = resolveTaskExit(stream, instance, provisionalJob || kind === 'play');
+	const backTarget = resolveTaskExit(stream, instance, provisionalJob);
 
-	if (kind === 'play' || provisionalJob) {
+	if (provisionalJob) {
 		return {
 			showBack: true,
 			backTarget,

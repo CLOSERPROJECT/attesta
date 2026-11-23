@@ -22,7 +22,6 @@
 		submitMany?: boolean;
 		submissions?: TimelineSubmission[];
 		focused?: boolean;
-		play?: boolean;
 		disabled?: boolean;
 		stayedOutcome?: CommitOutcome | null;
 		open?: boolean;
@@ -39,7 +38,6 @@
 		submitMany = false,
 		submissions = [],
 		focused = false,
-		play = false,
 		disabled = false,
 		stayedOutcome = null,
 		open = true,
@@ -126,7 +124,6 @@
 							jobInstanceId={address.jobInstanceId}
 							{bundle}
 							provisionalJob={address.provisionalJob}
-							{play}
 							disabled={disabled || Boolean(stayedOutcome)}
 							onCommitted={(outcome) => onCommitted?.(outcome)}
 						/>

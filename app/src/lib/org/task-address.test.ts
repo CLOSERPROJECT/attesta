@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	isProvisionalJobInstance,
+	needsStartingNewMint,
 	normalizeJobInstanceId,
 	normalizeTaskAddress,
 	taskAddressKey,
@@ -14,6 +15,13 @@ const stream = 'recycling';
 const truck = '261102-1';
 
 describe('task-address', () => {
+	test('needsStartingNewMint when provisionalJob or blank instance', () => {
+		expect(needsStartingNewMint({ provisionalJob: true, instance: truck })).toBe(true);
+		expect(needsStartingNewMint({ provisionalJob: false, instance: '' })).toBe(true);
+		expect(needsStartingNewMint({ provisionalJob: true, instance: '' })).toBe(true);
+		expect(needsStartingNewMint({ provisionalJob: false, instance: truck })).toBe(false);
+	});
+
 	test('treats empty and new as provisional', () => {
 		expect(isProvisionalJobInstance('')).toBe(true);
 		expect(isProvisionalJobInstance(PROVISIONAL_JOB_INSTANCE_ID)).toBe(true);

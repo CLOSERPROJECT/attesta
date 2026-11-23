@@ -38,9 +38,12 @@ export type TimelineStep = {
 	rows?: TimelineRow[];
 };
 
+export type TimelineMode = 'boot' | 'instance';
+
 export type TimelineView = {
 	stream: string;
 	instance: string;
+	mode?: TimelineMode;
 	label: string;
 	status: string;
 	steps: TimelineStep[];

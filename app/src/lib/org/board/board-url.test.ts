@@ -101,4 +101,39 @@ describe('board-url ?task= sync', () => {
 		);
 		expect(parsed?.seed).toEqual({ lotId: 'L1' });
 	});
+
+	test('parseTaskHref accepts Play boot …/new/{job}/{ji}/{task}', () => {
+		const parsed = parseTaskHref(
+			'/app/recycling/new/intake/new/truckArrive',
+			'recycling',
+			''
+		);
+		expect(parsed?.address).toEqual(
+			normalizeTaskAddress({
+				stream: 'recycling',
+				instance: '',
+				jobId: 'intake',
+				jobInstanceId: 'new',
+				taskId: 'truckArrive'
+			})
+		);
+		expect(parsed?.seed).toEqual({});
+	});
+
+	test('parseTaskHref Play shape strips seed.*', () => {
+		const parsed = parseTaskHref(
+			'/app/recycling/new/lot_processing/new/startLot?seed.lotId=L1',
+			'recycling'
+		);
+		expect(parsed?.address).toEqual(
+			normalizeTaskAddress({
+				stream: 'recycling',
+				instance: '',
+				jobId: 'lot_processing',
+				jobInstanceId: 'new',
+				taskId: 'startLot'
+			})
+		);
+		expect(parsed?.seed).toEqual({ lotId: 'L1' });
+	});
 });

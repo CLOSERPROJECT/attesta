@@ -583,7 +583,11 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	}
 
 	// /my truck A timeline: one finished lot (DPP) + one open mid-weigh row.
-	tl := ProjectStreamTimeline(cfg, got, op, SeedTruckID)
+	tlFocus, err := TimelineInstance(SeedTruckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tl := ProjectStreamTimeline(cfg, got, op, tlFocus)
 	var each *StreamTimelineStep
 	for i := range tl.Steps {
 		if tl.Steps[i].JobID == "lot_processing" {
@@ -614,7 +618,11 @@ func assertStagedDemoDomain(t *testing.T, got Domain) {
 	}
 
 	// Truck B Apri lotto stays open while DA is open on truck A (per-truck line-busy).
-	tlB := ProjectStreamTimeline(cfg, got, op, SeedTruckBID)
+	tlBFocus, err := TimelineInstance(SeedTruckBID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tlB := ProjectStreamTimeline(cfg, got, op, tlBFocus)
 	var startState StreamSubstepState
 	var startBlocked string
 	for _, step := range tlB.Steps {

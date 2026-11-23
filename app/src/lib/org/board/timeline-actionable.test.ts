@@ -64,6 +64,41 @@ describe('soleActionableAddress', () => {
 		expect(soleActionableAddress(many)).toBeNull();
 		expect(firstActionableAddress(many)?.taskId).toBe('register');
 	});
+
+	test('resolves Play boot …/new/{job}/{ji}/{task} hrefs', () => {
+		const boot: TimelineView = {
+			stream: 'recycling',
+			instance: '',
+			mode: 'boot',
+			label: 'recycling',
+			status: 'active',
+			steps: [
+				{
+					stepId: '1',
+					title: 'Intake',
+					substepCount: 1,
+					expanded: true,
+					substeps: [
+						{
+							substepId: 'intake.truckArrive',
+							title: 'Truck arrive',
+							status: 'available',
+							orgActionable: true,
+							href: '/app/recycling/new/intake/new/truckArrive'
+						}
+					]
+				}
+			]
+		};
+		const addr = firstActionableAddress(boot);
+		expect(addr).toMatchObject({
+			stream: 'recycling',
+			instance: '',
+			jobId: 'intake',
+			taskId: 'truckArrive',
+			provisionalJob: true
+		});
+	});
 });
 
 describe('recapAddressesFromTimeline', () => {

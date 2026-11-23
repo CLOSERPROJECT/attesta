@@ -17,7 +17,6 @@ export type BoardEmbedApi = {
 	stayedFor: (addr: TaskAddress) => CommitOutcome | null;
 	onCommitted: (addr: TaskAddress, outcome: CommitOutcome) => void;
 	onContinue: (addr: TaskAddress) => void;
-	play?: boolean;
 };
 
 export const [getBoardEmbed, setBoardEmbed] = createContext<BoardEmbedApi>();

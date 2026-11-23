@@ -3,10 +3,39 @@ import { expect, test, type Page } from '@playwright/test';
 const stream = 'recycling';
 const instance = 'NIR-1';
 const homePath = `/app/${stream}/i/${instance}`;
+const playPath = `/app/${stream}/new`;
+const playStartHref = `${playPath}/intake/new/register`;
+
+const bootTimelineStub = {
+	stream,
+	instance: '',
+	mode: 'boot',
+	label: stream,
+	status: 'active',
+	steps: [
+		{
+			stepId: '1',
+			title: 'Ingresso',
+			substepCount: 1,
+			expanded: true,
+			substeps: [
+				{
+					substepId: 'intake.register',
+					title: 'Registrazione',
+					status: 'available',
+					statusLabel: 'available',
+					orgActionable: true,
+					href: playStartHref
+				}
+			]
+		}
+	]
+};
 
 const timelineStub = {
 	stream,
 	instance,
+	mode: 'instance',
 	label: 'Camion A',
 	status: 'active',
 	steps: [
@@ -29,7 +58,8 @@ const timelineStub = {
 					title: 'Peso pallet',
 					status: 'locked',
 					statusLabel: 'locked',
-					blockedReason: 'Linea occupata: lotto L2 (camion T-B)'
+					blockedReason: 'Linea occupata: lotto L2 (camion T-B)',
+					href: `${homePath}/intake/${instance}/palletWeight`
 				}
 			]
 		}
@@ -120,10 +150,12 @@ async function stubOrgApis(page: Page) {
 		});
 	});
 	await page.route('**/api/org/timeline**', async (route) => {
+		const url = new URL(route.request().url());
+		const hasInstance = Boolean(url.searchParams.get('instance')?.trim());
 		await route.fulfill({
 			status: 200,
 			contentType: 'application/json',
-			body: JSON.stringify(timelineStub)
+			body: JSON.stringify(hasInstance ? timelineStub : bootTimelineStub)
 		});
 	});
 	await page.route('**/api/org/task-form**', async (route) => {
@@ -167,7 +199,7 @@ test('instance route auto-opens sole actionable and soft-focuses URL', async ({ 
 		new RegExp(`${homePath}\\?task=intake%2F${instance}%2Fregister`)
 	);
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
-	await expect(page.getByTestId('instance-chrome-label')).toHaveText('Camion A');
+	await expect(page.getByTestId('board-chrome-label')).toHaveText('Camion A');
 	await expect(page.locator('.js-show-all-filter')).toBeVisible();
 	await expect(page.getByTestId('actionable-embed')).toBeVisible();
 	await expect(page.getByTestId('task-register')).toBeVisible();
@@ -245,23 +277,26 @@ test('unknown Task instance redirects to instance timeline', async ({ page }) =>
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
 });
 
-test('Play route shows stream chrome and embed', async ({ page }) => {
+test('Play route shows timeline accordion and start embed', async ({ page }) => {
 	await stubOrgApis(page);
-	await page.goto(`/app/${stream}/new`);
-	await expect(page.getByTestId('play-route')).toBeVisible();
-	await expect(page.getByTestId('play-chrome')).toBeVisible();
-	await expect(page.getByTestId('play-chrome-stream')).toHaveText('Riciclo');
-	await expect(page.getByTestId('play-chrome-dashboard')).toHaveText(
-		'Torna alla dashboard'
+	await page.goto(playPath);
+	await expect(page.getByTestId('org-timeline')).toBeVisible();
+	await expect(page.getByTestId('org-timeline')).toHaveAttribute(
+		'data-board-scope',
+		'boot'
 	);
-	const dashboard = page.getByTestId('play-chrome-dashboard');
-	await expect(dashboard).toHaveAttribute(
-		'href',
-		`/my/streams/org-${stream}/`
-	);
-	await expect(dashboard).toHaveAttribute('rel', 'external');
-	await expect(dashboard).toHaveAttribute('target', '_self');
+	await expect(page.getByTestId('board-chrome')).toBeVisible();
+	await expect(page.getByTestId('board-chrome-stream')).toHaveText('Riciclo');
+	await expect(page.getByTestId('board-chrome-label')).toHaveCount(0);
+	const back = page.getByTestId('board-chrome-back');
+	await expect(back).toHaveAttribute('href', `/my/streams/org-${stream}/`);
+	await expect(back).toHaveAttribute('rel', 'external');
+	await expect(back).toHaveAttribute('target', '_self');
+	await expect(page.locator('.stream-timeline-step')).toBeVisible();
+	await expect(page.getByTestId('actionable-embed')).toBeVisible();
+	await expect(page.getByTestId('embedded-task-panel')).toBeVisible();
 	await expect(page.getByTestId('task-register')).toBeVisible();
+	await expect(page.getByTestId('play-embed')).toHaveCount(0);
 });
 
 test('Play Commit soft-navs to instance board without task route', async ({ page }) => {
@@ -300,13 +335,21 @@ test('Play Commit soft-navs to instance board without task route', async ({ page
 			})
 		});
 	});
-	await page.goto(`/app/${stream}/new`);
-	await expect(page.getByTestId('play-route')).toBeVisible();
+	await page.goto(playPath);
+	await expect(page.getByTestId('org-timeline')).toHaveAttribute(
+		'data-board-scope',
+		'boot'
+	);
+	await expect(page.getByTestId('actionable-embed')).toBeVisible();
 	await expect(page.getByTestId('task-register')).toBeVisible();
 	const hitsBefore = taskFormHits;
 	await page.locator('form button[type=submit]').click();
 	await expect(page).toHaveURL(new RegExp(`/app/${stream}/i/${instance}`));
 	await expect(page.getByTestId('org-timeline')).toBeVisible();
+	await expect(page.getByTestId('org-timeline')).toHaveAttribute(
+		'data-board-scope',
+		'instance'
+	);
 	await expect(page.getByTestId('actionable-embed')).toBeVisible();
 	// Soft-nav must not bounce through a dedicated task route.
 	await expect(page).not.toHaveURL(new RegExp(`/i/${instance}/intake/`));

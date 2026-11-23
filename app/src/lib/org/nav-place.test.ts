@@ -187,7 +187,7 @@ describe('resolveNavPlace', () => {
 		});
 	});
 
-	test('play: task-like chrome, back to my stream dashboard', () => {
+	test('play: Home label, no back (board owns back to my stream)', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'play',
@@ -200,10 +200,10 @@ describe('resolveNavPlace', () => {
 				worklist
 			})
 		).toEqual({
-			showBack: true,
+			showBack: false,
 			backTarget: { kind: 'myStream', stream: 'recycling' },
-			primaryLabel: 'Registrazione',
-			jobTitleLine: 'Camion'
+			primaryLabel: m.fallback_home(),
+			jobTitleLine: null
 		});
 	});
 

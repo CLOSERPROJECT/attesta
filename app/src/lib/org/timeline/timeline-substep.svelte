@@ -122,7 +122,6 @@
 					submitMany={!!substep.submitMany}
 					{submissions}
 					{focused}
-					play={!!board.play}
 					stayedOutcome={stayedOutcome}
 					open={embedOpen}
 					onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}

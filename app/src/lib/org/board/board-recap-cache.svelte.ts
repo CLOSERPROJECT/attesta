@@ -73,12 +73,16 @@ export class BoardRecapCache {
 		this.entries = next;
 	}
 
-	/** Enqueue addresses not yet ready/loading; pump up to concurrency. */
+	/** Enqueue addresses not yet ready/loading/error; pump up to concurrency. */
 	enqueue(addrs: TaskAddress[]): void {
 		for (const addr of addrs) {
 			const key = taskAddressKey(addr);
 			const existing = this.entries[key];
-			if (existing?.status === 'ready' || existing?.status === 'loading') {
+			if (
+				existing?.status === 'ready' ||
+				existing?.status === 'loading' ||
+				existing?.status === 'error'
+			) {
 				continue;
 			}
 			if (this.#queued.has(key)) continue;

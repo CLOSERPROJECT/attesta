@@ -197,8 +197,8 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=recycling", nil))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("missing instance = %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("boot (stream only) = %d body=%s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
@@ -440,9 +440,10 @@ func TestRequireStreamAndMissingStreamQuery(t *testing.T) {
 
 func TestBuildOrgTimelineMissingJobFallsBack(t *testing.T) {
 	cfg := OrgConfig{Jobs: OrderedObject{Keys: []string{}, Values: map[string]any{}}}
+	hrefs := TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, "T1"))
 	steps := BuildOrgTimelineSteps(cfg, EmptyDomain(), StreamTimeline{Steps: []StreamTimelineStep{
 		{JobID: "missing", Title: "", Tasks: []StreamTimelineTask{{ID: "t", Title: "", State: StreamSubstepAvailable}}},
-	}}, "recycling", "T1")
+	}}, hrefs)
 	if len(steps) != 1 || steps[0].Title != "missing" {
 		t.Fatalf("empty step title falls back to job id: %#v", steps)
 	}
@@ -458,7 +459,7 @@ func TestBuildOrgTimelineMissingJobFallsBack(t *testing.T) {
 		{JobID: "each", Title: "Each", Rows: []StreamTimelineRow{
 			{ID: "L1", Label: "L1", Tasks: []StreamTimelineTask{{ID: "start", Title: "Start", State: StreamSubstepLocked}}},
 		}},
-	}}, "recycling", "T1")
+	}}, hrefs)
 	if len(steps) != 1 || len(steps[0].Rows) != 1 || steps[0].Rows[0].Status != string(StreamSubstepLocked) {
 		t.Fatalf("each-row status = %#v", steps)
 	}
@@ -870,11 +871,16 @@ func TestMapApplyCommitErrorAndStreamDefaults(t *testing.T) {
 	if got := MapWorklistStatusToStreamState(TaskStatus("nope")); got != StreamSubstepLocked {
 		t.Fatalf("default map = %q", got)
 	}
-	if ProjectStreamTimeline(OrgConfig{}, EmptyDomain(), OperatorIdentity{}, "T1").Steps != nil {
+	instFocus, err := TimelineInstance("T1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ProjectStreamTimeline(OrgConfig{}, EmptyDomain(), OperatorIdentity{}, instFocus).Steps != nil {
 		t.Fatal("nil stream timeline")
 	}
-	if ProjectStreamTimeline(OrgConfig{Stream: &StreamConfig{}}, EmptyDomain(), OperatorIdentity{}, "").Steps != nil {
-		t.Fatal("empty instance timeline")
+	bootEmpty := ProjectStreamTimeline(OrgConfig{Stream: &StreamConfig{}}, EmptyDomain(), OperatorIdentity{}, TimelineBoot())
+	if len(bootEmpty.Steps) != 0 {
+		t.Fatalf("boot empty stream steps = %#v", bootEmpty.Steps)
 	}
 	if ListStreamInstances(OrgConfig{}, EmptyDomain(), OperatorIdentity{}) != nil {
 		t.Fatal("nil stream instances")
@@ -1001,7 +1007,7 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 	rows := buildOrgTimelineRows(Job{Title: "Lot"}, StreamTimelineStep{
 		JobID: "lot_processing",
 		Rows:  []StreamTimelineRow{{ID: "L1", Label: "  ", Finished: true}},
-	}, domain, "recycling", truck)
+	}, domain, TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, truck)))
 	if len(rows) != 1 || rows[0].Label != "L1" {
 		t.Fatalf("empty label = %#v", rows)
 	}

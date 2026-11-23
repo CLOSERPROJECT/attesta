@@ -240,8 +240,6 @@ export class BoardTimelineModel {
 	showAll = $state(false);
 	stream = $state('');
 	instance = $state('');
-	play = $state(false);
-	playAddress = $state.raw<TaskAddress | null>(null);
 	selection = $state.raw<BoardTaskFocus | null>(null);
 
 	constructor(opts: BoardTimelineModelOptions) {
@@ -274,7 +272,7 @@ export class BoardTimelineModel {
 
 	/** Actionable-only empty: no cards when filtering and nothing to do. */
 	get isEmpty(): boolean {
-		if (this.showAll || this.play) return false;
+		if (this.showAll) return false;
 		const view = this.view;
 		if (!view) return false;
 		return !walkSubsteps(view).some((s) => s.orgActionable);
@@ -298,14 +296,8 @@ export class BoardTimelineModel {
 	/** Focused Task with no timeline card (e.g. provisional Can start). */
 	get orphanFocus(): TaskAddress | null {
 		const focus = this.selection;
-		if (!focus || this.play) return null;
+		if (!focus) return null;
 		const addr = addressFromBoardTask(this.stream, this.instance, focus);
-		if (
-			this.playAddress &&
-			addressKey(this.playAddress) === addressKey(addr)
-		) {
-			return null;
-		}
 		if (this.addressVisible(addr)) return null;
 		return addr;
 	}
@@ -316,14 +308,6 @@ export class BoardTimelineModel {
 
 	setShowAll(v: boolean): void {
 		this.showAll = v;
-	}
-
-	setPlay(play: boolean): void {
-		this.play = play;
-	}
-
-	setPlayAddress(addr: TaskAddress | null): void {
-		this.playAddress = addr;
 	}
 
 	setScope(stream: string, instance: string): void {
@@ -372,20 +356,15 @@ export class BoardTimelineModel {
 				actionableAddressesFromTimeline(view, { showAll: true })
 			);
 		}
-		if (this.playAddress) this.#embed.setOpen(this.playAddress, false);
 		const orphan = this.orphanFocus;
 		if (orphan) this.#embed.setOpen(orphan, false);
 	}
 
 	/**
-	 * Bare load policy: Play → select+open; sole actionable → select+open; many → no selection.
+	 * Bare load policy: sole actionable → select+open; many → no selection.
 	 * Caller must skip when URL already carries focus.
 	 */
 	applyLoadPolicy(): void {
-		if (this.playAddress) {
-			this.select(this.playAddress);
-			return;
-		}
 		const sole = this.soleActionable;
 		if (sole) this.select(sole);
 	}

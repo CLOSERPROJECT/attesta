@@ -115,4 +115,33 @@ describe('BoardRecapCache', () => {
 		expect(cache.get(taskAddressKey(addr('a')))?.items).toEqual([]);
 		cache.dispose();
 	});
+
+	test('enqueue does not retry error without invalidate', async () => {
+		const fetch = vi.fn(async () => {
+			throw new TaskRecapError('bad request', 400);
+		});
+		const cache = createBoardRecapCache({
+			taskRecap: { fetch } satisfies TaskRecapPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.enqueue([a]);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('error');
+		});
+		expect(fetch).toHaveBeenCalledTimes(1);
+
+		cache.enqueue([a]);
+		await Promise.resolve();
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(cache.get(taskAddressKey(a))?.status).toBe('error');
+
+		cache.invalidate(taskAddressKey(a));
+		cache.enqueue([a]);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('error');
+		});
+		expect(fetch).toHaveBeenCalledTimes(2);
+		cache.dispose();
+	});
 });

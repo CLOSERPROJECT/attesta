@@ -12,7 +12,6 @@
 		decideContinueFollowThrough
 	} from '../commit-follow-through.js';
 	import { orgSession } from '../org-app.svelte.js';
-	import { applySeedQueryParams } from '../seed-query.js';
 	import { fetchStreamTitle } from '../stream-meta.js';
 	import {
 		normalizeTaskAddress,
@@ -21,7 +20,6 @@
 	} from '../task-address.js';
 	import { createHttpTimelinePort } from '../timeline/http-timeline-port.js';
 	import TimelineStep from '../timeline/timeline-step.svelte';
-	import type { TimelineView } from '../timeline/types.js';
 	import {
 		navigateOrgTarget,
 		orgMyStreamDashboardPath
@@ -34,6 +32,10 @@
 	import { Label } from '#lib/shadcn/ui/label/index.js';
 	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
+	import {
+		createBoardSession,
+		type BoardScope
+	} from './board-session.svelte.js';
 	import {
 		BoardTimelineModel,
 		recapAddressesFromTimeline,
@@ -54,7 +56,6 @@
 		BOARD_TASK_SEARCH_KEY,
 		boardTaskFromAddress,
 		encodeBoardTaskParam,
-		focusMatchesAddress,
 		parseBoardTaskParam,
 		type BoardTaskFocus
 	} from './board-url.js';
@@ -62,20 +63,11 @@
 
 	import '../timeline/org-timeline.css';
 
-	type StreamListItem = {
-		key: string;
-		title: string;
-		play?: { jobId: string; taskId: string } | null;
-	};
-
 	type Props = {
-		stream: string;
-		/** Empty on Play (`/{stream}/new`). */
-		instance?: string;
-		play?: boolean;
+		scope: BoardScope;
 	};
 
-	let { stream, instance = '', play = false }: Props = $props();
+	let { scope }: Props = $props();
 
 	const nestCollapse = new BoardNestCollapse();
 	setBoardNestCollapse(nestCollapse);
@@ -95,9 +87,35 @@
 
 	const timelinePort = createHttpTimelinePort();
 
-	let view = $state.raw<TimelineView | null>(null);
-	let error = $state('');
-	let loading = $state(true);
+	const session = createBoardSession({
+		// One-shot init; `$effect` below keeps scope in sync with route props.
+		scope: untrack(() => scope),
+		timeline: timelinePort,
+		model,
+		formCache: boardFormCache,
+		recapCache: boardRecapCache,
+		navigateToInstance: async ({ stream: s, instance: i, focus }) => {
+			const search =
+				focus != null
+					? { [BOARD_TASK_SEARCH_KEY]: encodeBoardTaskParam(focus) }
+					: undefined;
+			await navigate('/:stream/i/:instance', {
+				params: { stream: s, instance: i },
+				search,
+				replace: true
+			});
+		},
+		hydrate: (args) => {
+			void orgSession.hydrate(args);
+		}
+	});
+
+	const view = $derived(session.view);
+	const error = $derived(session.error);
+	const loading = $derived(session.loading);
+	const stream = $derived(scope.stream);
+	const instance = $derived(scope.kind === 'instance' ? scope.instance : '');
+	const isBoot = $derived(scope.kind === 'boot');
 	let streamTitle = $state('');
 	let shellPainted = $state(false);
 	/** After a deep-link gate deny, do not auto-focus first actionable. */
@@ -106,7 +124,7 @@
 	/** Stay UI keyed by address. */
 	let stayedByKey = $state.raw<Record<string, CommitOutcome>>({});
 
-	const scopeKey = $derived(`${stream}|${instance}|${play ? 'play' : 'home'}`);
+	const scopeKey = $derived(session.scopeKey);
 
 	const focusFromUrl = $derived.by(() => {
 		const raw = searchParams.get(BOARD_TASK_SEARCH_KEY);
@@ -114,7 +132,6 @@
 	});
 
 	const dashboardHref = $derived(orgMyStreamDashboardPath(stream));
-	const titleText = $derived(streamTitle || stream);
 	const cacheEntries = $derived(boardFormCache.entries);
 
 	const focusedAddress = $derived(
@@ -124,18 +141,8 @@
 	);
 
 	const orphanFocus = $derived(model.orphanFocus);
-	const playAddress = $derived(model.playAddress);
 	const showAll = $derived(model.showAll);
 	const actionableOnlyEmpty = $derived(model.isEmpty);
-
-	$effect(() => {
-		model.setScope(stream, instance);
-		model.setPlay(play);
-	});
-
-	$effect(() => {
-		model.setView(view);
-	});
 
 	function setFocus(addr: TaskAddress) {
 		model.select(addr);
@@ -175,24 +182,6 @@
 		stayedByKey = next;
 	}
 
-	async function softNavToInstance(
-		nextInstance: string,
-		opts: { focus?: BoardTaskFocus | null; bundleAddr?: TaskAddress; bundle?: CommitOutcome['nextTaskFormBundle'] } = {}
-	) {
-		if (opts.bundle && opts.bundleAddr) {
-			boardFormCache.putReady(opts.bundleAddr, opts.bundle);
-		}
-		const search =
-			opts.focus != null
-				? { [BOARD_TASK_SEARCH_KEY]: encodeBoardTaskParam(opts.focus) }
-				: undefined;
-		await navigate('/:stream/i/:instance', {
-			params: { stream, instance: nextInstance },
-			search,
-			replace: true
-		});
-	}
-
 	function refreshRecap(addr: TaskAddress) {
 		const key = taskAddressKey(addr);
 		boardRecapCache.invalidate(key);
@@ -216,8 +205,8 @@
 			if (outcome.nextTaskFormBundle) {
 				boardFormCache.putReady(nextAddr, outcome.nextTaskFormBundle);
 			}
-			if (play && !instance && target.instance) {
-				void softNavToInstance(target.instance, {
+			if (session.scope.kind === 'boot' && target.instance) {
+				void session.adoptInstance(target.instance, {
 					focus: boardTaskFromAddress(nextAddr),
 					bundleAddr: nextAddr,
 					bundle: outcome.nextTaskFormBundle
@@ -234,7 +223,7 @@
 							instance: t.instance
 						});
 						if (view) {
-							void reloadTimeline();
+							void session.reload();
 						}
 						return;
 					}
@@ -245,14 +234,14 @@
 		}
 
 		if (target.kind === 'home') {
-			if (play && !instance) {
-				void softNavToInstance(target.instance, { focus: null });
+			if (session.scope.kind === 'boot') {
+				void session.adoptInstance(target.instance, { focus: null });
 				orgSession.clearLinksStay();
 				return;
 			}
 			clearFocus();
 			orgSession.clearLinksStay();
-			void reloadTimeline();
+			void session.reload();
 			void orgSession.hydrate({ stream: target.stream, instance: target.instance });
 			return;
 		}
@@ -277,12 +266,12 @@
 						boardFormCache.putReady(nextAddr, outcome.nextTaskFormBundle);
 					}
 					setFocus(nextAddr);
-					void reloadTimeline();
+					void session.reload();
 					return;
 				}
 				if (t.kind === 'home') {
 					clearFocus();
-					void reloadTimeline();
+					void session.reload();
 					return;
 				}
 				navigateOrgTarget(t);
@@ -292,16 +281,6 @@
 				boardFormCache.enqueue([addr]);
 			}
 		});
-	}
-
-	async function reloadTimeline() {
-		if (!instance && !play) return;
-		if (!instance) return;
-		try {
-			view = await timelinePort.load({ stream, instance });
-		} catch {
-			/* keep prior view */
-		}
 	}
 
 	const boardApi: BoardEmbedApi = {
@@ -324,10 +303,7 @@
 		},
 		stayedFor,
 		onCommitted,
-		onContinue,
-		get play() {
-			return play;
-		}
+		onContinue
 	};
 	setBoardEmbed(boardApi);
 
@@ -340,82 +316,10 @@
 		// remounts the board and must keep putReady / in-flight preload entries.
 	});
 
-	// Load timeline (instance) or play start form.
+	// Load via BoardSession (boot = { stream }; instance = { stream, instance }).
 	$effect(() => {
-		const s = stream;
-		const i = instance;
-		const isPlay = play;
-		let cancelled = false;
-		loading = true;
-		error = '';
-		const scope = `${s}|${i}|${isPlay ? 'play' : 'home'}`;
-		boardFormCache.beginScope(scope);
-		boardRecapCache.beginScope(scope);
-
-		void (async () => {
-			try {
-				if (isPlay) {
-					view = null;
-					model.setPlayAddress(null);
-					const res = await fetch('/api/org/streams', {
-						credentials: 'include',
-						headers: { Accept: 'application/json' },
-						cache: 'no-store'
-					});
-					if (!res.ok) throw new Error(await res.text());
-					const items = (await res.json()) as StreamListItem[];
-					const row = items.find((item) => item.key === s);
-					const anchor = row?.play;
-					if (!anchor?.jobId || !anchor.taskId) {
-						throw new Error('play start not found');
-					}
-					if (cancelled) return;
-					streamTitle = row?.title?.trim() || s;
-					const stripped = applySeedQueryParams(window.location.href, orgSession, {
-						jobId: anchor.jobId,
-						taskId: anchor.taskId,
-						jobInstanceId: ''
-					});
-					if (stripped) {
-						window.history.replaceState(window.history.state, '', stripped);
-					}
-					const addr = normalizeTaskAddress({
-						stream: s,
-						instance: '',
-						jobId: anchor.jobId,
-						jobInstanceId: '',
-						taskId: anchor.taskId
-					});
-					model.setPlayAddress(addr);
-					boardFormCache.enqueue([addr]);
-					untrack(() => {
-						model.select(addr);
-					});
-				} else {
-					model.setPlayAddress(null);
-					const next = await timelinePort.load({ stream: s, instance: i });
-					if (cancelled) return;
-					view = next;
-					if (i) {
-						void orgSession.hydrate({ stream: s, instance: i });
-					}
-				}
-			} catch (e: unknown) {
-				if (cancelled) return;
-				view = null;
-				model.setPlayAddress(null);
-				error =
-					e instanceof Error
-						? e.message
-						: m.org_timeline_load_failed({ status: 0 });
-			} finally {
-				if (!cancelled) loading = false;
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
+		session.setScope(scope);
+		void session.load();
 	});
 
 	// URL → selection (opens body only when focus changes — see setFocusFromUrl).
@@ -423,10 +327,6 @@
 		const fromUrl = focusFromUrl;
 		if (fromUrl) {
 			model.setFocusFromUrl(fromUrl);
-			return;
-		}
-		if (play && model.playAddress && !model.isSelected(model.playAddress)) {
-			model.select(model.playAddress);
 		}
 	});
 
@@ -441,30 +341,30 @@
 		void key;
 	});
 
-	// After shell paint: preload actionable (+ play start already enqueued).
+	// After shell paint: preload actionable forms + recaps; auto-focus when sole actionable.
 	$effect(() => {
 		if (!shellPainted || loading) return;
 		void scopeKey;
+		void isBoot;
 		void model.showAll;
 		void model.view;
-		void model.playAddress;
 		void model.selection;
 
-		const addrs: TaskAddress[] = [];
-		if (model.playAddress) addrs.push(model.playAddress);
-		addrs.push(...model.actionableAddresses);
+		const addrs: TaskAddress[] = [...model.actionableAddresses];
 		if (model.selection) {
 			addrs.push(addressFromBoardTask(stream, instance, model.selection));
 		}
-		if (addrs.length > 0) {
-			boardFormCache.enqueue(addrs);
-		}
+		// untrack: enqueue reads $state entries; without it, #setEntry re-fires this effect.
+		untrack(() => {
+			if (addrs.length > 0) {
+				boardFormCache.enqueue(addrs);
+			}
+			// task-recap requires stream instance; boot Play has none.
+			if (view && !isBoot) {
+				boardRecapCache.enqueue(recapAddressesFromTimeline(view));
+			}
+		});
 
-		if (view) {
-			boardRecapCache.enqueue(recapAddressesFromTimeline(view));
-		}
-
-		// Prefer URL focus; else Play / sole actionable (multi → stay on bare board).
 		if (!focusFromUrl && !model.selection && !suppressAutoFocus) {
 			model.applyLoadPolicy();
 		}
@@ -474,7 +374,7 @@
 	$effect(() => {
 		const worklist = orgSession.result?.worklist;
 		const addr = focusedAddress;
-		if (!worklist || !addr || play) return;
+		if (!worklist || !addr || isBoot) return;
 		const gate = resolveTaskDeepLink(
 			addr.stream,
 			addr.instance,
@@ -496,81 +396,66 @@
 
 <div
 	class="org-timeline-page process-page"
-	data-testid={play ? 'play-route' : 'org-timeline'}
+	data-testid="org-timeline"
 	data-org-board="1"
+	data-board-scope={scope.kind}
 	data-show-all={showAll ? '1' : '0'}
-	data-route-key={playAddress ? taskAddressKey(playAddress) : scopeKey}
+	data-route-key={scopeKey}
 >
-	{#if play}
-		<div class="org-timeline-toolbar" data-testid="play-chrome">
-			<header class="org-timeline-header space-y-1">
-				<p class="org-timeline-header-label" data-testid="play-chrome-stream">{titleText}</p>
-				<a
-					href={dashboardHref}
-					class="inline-block text-sm text-zinc-600 underline-offset-2 hover:underline"
-					data-testid="play-chrome-dashboard"
-					data-sveltekit-reload
-					rel="external"
-					target="_self"
-				>
-					{m.back_to_stream_dashboard()}
-				</a>
-			</header>
-		</div>
-	{:else}
-		<div class="org-timeline-toolbar" data-testid="instance-chrome">
-			<header class="org-timeline-header flex items-center gap-2">
-				<Button
-					href={dashboardHref}
-					variant="outline"
-					size="icon"
-					class="shrink-0"
-					aria-label={m.nav_back()}
-					data-testid="instance-chrome-back"
-					data-sveltekit-reload
-					rel="external"
-					target="_self"
-				>
-					<ArrowLeft class="size-4" />
-				</Button>
-				<span class="timeline-header-line min-w-0">
-					<span class="timeline-header-index" data-testid="instance-chrome-stream">
-						{streamTitle || stream}
-					</span>
-					<span class="timeline-header-title" data-testid="instance-chrome-label">
+	<div class="org-timeline-toolbar" data-testid="board-chrome">
+		<header class="org-timeline-header flex items-center gap-2">
+			<Button
+				href={dashboardHref}
+				variant="outline"
+				size="icon"
+				class="shrink-0"
+				aria-label={m.nav_back()}
+				data-testid="board-chrome-back"
+				data-sveltekit-reload
+				rel="external"
+				target="_self"
+			>
+				<ArrowLeft class="size-4" />
+			</Button>
+			<span class="timeline-header-line min-w-0">
+				<span class="timeline-header-index" data-testid="board-chrome-stream">
+					{streamTitle || stream}
+				</span>
+				{#if scope.kind === 'instance'}
+					<span class="timeline-header-title" data-testid="board-chrome-label">
 						{view?.label || instance}
 					</span>
-				</span>
-			</header>
-			{#if view}
-				<div class="stream-show-all-filter">
-					<Label
-						class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}
-					>
-						<Checkbox
-							class="js-show-all-filter border-foreground/35 bg-background shadow-none"
-							bind:checked={
-								() => model.showAll,
-								(v) => model.setShowAll(!!v)
-							}
-							data-testid="show-all-filter"
-						/>
-						{m.show_all()}
-					</Label>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						data-testid="collapse-all"
-						onclick={collapseAllNests}
-					>
-						<ChevronsDownUpIcon data-icon="inline-start" />
-						{m.collapse_all()}
-					</Button>
-				</div>
-			{/if}
-		</div>
-	{/if}
+				{/if}
+			</span>
+		</header>
+		{#if view}
+			<div class="stream-show-all-filter">
+				<Label
+					class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}
+				>
+					<Checkbox
+						class="js-show-all-filter border-foreground/35 bg-background shadow-none"
+						bind:checked={
+							() => model.showAll,
+							(v) => model.setShowAll(!!v)
+						}
+						data-testid="show-all-filter"
+					/>
+					{m.show_all()}
+				</Label>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					data-testid="collapse-all"
+					onclick={collapseAllNests}
+				>
+					<ChevronsDownUpIcon data-icon="inline-start" />
+					{m.collapse_all()}
+				</Button>
+			</div>
+		{/if}
+	</div>
 
 	{#if orgSession.commitError}
 		<p class="text-sm text-red-700" data-testid="org-commit-error" role="alert">
@@ -578,39 +463,15 @@
 		</p>
 	{/if}
 
-	{#if loading && !view && !playAddress}
-		<p
-			class="text-sm text-zinc-500"
-			data-testid={play ? 'play-load-status' : 'org-timeline-status'}
-		>
+	{#if loading && !view}
+		<p class="text-sm text-zinc-500" data-testid="org-timeline-status">
 			{m.loading()}
 		</p>
-	{:else if error && !view && !playAddress}
-		<p
-			class="text-sm text-red-700"
-			data-testid={play ? 'play-load-error' : 'org-timeline-error'}
-			role="alert"
-		>
+	{:else if error && !view}
+		<p class="text-sm text-red-700" data-testid="org-timeline-error" role="alert">
 			{error}
 		</p>
 	{:else}
-		{#if play && playAddress}
-			<section class="mb-6" data-testid="play-embed">
-				<EmbeddedTaskPanel
-					address={playAddress}
-					entry={getEntry(playAddress)}
-					focused={focusMatchesAddress(model.selection, playAddress)}
-					play={true}
-					stayedOutcome={stayedFor(playAddress)}
-					open={model.isBodyOpen(playAddress)}
-					onOpenChange={(next) => model.setBodyOpen(playAddress!, next)}
-					onFocus={() => setFocus(playAddress!)}
-					onCommitted={(outcome) => onCommitted(playAddress!, outcome)}
-					onContinue={() => onContinue(playAddress!)}
-				/>
-			</section>
-		{/if}
-
 		{#if orphanFocus}
 			<section class="mb-6" data-testid="orphan-focus-embed">
 				<EmbeddedTaskPanel
