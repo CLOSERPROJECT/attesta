@@ -258,4 +258,17 @@ describe('BoardTimelineModel visibility', () => {
 		expect(model.isBodyOpen(addrDA())).toBe(false);
 		expect(model.selection).toEqual(focusDA);
 	});
+
+	// Collapse-all: embeds via collapseAllBodies; non-embed details via nest epoch (not step/row nests).
+	test('collapseAllBodies closes open embed panels', () => {
+		const syncUrl = vi.fn();
+		const embed = new BoardEmbedOpen();
+		const model = new BoardTimelineModel({ syncUrl, embedOpen: embed });
+		model.setScope(stream, instance);
+		model.setView(multiLotView());
+		model.setBodyOpen(addrDA(), true);
+		expect(model.isBodyOpen(addrDA())).toBe(true);
+		model.collapseAllBodies();
+		expect(model.isBodyOpen(addrDA())).toBe(false);
+	});
 });

@@ -6,7 +6,6 @@
 		getBoardTimelineModel,
 		type VisibleStep
 	} from '../board/board-timeline-model.svelte.js';
-	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import { displayStepTitle } from './outline-label.js';
 	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
@@ -21,7 +20,6 @@
 
 	let { projected, stream = '', instance = '' }: Props = $props();
 
-	const nestCollapse = getBoardNestCollapse();
 	const timelineModel = getBoardTimelineModel();
 
 	const step = $derived(projected.step);
@@ -36,11 +34,6 @@
 	const visibleSubsteps = $derived(projected.substeps ?? []);
 
 	let open = $state(Boolean(untrack(() => step.expanded)));
-	$effect(() => {
-		const e = nestCollapse.epoch;
-		if (e === 0) return;
-		open = false;
-	});
 </script>
 
 <Collapsible.Root class="stream-timeline-step" id={stepDomId} bind:open>

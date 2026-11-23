@@ -1,9 +1,9 @@
 import { createContext } from 'svelte';
 
 /**
- * Board-scoped collapse-all signal for nest Collapsibles (steps/rows/details).
- * Bump epoch; children set open=false when epoch changes from 0.
- * Embeds stay on BoardEmbedOpen.closeAll — do not remount the tree (forms).
+ * Board-scoped collapse-all signal for substep detail Collapsibles only.
+ * Bump epoch; substeps set detailsOpen=false when epoch changes from 0.
+ * Step/row nests stay expanded (initial board state). Embeds use BoardEmbedOpen.closeAll.
  */
 export class BoardNestCollapse {
 	epoch = $state(0);
