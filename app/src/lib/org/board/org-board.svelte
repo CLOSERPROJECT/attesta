@@ -27,6 +27,7 @@
 		orgMyStreamDashboardPath
 	} from '../../router/navigate-target.js';
 	import { navigate } from '../../router/index.js';
+	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
 	import { Checkbox } from '#lib/shadcn/ui/checkbox/index.js';
@@ -518,8 +519,21 @@
 		</div>
 	{:else}
 		<div class="org-timeline-toolbar" data-testid="instance-chrome">
-			<header class="org-timeline-header">
-				<span class="timeline-header-line">
+			<header class="org-timeline-header flex items-center gap-2">
+				<Button
+					href={dashboardHref}
+					variant="outline"
+					size="icon"
+					class="shrink-0"
+					aria-label={m.nav_back()}
+					data-testid="instance-chrome-back"
+					data-sveltekit-reload
+					rel="external"
+					target="_self"
+				>
+					<ArrowLeft class="size-4" />
+				</Button>
+				<span class="timeline-header-line min-w-0">
 					<span class="timeline-header-index" data-testid="instance-chrome-stream">
 						{streamTitle || stream}
 					</span>

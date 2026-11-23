@@ -130,8 +130,16 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: calc(var(--spacing) * 3);
-	padding: calc(var(--spacing) * 3) var(--org-pad-l);
+	/* Mobile: page has no inline pad — match nest summary inset. */
+	padding: 0 var(--org-pad-l);
 	margin-bottom: calc(var(--spacing) * 3);
+}
+
+@media (width >= 640px) {
+	.org-timeline-toolbar {
+		/* Page owns the inset; do not stack pad on .org-timeline-page. */
+		padding: 0;
+	}
 }
 
 .org-timeline-header {
