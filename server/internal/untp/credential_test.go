@@ -98,4 +98,14 @@ func TestBuildModifyEventsAndDTE(t *testing.T) {
 	if got, want := strings.Join(credential.Type, ","), "DigitalTraceabilityEvent,VerifiableCredential"; got != want {
 		t.Fatalf("type = %q", got)
 	}
+
+	skipped := BuildModifyEvents("https://dl.example.com", "/01/g/10/l/21/s", ProductIdentity{
+		Name: "Product",
+	}, "Demo", []EventInput{{
+		ID: "1.2", Title: "B", EventDate: eventDate,
+		Attachments: []AttachmentRef{{ID: "  ", Filename: "x.pdf"}},
+	}})
+	if len(skipped) != 1 || len(skipped[0].RelatedDocument) != 0 {
+		t.Fatalf("blank attachment id = %#v", skipped)
+	}
 }
