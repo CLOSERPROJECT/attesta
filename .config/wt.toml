@@ -1,4 +1,6 @@
-# Required Worktrunk project config for parallel Attesta worktrees.
+# Worktrunk project config for terminal / non-Cursor parallel checkouts.
+# In Cursor, prefer Cursor’s native worktrees (~/.cursor/worktrees/…) and
+# .cursor/worktrees.json — see QUICKSTART.md.
 # Install: mise install && wt config shell install
 # App and infrastructure ports are derived once through Worktrunk hash_port and
 # stored in ignored .env.worktree. Later manual edits are preserved.

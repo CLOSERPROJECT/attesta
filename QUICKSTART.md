@@ -16,8 +16,6 @@ mise trust
 mise install
 ```
 
-For parallel worktrees, `mise install` also pins Worktrunk (`wt`).
-
 ## Clone and env
 
 ```bash
@@ -30,6 +28,18 @@ Ports and Compose identity live in gitignored `.env.worktree` (written once by b
 
 ## Worktrees
 
+Parallel checkouts share one Git object store and get isolated Compose ports via bootstrap. Prefer the host’s native worktree manager; do not nest checkouts under `attesta/.worktrees/`.
+
+### Cursor
+
+Use Cursor’s built-in worktrees (Agents Window, IDE `/worktree` / `/best-of-n`, or CLI `agent --worktree`). Cursor places them under `~/.cursor/worktrees/<repo>/<id>/` and runs setup from [`.cursor/worktrees.json`](.cursor/worktrees.json) (Attesta: `bash scripts/worktree-bootstrap.sh`). Docs: [Cursor worktrees](https://cursor.com/docs/configuration/worktrees).
+
+After creation, open or move the agent into that checkout (`move_agent_to_root` / Agents Window), then `task start` / `task dev` from there. Print this checkout’s URLs with `bash scripts/worktree-env.sh print`.
+
+### Worktrunk (terminal / non-Cursor)
+
+`mise install` pins Worktrunk (`wt`) for CLI-driven parallel checkouts:
+
 ```bash
 mise install
 wt config shell install
@@ -37,8 +47,12 @@ wt config approvals add   # once: review shared bootstrap/cleanup hooks
 wt switch -c my-feature
 ```
 
-- Worktrunk / Codex / Cursor worktrees run `scripts/worktree-bootstrap.sh` automatically; plain Git worktrees: `bash scripts/worktree-bootstrap.sh`.
-- Bootstrap writes `.env.worktree` only when missing (path-qualified Compose project + host ports).
+Worktrunk runs the same bootstrap via [`.config/wt.toml`](.config/wt.toml). Codex / other managers that honor `.worktreeinclude` also pick up ignored setup files that way.
+
+### Any checkout
+
+- Plain `git worktree add`: run `bash scripts/worktree-bootstrap.sh` once in the new tree.
+- Bootstrap writes `.env.worktree` only when missing (path-qualified Compose project + host ports); later edits are preserved.
 - Each checkout starts with empty Compose volumes. Demo data comes only from the Go seed after Appwrite credentials exist (`ATTESTA_SEED` / `task seed`).
 
 ## Start infrastructure

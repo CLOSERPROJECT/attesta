@@ -17,7 +17,7 @@
 ## Source guidance
 
 - **Architecture:** how product and package seams connect → [`docs/architecture.md`](docs/architecture.md).
-- **Operations:** pitch/env → [`README.md`](README.md); day-1 prepare/seed/worktrees → [`QUICKSTART.md`](QUICKSTART.md); Compose/Coolify/lifecycle → [`DOCKER.md`](DOCKER.md). Scripts and configuration remain the source of truth.
+- **Operations:** pitch/env → [`README.md`](README.md); day-1 prepare/seed/worktrees (Cursor: native `/worktree`, not in-repo `.worktrees/`) → [`QUICKSTART.md`](QUICKSTART.md); Compose/Coolify/lifecycle → [`DOCKER.md`](DOCKER.md). Scripts and configuration remain the source of truth.
 - **Glossary layer:** before naming product nouns → [`GLOSSARY-MAP.md`](GLOSSARY-MAP.md).
 - **Glossary edit:** before adding or changing an entry → [`docs/agents/glossary.md`](docs/agents/glossary.md).
 - **ADRs:** before writing or editing `docs/adr/` → [`docs/adr/README.md`](docs/adr/README.md).

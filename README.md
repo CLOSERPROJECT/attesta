@@ -123,9 +123,10 @@ Primary defaults (when `.env.worktree` is absent) follow `.env.example` /
 ### Git worktrees
 
 Parallel checkouts get a gitignored `.env.worktree` with isolated ports and a
-path-qualified Compose project. Day-1 worktree bootstrap →
-[QUICKSTART.md](QUICKSTART.md). Stop/reset/purge and orphan GC →
-[DOCKER.md](DOCKER.md).
+path-qualified Compose project. In Cursor, use Cursor’s native worktrees
+(`~/.cursor/worktrees/…`, setup via `.cursor/worktrees.json`); elsewhere use
+Worktrunk or plain Git — see [QUICKSTART.md](QUICKSTART.md). Stop/reset/purge
+and orphan GC → [DOCKER.md](DOCKER.md).
 
 **[🔝 back to top](#toc)**
 
