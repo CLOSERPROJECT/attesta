@@ -27,10 +27,10 @@
 					{#if row.timestamp}
 						<time datetime={row.timestamp}>{row.timestampHuman || row.timestamp}</time>
 					{:else}
-						<span class="muted">—</span>
+						<span class="text-secondary-foreground">—</span>
 					{/if}
 					{#if row.userId}
-						<span class="muted">· {row.userId}</span>
+						<span class="text-secondary-foreground">· {row.userId}</span>
 					{/if}
 				</li>
 			{/each}

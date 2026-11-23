@@ -109,7 +109,7 @@
 			<div class="substep-org-body w-full min-w-0 gap-2" data-testid="embed-panel-body">
 				<Tabs.Content value="form" class="outline-none" data-testid="embed-form-pane">
 					{#if status === 'loading' || status === 'idle'}
-						<p class="muted u-m-0" data-testid="embed-form-skeleton">{m.loading()}</p>
+						<p class="m-0 text-secondary-foreground" data-testid="embed-form-skeleton">{m.loading()}</p>
 					{:else if status === 'error'}
 						<p class="text-sm text-red-700" data-testid="embed-form-error" role="alert">
 							{error}

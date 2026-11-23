@@ -624,9 +624,15 @@
 		{#if view}
 			<div class="process-stream-block">
 				<div class={filterRootClass}>
-					<div class="empty-state stream-show-all-filter-empty" hidden={!actionableOnlyEmpty}>
-						<p class="empty-state-title">No matching tasks</p>
-						<p class="empty-state-hint">Turn on Show all to see the full stream timeline.</p>
+					<div
+						class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground {!actionableOnlyEmpty
+							? 'hidden'
+							: ''}"
+					>
+						<p class="m-0 text-xs font-medium leading-5 text-muted-foreground">No matching tasks</p>
+						<p class="m-0 text-xs leading-4 text-muted-foreground">
+							Turn on Show all to see the full stream timeline.
+						</p>
 					</div>
 					<div class="stream-timeline-list">
 						{#each view.steps as step (step.stepId)}

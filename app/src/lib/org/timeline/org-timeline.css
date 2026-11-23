@@ -1,13 +1,86 @@
-/* Org SPA timeline — reuse Attesta /my process chrome (tokens + components). */
-@import '../../../../../web/src/styles/breakpoints.css';
-@import '../../../../../web/src/styles/tokens.css';
-@import '../../../../../web/src/styles/role-palette.css';
-@import '../../../../../web/src/styles/utilities.css';
-@import '../../../../../web/src/styles/components/shared.css';
-@import '../../../../../web/src/styles/components/empty-state.css';
-@import '../../../../../web/src/styles/components/stream-step-summary.css';
-@import '../../../../../web/src/styles/components/stream-timeline.css';
-@import '../../../../../web/src/styles/components/substep-shell.css';
+/*
+ * Org SPA board timeline — self-contained (no web/ CSS imports).
+ * Spacing/type use Tailwind v4 theme tokens (--spacing, --text-*, --font-weight-*).
+ * Colors come from layout.css / @theme (shadcn). Stream status hues are board-local.
+ */
+
+.org-timeline-page {
+	--stream-available: var(--primary);
+	--stream-active: light-dark(#5385d1, #7aa3e8);
+	--stream-done: light-dark(#b3b3b3, #6e6e6e);
+	--stream-terminated: light-dark(#dd8379, #c4786f);
+}
+
+.stream-timeline-list {
+	display: grid;
+	gap: calc(var(--spacing) * 3);
+	min-width: 0;
+}
+
+.stream-timeline-step,
+.stream-timeline-row-accordion {
+	overflow: visible;
+	min-width: 0;
+}
+
+.stream-timeline-row {
+	min-width: 0;
+}
+
+.stream-timeline-rows,
+.stream-timeline-substeps {
+	list-style: none;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.substep {
+	min-width: 0;
+	position: relative;
+	cursor: pointer;
+}
+
+.substep:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
+.substep-accordion {
+	display: grid;
+	gap: 0;
+}
+
+.substep-details {
+	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3);
+	display: grid;
+	gap: calc(var(--spacing) * 3);
+}
+
+.substep-org-submissions {
+	margin: 0;
+	border: 1px solid var(--border);
+	border-radius: calc(var(--spacing) * 2);
+	background: var(--background);
+}
+
+.substep-org-submissions-list {
+	list-style: none;
+	margin: 0;
+	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 2);
+	display: grid;
+	gap: calc(var(--spacing) * 1);
+}
+
+.substep-org-submissions-item {
+	font-size: var(--text-sm);
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--spacing) * 1);
+	align-items: baseline;
+	min-width: 0;
+}
 
 /*
  * Board elevation: elev-0 = light Attesta green page; ladder is steps → rows → substeps.
@@ -19,9 +92,9 @@
 	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #ffffff); /* steps */
 	--org-elev-2: color-mix(in srgb, var(--primary) 8%, #ffffff); /* rows/instances */
 	--org-elev-3: #ffffff; /* substeps + tabs */
-	--org-pad-l: var(--space-3);
+	--org-pad-l: calc(var(--spacing) * 3);
 	/* Chevron column: same right edge + slot width at every nest level. */
-	--org-chevron-pad: var(--space-3);
+	--org-chevron-pad: calc(var(--spacing) * 3);
 	--org-chevron-slot: 1.25rem;
 
 	display: flex;
@@ -33,14 +106,14 @@
 	max-width: 80rem;
 	margin-inline: auto;
 	background: var(--org-elev-0);
-	padding-block: var(--space-3);
+	padding-block: calc(var(--spacing) * 3);
 	padding-inline: 0;
 }
 
 /* App Vite/Tailwind path does not expand @custom-media; use a plain query. */
 @media (width >= 640px) {
 	.org-timeline-page {
-		padding: var(--space-3);
+		padding: calc(var(--spacing) * 3);
 	}
 }
 
@@ -56,9 +129,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: var(--space-3);
-	padding: var(--space-3) var(--org-pad-l);
-	margin-bottom: var(--space-3);
+	gap: calc(var(--spacing) * 3);
+	padding: calc(var(--spacing) * 3) var(--org-pad-l);
+	margin-bottom: calc(var(--spacing) * 3);
 }
 
 .org-timeline-header {
@@ -69,7 +142,7 @@
 .org-timeline-header-label {
 	margin: 0;
 	font-size: var(--text-lg);
-	font-weight: var(--font-semibold);
+	font-weight: var(--font-weight-semibold);
 	color: var(--foreground);
 }
 
@@ -84,7 +157,7 @@
 	align-items: center;
 	justify-content: flex-end;
 	flex-shrink: 0;
-	gap: var(--space-2);
+	gap: calc(var(--spacing) * 2);
 }
 
 .stream-show-all-filter-root.is-actionable-only
@@ -113,7 +186,7 @@
 
 .substep-org-body {
 	display: grid;
-	gap: var(--space-2);
+	gap: calc(var(--spacing) * 2);
 }
 
 /* --- Elevation surfaces (scoped; Formata /my keeps shared component defaults) --- */
@@ -157,14 +230,14 @@
 /* Embed Form/Recap: compact right-aligned segmented control (bordered list, no underline) */
 .org-timeline-page .substep-embed [data-slot='tabs-list'].embed-tabs-list {
 	/* Match embed-panel-body left pad so the control lines up with the form. */
-	margin-left: var(--space-3);
+	margin-left: calc(var(--spacing) * 3);
 	margin-right: auto;
 	width: auto;
 	height: auto;
 	min-width: 0;
 	flex-shrink: 0;
-	gap: var(--space-1);
-	padding: var(--space-1);
+	gap: calc(var(--spacing) * 1);
+	padding: calc(var(--spacing) * 1);
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	background: var(--org-elev-3);
@@ -175,8 +248,8 @@
 	flex: 0 0 auto;
 	height: auto;
 	min-height: 0;
-	gap: calc(var(--space-1) * 0.75);
-	padding: calc(var(--space-1) * 0.75) var(--space-2);
+	gap: calc(var(--spacing) * 0.75);
+	padding: calc(var(--spacing) * 0.75) calc(var(--spacing) * 2);
 	border: none;
 	border-radius: calc(var(--radius) * 0.75);
 	box-shadow: none;
@@ -247,7 +320,7 @@
 .org-timeline-page .timeline-header-line {
 	display: flex;
 	align-items: center;
-	gap: var(--space-2);
+	gap: calc(var(--spacing) * 2);
 	min-width: 0;
 	flex: 1 1 auto;
 	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
@@ -256,7 +329,7 @@
 .org-timeline-page .timeline-header-index {
 	flex-shrink: 0;
 	font-size: var(--text-sm);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	font-variant-numeric: tabular-nums;
 	line-height: 1.25;
 	color: var(--secondary-foreground);
@@ -269,7 +342,7 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-size: var(--text-sm);
-	font-weight: 600;
+	font-weight: var(--font-weight-semibold);
 	line-height: 1.25;
 	color: var(--foreground);
 }
@@ -280,12 +353,12 @@
 	flex-shrink: 0;
 	margin-left: auto;
 	/* Clear the absolute chevron column. */
-	margin-right: var(--space-2);
+	margin-right: calc(var(--spacing) * 2);
 }
 
 .org-timeline-page .timeline-header-count {
 	font-size: var(--text-sm);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	color: var(--muted-foreground);
 	font-variant-numeric: tabular-nums;
 }
@@ -298,9 +371,9 @@
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: var(--space-2);
+	gap: calc(var(--spacing) * 2);
 	min-height: 2.75rem;
-	padding-block: var(--space-2);
+	padding-block: calc(var(--spacing) * 2);
 	padding-left: var(--org-pad-l);
 	padding-right: calc(var(--org-chevron-pad) + var(--org-chevron-slot));
 	border-radius: 0;
@@ -335,7 +408,7 @@
 	border-radius: var(--radius);
 	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
 	font-size: 0.6875rem;
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	letter-spacing: 0.02em;
 	text-transform: none;
 	line-height: 1.25;
@@ -418,7 +491,7 @@
 }
 
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
-	padding: var(--space-3);
+	padding: calc(var(--spacing) * 3);
 }
 
 /* Open nest: space under the header before children (no hairline — card edges already outline). */
@@ -431,7 +504,7 @@
 	.substep-embed-host[data-state='open']
 	> .substep-accordion-summary
 	+ div {
-	padding-top: var(--space-3);
+	padding-top: calc(var(--spacing) * 3);
 }
 
 /* Submissions trigger: Accordion-like muted text + Lucide via Collapsible.Trigger */
@@ -439,7 +512,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: var(--space-2);
+	gap: calc(var(--spacing) * 2);
 	font-size: var(--text-sm);
 	color: var(--muted-foreground);
 	border-radius: 0;

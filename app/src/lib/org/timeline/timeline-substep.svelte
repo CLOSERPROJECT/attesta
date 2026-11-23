@@ -156,7 +156,7 @@
 						<div class="substep-org-body">
 							{#if substep.blockedReason}
 								<p
-									class="muted u-m-0 u-pre-line"
+									class="m-0 whitespace-pre-line text-secondary-foreground"
 									data-testid="task-blocked-reason"
 								>
 									{substep.blockedReason}
@@ -167,7 +167,7 @@
 							{/if}
 						</div>
 					{:else}
-						<p class="muted">No data form configured for this substep</p>
+						<p class="text-secondary-foreground">No data form configured for this substep</p>
 					{/if}
 				</div>
 			</Collapsible.Content>
