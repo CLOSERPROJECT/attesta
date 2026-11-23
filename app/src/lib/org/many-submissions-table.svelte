@@ -29,6 +29,7 @@
 						</th>
 					{/each}
 					<th class="px-2 py-2 font-medium text-zinc-600">Timestamp</th>
+					<th class="px-2 py-2 font-medium text-zinc-600">User</th>
 					<th class="px-2 py-2 font-medium text-zinc-600">Links</th>
 				</tr>
 			</thead>
@@ -43,6 +44,7 @@
 						<td class="px-2 py-2 text-zinc-900">
 							{formatSubmissionTimestamp(item.timestamp)}
 						</td>
+						<td class="px-2 py-2 text-zinc-900">{item.userId || '—'}</td>
 						<td class="px-2 py-2">
 							{#if item.links.length > 0}
 								<HttpLinkStrip items={item.links} />

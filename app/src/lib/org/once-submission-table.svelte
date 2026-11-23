@@ -29,9 +29,13 @@
 					<td class="py-2 text-zinc-900">{formatFactValue(value)}</td>
 				</tr>
 			{/each}
-			<tr class="border-b border-zinc-100 last:border-0">
+			<tr class="border-b border-zinc-100">
 				<th class="py-2 pr-3 text-left font-medium text-zinc-600">Timestamp</th>
 				<td class="py-2 text-zinc-900">{timestamp}</td>
+			</tr>
+			<tr class="border-b border-zinc-100 last:border-0">
+				<th class="py-2 pr-3 text-left font-medium text-zinc-600">User</th>
+				<td class="py-2 text-zinc-900">{item.userId || '—'}</td>
 			</tr>
 		</tbody>
 	</table>
