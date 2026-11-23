@@ -6,6 +6,7 @@ import "context"
 type AuthorizeCommit struct {
 	Operator      OperatorIdentity
 	Org           string
+	Stream        string
 	TaskPath      string
 	JobID         string
 	TaskID        string

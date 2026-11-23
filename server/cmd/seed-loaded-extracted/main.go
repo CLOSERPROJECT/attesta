@@ -33,7 +33,8 @@ func main() {
 	if _, err := org.SeedDemo(ctx, domains, configs, org.SeedOptions{SkipEmptyDomainStaging: true}); err != nil {
 		must(err)
 	}
-	must(domains.Put(ctx, "feragame", org.EmptyDomain()))
+	scope := org.FeragameScope()
+	must(domains.Put(ctx, scope, org.EmptyDomain()))
 
 	c := &org.TaskCommitter{
 		Domains:    domains,
@@ -66,9 +67,10 @@ func main() {
 	}
 
 	commit(c, logOp, org.CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     mintNew(),
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             mintNew(),
+		StreamInstanceID: truckID,
 	})
 	for _, row := range []struct {
 		id     string
@@ -133,12 +135,12 @@ func main() {
 		},
 	})
 
-	ver, err := configs.ActiveVersion(ctx, "feragame")
+	ver, err := configs.ActiveVersion(ctx, org.FeragameScope())
 	must(err)
-	cfg, err := configs.Get(ctx, "feragame", ver)
+	cfg, err := configs.Get(ctx, org.FeragameScope(), ver)
 	must(err)
 	domain := res.Domain
-	wl := org.ProjectWorklist(cfg, domain, org.FixtureAllRolesOp())
+	wl := org.ProjectWorklistAll(cfg, domain, org.FixtureAllRolesOp())
 	fmt.Printf("seeded feragame in %s\n", dbName)
 	fmt.Printf("containers=%d submissions=%d\n", len(domain.Kind("container")), len(domain.Submissions))
 	for _, j := range wl.Jobs {
@@ -169,7 +171,7 @@ func main() {
 }
 
 func commit(c *org.TaskCommitter, op org.OperatorIdentity, req org.CommitRequest) org.CommitResult {
-	res, err := c.Commit(context.Background(), "feragame", op, req)
+	res, err := c.Commit(context.Background(), org.FeragameScope(), op, req)
 	if err != nil {
 		must(fmt.Errorf("%s: %w", req.TaskPath, err))
 	}

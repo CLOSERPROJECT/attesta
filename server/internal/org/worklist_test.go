@@ -10,11 +10,11 @@ import (
 
 func mustActiveConfig(t *testing.T, c *TaskCommitter) OrgConfig {
 	t.Helper()
-	version, err := c.Configs.ActiveVersion(t.Context(), "feragame")
+	version, err := c.Configs.ActiveVersion(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := c.Configs.Get(t.Context(), "feragame", version)
+	cfg, err := c.Configs.Get(t.Context(), FeragameScope(), version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLotProcessingBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
-	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	result, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,12 +56,8 @@ func TestLoaderWorklistEmptyDomainIntakeOpenLotProcessingBlocked(t *testing.T) {
 		t.Fatal("lot_processing canStart want false on empty domain (no eligible lots)")
 	}
 
-	passport, ok := worklistJobByID(result.Worklist, "passport")
-	if !ok {
-		t.Fatal("missing passport worklist job")
-	}
-	if passport.CanStart {
-		t.Fatal("passport canStart want false on empty Domain (select readyWhen)")
+	if _, ok := worklistJobByID(result.Worklist, "passport"); ok {
+		t.Fatal("passport Job must not appear on Worklist")
 	}
 }
 
@@ -69,7 +65,7 @@ func TestLoadJSONWorklistIntakeStatuses(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID, _, _ := commitIntakeThroughLotsClosed(t, c)
 
-	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	result, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,9 +99,13 @@ func TestLoadJSONWorklistIntakeStatuses(t *testing.T) {
 		t.Fatalf("weightCheck = %q, want actionable", inst.Tasks["weightCheck"])
 	}
 
-	lp, ok := worklistJobByID(result.Worklist, "lot_processing")
+	scoped, err := loader.LoadForStreamInstance(t.Context(), FeragameScope(), FixtureAllRolesOp(), truckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lp, ok := worklistJobByID(scoped.Worklist, "lot_processing")
 	if !ok || !lp.CanStart {
-		t.Fatalf("lot_processing canStart = %#v, want true", lp)
+		t.Fatalf("lot_processing canStart on truck = %#v, want true", lp)
 	}
 }
 
@@ -113,7 +113,7 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 
-	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	loaded, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 	}
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value: map[string]any{
@@ -140,7 +140,7 @@ func TestLoadJSONWorklistLotProcessingSubmissionDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loaded, err = loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	loaded, err = loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,6 +180,11 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T-load", Label: "T-load"}}
+	if err := domains.Put(t.Context(), FeragameScope(), domain); err != nil {
+		t.Fatal(err)
+	}
 	h := &API{
 		DomainLoader: &DomainLoader{Domains: domains, Configs: configs},
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -187,7 +192,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-load", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -196,27 +201,26 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Worklist.Jobs) != 3 {
+	if len(got.Worklist.Jobs) != 2 {
 		t.Fatalf("worklist jobs = %#v", got.Worklist.Jobs)
 	}
 	intake, _ := worklistJobByID(got.Worklist, "intake")
-	if !intake.CanStart {
-		t.Fatal("administration intake canStart want true on empty domain")
+	if len(intake.Instances) != 1 || intake.Instances[0].ID != "T-load" {
+		t.Fatalf("scoped intake instances = %#v", intake.Instances)
 	}
 	lp, _ := worklistJobByID(got.Worklist, "lot_processing")
 	if lp.CanStart {
 		t.Fatal("administration viewer must not canStart lot_processing (startLot is logistic-only)")
 	}
-	passport, _ := worklistJobByID(got.Worklist, "passport")
-	if passport.CanStart || passport.StartLabel != "Emetti DPP" {
-		t.Fatalf("passport Job = %#v, want canStart false on empty Domain", passport)
+	if _, ok := worklistJobByID(got.Worklist, "passport"); ok {
+		t.Fatal("passport Job must not appear on Worklist")
 	}
 }
 
 func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	h := &API{
-		DomainLoader:    loader,
+		DomainLoader:  loader,
 		TaskCommitter: c,
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
 			return OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}, true
@@ -225,7 +229,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -243,12 +247,12 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	want := ProjectWorklist(mustActiveConfig(t, c), domain, admin)
+	want := ProjectWorklist(mustActiveConfig(t, c), domain, admin, got.JobInstanceID)
 	if len(got.Worklist.Jobs) != len(want.Jobs) {
 		t.Fatalf("worklist jobs = %#v, want %#v", got.Worklist.Jobs, want.Jobs)
 	}
@@ -276,7 +280,7 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 	lineOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	result, err := c.Commit(t.Context(), "feragame", lineOp, CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), lineOp, CommitRequest{
 		TaskPath:      "lot_processing/markProgress",
 		JobInstanceID: lotID,
 		Value: map[string]any{
@@ -306,11 +310,11 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
 		t.Fatalf("containerReg = %q, want available for line viewer (open lot)", inst.Tasks["containerReg"])
 	}
-	want := ProjectWorklist(mustActiveConfig(t, c), result.Domain, lineOp)
+	want := projectWorklistUnfiltered(mustActiveConfig(t, c), result.Domain, lineOp)
 	rawGot, _ := json.Marshal(result.Worklist)
 	rawWant, _ := json.Marshal(want)
 	if string(rawGot) != string(rawWant) {
-		t.Fatalf("Commit worklist != ProjectWorklist(domain)\ngot  %s\nwant %s", rawGot, rawWant)
+		t.Fatalf("Commit worklist != projectWorklistUnfiltered(domain)\ngot  %s\nwant %s", rawGot, rawWant)
 	}
 }
 
@@ -324,8 +328,8 @@ func TestProjectWorklistViewerRoleSplitCanStartAndChrome(t *testing.T) {
 	admin := OperatorIdentity{UserID: "admin", Org: "feragame", Roles: []string{"administration"}}
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
-	adminWL := ProjectWorklist(cfg, domain, admin)
-	logWL := ProjectWorklist(cfg, domain, logistic)
+	adminWL := projectWorklistUnfiltered(cfg, domain, admin)
+	logWL := projectWorklistUnfiltered(cfg, domain, logistic)
 
 	adminIntake, ok := worklistJobByID(adminWL, "intake")
 	if !ok {
@@ -387,7 +391,7 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	truckID, loadID, _ := commitIntakeThroughLotsClosed(t, c)
 	_ = commitStartLot(t, c, loadID)
 	cfg := mustActiveConfig(t, c)
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,9 +400,9 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	lineOp := OperatorIdentity{UserID: "lin", Org: "feragame", Roles: []string{"line"}}
 	logistic := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
 
-	adminWL := ProjectWorklist(cfg, domain, admin)
-	lineWL := ProjectWorklist(cfg, domain, lineOp)
-	logWL := ProjectWorklist(cfg, domain, logistic)
+	adminWL := projectWorklistUnfiltered(cfg, domain, admin)
+	lineWL := projectWorklistUnfiltered(cfg, domain, lineOp)
+	logWL := projectWorklistUnfiltered(cfg, domain, logistic)
 
 	adminLP, _ := worklistJobByID(adminWL, "lot_processing")
 	lineLP, _ := worklistJobByID(lineWL, "lot_processing")
@@ -454,21 +458,21 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 		t.Fatalf("line Available affordances must include weigh: %#v", lineRefs)
 	}
 
-	adminLoaded, err := loader.Load(t.Context(), "feragame", admin)
+	adminLoaded, err := loader.Load(t.Context(), FeragameScope(), admin)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lineLoaded, err := loader.Load(t.Context(), "feragame", lineOp)
+	lineLoaded, err := loader.Load(t.Context(), FeragameScope(), lineOp)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(adminLoaded.TaskFormBundles) != 0 || len(lineLoaded.TaskFormBundles) != 0 {
 		t.Fatal("home Load must omit bulk Task form bundles for all viewers")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "lot_processing", "weigh", loadID); err == nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), admin, "lot_processing", "weigh", loadID); err == nil {
 		t.Fatal("administration addressed fetch must forbid weigh")
 	}
-	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", lineOp, "lot_processing", "weigh", loadID); err != nil {
+	if _, err := loader.LoadTaskBundle(t.Context(), FeragameScope(), lineOp, "lot_processing", "weigh", loadID); err != nil {
 		t.Fatalf("line addressed fetch must allow weigh: %v", err)
 	}
 }
@@ -496,7 +500,7 @@ func TestProjectWorklistFlatRegisterMintsLotWithoutGroup(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	wl := ProjectWorklist(mustActiveConfig(t, c), result.Domain, op)
+	wl := projectWorklistUnfiltered(mustActiveConfig(t, c), result.Domain, op)
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "intake"), truckID)
 	if !ok {
 		t.Fatal("missing truck instance")
@@ -521,7 +525,7 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 	palletID := loadID + ".1"
 	result := commitWeigh(t, c, loadID, palletID, 400)
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic", "line", "administration"}}
-	wl := ProjectWorklist(mustActiveConfig(t, c), result.Domain, op)
+	wl := projectWorklistUnfiltered(mustActiveConfig(t, c), result.Domain, op)
 	inst, ok := worklistInstance(worklistMustJob(t, wl, "lot_processing"), loadID)
 	if !ok {
 		t.Fatal("missing lot_processing instance")
@@ -537,7 +541,6 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 		t.Fatalf("pallet %q missing under Domain: %#v", palletID, result.Domain.Kind("pallet"))
 	}
 }
-
 
 func worklistMustJob(t *testing.T, wl Worklist, jobID string) WorklistJob {
 	t.Helper()
@@ -585,12 +588,12 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("omit_readyWhen_role_split", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", nil))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("omit + eligible = %q, want actionable", inst.Tasks["gated"])
 		}
-		wlOther := ProjectWorklist(cfg, domainUnlocked, other)
+		wlOther := projectWorklistUnfiltered(cfg, domainUnlocked, other)
 		instOther, _ := worklistInstance(worklistMustJob(t, wlOther, "gateJob"), "I1")
 		if instOther.Tasks["gated"] != TaskStatusAvailable {
 			t.Fatalf("omit + ineligible = %q, want available", instOther.Tasks["gated"])
@@ -599,7 +602,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("literal_true", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "true"))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("true = %q, want actionable", inst.Tasks["gated"])
@@ -608,12 +611,12 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("literal_false_skips_role_split", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "false"))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("false + eligible = %q, want unavailable", inst.Tasks["gated"])
 		}
-		wlOther := ProjectWorklist(cfg, domainUnlocked, other)
+		wlOther := projectWorklistUnfiltered(cfg, domainUnlocked, other)
 		instOther, _ := worklistInstance(worklistMustJob(t, wlOther, "gateJob"), "I1")
 		if instOther.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("false + ineligible = %q, want unavailable (not available)", instOther.Tasks["gated"])
@@ -628,7 +631,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("blank_string_omit_semantics", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "   "))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("blank = %q, want actionable", inst.Tasks["gated"])
@@ -637,7 +640,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("invalid_fail_closed", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", 1))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("invalid = %q, want unavailable", inst.Tasks["gated"])
@@ -646,14 +649,14 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 
 	t.Run("domain_expr", func(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "$count($domain.widget.*) >= 1"))
-		wl := ProjectWorklist(cfg, domainUnlocked, op)
+		wl := projectWorklistUnfiltered(cfg, domainUnlocked, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("no widget = %q, want unavailable", inst.Tasks["gated"])
 		}
 		withWidget := domainUnlocked
 		putKind(&withWidget, "widget", EntityMap{"W1": {"n": 1}})
-		wl = ProjectWorklist(cfg, withWidget, op)
+		wl = projectWorklistUnfiltered(cfg, withWidget, op)
 		inst, _ = worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusActionable {
 			t.Fatalf("with widget = %q, want actionable", inst.Tasks["gated"])
@@ -664,13 +667,12 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 		cfg := cfgFor(leaf("gated", "false"))
 		empty := EmptyDomain()
 		empty.JobInstances = []JobInstance{{JobID: "gateJob", ID: "I1", Label: "inst"}}
-		wl := ProjectWorklist(cfg, empty, op)
+		wl := projectWorklistUnfiltered(cfg, empty, op)
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "gateJob"), "I1")
 		if inst.Tasks["gated"] != TaskStatusUnavailable {
 			t.Fatalf("readyWhen false = %q, want unavailable (no locked)", inst.Tasks["gated"])
 		}
 	})
-
 
 	t.Run("canStart_folds_first_task_readyWhen", func(t *testing.T) {
 		cfg := OrgConfig{
@@ -686,14 +688,14 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 				},
 			},
 		}
-		wl := ProjectWorklist(cfg, EmptyDomain(), op)
+		wl := projectWorklistUnfiltered(cfg, EmptyDomain(), op)
 		job := worklistMustJob(t, wl, "startJob")
 		if job.CanStart {
 			t.Fatal("canStart want false when first-Task readyWhen fails")
 		}
 		withWidget := EmptyDomain()
 		putKind(&withWidget, "widget", EntityMap{"W1": {"n": 1}})
-		wl = ProjectWorklist(cfg, withWidget, op)
+		wl = projectWorklistUnfiltered(cfg, withWidget, op)
 		job = worklistMustJob(t, wl, "startJob")
 		if !job.CanStart {
 			t.Fatal("canStart want true when first-Task readyWhen holds")
@@ -709,7 +711,7 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 				},
 			},
 		}
-		wl = ProjectWorklist(omitCfg, EmptyDomain(), op)
+		wl = projectWorklistUnfiltered(omitCfg, EmptyDomain(), op)
 		if !worklistMustJob(t, wl, "startJob").CanStart {
 			t.Fatal("omit readyWhen ⇒ canStart true")
 		}

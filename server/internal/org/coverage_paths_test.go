@@ -341,7 +341,7 @@ func TestFirstActionableTaskAndCompileDerivedEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
-	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
+	wl := projectWorklistUnfiltered(cfg, domain, FixtureAllRolesOp())
 	ref, ok := FirstActionableTask(cfg, wl)
 	if !ok || ref.JobID != "intake" || ref.TaskID != "truckArrive" || ref.JobInstanceID != "" {
 		t.Fatalf("first = %#v ok=%v", ref, ok)
@@ -423,6 +423,11 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
+	seed := EmptyDomain()
+	seed.JobInstances = []JobInstance{{JobID: "intake", ID: "T-cov", Label: "T-cov"}}
+	if err := domains.Put(t.Context(), FeragameScope(), seed); err != nil {
+		t.Fatal(err)
+	}
 	loader := &DomainLoader{Domains: domains, Configs: configs}
 	c := &TaskCommitter{Domains: domains, Configs: configs, Authorizer: AllowAllAuthorizer{}}
 	gateOK := func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -476,7 +481,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodHead, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodHead, "/api/org/domain?stream=recycling&instance=T-cov", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
 		t.Fatalf("HEAD load = %d body=%q", rec.Code, rec.Body.String())
@@ -484,23 +489,23 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 
 	missingCfg := &API{
 		DomainLoader: &DomainLoader{Domains: NewMemoryDomainStore(), Configs: NewMemoryConfigStore()},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
-	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain", nil))
+	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-cov", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("load missing config = %d", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(`{`)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(`{`)))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad json = %d", rec.Code)
 	}
 
 	deny := &API{DomainLoader: loader, TaskCommitter: &TaskCommitter{Domains: domains, Configs: configs, Authorizer: DenyAllAuthorizer{}}, Gate: gateOK}
 	rec = httptest.NewRecorder()
-	deny.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(
+	deny.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(
 		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`,
 	)))
 	if rec.Code != http.StatusForbidden {
@@ -508,7 +513,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(
 		`{"taskPath":"nope","value":{}}`,
 	)))
 	if rec.Code != http.StatusBadRequest {
@@ -516,7 +521,7 @@ func TestHandlerHTTPErrorPaths(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit", strings.NewReader(
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling&instance=T-cov", strings.NewReader(
 		`{"taskPath":"intake/weightCheck","jobInstanceId":"x","mint":{"kind":"none"},"value":{}}`,
 	)))
 	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusForbidden && rec.Code != http.StatusConflict {
@@ -543,38 +548,38 @@ func TestCommitterValidationBranches(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 
-	_, err := c.Commit(t.Context(), "  ", op, CommitRequest{})
+	_, err := c.Commit(t.Context(), Scope{}, op, CommitRequest{})
 	var ce *CommitError
 	if !asCommitError(err, &ce) || ce.Kind != "forbidden" {
 		t.Fatalf("empty org = %v", err)
 	}
-	_, err = (&TaskCommitter{}).Commit(t.Context(), "feragame", op, CommitRequest{})
+	_, err = (&TaskCommitter{}).Commit(t.Context(), FeragameScope(), op, CommitRequest{})
 	if err == nil {
 		t.Fatal("nil stores")
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{TaskPath: "bad", Value: map[string]any{}})
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{TaskPath: "bad", Value: map[string]any{}})
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("bad path = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", Mint: &CommitMint{Kind: "weird"}, Value: map[string]any{},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("bad mint = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: "_new", Value: map[string]any{},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("_new = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", Mint: &CommitMint{Kind: MintKindNone}, Value: map[string]any{},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("missing instance = %v", err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: "x", Mint: &CommitMint{Kind: MintKindNone},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
@@ -1041,6 +1046,13 @@ org: acme
 domain:
   entities:
     lot: {}
+stream:
+  key: mini
+  title: Mini
+  instance:
+    job: intake
+  steps:
+    - job: intake
 steps:
   intake:
     repeatable: true
@@ -1061,6 +1073,13 @@ steps:
 	// SeedFixtureConfigStore with missing org
 	noOrg, err := ParseFeragameConfigFixture([]byte(`
 id: mini
+stream:
+  key: mini
+  title: Mini
+  instance:
+    job: intake
+  steps:
+    - job: intake
 steps:
   intake:
     repeatable: true
@@ -1188,10 +1207,10 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 		t.Fatal("missing keys")
 	}
 
-	if _, err := (&DomainLoader{}).Load(t.Context(), "", OperatorIdentity{}); err == nil {
+	if _, err := (&DomainLoader{}).Load(t.Context(), Scope{}, OperatorIdentity{}); err == nil {
 		t.Fatal("empty org")
 	}
-	if _, err := (&DomainLoader{}).Load(t.Context(), "x", OperatorIdentity{}); err == nil {
+	if _, err := (&DomainLoader{}).Load(t.Context(), Scope{Org: "x"}, OperatorIdentity{}); err == nil {
 		t.Fatal("nil stores")
 	}
 	configs := NewMemoryConfigStore()
@@ -1202,16 +1221,16 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 		Domains: &errDomainStore{err: errors.New("boom")},
 		Configs: configs,
 	}
-	if _, err := failing.Load(t.Context(), "feragame", FixtureAllRolesOp()); err == nil {
+	if _, err := failing.Load(t.Context(), FeragameScope(), FixtureAllRolesOp()); err == nil {
 		t.Fatal("domain get error")
 	}
 }
 
 type errDomainStore struct{ err error }
 
-func (e *errDomainStore) Get(context.Context, string) (Domain, error) { return Domain{}, e.err }
-func (e *errDomainStore) Put(context.Context, string, Domain) error   { return e.err }
-func (e *errDomainStore) Update(context.Context, string, func(Domain) (Domain, error)) (Domain, error) {
+func (e *errDomainStore) Get(context.Context, Scope) (Domain, error) { return Domain{}, e.err }
+func (e *errDomainStore) Put(context.Context, Scope, Domain) error   { return e.err }
+func (e *errDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, error) {
 	return Domain{}, e.err
 }
 
@@ -1262,14 +1281,14 @@ func TestChromeCompileHelpersAndSequenceEdges(t *testing.T) {
 		t.Fatal("unknown job sequence")
 	}
 	configs := NewMemoryConfigStore()
-	if err := configs.SetActiveVersion(t.Context(), "nope", "1"); !errors.Is(err, ErrNotFound) {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "nope", Stream: "test"}, "1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("SetActiveVersion = %v", err)
 	}
 	domains := NewMemoryDomainStore()
-	if err := domains.Put(t.Context(), "o", Domain{}); err != nil {
+	if err := domains.Put(t.Context(), Scope{Org: "o", Stream: "test"}, Domain{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := domains.Get(t.Context(), "missing"); !errors.Is(err, ErrNotFound) {
+	if _, err := domains.Get(t.Context(), Scope{Org: "missing", Stream: "test"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Get missing = %v", err)
 	}
 }
@@ -1278,32 +1297,34 @@ func TestCommitErrorWrappingViaApply(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	var ce *CommitError
-	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/nope", JobInstanceID: "x", Value: map[string]any{"a": 1},
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("unknown task = %v", err)
 	}
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+	if _, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: "", Value: map[string]any{}, Mint: startingNewMint(),
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("startingNew non-first = %v", err)
 	}
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 	logistic := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	if _, err := c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	if _, err := c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot", Value: map[string]any{"lotId": loadID}, Mint: startingNewMint(),
+		StreamInstanceID: truckID,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Commit(t.Context(), "feragame", logistic, CommitRequest{
+	_, err = c.Commit(t.Context(), FeragameScope(), logistic, CommitRequest{
 		TaskPath: "lot_processing/startLot", Value: map[string]any{"lotId": loadID}, Mint: startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("duplicate startLot instance = %v", err)
@@ -1350,18 +1371,18 @@ type errConfigStore struct {
 	setErr error
 }
 
-func (e errConfigStore) Put(ctx context.Context, org, version string, cfg OrgConfig) error {
+func (e errConfigStore) Put(ctx context.Context, scope Scope, version string, cfg OrgConfig) error {
 	if e.putErr != nil {
 		return e.putErr
 	}
-	return e.ConfigStore.Put(ctx, org, version, cfg)
+	return e.ConfigStore.Put(ctx, scope, version, cfg)
 }
 
-func (e errConfigStore) SetActiveVersion(ctx context.Context, org, version string) error {
+func (e errConfigStore) SetActiveVersion(ctx context.Context, scope Scope, version string) error {
 	if e.setErr != nil {
 		return e.setErr
 	}
-	return e.ConfigStore.SetActiveVersion(ctx, org, version)
+	return e.ConfigStore.SetActiveVersion(ctx, scope, version)
 }
 
 func TestSeedFixtureConfigStorePutErrors(t *testing.T) {
@@ -1514,7 +1535,7 @@ func (errAuthorizer) AllowCommit(context.Context, AuthorizeCommit) (bool, error)
 
 func TestCommitAuthorizerErrorAndReadyWhen(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, errAuthorizer{})
-	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
+	_, err := c.Commit(t.Context(), FeragameScope(), OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
 		TaskPath: "intake/truckArrive", Value: truckArriveValue(), Mint: startingNewMint(),
 	})
 	if err == nil || !strings.Contains(err.Error(), "auth boom") {
@@ -1732,12 +1753,12 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		ids = []string{}
 	}
 	_ = markProgressRowIDs(EmptyDomain(), "nope")
-	wl := ProjectWorklist(OrgConfig{Jobs: badJobs}, EmptyDomain(), FixtureAllRolesOp())
+	wl := projectWorklistUnfiltered(OrgConfig{Jobs: badJobs}, EmptyDomain(), FixtureAllRolesOp())
 	if len(wl.Jobs) != 0 {
 		t.Fatalf("skip invalid jobs = %#v", wl)
 	}
 	cfg := OrgConfig{Jobs: goodJobs}
-	wl = ProjectWorklist(cfg, Domain{JobInstances: []JobInstance{{JobID: "other", ID: "x"}}}, FixtureAllRolesOp())
+	wl = projectWorklistUnfiltered(cfg, Domain{JobInstances: []JobInstance{{JobID: "other", ID: "x"}}}, FixtureAllRolesOp())
 	if len(wl.Jobs) != 1 || len(wl.Jobs[0].Instances) != 0 {
 		t.Fatalf("filter instances = %#v", wl)
 	}
@@ -1751,10 +1772,10 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	}
 	boomLoad := &API{
 		DomainLoader: &DomainLoader{Domains: &errDomainStore{err: errors.New("boom")}, Configs: configs},
-		Gate:   gateOK,
+		Gate:         gateOK,
 	}
 	rec := httptest.NewRecorder()
-	boomLoad.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain", nil))
+	boomLoad.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-boom", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("load boom = %d", rec.Code)
 	}
@@ -1762,7 +1783,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	c := &TaskCommitter{Domains: domains, Configs: configs, Authorizer: AllowAllAuthorizer{}}
 	h := &API{DomainLoader: &DomainLoader{Domains: domains, Configs: configs}, TaskCommitter: c, Gate: gateOK}
 	rec = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit", errReader{})
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", errReader{})
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("commit read err = %d", rec.Code)

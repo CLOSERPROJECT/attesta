@@ -2,6 +2,7 @@ import * as m from '#lib/paraglide/messages.js';
 
 import type { HttpLinkItem } from './commit-port.js';
 import { parseHttpLinkItem } from './parse-http-link-item.js';
+import { appendStreamScope } from './stream-scope.js';
 import {
 	TaskRecapError,
 	type TaskRecap,
@@ -17,11 +18,14 @@ export type HttpTaskRecapPortOptions = {
 };
 
 function taskRecapUrl(base: string, req: TaskRecapRequest): string {
-	const params = new URLSearchParams({
-		jobId: req.jobId,
-		taskId: req.taskId,
-		jobInstanceId: req.jobInstanceId
-	});
+	const params = appendStreamScope(
+		new URLSearchParams({
+			jobId: req.jobId,
+			taskId: req.taskId,
+			jobInstanceId: req.jobInstanceId
+		}),
+		{ stream: req.stream, instance: req.instance }
+	);
 	return `${base}/api/org/task-recap?${params}`;
 }
 

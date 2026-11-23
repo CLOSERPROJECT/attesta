@@ -38,8 +38,9 @@ func submitCardinalityConfig() OrgConfig {
 		"onSubmit": map[string]any{"transform": []any{}},
 	}
 	return OrgConfig{
-		ID:  "submit-cardinality",
-		Org: "cardorg",
+		ID:     "submit-cardinality",
+		Org:    "cardorg",
+		Stream: streamForAnchor("card", "Cardinality", "session"),
 		Jobs: OrderedObject{
 			Keys: []string{"session"},
 			Values: map[string]any{
@@ -60,10 +61,10 @@ func submitCardinalityCommitter(t *testing.T, auth Authorizer) *TaskCommitter {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
 	cfg := submitCardinalityConfig()
-	if err := configs.Put(t.Context(), "cardorg", "v1", cfg); err != nil {
+	if err := configs.Put(t.Context(), Scope{Org: "cardorg", Stream: "card"}, "v1", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "cardorg", "v1"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "cardorg", Stream: "card"}, "v1"); err != nil {
 		t.Fatal(err)
 	}
 	if auth == nil {
@@ -114,7 +115,7 @@ func TestSubmitManyStaysActionableAcrossTwoCommits(t *testing.T) {
 	c := submitCardinalityCommitter(t, nil)
 	op := OperatorIdentity{UserID: "ada", Org: "cardorg", Roles: []string{"operator"}}
 
-	start, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	start, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath: "session/start",
 		Value:    map[string]any{},
 		Mint:     startingNewMint(),
@@ -124,7 +125,7 @@ func TestSubmitManyStaysActionableAcrossTwoCommits(t *testing.T) {
 	}
 	sid := start.JobInstanceID
 
-	first, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	first, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath:      "session/repeat",
 		JobInstanceID: sid,
 		Value:         map[string]any{},
@@ -140,7 +141,7 @@ func TestSubmitManyStaysActionableAcrossTwoCommits(t *testing.T) {
 	}
 	subsAfterFirst := len(first.Domain.Submissions)
 
-	second, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	second, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath:      "session/repeat",
 		JobInstanceID: sid,
 		Value:         map[string]any{},
@@ -160,7 +161,7 @@ func TestSubmitOnceBecomesDoneAndSecondCommitDenied(t *testing.T) {
 	c := submitCardinalityCommitter(t, nil)
 	op := OperatorIdentity{UserID: "ada", Org: "cardorg", Roles: []string{"operator"}}
 
-	start, err := c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	start, err := c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath: "session/start",
 		Value:    map[string]any{},
 		Mint:     startingNewMint(),
@@ -173,7 +174,7 @@ func TestSubmitOnceBecomesDoneAndSecondCommitDenied(t *testing.T) {
 		t.Fatalf("once start status = %q, want done", got)
 	}
 
-	_, err = c.Commit(t.Context(), "cardorg", op, CommitRequest{
+	_, err = c.Commit(t.Context(), Scope{Org: "cardorg", Stream: "card"}, op, CommitRequest{
 		TaskPath:      "session/start",
 		JobInstanceID: sid,
 		Value:         map[string]any{},
@@ -190,7 +191,7 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{{JobID: "session", ID: "S1", Label: "Session S1"}}
 
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	inst := wl.Jobs[0].Instances[0]
 	if len(inst.SubmissionCounts) != 0 {
 		t.Fatalf("0 submissions: counts = %#v, want empty/nil", inst.SubmissionCounts)
@@ -199,7 +200,7 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 	domain.Submissions = []Submission{
 		{JobID: "session", TaskID: "start", JobInstanceID: "S1"},
 	}
-	wl = ProjectWorklist(cfg, domain, op)
+	wl = projectWorklistUnfiltered(cfg, domain, op)
 	inst = wl.Jobs[0].Instances[0]
 	if inst.SubmissionCounts["start"] != 1 {
 		t.Fatalf("1 once: start count = %d, want 1 (%#v)", inst.SubmissionCounts["start"], inst.SubmissionCounts)
@@ -213,7 +214,7 @@ func TestProjectWorklistSubmissionCounts(t *testing.T) {
 		Submission{JobID: "session", TaskID: "repeat", JobInstanceID: "S1"},
 		Submission{JobID: "session", TaskID: "repeat", JobInstanceID: "S1"},
 	)
-	wl = ProjectWorklist(cfg, domain, op)
+	wl = projectWorklistUnfiltered(cfg, domain, op)
 	inst = wl.Jobs[0].Instances[0]
 	if inst.SubmissionCounts["start"] != 1 || inst.SubmissionCounts["repeat"] != 3 {
 		t.Fatalf("N many: counts = %#v, want start=1 repeat=3", inst.SubmissionCounts)
@@ -230,7 +231,7 @@ func TestRemainingWorkIgnoresSubmitMany(t *testing.T) {
 		{JobID: "session", TaskID: "repeat", JobInstanceID: "S1"},
 		{JobID: "session", TaskID: "finish", JobInstanceID: "S1"},
 	}
-	wl := ProjectWorklist(cfg, domain, op)
+	wl := projectWorklistUnfiltered(cfg, domain, op)
 	inst := wl.Jobs[0].Instances[0]
 	if inst.Tasks["start"] != TaskStatusDone || inst.Tasks["finish"] != TaskStatusDone {
 		t.Fatalf("once statuses = %#v", inst.Tasks)
@@ -243,7 +244,7 @@ func TestRemainingWorkIgnoresSubmitMany(t *testing.T) {
 	}
 
 	domain.Submissions = domain.Submissions[:2] // finish not submitted
-	wl = ProjectWorklist(cfg, domain, op)
+	wl = projectWorklistUnfiltered(cfg, domain, op)
 	if !worklistInstanceHasRemainingWork(cfg, wl, "session", "S1") {
 		t.Fatal("missing once finish must still count as remaining work")
 	}

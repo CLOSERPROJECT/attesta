@@ -68,7 +68,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
 
-	stored, err := domains.Get(t.Context(), "feragame")
+	stored, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	c.HttpPort = port
 
 	truckID := commitTruckArrive(t, c)
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value:         registerLotValue(),
@@ -156,7 +156,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
 
-	stored, err := domains.Get(t.Context(), "feragame")
+	stored, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestCommitWithoutHTTPSkipsPort(t *testing.T) {
 		t.Fatalf("register should call http twice — calls=%d", len(port.calls))
 	}
 
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
 		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
 	})

@@ -30,10 +30,10 @@ func (a SubmissionAddress) valid() bool {
 }
 
 // LinkStore persists post-Commit HTTP links separately from Submission facts.
-// Put/Get are keyed by Submission address + timestamp (no address-only fallback).
+// Put/Get are keyed by Scope + Submission address + timestamp (no address-only fallback).
 type LinkStore interface {
-	Put(ctx context.Context, org string, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error
-	Get(ctx context.Context, org string, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error)
+	Put(ctx context.Context, scope Scope, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error
+	Get(ctx context.Context, scope Scope, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error)
 }
 
 var _ LinkStore = (*MemoryLinkStore)(nil)
@@ -48,14 +48,17 @@ func NewMemoryLinkStore() *MemoryLinkStore {
 	return &MemoryLinkStore{byKey: map[string][]HttpLinkItem{}}
 }
 
-func linkStoreKey(org string, addr SubmissionAddress, timestamp string) (string, error) {
-	org = strings.TrimSpace(org)
+func linkStoreKey(scope Scope, addr SubmissionAddress, timestamp string) (string, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return "", err
+	}
 	addr = addr.normalized()
 	timestamp = strings.TrimSpace(timestamp)
-	if org == "" || !addr.valid() || timestamp == "" {
-		return "", fmt.Errorf("org: link store key requires org, submission address, and timestamp")
+	if !addr.valid() || timestamp == "" {
+		return "", fmt.Errorf("org: link store key requires scope, submission address, and timestamp")
 	}
-	parts := []string{org, addr.JobID, addr.JobInstanceID, addr.TaskID, timestamp}
+	parts := []string{scope.Org, scope.Stream, addr.JobID, addr.JobInstanceID, addr.TaskID, timestamp}
 	return strings.Join(parts, "\x00"), nil
 }
 
@@ -68,8 +71,8 @@ func cloneHTTPLinks(in []HttpLinkItem) []HttpLinkItem {
 	return out
 }
 
-func (s *MemoryLinkStore) Put(_ context.Context, org string, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
-	key, err := linkStoreKey(org, addr, timestamp)
+func (s *MemoryLinkStore) Put(_ context.Context, scope Scope, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
+	key, err := linkStoreKey(scope, addr, timestamp)
 	if err != nil {
 		return err
 	}
@@ -79,8 +82,8 @@ func (s *MemoryLinkStore) Put(_ context.Context, org string, addr SubmissionAddr
 	return nil
 }
 
-func (s *MemoryLinkStore) Get(_ context.Context, org string, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
-	key, err := linkStoreKey(org, addr, timestamp)
+func (s *MemoryLinkStore) Get(_ context.Context, scope Scope, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
+	key, err := linkStoreKey(scope, addr, timestamp)
 	if err != nil {
 		return nil, err
 	}

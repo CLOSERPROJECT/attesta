@@ -32,16 +32,22 @@ export function qrDraftCoords(nav: QrNavigate): {
 	};
 }
 
-export function qrNavigateTarget(nav: QrNavigate): PostCommitTarget {
+export function qrNavigateTarget(nav: QrNavigate, stream: string): PostCommitTarget {
+	const instance = (nav.streamInstanceId ?? '').trim();
 	return {
 		kind: 'task',
+		stream,
+		instance,
 		jobId: nav.jobId,
 		jobInstanceId: nav.jobInstanceId,
 		taskId: nav.taskId
 	};
 }
 
-export function interpretQrResolve(result: QrResolveResult): QrApplyOutcome {
+export function interpretQrResolve(
+	result: QrResolveResult,
+	stream: string
+): QrApplyOutcome {
 	if (result.error?.message) {
 		return { kind: 'error', message: result.error.message };
 	}
@@ -52,14 +58,14 @@ export function interpretQrResolve(result: QrResolveResult): QrApplyOutcome {
 	const coords = qrDraftCoords(nav);
 	return {
 		kind: 'navigate',
-		target: qrNavigateTarget(nav),
+		target: qrNavigateTarget(nav, stream),
 		taskPath: coords.taskPath,
 		draftInstanceKey: coords.draftInstanceKey,
 		seed: result.seed ?? {}
 	};
 }
 
-/** Cold `/app?entityId=` — capture raw then strip query so resolve runs once. */
+/** Cold `/app/{stream}?entityId=` — capture raw then strip query so resolve runs once. */
 export function takeColdEntityIdRaw(href: string): {
 	raw: string | null;
 	strippedHref: string;

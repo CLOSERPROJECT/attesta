@@ -27,6 +27,8 @@ type CommitRequest struct {
 	JobInstanceID string         `json:"jobInstanceId"`
 	Value         map[string]any `json:"value"`
 	Mint          *CommitMint    `json:"mint,omitempty"`
+	// StreamInstanceID is the Org stream instance scope from the HTTP API (not JSON).
+	StreamInstanceID string `json:"-"`
 }
 
 func (req CommitRequest) mintKind() MintKind {
@@ -90,22 +92,24 @@ type TaskCommitter struct {
 	// HttpPort runs onSubmit.http after the Domain write. Nil is always a no-op
 	// (no links/errors) even when the Task declares effects; product uses SidecarHttpPort or soft-fail.
 	HttpPort HttpPort
-	// SubmitBindings are ops/runtime JSONata vars merged into onSubmit.http evaluation
-	// (e.g. qrEndpoint from OrgAppBaseURL). Nil/empty is fine.
+	// SubmitBindings are ops/runtime JSONata vars merged into onSubmit.http evaluation.
+	// Stream-scoped $qrEndpoint is always merged from OrgAppBaseURL(scope.Stream) and
+	// wins over any qrEndpoint planted here. Nil/empty is fine.
 	SubmitBindings ExprBindings
 	// LinkStore persists Commit links[] after HttpPort. Nil skips persist; Put errors
 	// never fail Commit or roll back Domain (response still returns links for stay UI).
 	LinkStore LinkStore
 	// DPPs persists Passport records when onSubmit.passport is set. Required for that hook.
 	DPPs DPPStore
-	Now       func() time.Time
+	Now  func() time.Time
 }
 
-func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
-	org = strings.TrimSpace(org)
-	if org == "" {
-		return CommitResult{}, &CommitError{Kind: "forbidden", Message: "organization required"}
+func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return CommitResult{}, &CommitError{Kind: "forbidden", Message: "organization and stream required"}
 	}
+	org := scope.Org
 	if c.Domains == nil || c.Configs == nil || c.Authorizer == nil {
 		return CommitResult{}, fmt.Errorf("org: commit stores/authorizer required")
 	}
@@ -141,13 +145,16 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 		return CommitResult{}, &CommitError{Kind: "prep", Message: "value required"}
 	}
 
-	version, err := c.Configs.ActiveVersion(ctx, org)
+	version, err := c.Configs.ActiveVersion(ctx, scope)
 	if err != nil {
 		return CommitResult{}, err
 	}
-	cfg, err := c.Configs.Get(ctx, org, version)
+	cfg, err := c.Configs.Get(ctx, scope, version)
 	if err != nil {
 		return CommitResult{}, err
+	}
+	if err := ValidateStreamConfig(cfg); err != nil {
+		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}
 	}
 	if err := ValidateDPPConfig(cfg); err != nil {
 		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}
@@ -164,6 +171,22 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 			Message: fmt.Sprintf("Task %q has no onSubmit.transform", taskPath),
 		}
 	}
+	if req.StreamInstanceID != "" && jobInstanceID != "" {
+		domainForMember, err := c.Domains.Get(ctx, scope)
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				return CommitResult{}, err
+			}
+			domainForMember = EmptyDomain()
+		}
+		if !JobInstanceBelongsToStream(cfg, domainForMember, ref.JobID, jobInstanceID, req.StreamInstanceID) {
+			return CommitResult{}, &CommitError{
+				Kind:    "conflict",
+				Message: "job instance is not a member of the stream instance",
+			}
+		}
+	}
+
 	wantsPassport := taskOnSubmitDPP(task)
 
 	now := c.Now
@@ -176,17 +199,22 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 
 	// Gates are re-evaluated on each retry so a concurrent Commit cannot slip past readyWhen.
 	var applied appliedCommit
-	_, err = c.Domains.Update(ctx, org, func(domain Domain) (Domain, error) {
+	_, err = c.Domains.Update(ctx, scope, func(domain Domain) (Domain, error) {
+		streamID := EffectiveStreamInstanceID(cfg, domain, ref.JobID, jobInstanceID, req.StreamInstanceID)
 		allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 			Operator:      op,
 			Org:           org,
+			Stream:        scope.Stream,
 			TaskPath:      taskPath,
 			JobID:         ref.JobID,
 			TaskID:        ref.TaskID,
 			JobInstanceID: jobInstanceID,
 			RolesAllowed:  rolesAllowedForPath(cfg, ref),
 			SequenceOk:    sequenceOkForPath(cfg, domain, ref, jobInstanceID),
-			ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID, cfg.Catalogs),
+			ReadyWhenOk: readyWhenOkForCommit(
+				domain, task, jobInstanceID, cfg.Catalogs,
+				streamBindingFrom(cfg, streamID),
+			),
 		})
 		if err != nil {
 			return Domain{}, err
@@ -203,7 +231,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 				return Domain{}, &CommitError{Kind: "prep", Message: "passport store not configured"}
 			}
 			// Fail closed before the Domain write so a second lock does not rewrite Domain then error.
-			if _, err := c.DPPs.Get(ctx, org, applied.JobInstanceID); err == nil {
+			if _, err := c.DPPs.Get(ctx, scope, applied.JobInstanceID); err == nil {
 				return Domain{}, &CommitError{Kind: "passport-exists", Message: "passport already issued for subject"}
 			} else if !errors.Is(err, ErrNotFound) {
 				return Domain{}, err
@@ -218,7 +246,16 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 		return CommitResult{}, err
 	}
 
-	wl := ProjectWorklist(cfg, applied.Domain, op)
+	streamInstanceID := strings.TrimSpace(req.StreamInstanceID)
+	if streamInstanceID == "" && mintKind == MintKindStartingNew && cfg.Stream != nil && ref.JobID == cfg.Stream.Instance.Job {
+		streamInstanceID = applied.JobInstanceID
+	}
+	var wl Worklist
+	if streamInstanceID == "" {
+		wl = projectWorklistUnfiltered(cfg, applied.Domain, op)
+	} else {
+		wl = ProjectWorklist(cfg, applied.Domain, op, streamInstanceID)
+	}
 	nav, continueNav, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref, applied.JobInstanceID)
 	if err != nil {
 		return CommitResult{}, err
@@ -242,6 +279,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
 			httpBindings := mergeBindings(applied.Bindings, c.SubmitBindings)
+			httpBindings = mergeBindings(httpBindings, SubmitBindingsForStream(scope.Stream))
 			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, httpBindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs, org)
 			result.Links = append(result.Links, httpResult.Links...)
 			result.HttpErrors = httpResult.Errors
@@ -249,7 +287,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, org string, op OperatorIdent
 	}
 	if c.LinkStore != nil && len(result.Links) > 0 {
 		// Side record only — never roll back Domain or fail Commit on store error.
-		_ = c.LinkStore.Put(ctx, org, applied.submissionAddress(), ts, result.Links)
+		_ = c.LinkStore.Put(ctx, scope, applied.submissionAddress(), ts, result.Links)
 	}
 	return result, nil
 }

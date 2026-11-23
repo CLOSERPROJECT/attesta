@@ -1,6 +1,7 @@
 package org
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -22,11 +23,24 @@ type Gate func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool)
 
 // API serves Load, addressed Task form / recap, Commit, QR resolve, and artifact proxy over HTTP seams.
 type API struct {
-	DomainLoader    *DomainLoader
+	DomainLoader  *DomainLoader
 	TaskCommitter *TaskCommitter
-	Gate      Gate
+	Gate          Gate
 	// Artifacts fetches sidecar bytes with the shared secret; nil → artifact route unavailable.
 	Artifacts *SidecarHttpPort
+}
+
+// StreamPlayStart is the anchor Job's first Task (Play / mint.startingNew).
+type StreamPlayStart struct {
+	JobID  string `json:"jobId"`
+	TaskID string `json:"taskId"`
+}
+
+// StreamListItem is one row of GET /api/org/streams.
+type StreamListItem struct {
+	Key   string           `json:"key"`
+	Title string           `json:"title"`
+	Play  *StreamPlayStart `json:"play,omitempty"`
 }
 
 func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -42,11 +56,122 @@ func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleCommit(w, r)
 	case path == "/api/org/qr-resolve":
 		h.handleQrResolve(w, r)
+	case path == "/api/org/streams":
+		h.handleStreams(w, r)
+	case path == "/api/org/timeline":
+		h.handleTimeline(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
 		h.handleArtifact(w, r, strings.TrimPrefix(path, ArtifactProxyPathPrefix))
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.Gate == nil || h.DomainLoader == nil {
+		http.Error(w, "org timeline not configured", http.StatusInternalServerError)
+		return
+	}
+	op, ok := h.Gate(w, r)
+	if !ok {
+		return
+	}
+	orgID := strings.TrimSpace(op.Org)
+	if orgID == "" {
+		http.Error(w, "organization required", http.StatusForbidden)
+		return
+	}
+	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
+	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
+	if streamKey == "" || instanceID == "" {
+		http.Error(w, "stream and instance required", http.StatusBadRequest)
+		return
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), orgID, streamKey, h.DomainLoader.Configs)
+	if !ok {
+		return
+	}
+	if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+		return
+	}
+
+	domain := EmptyDomain()
+	if h.DomainLoader.Domains != nil {
+		if loaded, domainErr := h.DomainLoader.Domains.Get(r.Context(), scope); domainErr == nil {
+			domain = loaded
+		} else if !errors.Is(domainErr, ErrNotFound) {
+			http.Error(w, "failed to load timeline", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	view := BuildOrgTimelineView(cfg, domain, op, scope.Stream, instanceID)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method == http.MethodHead {
+		return
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(view)
+}
+
+func (h *API) handleStreams(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.Gate == nil || h.DomainLoader == nil || h.DomainLoader.Configs == nil {
+		http.Error(w, "org streams not configured", http.StatusInternalServerError)
+		return
+	}
+	op, ok := h.Gate(w, r)
+	if !ok {
+		return
+	}
+	org := strings.TrimSpace(op.Org)
+	if org == "" {
+		http.Error(w, "organization required", http.StatusForbidden)
+		return
+	}
+	keys, err := h.DomainLoader.Configs.ListStreams(r.Context(), org)
+	if err != nil {
+		http.Error(w, "failed to list streams", http.StatusInternalServerError)
+		return
+	}
+	out := make([]StreamListItem, 0, len(keys))
+	for _, key := range keys {
+		scope := Scope{Org: org, Stream: key}
+		version, err := h.DomainLoader.Configs.ActiveVersion(r.Context(), scope)
+		if err != nil {
+			continue
+		}
+		cfg, err := h.DomainLoader.Configs.Get(r.Context(), scope, version)
+		if err != nil || cfg.Stream == nil {
+			continue
+		}
+		title := strings.TrimSpace(cfg.Stream.Title)
+		if title == "" {
+			title = key
+		}
+		item := StreamListItem{Key: key, Title: title}
+		if play := streamPlayStart(cfg); play != nil {
+			item.Play = play
+		}
+		out = append(out, item)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method == http.MethodHead {
+		return
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(out)
 }
 
 func (h *API) handleLoad(w http.ResponseWriter, r *http.Request) {
@@ -67,8 +192,12 @@ func (h *API) handleLoad(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "organization required", http.StatusForbidden)
 		return
 	}
+	scope, instanceID, ok := h.requireStreamAndInstance(w, r, org, h.DomainLoader.Configs, true)
+	if !ok {
+		return
+	}
 
-	result, err := h.DomainLoader.Load(r.Context(), org, op)
+	result, err := h.DomainLoader.LoadForStreamInstance(r.Context(), scope, op, instanceID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "active config not found", http.StatusNotFound)
@@ -117,7 +246,32 @@ func (h *API) handleTaskForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bundle, err := h.DomainLoader.LoadTaskBundle(r.Context(), org, op, jobID, taskID, jobInstanceID)
+	streamKey := strings.TrimSpace(q.Get("stream"))
+	if streamKey == "" {
+		http.Error(w, "stream required", http.StatusBadRequest)
+		return
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), org, streamKey, h.DomainLoader.Configs)
+	if !ok {
+		return
+	}
+	play := IsAnchorStartTask(cfg, jobID, taskID) && NormalizeJobInstanceID(jobInstanceID) == ""
+	instanceID := strings.TrimSpace(q.Get("instance"))
+	if play {
+		instanceID = ""
+	} else {
+		if instanceID == "" {
+			http.Error(w, "instance required", http.StatusBadRequest)
+			return
+		}
+		if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+			return
+		}
+	}
+
+	bundle, err := h.DomainLoader.LoadTaskBundleForStreamInstance(
+		r.Context(), scope, op, jobID, taskID, jobInstanceID, instanceID,
+	)
 	if err != nil {
 		if errors.Is(err, ErrTaskBundleForbidden) {
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -159,6 +313,10 @@ func (h *API) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "organization required", http.StatusForbidden)
 		return
 	}
+	scope, _, ok := h.requireStreamAndInstance(w, r, org, h.DomainLoader.Configs, true)
+	if !ok {
+		return
+	}
 	q := r.URL.Query()
 	addr := SubmissionAddress{
 		JobID:         strings.TrimSpace(q.Get("jobId")),
@@ -170,7 +328,7 @@ func (h *API) handleTaskRecap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list, err := h.DomainLoader.LoadTaskRecap(r.Context(), org, addr)
+	list, err := h.DomainLoader.LoadTaskRecap(r.Context(), scope, addr)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "task recap not found", http.StatusNotFound)
@@ -206,7 +364,30 @@ func (h *API) handleCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.TaskCommitter.Commit(r.Context(), org, op, req)
+	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
+	if streamKey == "" {
+		http.Error(w, "stream required", http.StatusBadRequest)
+		return
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), org, streamKey, h.TaskCommitter.Configs)
+	if !ok {
+		return
+	}
+	ref, err := ParseTaskPath(strings.TrimSpace(req.TaskPath))
+	play := err == nil && req.mintKind() == MintKindStartingNew && IsAnchorStartTask(cfg, ref.JobID, ref.TaskID)
+	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
+	if !play {
+		if instanceID == "" {
+			http.Error(w, "instance required", http.StatusBadRequest)
+			return
+		}
+		if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+			return
+		}
+	}
+	req.StreamInstanceID = instanceID
+
+	result, err := h.TaskCommitter.Commit(r.Context(), scope, op, req)
 	if err != nil {
 		writeCommitError(w, err)
 		return
@@ -229,7 +410,23 @@ func (h *API) handleQrResolve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loaded, err := h.DomainLoader.Load(r.Context(), org, op)
+	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
+	if streamKey == "" {
+		http.Error(w, "stream required", http.StatusBadRequest)
+		return
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), org, streamKey, h.DomainLoader.Configs)
+	if !ok {
+		return
+	}
+	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
+	if instanceID != "" {
+		if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+			return
+		}
+	}
+
+	loaded, err := h.DomainLoader.Load(r.Context(), scope, op)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "active config not found", http.StatusNotFound)
@@ -351,6 +548,117 @@ func (h *API) handleArtifact(w http.ResponseWriter, r *http.Request, id string) 
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(art.Body)
+}
+
+func (h *API) requireStreamAndInstance(
+	w http.ResponseWriter,
+	r *http.Request,
+	org string,
+	configs ConfigStore,
+	requireInstance bool,
+) (Scope, string, bool) {
+	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
+	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
+	if streamKey == "" || (requireInstance && instanceID == "") {
+		http.Error(w, "stream and instance required", http.StatusBadRequest)
+		return Scope{}, "", false
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), org, streamKey, configs)
+	if !ok {
+		return Scope{}, "", false
+	}
+	if requireInstance {
+		if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+			return Scope{}, "", false
+		}
+	}
+	return scope, instanceID, true
+}
+
+func (h *API) resolveStreamScope(
+	w http.ResponseWriter,
+	ctx context.Context,
+	org, streamKey string,
+	configs ConfigStore,
+) (Scope, OrgConfig, bool) {
+	if configs == nil {
+		http.Error(w, "org config store required", http.StatusInternalServerError)
+		return Scope{}, OrgConfig{}, false
+	}
+	scope, err := Scope{Org: org, Stream: streamKey}.Normalize()
+	if err != nil {
+		http.Error(w, "stream required", http.StatusBadRequest)
+		return Scope{}, OrgConfig{}, false
+	}
+	version, err := configs.ActiveVersion(ctx, scope)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "stream not found", http.StatusNotFound)
+			return Scope{}, OrgConfig{}, false
+		}
+		http.Error(w, "failed to resolve stream", http.StatusInternalServerError)
+		return Scope{}, OrgConfig{}, false
+	}
+	cfg, err := configs.Get(ctx, scope, version)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "stream not found", http.StatusNotFound)
+			return Scope{}, OrgConfig{}, false
+		}
+		http.Error(w, "failed to resolve stream", http.StatusInternalServerError)
+		return Scope{}, OrgConfig{}, false
+	}
+	return scope, cfg, true
+}
+
+func streamPlayStart(cfg OrgConfig) *StreamPlayStart {
+	if cfg.Stream == nil {
+		return nil
+	}
+	jobID := strings.TrimSpace(cfg.Stream.Instance.Job)
+	if jobID == "" {
+		return nil
+	}
+	jobVal, ok := cfg.Jobs.Get(jobID)
+	if !ok {
+		return nil
+	}
+	job, ok := AsJob(jobVal)
+	if !ok {
+		return nil
+	}
+	ordered := OrderedTaskIDs(job.Tasks)
+	if len(ordered) == 0 {
+		return nil
+	}
+	return &StreamPlayStart{JobID: jobID, TaskID: ordered[0]}
+}
+
+func (h *API) ensureStreamInstance(
+	w http.ResponseWriter,
+	ctx context.Context,
+	scope Scope,
+	cfg OrgConfig,
+	instanceID string,
+) bool {
+	if h.DomainLoader == nil || h.DomainLoader.Domains == nil {
+		http.Error(w, "org domain store required", http.StatusInternalServerError)
+		return false
+	}
+	domain, err := h.DomainLoader.Domains.Get(ctx, scope)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "instance not found", http.StatusNotFound)
+			return false
+		}
+		http.Error(w, "failed to resolve instance", http.StatusInternalServerError)
+		return false
+	}
+	if !StreamInstanceExists(cfg, domain, instanceID) {
+		http.Error(w, "instance not found", http.StatusNotFound)
+		return false
+	}
+	return true
 }
 
 func writeCommitError(w http.ResponseWriter, err error) {

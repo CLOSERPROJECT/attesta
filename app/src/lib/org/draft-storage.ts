@@ -7,12 +7,21 @@ export type StorageLike = {
 
 export const DRAFT_STORAGE_PREFIX = 'attesta:org-draft:';
 
-export function orgDraftStoragePrefix(org: string, userId: string): string {
-	return `${DRAFT_STORAGE_PREFIX}${org}:${userId}:`;
+export function orgDraftStoragePrefix(
+	org: string,
+	stream: string,
+	userId: string
+): string {
+	return `${DRAFT_STORAGE_PREFIX}${org}:${stream}:${userId}:`;
 }
 
-export function orgDraftStorageKey(org: string, userId: string, draftKey: string): string {
-	return `${orgDraftStoragePrefix(org, userId)}${draftKey}`;
+export function orgDraftStorageKey(
+	org: string,
+	stream: string,
+	userId: string,
+	draftKey: string
+): string {
+	return `${orgDraftStoragePrefix(org, stream, userId)}${draftKey}`;
 }
 
 export function memoryStorage(seed?: Record<string, string>): StorageLike {
@@ -130,13 +139,14 @@ export function removeStoredDraft(
 export function loadDirtyDraftsForIdentity(
 	storage: StorageLike | null | undefined,
 	org: string,
+	stream: string,
 	userId: string
 ): Record<string, Record<string, unknown>> {
 	const out: Record<string, Record<string, unknown>> = {};
 	if (!storage) {
 		return out;
 	}
-	const prefix = orgDraftStoragePrefix(org, userId);
+	const prefix = orgDraftStoragePrefix(org, stream, userId);
 	for (const key of storage.keys()) {
 		if (!key.startsWith(prefix)) {
 			continue;

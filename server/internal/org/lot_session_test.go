@@ -26,7 +26,7 @@ func TestLotSessionStaysOpenUntilCloseLot(t *testing.T) {
 		}
 	}
 
-	after, err := loader.Load(t.Context(), "feragame", adminOp())
+	after, err := loader.Load(t.Context(), FeragameScope(), adminOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,13 +69,13 @@ func TestCloseLotDeniedUntilWeighedAndLoaded(t *testing.T) {
 
 	assertCloseLotDenied := func(when string) {
 		t.Helper()
-		_, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+		_, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 			TaskPath: "lot_processing/closeLot", JobInstanceID: loadID, Value: map[string]any{},
 		})
 		if err == nil {
 			t.Fatalf("closeLot %s must fail", when)
 		}
-		wl := ProjectWorklist(mustActiveConfig(t, c), mustDomain(t, c), adminOp())
+		wl := projectWorklistUnfiltered(mustActiveConfig(t, c), mustDomain(t, c), adminOp())
 		inst, _ := worklistInstance(worklistMustJob(t, wl, "lot_processing"), loadID)
 		if inst.Tasks["closeLot"] != TaskStatusUnavailable {
 			t.Fatalf("closeLot %s status = %q, want unavailable", when, inst.Tasks["closeLot"])
@@ -107,7 +107,7 @@ func TestContainerRegDoesNotSetFullyProcessed(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID := plantSeedOpenLotReadyForContainer(t, c)
 
-	result, err := c.Commit(t.Context(), "feragame", adminOp(), CommitRequest{
+	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: loadID,
 		Value: map[string]any{

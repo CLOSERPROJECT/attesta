@@ -241,10 +241,15 @@ export function availableRowKey(row: AvailableRow): string {
 	return `${row.jobId}/${row.jobInstanceId}/${row.taskId}`;
 }
 
-/** Deep-link target for a home Available row. */
-export function availableRowTarget(row: AvailableRow): Extract<PostCommitTarget, { kind: 'task' }> {
+/** Deep-link target for a home Available row (keeps stream instance prefix). */
+export function availableRowTarget(
+	row: AvailableRow,
+	scope: { stream: string; instance: string }
+): Extract<PostCommitTarget, { kind: 'task' }> {
 	return {
 		kind: 'task',
+		stream: scope.stream,
+		instance: scope.instance,
 		jobId: row.jobId,
 		jobInstanceId: row.jobInstanceId,
 		taskId: row.taskId
@@ -253,15 +258,4 @@ export function availableRowTarget(row: AvailableRow): Extract<PostCommitTarget,
 
 export function completedRowKey(row: CompletedRow): string {
 	return `${row.jobId}/${row.jobInstanceId}`;
-}
-
-/** Deep-link target for an Archive Completed row → Job instance overview. */
-export function completedRowTarget(
-	row: CompletedRow
-): Extract<PostCommitTarget, { kind: 'overview' }> {
-	return {
-		kind: 'overview',
-		jobId: row.jobId,
-		jobInstanceId: row.jobInstanceId
-	};
 }

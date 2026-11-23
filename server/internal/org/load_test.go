@@ -16,7 +16,7 @@ func TestLoaderEmptyDomainAndActiveConfig(t *testing.T) {
 	}
 
 	loader := &DomainLoader{Domains: domains, Configs: configs}
-	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	result, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestLoaderMissingActiveConfig(t *testing.T) {
 		Domains: NewMemoryDomainStore(),
 		Configs: NewMemoryConfigStore(),
 	}
-	_, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
+	_, err := loader.Load(t.Context(), FeragameScope(), FixtureAllRolesOp())
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
@@ -54,6 +54,11 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	if _, err := SeedFixtureConfigStore(configs); err != nil {
 		t.Fatal(err)
 	}
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T-empty", Label: "T-empty"}}
+	if err := domains.Put(t.Context(), FeragameScope(), domain); err != nil {
+		t.Fatal(err)
+	}
 	h := &API{
 		DomainLoader: &DomainLoader{Domains: domains, Configs: configs},
 		Gate: func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool) {
@@ -62,7 +67,7 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-empty", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -115,10 +120,10 @@ func TestMemoryStoresRoundTrip(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	domain := EmptyDomain()
 	putKind(&domain, "lot", EntityMap{"L1": {"client": "NO"}})
-	if err := domains.Put(t.Context(), "feragame", domain); err != nil {
+	if err := domains.Put(t.Context(), FeragameScope(), domain); err != nil {
 		t.Fatal(err)
 	}
-	got, err := domains.Get(t.Context(), "feragame")
+	got, err := domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,13 +133,13 @@ func TestMemoryStoresRoundTrip(t *testing.T) {
 
 	configs := NewMemoryConfigStore()
 	cfg := OrgConfig{ID: "x", Jobs: newOrderedObject()}
-	if err := configs.Put(t.Context(), "feragame", "2", cfg); err != nil {
+	if err := configs.Put(t.Context(), FeragameScope(), "2", cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := configs.SetActiveVersion(t.Context(), "feragame", "2"); err != nil {
+	if err := configs.SetActiveVersion(t.Context(), FeragameScope(), "2"); err != nil {
 		t.Fatal(err)
 	}
-	active, err := configs.ActiveVersion(t.Context(), "feragame")
+	active, err := configs.ActiveVersion(t.Context(), FeragameScope())
 	if err != nil || active != "2" {
 		t.Fatalf("active=%q err=%v", active, err)
 	}

@@ -29,16 +29,22 @@ export type CommitFollowThroughDeps = {
 /**
  * Commit outcome + current Task address → stay | navigate (ADR-0006).
  * Destination from server navigation only; stay never inferred from links.
+ * Play Commit (empty instance) navigates to the minted instance home.
  */
 export function decideCommitFollowThrough(
 	outcome: Pick<
 		CommitOutcome,
 		'navigation' | 'jobInstanceId' | 'nextTaskFormBundle'
 	>,
-	current: Pick<TaskAddress, 'jobId'>
+	current: Pick<TaskAddress, 'stream' | 'instance' | 'jobId'>
 ): CommitFollowThrough {
+	const instance =
+		current.instance ||
+		(outcome.navigation !== 'stay' ? outcome.jobInstanceId : current.instance);
 	const followUp = resolveCommitFollowUp(
 		outcome.navigation,
+		current.stream,
+		instance,
 		current.jobId,
 		outcome.jobInstanceId,
 		outcome.nextTaskFormBundle
@@ -60,6 +66,8 @@ export function decideContinueFollowThrough(
 ): ContinueFollowThrough {
 	const target = resolveContinueNavigation(
 		outcome.continueNavigation,
+		current.stream,
+		current.instance,
 		current.jobId,
 		outcome.jobInstanceId,
 		outcome.nextTaskFormBundle

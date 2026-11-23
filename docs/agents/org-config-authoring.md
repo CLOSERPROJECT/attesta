@@ -2,7 +2,7 @@
 
 Platform authoring reference for **any** Org Config: gates, transforms, and post-Commit navigation. Not a plant fixture checklist.
 
-Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, **readyWhen**, **startsWhen**, **Commit navigation**, **submit cardinality**, **Chrome**). Transform keys (`bind`, `reads`, `derived`, `dynamicProperties`) are authored here—not glossary entries. Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0013). Feragame fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
+Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, **readyWhen**, **startsWhen**, **Commit navigation**, **submit cardinality**, **Chrome**, **Org stream**, **anchor Job**, **each**, **blockedReason**). Transform keys (`bind`, `reads`, `derived`, `dynamicProperties`) are authored here—not glossary entries. Decisions: [`docs/adr/`](../adr/) (especially 0005–0008, 0010–0014). Feragame fixture edits: [`feragame-fixture-authoring.md`](feragame-fixture-authoring.md).
 
 ## Rules
 
@@ -12,6 +12,37 @@ Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, 
 - **Submit cardinality:** multi-pass same-form work uses leaf Tasks with `submit: many` + Domain **`readyWhen`**, not Task groups ([ADR-0008](../adr/0008-org-task-submit-cardinality.md)).
 - **JSONata:** chrome / transform / QR / HttpPort bodies use jsonata-go — see [`jsonata-org.md`](jsonata-org.md) before blaming the executor.
 - **Copy tracks:** SPA chrome vs Config product copy vs English engine errors — [ADR-0013](../adr/0013-org-app-locale-tracks.md) and [`app-i18n.md`](app-i18n.md). Plant Italian labels stay in YAML.
+
+## Stream section (`stream`)
+
+Every Org Config has a required `stream` block ([ADR-0014](../adr/0014-org-config-as-stream.md)). It names the Org stream for `/my` and lists timeline steps over Jobs.
+
+```yaml
+stream:
+  key: recycling              # slug; unique per org; not reserved /app segments i or new
+  title: Lavorazione rifiuti
+  description: …             # optional
+  categorySlug: …             # optional /my discovery
+  subCategorySlug: …
+  instance:
+    job: intake               # anchor Job (repeatable); Play starts it
+  steps:
+    - job: intake             # once per Org stream instance
+    - job: lot_processing
+      each:                   # one timeline row per matching Domain entity
+        entity: lot
+        where: truckId = $stream.id
+```
+
+Validation (`ValidateStreamConfig` at Config load and Commit prep, mirroring DPP): `stream` present; `key` is a slug and not `i`/`new`; `instance.job` is a repeatable Job listed in `steps`; every `steps[].job` exists; `each.entity` is in `domain.entities`; `each.where` compiles. `$stream` is accepted in expressions here and bound when evaluating under an Org stream instance.
+
+**Membership caveat:** a Job instance belongs to Org stream instance S when it is the anchor instance with id S, or when its Job step has `each` and its id is one of the entity ids that `each` selects with `$stream.id = S`. That only works when the row Job’s `instanceId` equals the selected entity id (Feragame: `instanceId: $.lotId`). Validation cannot check this statically—author it that way.
+
+**Finished rule (no new field):** a Job instance is finished when every `submit: once` Task on it is done. End a Job with a once-only closing Task when “finished” should mean that beat is complete.
+
+### `blockedReason` (Task, optional)
+
+JSONata string evaluated when `readyWhen` is false; shown next to the unavailable Task on the `/my` timeline. Compile-checked at Config load; evaluation happens with Worklist projection.
 
 ## Commit navigation (`onCommit`)
 

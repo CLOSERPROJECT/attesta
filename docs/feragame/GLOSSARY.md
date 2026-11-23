@@ -21,9 +21,9 @@ _Avoid_: load (former name); conflating with Job instance
 ### Lot session and row facts
 
 **lot session status**: Lifecycle state of a lot session on a **lot**: `open` | `fullyProcessed`.\
-_Avoid_: `parked`; open/close working day or shift as Domain peers; separate boolean fullyProcessed beside open; parallel open lots
+_Avoid_: `parked`; open/close working day or shift as Domain peers; separate boolean fullyProcessed beside open; parallel open lots on the same truck
 
-**fullyProcessed**: Terminal **lot session status**: the lot is closed for line processing. Passport still needs Lock on that lot — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
+**fullyProcessed**: Terminal **lot session status**: the lot is closed for line processing. The lot’s DPP still needs the final **lot_processing** `lock` Task — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
 _Avoid_: boolean `processed`; container register as the writer of this status
 
 **progress**: Plant row fact on some entities (e.g. pallet): unset, `partial`, or `done`.
@@ -33,12 +33,11 @@ _Avoid_: Treating incomplete as operator-board status or progress
 
 ### Jobs and roles
 
-**intake** (Job): Truck arrival chapter.\
-_Avoid_: Treating intake as the Passport path
+**intake** (Job): Truck arrival chapter. Several trucks may be in intake at once; each truck allows only one **lot** with **lot session status** `open` (demo; plant-wide one-open-lot is the restore path — #365).\
+_Avoid_: Treating intake as the Passport path; serialising trucks behind another truck's weightCheck
 
-**lot_processing** (Job): Lot session chapter.
-
-**Passport Lock Job**: Issues a Passport whose subject is a **lot**. Still needs Lock after the lot is **fullyProcessed** — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).
+**lot_processing** (Job): Lot session chapter. Ends with once-only `lock`, which issues a Passport whose subject is that **lot** after **fullyProcessed** — see [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (Passport lock).\
+_Avoid_: A separate passport Job; treating closeLot as DPP issue
 
 **administration** / **line** / **logistic**: Plant Config role slugs (office, line floor, logistics).\
 _Avoid_: Treating these as platform standing (Org admin / Member)
@@ -46,7 +45,7 @@ _Avoid_: Treating these as platform standing (Org admin / Member)
 ## Relationships
 
 - A **lot** owns zero or more **pallets** and zero or more **containers**.
-- At most one **lot** has **lot session status** `open` at a time.
+- At most one **lot** per truck has **lot session status** `open` at a time (demo drift #365; plant-wide restore path stays in the fixture comment).
 - **Passport** subject for this plant is a **lot**, not a **truck**.
 - An **incomplete** **container** may be continued by a later register on another lot.
 
@@ -61,3 +60,5 @@ Do not revive as Feragame nouns.
 **working day** / **shift** / whole-day Domain peers: Former Domain calendar layer; not plant Domain entities.
 
 **`parked`**: Former lot session status; not in the living enum (`open` | `fullyProcessed`).
+
+**Passport Lock Job**: Former separate Job (`passport` / `select`+`lock`) after close; folded into **lot_processing** as final once-only `lock`.

@@ -19,6 +19,8 @@ export type QrScanDraftBag = {
 
 export type QrScanFlowDeps = {
 	resolve: QrResolvePort['resolve'];
+	stream: string;
+	instance?: string;
 	drafts: QrScanDraftBag;
 	navigate: (target: PostCommitTarget) => void;
 	toast: (message: string) => void;
@@ -35,7 +37,10 @@ export async function runQrScan(
 	}
 	let result: QrResolveResult;
 	try {
-		result = await deps.resolve(trimmed);
+		result = await deps.resolve(trimmed, {
+			stream: deps.stream,
+			instance: deps.instance
+		});
 	} catch (err) {
 		const message =
 			err instanceof QrResolveHttpError
@@ -46,7 +51,7 @@ export async function runQrScan(
 		deps.toast(message || qrResolveFailedMessage());
 		return 'toasted';
 	}
-	const outcome = interpretQrResolve(result);
+	const outcome = interpretQrResolve(result, deps.stream);
 	if (outcome.kind === 'error') {
 		deps.toast(outcome.message);
 		return 'toasted';
@@ -56,6 +61,14 @@ export async function runQrScan(
 		...prior,
 		...outcome.seed
 	});
+	const fromInstance = (deps.instance ?? '').trim();
+	const toInstance =
+		outcome.target.kind === 'task' ? outcome.target.instance.trim() : '';
+	const switched =
+		Boolean(fromInstance) && Boolean(toInstance) && fromInstance !== toInstance;
+	if (switched) {
+		deps.toast(m.scan_switched_instance());
+	}
 	deps.navigate(outcome.target);
 	return 'navigated';
 }

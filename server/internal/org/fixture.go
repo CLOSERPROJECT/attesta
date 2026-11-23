@@ -4,13 +4,15 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 //go:embed fixtures/feragame-config.yaml
 var feragameConfigYAML []byte
+
+//go:embed fixtures/second-stream-config.yaml
+var secondStreamConfigYAML []byte
 
 // DefaultFixtureVersion is the Config version assigned when seeding the Feragame fixture.
 const DefaultFixtureVersion = "1"
@@ -19,6 +21,12 @@ const DefaultFixtureVersion = "1"
 // steps/substeps → jobs/tasks so Load speaks living nouns only.
 func LoadFeragameConfigFixture() (OrgConfig, error) {
 	return ParseFeragameConfigFixture(feragameConfigYAML)
+}
+
+// LoadSecondStreamConfigFixture parses the embedded minimal second-stream YAML
+// used by isolation tests (not seeded for demo).
+func LoadSecondStreamConfigFixture() (OrgConfig, error) {
+	return ParseFeragameConfigFixture(secondStreamConfigYAML)
 }
 
 // ParseFeragameConfigFixture parses Feragame YAML bytes into an OrgConfig with Job/Task keys.
@@ -107,30 +115,45 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 		}
 		cfg.DPP = &dpp
 	}
+	if streamNode := child(doc, "stream"); streamNode != nil {
+		var stream StreamConfig
+		if err := streamNode.Decode(&stream); err != nil {
+			return OrgConfig{}, fmt.Errorf("decode stream: %w", err)
+		}
+		cfg.Stream = &stream
+	}
+	if err := ValidateStreamConfig(cfg); err != nil {
+		return OrgConfig{}, err
+	}
 	if err := ValidateDPPConfig(cfg); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
 }
 
-// SeedFixtureConfigStore puts the Feragame Org Config as the Active Config version for its org.
+// SeedFixtureConfigStore puts the Feragame Org Config as the Active Config version for its stream.
 func SeedFixtureConfigStore(store ConfigStore) (OrgConfig, error) {
 	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		return OrgConfig{}, err
 	}
-	org := strings.TrimSpace(cfg.Org)
-	if org == "" {
-		return OrgConfig{}, fmt.Errorf("feragame-config fixture missing org")
+	scope, err := ScopeFromConfig(cfg)
+	if err != nil {
+		return OrgConfig{}, fmt.Errorf("feragame-config fixture: %w", err)
 	}
 	ctx := context.Background()
-	if err := store.Put(ctx, org, cfg.Version, cfg); err != nil {
+	if err := store.Put(ctx, scope, cfg.Version, cfg); err != nil {
 		return OrgConfig{}, err
 	}
-	if err := store.SetActiveVersion(ctx, org, cfg.Version); err != nil {
+	if err := store.SetActiveVersion(ctx, scope, cfg.Version); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
+}
+
+// FeragameScope is the (org, stream) of the embedded Feragame fixture.
+func FeragameScope() Scope {
+	return Scope{Org: "feragame", Stream: "recycling"}
 }
 
 func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {

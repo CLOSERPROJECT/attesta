@@ -24,7 +24,7 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 	c, domains, _ := testTaskCommitter(t, auth)
 
 	allowOp := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
-	if _, err := c.Commit(t.Context(), "feragame", allowOp, CommitRequest{
+	if _, err := c.Commit(t.Context(), FeragameScope(), allowOp, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    truckArriveValue(),
 		Mint:     startingNewMint(),
@@ -43,7 +43,7 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 		Authorizer: auth,
 		Now:        func() time.Time { return time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC) },
 	}
-	_, err := denyCommitter.Commit(t.Context(), "feragame", OperatorIdentity{
+	_, err := denyCommitter.Commit(t.Context(), FeragameScope(), OperatorIdentity{
 		UserID: "gio", Org: "feragame", Roles: []string{"logistic"},
 	}, CommitRequest{
 		TaskPath: "intake/truckArrive",
@@ -54,7 +54,7 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("logistic should be denied: %v", err)
 	}
-	if _, getErr := denyDomains.Get(t.Context(), "feragame"); getErr == nil {
+	if _, getErr := denyDomains.Get(t.Context(), FeragameScope()); getErr == nil {
 		t.Fatal("domain should remain unset on deny")
 	}
 	_ = domains

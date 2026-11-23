@@ -1,6 +1,7 @@
 import * as m from '#lib/paraglide/messages.js';
 
 import type { TaskFormBundle } from './form/task-form-bundle.js';
+import { appendStreamScope } from './stream-scope.js';
 import { TaskFormError, type TaskFormPort, type TaskFormRequest } from './task-form-port.js';
 
 export type HttpTaskFormPortOptions = {
@@ -17,6 +18,7 @@ function taskFormUrl(base: string, req: TaskFormRequest): string {
 	if (req.jobInstanceId !== undefined) {
 		params.set('jobInstanceId', req.jobInstanceId);
 	}
+	appendStreamScope(params, { stream: req.stream, instance: req.instance });
 	return `${base}/api/org/task-form?${params}`;
 }
 

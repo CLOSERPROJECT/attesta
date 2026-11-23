@@ -1,7 +1,7 @@
 # Attesta Feragame demo fixture (steps / substeps).
 # Single source of truth: embedded by Go (LoadFeragameConfigFixture) and imported by SPA tests.
 # Plant tree: intake truckArrive → register (many) → weightCheck;
-# lot_processing startLot → weigh / markProgress / containerReg → closeLot; passport.
+# lot_processing startLot → weigh / markProgress / containerReg → closeLot → lock (DPP).
 #
 # Authored tasks are ordered lists with required unique id (not maps).
 # Lot session status is open|fullyProcessed only (no parked / turn bookends).
@@ -9,6 +9,20 @@
 
 id: feragame-config
 org: feragame
+stream:
+    key: recycling
+    title: Lavorazione rifiuti
+    description: Ingresso camion e lavorazione lotti
+    categorySlug: recycling-and-recovery
+    subCategorySlug: flat-screen-displays
+    instance:
+        job: intake
+    steps:
+        - job: intake
+        - job: lot_processing
+          each:
+              entity: lot
+              where: truckId = $stream.id
 domain:
     entities:
         truck:
@@ -149,8 +163,6 @@ steps:
         substeps:
             - id: truckArrive
               roles: [administration]
-              readyWhen: >-
-                $count($sift($domain.truck, function($v){$not($exists($v.checkedTruckWeight))})) = 0
               schema:
                 type: object
                 title: Registrazione camion
@@ -368,21 +380,30 @@ steps:
         startLabel: Apri lotto
         color: '#0284c7'
         instanceId: $.lotId
-        label: "'Lotto: ' & $.lotId"
+        label: "'Lotto ' & $.lotId"
         substeps:
             - id: startLot
               roles: [logistic]
+              # Demo drift (#365): one open lot per truck ($stream.id), not plant-wide.
+              # Revert: drop truckId = $stream.id filters; restore plant-wide open count.
               readyWhen: >-
                 (
-                  $count($domain.lot.*[status = "open"]) = 0
-                  and $count($domain.lot.*[$not(status = "fullyProcessed") and $not(status = "open")]) >= 1
+                  $count($domain.lot.*[truckId = $stream.id and status = "open"]) = 0
+                  and $count($domain.lot.*[truckId = $stream.id and $not(status = "fullyProcessed") and $not(status = "open")]) >= 1
+                )
+              blockedReason: >-
+                (
+                  $openId := $keys($sift($domain.lot, function($v){$v.status = "open" and $v.truckId = $stream.id}))[0];
+                  $exists($openId)
+                    ? 'Linea occupata: lotto ' & $openId & ' (camion ' & $lookup($domain.lot, $openId).truckId & ')'
+                    : ''
                 )
               enumReads:
                 lotId: lots
               reads:
                 lots:
                     entity: lot
-                    where: $not(status = "fullyProcessed") and $not(status = "open")
+                    where: $not(status = "fullyProcessed") and $not(status = "open") and truckId = $stream.id
                     key: id
               schema:
                 type: object
@@ -734,50 +755,14 @@ steps:
                       id: $instance.id
                       set:
                         status: '"fullyProcessed"'
-    passport:
-        repeatable: true
-        title: Verifica dati e DPP
-        startLabel: Emetti DPP
-        color: '#0f766e'
-        instanceId: $.lotId
-        label: "'DPP: ' & $.lotId"
-        substeps:
-            - id: select
-              roles: [administration]
-              readyWhen: >-
-                $count($domain.lot.*[status = "fullyProcessed" and $not(locked = true)]) >= 1
-              enumReads:
-                lotId: lots
-              reads:
-                lots:
-                    entity: lot
-                    where: status = "fullyProcessed" and $not(locked = true)
-                    key: id
-              schema:
-                type: object
-                title: Seleziona carico
-                required: [lotId]
-                properties:
-                    lotId:
-                        type: string
-                        title: Carico
-              uiSchema:
-                lotId:
-                    ui:components:
-                        stringField: enumField
-              onSubmit:
-                transform: []
             - id: lock
               roles: [administration]
+              title: Verifica dati e DPP
               readyWhen: >-
-                (
-                  $count($domain.submissions[jobId = "passport" and taskId = "select" and jobInstanceId = $instance.id]) >= 1
-                  and $lookup($domain.lot, $instance.id).status = "fullyProcessed"
-                  and $not($lookup($domain.lot, $instance.id).locked = true)
-                )
+                $lookup($domain.lot, $instance.id).status = "fullyProcessed" and $not($lookup($domain.lot, $instance.id).locked = true)
               schema:
                 type: object
-                title: Emetti DPP
+                title: Verifica dati e DPP
                 required: [ack]
                 properties:
                     ack:

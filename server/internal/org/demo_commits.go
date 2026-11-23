@@ -34,9 +34,9 @@ func demoSeedCommitter(domains DomainStore, configs ConfigStore) *TaskCommitter 
 	}
 }
 
-func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *TaskCommitter, org string) (truckID, loadID string, err error) {
-	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "logistic", "line"}}
-	arrive, err := c.Commit(ctx, org, op, CommitRequest{
+func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *TaskCommitter, scope Scope) (truckID, loadID string, err error) {
+	op := OperatorIdentity{UserID: "ada", Org: scope.Org, Roles: []string{"administration", "logistic", "line"}}
+	arrive, err := c.Commit(ctx, scope, op, CommitRequest{
 		TaskPath: "intake/truckArrive",
 		Value:    map[string]any{"truckWeight": 1000.0},
 		Mint:     startingNewMint(),
@@ -45,7 +45,7 @@ func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *TaskCommitter, org
 		return "", "", err
 	}
 	truckID = arrive.JobInstanceID
-	lot, err := c.Commit(ctx, org, op, CommitRequest{
+	lot, err := c.Commit(ctx, scope, op, CommitRequest{
 		TaskPath:      "intake/register",
 		JobInstanceID: truckID,
 		Value: map[string]any{
@@ -66,16 +66,17 @@ func commitIntakeThroughLotsClosedCtx(ctx context.Context, c *TaskCommitter, org
 	return truckID, loadID, nil
 }
 
-func commitIntakeThroughPalletWeight(ctx context.Context, c *TaskCommitter, org string) (Domain, error) {
-	_, loadID, err := commitIntakeThroughLotsClosedCtx(ctx, c, org)
+func commitIntakeThroughPalletWeight(ctx context.Context, c *TaskCommitter, scope Scope) (Domain, error) {
+	truckID, loadID, err := commitIntakeThroughLotsClosedCtx(ctx, c, scope)
 	if err != nil {
 		return Domain{}, err
 	}
-	op := OperatorIdentity{UserID: "ada", Org: org, Roles: []string{"administration", "logistic", "line"}}
-	started, err := c.Commit(ctx, org, op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+	op := OperatorIdentity{UserID: "ada", Org: scope.Org, Roles: []string{"administration", "logistic", "line"}}
+	started, err := c.Commit(ctx, scope, op, CommitRequest{
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		return Domain{}, err
@@ -87,7 +88,7 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *TaskCommitter, org 
 		{loadID + ".1", 11},
 		{loadID + ".2", 22},
 	} {
-		if _, err := c.Commit(ctx, org, op, CommitRequest{
+		if _, err := c.Commit(ctx, scope, op, CommitRequest{
 			TaskPath:      "lot_processing/weigh",
 			JobInstanceID: started.JobInstanceID,
 			Value:         weighValue(row.id, row.weight),
@@ -95,19 +96,18 @@ func commitIntakeThroughPalletWeight(ctx context.Context, c *TaskCommitter, org 
 			return Domain{}, err
 		}
 	}
-	return c.Domains.Get(ctx, org)
+	return c.Domains.Get(ctx, scope)
 }
 
-// seedLotProcessingReadyDomain wipes org Domain then Commits intake + startLot + weigh
+// seedLotProcessingReadyDomain wipes stream Domain then Commits intake + startLot + weigh
 // so markProgress / containerReg see an open lot with weighed pallets.
-func seedLotProcessingReadyDomain(ctx context.Context, domains DomainStore, configs ConfigStore, org string) error {
-	if err := domains.Put(ctx, org, EmptyDomain()); err != nil {
+func seedLotProcessingReadyDomain(ctx context.Context, domains DomainStore, configs ConfigStore, scope Scope) error {
+	if err := domains.Put(ctx, scope, EmptyDomain()); err != nil {
 		return err
 	}
 	c := demoSeedCommitter(domains, configs)
-	if _, err := commitIntakeThroughPalletWeight(ctx, c, org); err != nil {
+	if _, err := commitIntakeThroughPalletWeight(ctx, c, scope); err != nil {
 		return fmt.Errorf("org seed demo intake: %w", err)
 	}
 	return nil
 }
-

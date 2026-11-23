@@ -39,7 +39,7 @@ func TestMarkProgressUnavailableUntilWeigh(t *testing.T) {
 	if started.Kind("lot")[loadID]["status"] != "open" {
 		t.Fatalf("lot status = %#v", started.Kind("lot")[loadID])
 	}
-	startWL := ProjectWorklist(cfg, started, lineOp)
+	startWL := projectWorklistUnfiltered(cfg, started, lineOp)
 	startLP, _ := worklistJobByID(startWL, "lot_processing")
 	startInst, ok := worklistInstance(startLP, loadID)
 	if !ok || startInst.Tasks["markProgress"] != TaskStatusUnavailable {
@@ -48,7 +48,7 @@ func TestMarkProgressUnavailableUntilWeigh(t *testing.T) {
 	if startInst.Tasks["weigh"] != TaskStatusActionable {
 		t.Fatalf("weigh after startLot (line) = %#v", startInst)
 	}
-	logWL := ProjectWorklist(cfg, started, OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}})
+	logWL := projectWorklistUnfiltered(cfg, started, OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}})
 	logLP, _ := worklistJobByID(logWL, "lot_processing")
 	logInst, ok := worklistInstance(logLP, loadID)
 	if !ok || logInst.Tasks["weigh"] != TaskStatusAvailable {
@@ -56,7 +56,7 @@ func TestMarkProgressUnavailableUntilWeigh(t *testing.T) {
 	}
 
 	_ = commitWeigh(t, c, loadID, loadID+".1", 11)
-	afterWeigh := ProjectWorklist(cfg, mustDomain(t, c), lineOp)
+	afterWeigh := projectWorklistUnfiltered(cfg, mustDomain(t, c), lineOp)
 	weighLP, _ := worklistJobByID(afterWeigh, "lot_processing")
 	weighInst, ok := worklistInstance(weighLP, loadID)
 	if !ok || weighInst.Tasks["markProgress"] != TaskStatusActionable {
@@ -66,7 +66,7 @@ func TestMarkProgressUnavailableUntilWeigh(t *testing.T) {
 
 func mustDomain(t *testing.T, c *TaskCommitter) Domain {
 	t.Helper()
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,481 @@
+/* Org SPA timeline — reuse Attesta /my process chrome (tokens + components). */
+@import '../../../../../web/src/styles/breakpoints.css';
+@import '../../../../../web/src/styles/tokens.css';
+@import '../../../../../web/src/styles/role-palette.css';
+@import '../../../../../web/src/styles/utilities.css';
+@import '../../../../../web/src/styles/components/shared.css';
+@import '../../../../../web/src/styles/components/empty-state.css';
+@import '../../../../../web/src/styles/components/stream-step-summary.css';
+@import '../../../../../web/src/styles/components/stream-timeline.css';
+@import '../../../../../web/src/styles/components/substep-shell.css';
+
+/*
+ * Board elevation: elev-0 = light Attesta green page; ladder is steps → rows → substeps.
+ * Light: primary mixed into white. Dark: primary into slate lifts.
+ * Mobile: block pad only. ≥640px: stream container pads on all sides.
+ */
+.org-timeline-page {
+	--org-elev-0: color-mix(in srgb, var(--primary) 9%, #ffffff); /* page — light Attesta green */
+	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #ffffff); /* steps */
+	--org-elev-2: color-mix(in srgb, var(--primary) 8%, #ffffff); /* rows/instances */
+	--org-elev-3: #ffffff; /* substeps + tabs */
+	--org-pad-l: var(--space-3);
+	/* Chevron column: same right edge + slot width at every nest level. */
+	--org-chevron-pad: var(--space-3);
+	--org-chevron-slot: 1.25rem;
+
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+	width: 100%;
+	max-width: 80rem;
+	margin-inline: auto;
+	background: var(--org-elev-0);
+	padding-block: var(--space-3);
+	padding-inline: 0;
+}
+
+/* App Vite/Tailwind path does not expand @custom-media; use a plain query. */
+@media (width >= 640px) {
+	.org-timeline-page {
+		padding: var(--space-3);
+	}
+}
+
+/* Dark: page + ladder lift toward --primary. */
+:is(.dark *) .org-timeline-page {
+	--org-elev-0: color-mix(in srgb, var(--primary) 8%, #0f172a);
+	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #1e293b);
+	--org-elev-2: color-mix(in srgb, var(--primary) 12%, #334155);
+	--org-elev-3: color-mix(in srgb, var(--primary) 10%, #475569);
+}
+
+.org-timeline-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	padding: var(--space-3) var(--org-pad-l);
+	margin-bottom: var(--space-3);
+}
+
+.org-timeline-header {
+	min-width: 0;
+	flex: 1;
+}
+
+.org-timeline-header-label {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: var(--font-semibold);
+	color: var(--foreground);
+}
+
+.process-stream-block {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.stream-show-all-filter {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-shrink: 0;
+	gap: var(--space-2);
+}
+
+.stream-show-all-filter-root.is-actionable-only
+	.substep:not([data-org-actionable='true']):not([data-board-focused='true']) {
+	display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only
+	.stream-timeline-row:not(
+		:has(.substep[data-org-actionable='true'], .substep[data-board-focused='true'])
+	) {
+	display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only
+	.stream-timeline-step:not(
+		:has(.substep[data-org-actionable='true'], .substep[data-board-focused='true'])
+	) {
+	display: none;
+}
+
+.stream-show-all-filter-root.is-actionable-only.is-actionable-only-empty
+	.stream-timeline-list {
+	display: none;
+}
+
+.substep-org-body {
+	display: grid;
+	gap: var(--space-2);
+}
+
+/* --- Elevation surfaces (scoped; Formata /my keeps shared component defaults) --- */
+
+/*
+ * Nest box: all sides match fill at rest (6px left is an invisible hover reserve).
+ * Hover recolors the full border to primary.
+ */
+.org-timeline-page .stream-timeline-step {
+	background: var(--org-elev-1);
+	border-width: 1px 1px 1px 6px;
+	border-color: var(--org-elev-1);
+}
+
+.org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
+	background: var(--org-elev-1);
+}
+
+.org-timeline-page .stream-timeline-row-accordion {
+	background: var(--org-elev-2);
+	border-width: 1px 1px 1px 6px;
+	border-color: var(--org-elev-2);
+}
+
+.org-timeline-page .substep,
+.org-timeline-page .substep-available,
+.org-timeline-page .substep-active,
+.org-timeline-page .substep-done,
+.org-timeline-page .substep-locked,
+.org-timeline-page .substep-skipped {
+	background: var(--org-elev-3);
+	border-width: 1px 1px 1px 6px;
+	border-color: var(--org-elev-3);
+	border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
+	background: var(--org-elev-3);
+}
+
+/* Embed Form/Recap: compact right-aligned segmented control (bordered list, no underline) */
+.org-timeline-page .substep-embed [data-slot='tabs-list'].embed-tabs-list {
+	/* Match embed-panel-body left pad so the control lines up with the form. */
+	margin-left: var(--space-3);
+	margin-right: auto;
+	width: auto;
+	height: auto;
+	min-width: 0;
+	flex-shrink: 0;
+	gap: var(--space-1);
+	padding: var(--space-1);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--org-elev-3);
+	justify-content: flex-start;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger {
+	flex: 0 0 auto;
+	height: auto;
+	min-height: 0;
+	gap: calc(var(--space-1) * 0.75);
+	padding: calc(var(--space-1) * 0.75) var(--space-2);
+	border: none;
+	border-radius: calc(var(--radius) * 0.75);
+	box-shadow: none;
+	background: transparent;
+	color: var(--foreground);
+	justify-content: center;
+	text-align: center;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger svg {
+	width: 0.875rem;
+	height: 0.875rem;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger::after {
+	content: none;
+	display: none;
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger:hover {
+	background: color-mix(in srgb, var(--foreground) 6%, transparent);
+	color: var(--foreground);
+}
+
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger[data-state='active'],
+.org-timeline-page .substep-embed [data-slot='tabs-trigger'].embed-tabs-trigger[data-active] {
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--foreground);
+	box-shadow: none;
+}
+
+/*
+ * Nest hover: recolor only. Child list :hover (incl. gaps) suppresses the parent nest
+ * so pointer travel across gap does not flash the instance/step.
+ */
+.org-timeline-page .stream-timeline-step:hover:not(:has(.stream-timeline-rows:hover, .stream-timeline-substeps:hover)) {
+	background: var(--org-elev-1);
+	border-color: var(--primary);
+}
+
+.org-timeline-page .stream-timeline-row-accordion:hover:not(:has(.stream-timeline-substeps:hover)) {
+	background: var(--org-elev-2);
+	border-color: var(--primary);
+}
+
+.org-timeline-page .substep:hover,
+.org-timeline-page .substep-available:hover,
+.org-timeline-page .substep-active:hover,
+.org-timeline-page .substep-done:hover,
+.org-timeline-page .substep-skipped:hover {
+	background: var(--org-elev-3);
+	border-color: var(--primary);
+	opacity: 1;
+}
+
+/* Locked: white elev (undo Formata card opacity); no primary hover — mark + title only. */
+.org-timeline-page .substep-locked {
+	opacity: 1;
+}
+
+.org-timeline-page .substep-locked .timeline-header-index,
+.org-timeline-page .substep-locked .timeline-header-title {
+	opacity: 0.4;
+}
+
+/* --- One-line headers; Lucide chevrons share one absolute column from each row’s right edge --- */
+
+.org-timeline-page .timeline-header-line {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	flex: 1 1 auto;
+	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+.org-timeline-page .timeline-header-index {
+	flex-shrink: 0;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.25;
+	color: var(--secondary-foreground);
+}
+
+.org-timeline-page .timeline-header-title {
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--foreground);
+}
+
+.org-timeline-page .timeline-header-trail {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	margin-left: auto;
+	/* Clear the absolute chevron column. */
+	margin-right: var(--space-2);
+}
+
+.org-timeline-page .timeline-header-count {
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--muted-foreground);
+	font-variant-numeric: tabular-nums;
+}
+
+.org-timeline-page .stream-timeline-step-summary,
+.org-timeline-page .stream-timeline-row-summary,
+.org-timeline-page .substep-accordion-summary,
+.org-timeline-page .substep-card-link,
+.org-timeline-page .substep-embed-host > .substep-accordion-summary {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-height: 2.75rem;
+	padding-block: var(--space-2);
+	padding-left: var(--org-pad-l);
+	padding-right: calc(var(--org-chevron-pad) + var(--org-chevron-slot));
+	border-radius: 0;
+}
+
+/* Absolute column only — do not set display (would override Trigger’s hidden/shown Lucide pair). */
+.org-timeline-page .stream-timeline-step-summary [data-slot='accordion-trigger-icon'],
+.org-timeline-page .stream-timeline-row-summary [data-slot='accordion-trigger-icon'],
+.org-timeline-page .substep-accordion-summary [data-slot='accordion-trigger-icon'] {
+	position: absolute;
+	top: 50%;
+	right: var(--org-chevron-pad);
+	width: var(--org-chevron-slot);
+	height: var(--org-chevron-slot);
+	margin: 0 !important;
+	transform: translateY(-50%);
+	color: var(--muted-foreground);
+}
+
+/* Status: soft tint + dot (quieter than Formata bordered pills) */
+.org-timeline-page .timeline-header-trail .status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	box-sizing: border-box;
+	/* Fits longest label ("terminated"); override header mono. */
+	width: 5.75rem;
+	gap: 0.35em;
+	margin: 0;
+	padding: 0.2rem 0.35rem;
+	border: none;
+	border-radius: var(--radius);
+	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	text-transform: none;
+	line-height: 1.25;
+	white-space: nowrap;
+	color: var(--secondary-foreground);
+	background-color: color-mix(in srgb, var(--secondary-foreground) 10%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status::before {
+	content: '';
+	width: 0.375rem;
+	height: 0.375rem;
+	border-radius: 999px;
+	background: currentColor;
+	flex-shrink: 0;
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='available'] {
+	color: var(--stream-available);
+	background-color: color-mix(in srgb, var(--stream-available) 12%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='pending'],
+.org-timeline-page .timeline-header-trail .status[data-status='active'] {
+	color: var(--stream-active);
+	background-color: color-mix(in srgb, var(--stream-active) 12%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='done'] {
+	color: var(--stream-done);
+	background-color: color-mix(in srgb, var(--stream-done) 12%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='locked'] {
+	color: color-mix(in srgb, var(--stream-done) 70%, var(--foreground));
+	background-color: color-mix(in srgb, var(--stream-done) 28%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='terminated'] {
+	color: var(--stream-terminated);
+	background-color: color-mix(in srgb, var(--stream-terminated) 12%, transparent);
+}
+
+.org-timeline-page .timeline-header-trail .status[data-status='skipped'] {
+	color: var(--secondary-foreground);
+	background-color: color-mix(in srgb, var(--secondary-foreground) 10%, transparent);
+}
+
+/*
+ * Sibling gaps: form 1px, substeps 4px (instance elev shows through), rows 13px, steps 17px.
+ * Substep/row list boxes catch pointer in the gap so parent nest hover stays off.
+ */
+.org-timeline-page .substep-org-body,
+.org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
+	gap: 1px;
+}
+
+.org-timeline-page .stream-timeline-substeps {
+	gap: 4px;
+}
+
+.org-timeline-page .stream-timeline-rows {
+	gap: 13px;
+}
+
+.org-timeline-page .stream-timeline-list {
+	gap: 17px;
+}
+
+/* Nest: indent left, keep 100%−indent width so right edges match the parent */
+.org-timeline-page .stream-timeline-rows,
+.org-timeline-page .stream-timeline-substeps {
+	box-sizing: border-box;
+	width: calc(100% - var(--org-pad-l));
+	max-width: calc(100% - var(--org-pad-l));
+	margin-left: var(--org-pad-l);
+	margin-right: 0;
+	padding-block: 0;
+	padding-inline: 0;
+}
+
+.org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
+	padding: var(--space-3);
+}
+
+/* Open nest: space under the header before children (no hairline — card edges already outline). */
+.org-timeline-page .stream-timeline-step[data-state='open'] > [data-slot='collapsible-content'],
+.org-timeline-page
+	.stream-timeline-row-accordion[data-state='open']
+	> [data-slot='collapsible-content'],
+.org-timeline-page .substep-accordion[data-state='open'] > [data-slot='collapsible-content'],
+.org-timeline-page
+	.substep-embed-host[data-state='open']
+	> .substep-accordion-summary
+	+ div {
+	padding-top: var(--space-3);
+}
+
+/* Submissions trigger: Accordion-like muted text + Lucide via Collapsible.Trigger */
+.org-timeline-page .substep-org-submissions-summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	font-size: var(--text-sm);
+	color: var(--muted-foreground);
+	border-radius: 0;
+}
+
+.org-timeline-page .substep-org-submissions-summary [data-slot='accordion-trigger-icon'] {
+	color: var(--muted-foreground);
+	margin-left: auto;
+}
+
+@media (width < 640px) {
+	.org-timeline-page .stream-timeline-rows,
+	.org-timeline-page .stream-timeline-substeps {
+		width: calc(100% - var(--org-pad-l));
+		margin-left: var(--org-pad-l);
+		padding-inline: 0;
+	}
+}
+
+@media (width < 768px) {
+	.org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
+		position: sticky;
+		top: 0;
+		background: var(--org-elev-1);
+		z-index: 10;
+	}
+
+	.org-timeline-page
+		.stream-timeline-step[data-state='open']:has(.substep-accordion[data-state='open'])
+		> .stream-timeline-step-summary {
+		position: static;
+	}
+
+	.org-timeline-page .substep-accordion[data-state='open'] > .substep-accordion-summary {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+	}
+}

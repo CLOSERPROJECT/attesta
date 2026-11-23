@@ -1,6 +1,7 @@
 import * as m from '#lib/paraglide/messages.js';
 
 import { LoadDomainError, type LoadDomainPort } from './load-port.js';
+import { streamScopeQuery, type StreamScope } from './stream-scope.js';
 import type { LoadResult } from './types.js';
 
 export type HttpLoadDomainPortOptions = {
@@ -16,8 +17,12 @@ export function createHttpLoadDomainPort(
 	const base = options.baseUrl ?? '';
 
 	return {
-		async load() {
-			const res = await fetchFn(`${base}/api/org/domain`, {
+		async load(scope: StreamScope & { instance: string }) {
+			const qs = streamScopeQuery({
+				stream: scope.stream,
+				instance: scope.instance
+			});
+			const res = await fetchFn(`${base}/api/org/domain?${qs}`, {
 				method: 'GET',
 				credentials: 'include',
 				headers: { Accept: 'application/json' },

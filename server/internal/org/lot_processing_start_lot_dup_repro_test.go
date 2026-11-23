@@ -8,13 +8,14 @@ import (
 // duplicate lot_processing JobInstance (JobPanel keyed-each would crash).
 func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
-	_, loadID := plantIntakeOneLot(t, c)
+	truckID, loadID := plantIntakeOneLot(t, c)
 
 	op := OperatorIdentity{UserID: "log", Org: "feragame", Roles: []string{"logistic"}}
-	first, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+	first, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -23,17 +24,18 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 		t.Fatalf("first mint = %q, want %q", first.JobInstanceID, loadID)
 	}
 
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "lot_processing/startLot",
-		Value:    map[string]any{"lotId": loadID},
-		Mint:     startingNewMint(),
+	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
+		TaskPath:         "lot_processing/startLot",
+		Value:            map[string]any{"lotId": loadID},
+		Mint:             startingNewMint(),
+		StreamInstanceID: truckID,
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("second startingNew must prep-deny: %v", err)
 	}
 
-	domain, err := c.Domains.Get(t.Context(), "feragame")
+	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +52,7 @@ func TestCommitStartLotStartingNewTwiceDeniesDuplicate(t *testing.T) {
 
 func TestMutateRejectsDuplicateJobInstance(t *testing.T) {
 	domain := EmptyDomain()
-	domain.JobInstances = []JobInstance{{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto: CO-261029-1"}}
+	domain.JobInstances = []JobInstance{{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto CO-261029-1"}}
 	_, err := Mutate(domain, MutateRequest{
 		UserID:         "ada",
 		JobID:          "lot_processing",
@@ -58,7 +60,7 @@ func TestMutateRejectsDuplicateJobInstance(t *testing.T) {
 		JobInstanceID:  "CO-261029-1",
 		Timestamp:      "2026-10-30T12:00:00Z",
 		Facts:          map[string]any{"lotId": "CO-261029-1"},
-		NewJobInstance: &JobInstance{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto: CO-261029-1"},
+		NewJobInstance: &JobInstance{JobID: "lot_processing", ID: "CO-261029-1", Label: "Lotto CO-261029-1"},
 	})
 	var me MutateError
 	if err == nil || !asMutateError(err, &me) || me.Kind != "duplicate-job-instance" {

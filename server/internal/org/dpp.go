@@ -34,9 +34,10 @@ type DPPSnapshotConfig struct {
 	Expr string `json:"expr"`
 }
 
-// DPPRecord is one issued Passport (org + subject), with frozen snapshot.
+// DPPRecord is one issued Passport (org + stream + subject), with frozen snapshot.
 type DPPRecord struct {
 	Org           string         `json:"org"`
+	Stream        string         `json:"stream"`
 	SubjectID     string         `json:"subjectId"`
 	GTIN          string         `json:"gtin"`
 	Lot           string         `json:"lot"`
@@ -186,9 +187,14 @@ func issueDPP(
 		return passportIssue{}, &CommitError{Kind: "prep", Message: err.Error()}
 	}
 
+	stream := ""
+	if cfg.Stream != nil {
+		stream = cfg.Stream.Key
+	}
 	link := untp.URL(identity.gtin, identity.lot, identity.serial)
 	record := DPPRecord{
 		Org:           strings.TrimSpace(cfg.Org),
+		Stream:        strings.TrimSpace(stream),
 		SubjectID:     subjectID,
 		GTIN:          identity.gtin,
 		Lot:           identity.lot,

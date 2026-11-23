@@ -15,6 +15,7 @@ import (
 func orgDPPTestRecord() org.DPPRecord {
 	return org.DPPRecord{
 		Org:         "synth",
+		Stream:      "synth",
 		SubjectID:   "W-9",
 		GTIN:        "09506000134352",
 		Lot:         "LOT-9",

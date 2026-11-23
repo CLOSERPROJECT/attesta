@@ -12,18 +12,15 @@ vi.mock('../router/index.js', () => ({
 	navigate: vi.fn()
 }));
 
-import { hrefOrgTarget } from '../router/navigate-target.js';
 import type { Worklist } from './types.js';
 import {
 	actNowRowKey,
 	actNowRowsFromWorklist,
 	availableRowKey,
 	availableRowsFromWorklist,
-	availableRowTarget,
 	canStartRowsFromWorklist,
 	completedRowKey,
 	completedRowsFromWorklist,
-	completedRowTarget,
 	instanceTaskProgress,
 	progressFraction,
 	taskRouteInstanceSegment
@@ -76,7 +73,7 @@ const adminWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'available' }
 				}
 			]
@@ -118,7 +115,7 @@ const logisticWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'available' }
 				}
 			]
@@ -160,7 +157,7 @@ const lineWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'actionable' }
 				}
 			]
@@ -202,7 +199,7 @@ const allRolesWorklist: Worklist = {
 			instances: [
 				{
 					id: 'CO-1',
-					label: 'Lotto: CO-1',
+					label: 'Lotto CO-1',
 					tasks: { startLot: 'done', markProgress: 'actionable' }
 				}
 			]
@@ -368,12 +365,12 @@ describe('worklist-home bands', () => {
 					instances: [
 						{
 							id: 'CO-1',
-							label: 'Lotto: CO-1',
+							label: 'Lotto CO-1',
 							tasks: { startLot: 'done', markProgress: 'available' }
 						},
 						{
 							id: 'CO-done',
-							label: 'Lotto: CO-done',
+							label: 'Lotto CO-done',
 							tasks: { startLot: 'done', markProgress: 'done' }
 						}
 					]
@@ -397,7 +394,7 @@ describe('worklist-home bands', () => {
 		expect(rows[1]).toMatchObject({
 			jobId: 'lot_processing',
 			jobInstanceId: 'CO-done',
-			instanceLabel: 'Lotto: CO-done',
+			instanceLabel: 'Lotto CO-done',
 			jobTitle: 'Lavorazione',
 			tasksDone: 2,
 			tasksTotal: 2
@@ -406,18 +403,9 @@ describe('worklist-home bands', () => {
 		for (const key of ['intake/NIR-1', 'intake/NIR-2', 'lot_processing/CO-1']) {
 			expect(rows.map((r) => completedRowKey(r))).not.toContain(key);
 		}
-
-		expect(completedRowTarget(rows[0]!)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-done'
-		});
-		expect(hrefOrgTarget(completedRowTarget(rows[0]!))).toBe(
-			'/app/intake/NIR-done'
-		);
 	});
 
-	test('Archive list uses completedRows (flat; not on act-now home)', () => {
+	test('completedRows stay off act-now home (no Archive place)', () => {
 		const mixed: Worklist = {
 			jobs: [
 				{
@@ -442,16 +430,11 @@ describe('worklist-home bands', () => {
 				}
 			]
 		};
-		const archive = completedRowsFromWorklist(mixed);
-		expect(archive.map((r) => completedRowKey(r))).toEqual(['intake/NIR-done']);
+		const completed = completedRowsFromWorklist(mixed);
+		expect(completed.map((r) => completedRowKey(r))).toEqual(['intake/NIR-done']);
 		expect(actNowRowsFromWorklist(mixed).map((r) => actNowRowKey(r))).toEqual([
 			'task:intake/NIR-open/register',
 			'start:intake'
 		]);
-		expect(completedRowTarget(archive[0]!)).toEqual({
-			kind: 'overview',
-			jobId: 'intake',
-			jobInstanceId: 'NIR-done'
-		});
 	});
 });

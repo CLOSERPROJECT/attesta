@@ -27,6 +27,7 @@ func NewMongoLinkStore(db *mongo.Database) *MongoLinkStore {
 type mongoSubmissionLinksDoc struct {
 	ID            string         `bson:"_id"`
 	Org           string         `bson:"org"`
+	Stream        string         `bson:"stream"`
 	JobID         string         `bson:"jobId"`
 	JobInstanceID string         `bson:"jobInstanceId"`
 	TaskID        string         `bson:"taskId"`
@@ -38,17 +39,21 @@ func (s *MongoLinkStore) coll() *mongo.Collection {
 	return s.db.Collection(collectionOrgSubmissionLinks)
 }
 
-func (s *MongoLinkStore) Put(ctx context.Context, org string, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
-	key, err := linkStoreKey(org, addr, timestamp)
+func (s *MongoLinkStore) Put(ctx context.Context, scope Scope, addr SubmissionAddress, timestamp string, links []HttpLinkItem) error {
+	key, err := linkStoreKey(scope, addr, timestamp)
+	if err != nil {
+		return err
+	}
+	scope, err = scope.Normalize()
 	if err != nil {
 		return err
 	}
 	addr = addr.normalized()
-	org = strings.TrimSpace(org)
 	timestamp = strings.TrimSpace(timestamp)
 	doc := mongoSubmissionLinksDoc{
 		ID:            key,
-		Org:           org,
+		Org:           scope.Org,
+		Stream:        scope.Stream,
 		JobID:         addr.JobID,
 		JobInstanceID: addr.JobInstanceID,
 		TaskID:        addr.TaskID,
@@ -65,8 +70,8 @@ func (s *MongoLinkStore) Put(ctx context.Context, org string, addr SubmissionAdd
 	return nil
 }
 
-func (s *MongoLinkStore) Get(ctx context.Context, org string, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
-	key, err := linkStoreKey(org, addr, timestamp)
+func (s *MongoLinkStore) Get(ctx context.Context, scope Scope, addr SubmissionAddress, timestamp string) ([]HttpLinkItem, error) {
+	key, err := linkStoreKey(scope, addr, timestamp)
 	if err != nil {
 		return nil, err
 	}

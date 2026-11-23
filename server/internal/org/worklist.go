@@ -46,21 +46,39 @@ type WorklistJob struct {
 // Leaf statuses are unavailable | available | actionable | done.
 // SubmissionCounts is Domain Submission N per flat leaf taskId;
 // omitted when empty. Overview uses this for many-submit chrome without recap.
+// Finished is platform law: every submit: once Task is done (many ignored).
+// BlockedReasons carries blockedReason text for unavailable leaves only.
 type WorklistInstance struct {
 	ID               string                `json:"id"`
 	Label            string                `json:"label"`
 	Tasks            map[string]TaskStatus `json:"tasks"`
 	SubmissionCounts map[string]int        `json:"submissionCounts,omitempty"`
+	Finished         bool                  `json:"finished"`
+	BlockedReasons   map[string]string     `json:"blockedReasons,omitempty"`
 }
 
-// ProjectWorklist evaluates startsWhen into canStart + Task statuses, then scopes
-// canStart to first-Task readyWhen (omit ⇒ true; same Domain grammar as Commit)
-// and OperatorIdentity Config-role intersection with the Job's first Task
-// (board chrome; not Cerbos). submit: once (default) is done after Submission on
-// the instance; submit: many never becomes done from one Commit (ADR-0008).
+// ProjectWorklist evaluates startsWhen into canStart + Task statuses for one Org
+// stream instance, keeping only member Job instances (§3 / §4). canStart first-Task
+// readyWhen and leaf readyWhen/blockedReason bind $stream. submit: once (default)
+// is done after Submission; submit: many never becomes done from one Commit (ADR-0008).
 // Not-done leaves fold readyWhen (false ⇒ unavailable), else split by role
 // eligibility into available vs actionable (ADR-0005).
-func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
+func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity, streamInstanceID string) Worklist {
+	return projectWorklist(cfg, domain, op, streamBindingFrom(cfg, streamInstanceID), true)
+}
+
+// ProjectWorklistAll is the unfiltered board (QR resolve, stream list, Play).
+// Prefer ProjectWorklist when an instance id is known.
+func ProjectWorklistAll(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
+	return projectWorklistUnfiltered(cfg, domain, op)
+}
+
+func projectWorklistUnfiltered(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
+	// Bind $stream.key (no id) so Play / plant-wide projection can still read the stream slug.
+	return projectWorklist(cfg, domain, op, streamBindingFrom(cfg, ""), false)
+}
+
+func projectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity, stream *streamBinding, filterMembers bool) Worklist {
 	out := Worklist{Jobs: make([]WorklistJob, 0, cfg.Jobs.Len())}
 	for _, jobID := range cfg.Jobs.Keys {
 		jobVal, ok := cfg.Jobs.Get(jobID)
@@ -71,25 +89,31 @@ func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist
 		if !ok {
 			continue
 		}
-		out.Jobs = append(out.Jobs, projectWorklistJob(cfg, domain, jobID, job, op))
+		out.Jobs = append(out.Jobs, projectWorklistJob(cfg, domain, jobID, job, op, stream, filterMembers))
 	}
 	return out
 }
 
-func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op OperatorIdentity) WorklistJob {
+func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op OperatorIdentity, stream *streamBinding, filterMembers bool) WorklistJob {
 	refTask := referencedStartsWhenTask(cfg, job.StartsWhen)
 	canStart := CanStartJob(job, jobID, domain.Submissions, domain.JobInstances, refTask)
 
 	ordered := OrderedTaskIDs(job.Tasks)
 	chrome := projectWorklistTasks(job.Tasks, ordered)
-	// Provisional start has no instance yet; evaluate first-Task readyWhen over Domain only.
+	// Provisional start has no instance yet; evaluate first-Task readyWhen over Domain (+ $stream).
 	if canStart && len(ordered) > 0 {
 		if tc, ok := TaskByID(job.Tasks, ordered[0]); ok &&
-			!readyWhenOkForCommit(domain, taskPayload(tc), "", cfg.Catalogs) {
+			!readyWhenOkForCommit(domain, taskPayload(tc), "", cfg.Catalogs, stream) {
 			canStart = false
 		}
 	}
 	if canStart && (len(chrome) == 0 || !rolesIntersect(op.Roles, chrome[0].Roles)) {
+		canStart = false
+	}
+	// Instance-scoped Worklist: anchor canStart would open a sibling stream
+	// instance; Play owns that affordance (ADR-0014 / #361).
+	if canStart && filterMembers && stream != nil && stream.ID != "" &&
+		cfg.Stream != nil && jobID == cfg.Stream.Instance.Job {
 		canStart = false
 	}
 
@@ -98,23 +122,43 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 		if inst.JobID != jobID {
 			continue
 		}
+		if filterMembers {
+			streamID := ""
+			if stream != nil {
+				streamID = stream.ID
+			}
+			if !JobInstanceBelongsToStream(cfg, domain, jobID, inst.ID, streamID) {
+				continue
+			}
+		}
 		tasks := make(map[string]TaskStatus, len(ordered))
+		blocked := map[string]string{}
 		for i, taskID := range ordered {
 			tc, ok := TaskByID(job.Tasks, taskID)
 			path := projectTaskStatus(cfg, domain, jobID, taskID, inst.ID)
 			status := path
 			if ok {
-				status = foldReadyWhen(domain, path, tc, inst.ID, cfg.Catalogs)
+				status = foldReadyWhen(domain, path, tc, inst.ID, cfg.Catalogs, stream)
+				if status == TaskStatusUnavailable {
+					if reason := evaluateBlockedReason(domain, taskPayload(tc), inst.ID, cfg.Catalogs, stream); reason != "" {
+						blocked[taskID] = reason
+					}
+				}
 			}
 			eligible := i < len(chrome) && rolesIntersect(op.Roles, chrome[i].Roles)
 			tasks[taskID] = viewerScopedStatus(status, eligible)
 		}
-		instances = append(instances, WorklistInstance{
+		wlInst := WorklistInstance{
 			ID:               inst.ID,
 			Label:            inst.Label,
 			Tasks:            tasks,
 			SubmissionCounts: countFlatLeafSubmissions(domain.Submissions, jobID, inst.ID),
-		})
+		}
+		if len(blocked) > 0 {
+			wlInst.BlockedReasons = blocked
+		}
+		wlInst.Finished = worklistInstanceIsFinished(job, wlInst)
+		instances = append(instances, wlInst)
 	}
 
 	return WorklistJob{
@@ -165,14 +209,56 @@ func pathAvailabilityStatus(ev PathAvailability) TaskStatus {
 // foldReadyWhen applies Task readyWhen after path says available-not-done.
 // Same semantics as Commit (readyWhenOkForCommit): omit/blank ⇒ true; fail ⇒ false.
 // False ⇒ unavailable (caller must not role-split).
-func foldReadyWhen(domain Domain, path TaskStatus, task TaskConfig, jobInstanceID string, catalogs map[string]any) TaskStatus {
+func foldReadyWhen(domain Domain, path TaskStatus, task TaskConfig, jobInstanceID string, catalogs map[string]any, stream ...*streamBinding) TaskStatus {
 	if path != TaskStatusAvailable {
 		return path
 	}
-	if !readyWhenOkForCommit(domain, taskPayload(task), jobInstanceID, catalogs) {
+	if !readyWhenOkForCommit(domain, taskPayload(task), jobInstanceID, catalogs, stream...) {
 		return TaskStatusUnavailable
 	}
 	return path
+}
+
+// worklistInstanceIsFinished matches SPA worklist-overview: every submit: once
+// Task is done; submit: many is ignored; no Tasks ⇒ not finished.
+func worklistInstanceIsFinished(job Job, inst WorklistInstance) bool {
+	ordered := OrderedTaskIDs(job.Tasks)
+	if len(ordered) == 0 {
+		return false
+	}
+	for _, tid := range ordered {
+		tc, ok := TaskByID(job.Tasks, tid)
+		if ok && taskSubmitMany(tc) {
+			continue
+		}
+		if inst.Tasks[tid] != TaskStatusDone {
+			return false
+		}
+	}
+	return true
+}
+
+func evaluateBlockedReason(domain Domain, task map[string]any, jobInstanceID string, catalogs map[string]any, stream *streamBinding) string {
+	if task == nil {
+		return ""
+	}
+	raw, ok := task["blockedReason"]
+	if !ok || raw == nil {
+		return ""
+	}
+	expr, ok := raw.(string)
+	if !ok || strings.TrimSpace(expr) == "" {
+		return ""
+	}
+	value, err := evaluateExpr(expr, nil, domainBindingsWith(domain, jobInstanceID, catalogs, "", stream))
+	if err != nil || value == nil {
+		return ""
+	}
+	s, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return s
 }
 
 // viewerScopedStatus maps path Available into actionable when the viewer
@@ -287,9 +373,10 @@ func worklistInstanceHasRemainingWork(cfg OrgConfig, wl Worklist, jobID, jobInst
 
 // ActionableTaskRef addresses one Worklist-actionable Task on an instance.
 type ActionableTaskRef struct {
-	JobID         string
-	TaskID        string
-	JobInstanceID string
+	JobID            string
+	TaskID           string
+	JobInstanceID    string
+	StreamInstanceID string // HTTP/instance scope; used when ResolveStreamInstanceID is empty (provisional)
 }
 
 // CollectActionableTaskRefs walks Worklist in Org Config Job order: provisional

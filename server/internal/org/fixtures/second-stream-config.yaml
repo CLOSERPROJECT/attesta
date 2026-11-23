@@ -1,0 +1,39 @@
+# Minimal second Org stream Config for isolation tests (#303/#304/#309). Not seeded for demo.
+id: second-stream-config
+org: second-org
+domain:
+    entities:
+        item:
+            fields: [label]
+stream:
+    key: other
+    title: Other stream
+    description: Minimal fixture for cross-stream isolation tests
+    instance:
+        job: work
+    steps:
+        - job: work
+steps:
+    work:
+        repeatable: true
+        title: Work
+        startLabel: Start
+        instanceId: $.id
+        label: $.id
+        substeps:
+            - id: start
+              roles: [operator]
+              schema:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                      id: {type: string, minLength: 1}
+                  required: [id]
+              onSubmit:
+                  transform:
+                      - op: mint
+                        entity: item
+                        as: item
+                        id: $.id
+                        set:
+                            label: $.id

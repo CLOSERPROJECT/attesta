@@ -13,7 +13,7 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 
-	list, err := loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	list, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "truckArrive",
 	})
 	if err != nil {
@@ -72,7 +72,7 @@ func TestLoadTaskRecapManySubmitOldestFirstWithPerRowLinks(t *testing.T) {
 	_ = commitLotRegister(t, c, truckID, lot2)
 
 	addr := SubmissionAddress{JobID: "intake", JobInstanceID: truckID, TaskID: "register"}
-	list, err := loader.LoadTaskRecap(t.Context(), "feragame", addr)
+	list, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,21 +102,21 @@ func TestLoadTaskRecapRejectsNotDoneAndUnknown(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 
-	_, err := loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	_, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "register",
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("not-done register = %v, want ErrNotFound", err)
 	}
 
-	_, err = loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	_, err = loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: "no-such", TaskID: "truckArrive",
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown instance = %v, want ErrNotFound", err)
 	}
 
-	_, err = loader.LoadTaskRecap(t.Context(), "feragame", SubmissionAddress{
+	_, err = loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "",
 	})
 	if err == nil || errors.Is(err, ErrNotFound) {
@@ -150,7 +150,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?jobId=intake&taskId=register&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=register&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("register recap status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -165,7 +165,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("flat recap = %d", rec.Code)
 	}
@@ -179,13 +179,13 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?jobId=intake&taskId=weightCheck&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=weightCheck&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("not done = %d, want 404", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?stream=recycling&instance="+truckID+"&taskId=truckArrive", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("missing params = %d", rec.Code)
 	}
@@ -199,7 +199,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	logH.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logistic recap = %d body=%s", rec.Code, rec.Body.String())
 	}
