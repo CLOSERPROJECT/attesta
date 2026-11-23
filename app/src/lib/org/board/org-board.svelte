@@ -112,16 +112,6 @@
 		)
 	);
 	const actionableOnlyEmpty = $derived(!showAll && !hasActionable && !play);
-	const filterRootClass = $derived(
-		[
-			'js-show-all-filter-root',
-			'stream-show-all-filter-root',
-			!showAll ? 'is-actionable-only' : '',
-			actionableOnlyEmpty ? 'is-actionable-only-empty' : ''
-		]
-			.filter(Boolean)
-			.join(' ')
-	);
 
 	const dashboardHref = $derived(orgMyStreamDashboardPath(stream));
 	const titleText = $derived(streamTitle || stream);
@@ -623,11 +613,20 @@
 
 		{#if view}
 			<div class="process-stream-block">
-				<div class={filterRootClass}>
+				<div
+					class={[
+						'js-show-all-filter-root stream-show-all-filter-root',
+						!showAll && 'is-actionable-only',
+						actionableOnlyEmpty && 'is-actionable-only-empty'
+					]}
+				>
 					<div
-						class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground {!actionableOnlyEmpty
-							? 'hidden'
-							: ''}"
+						class={[
+							'stream-show-all-filter-empty rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground',
+							actionableOnlyEmpty
+								? 'flex flex-col items-center justify-center'
+								: 'hidden'
+						]}
 					>
 						<p class="m-0 text-xs font-medium leading-5 text-muted-foreground">No matching tasks</p>
 						<p class="m-0 text-xs leading-4 text-muted-foreground">
