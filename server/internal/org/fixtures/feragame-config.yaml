@@ -228,7 +228,7 @@ steps:
                         (
                           $dateStamp := $substring($replace($today, '-', ''), 2);
                           $prefix := $.client & '-' & $dateStamp & '-';
-                          $count($filter($domain.lot.*, function($v){$substring($string($v.id), 0, $length($prefix)) = $prefix})) + 1
+                          $count($filter($keys($domain.lot), function($k){ $substring($string($k), 0, $length($prefix)) = $prefix })) + 1
                         )
                 lotNetWeight:
                     kind: readonly
@@ -248,7 +248,7 @@ steps:
                         (
                           $dateStamp := $substring($replace($today, '-', ''), 2);
                           $prefix := $.client & '-' & $dateStamp & '-';
-                          $n := $count($filter($domain.lot.*, function($v){$substring($string($v.id), 0, $length($prefix)) = $prefix})) + 1;
+                          $n := $count($filter($keys($domain.lot), function($k){ $substring($string($k), 0, $length($prefix)) = $prefix })) + 1;
                           $.client & '-' & $dateStamp & '-' & $string($n)
                         )
                       set:
@@ -257,7 +257,7 @@ steps:
                           (
                             $dateStamp := $substring($replace($today, '-', ''), 2);
                             $prefix := $.client & '-' & $dateStamp & '-';
-                            $count($filter($domain.lot.*, function($v){$substring($string($v.id), 0, $length($prefix)) = $prefix})) + 1
+                            $count($filter($keys($domain.lot), function($k){ $substring($string($k), 0, $length($prefix)) = $prefix })) + 1
                           )
                         numeroFir: $.numeroFir
                         wasteCode: $.wasteCode
