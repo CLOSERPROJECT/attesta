@@ -20,7 +20,7 @@
 	import { runQrScan } from '#lib/org/qr-scan-flow.js';
 	import { orgToast } from '#lib/org/toast.svelte.js';
 	import { Badge } from '#lib/shadcn/ui/badge/index.js';
-	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
+	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import { navigateOrgTarget } from '#lib/router/navigate-target.js';
 	import { route } from '#lib/router/index.js';
 
@@ -113,25 +113,35 @@
 				>
 					<ArrowLeft class="size-4" />
 				</Button>
-			{:else}
-				<span
-					class={buttonVariants({ variant: 'outline', size: 'icon' })}
-					data-testid="nav-home-mark"
-				>
-					<img src={attestaMark} alt={m.brand_attesta()} class="size-5" />
-				</span>
-			{/if}
-
-			<div class="min-w-0 text-left" data-testid="nav-place">
-				{#if place.jobTitleLine}
-					<p class="truncate text-xs text-zinc-500" data-testid="nav-place-job-title">
-						{place.jobTitleLine}
+				<div class="min-w-0 text-left" data-testid="nav-place">
+					{#if place.jobTitleLine}
+						<p class="truncate text-xs text-zinc-500" data-testid="nav-place-job-title">
+							{place.jobTitleLine}
+						</p>
+					{/if}
+					<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
+						{place.primaryLabel}
 					</p>
-				{/if}
-				<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
-					{place.primaryLabel}
-				</p>
-			</div>
+				</div>
+			{:else}
+				<a
+					href="/"
+					class="inline-flex min-w-0 items-center gap-1 text-zinc-900 no-underline hover:no-underline"
+					data-testid="nav-brand"
+				>
+					<img
+						src={attestaMark}
+						alt=""
+						aria-hidden="true"
+						width="32"
+						height="32"
+						class="size-8 shrink-0 -translate-y-0.5 object-contain"
+					/>
+					<span class="text-base font-semibold leading-none tracking-[0.01em]">
+						{m.brand_attesta()}
+					</span>
+				</a>
+			{/if}
 		</div>
 
 		<div class="flex shrink-0 items-center gap-2">
