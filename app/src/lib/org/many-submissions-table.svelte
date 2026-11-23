@@ -4,6 +4,7 @@
 		factTitle,
 		formatSubmissionTimestamp,
 		formatSubmissionUser,
+		recapRowMatchesSubmissionId,
 		unionFactKeys
 	} from './submission-table.js';
 	import type { TaskRecap } from './task-recap-port.js';
@@ -11,10 +12,16 @@
 
 	type Props = {
 		items: TaskRecap[];
+		/** Just-completed Commit submissionId (Submission.timestamp) to highlight. */
+		highlightSubmissionId?: string;
 		'data-testid'?: string;
 	};
 
-	let { items, 'data-testid': testId = 'many-submissions-table' }: Props = $props();
+	let {
+		items,
+		highlightSubmissionId,
+		'data-testid': testId = 'many-submissions-table'
+	}: Props = $props();
 
 	const columns = $derived(unionFactKeys(items));
 </script>
@@ -36,7 +43,18 @@
 			</thead>
 			<tbody>
 				{#each items as item, index (`${item.timestamp}:${item.jobInstanceId}:${index}`)}
-					<tr class="border-b border-zinc-100 last:border-0">
+					{@const highlighted = recapRowMatchesSubmissionId(
+						item,
+						highlightSubmissionId
+					)}
+					<tr
+						class={[
+							'border-b border-zinc-100 last:border-0',
+							highlighted && 'bg-sky-50'
+						]}
+						data-just-completed={highlighted ? '1' : undefined}
+						data-testid={highlighted ? 'many-recap-just-completed' : undefined}
+					>
 						{#each columns as key (key)}
 							<td class="px-2 py-2 text-zinc-900">
 								{formatFactValue(item.facts[key])}

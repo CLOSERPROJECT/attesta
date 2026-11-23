@@ -37,6 +37,11 @@ export type ContinueNavigation = 'task' | 'overview' | 'home';
 export type CommitResult = {
 	org: string;
 	jobInstanceId: string;
+	/**
+	 * Domain Submission timestamp for this Commit (many-recap row key).
+	 * Omitted when the wire lacks a string id.
+	 */
+	submissionId?: string;
 	/** Server-projected board after this Commit (same projector as Load). */
 	worklist: Worklist;
 	/** Explicit destination: stay | task | overview | home. */
@@ -56,6 +61,8 @@ export type CommitResult = {
 
 export type CommitOutcome = {
 	jobInstanceId: string;
+	/** Domain Submission timestamp; matches TaskRecap.timestamp for row highlight. */
+	submissionId?: string;
 	worklist: Worklist;
 	navigation: CommitNavigation;
 	continueNavigation: ContinueNavigation | null;

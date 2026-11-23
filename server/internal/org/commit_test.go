@@ -205,6 +205,10 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if wire["jobInstanceId"] != "261029-1" {
 		t.Fatalf("jobInstanceId = %#v", wire["jobInstanceId"])
 	}
+	sid, _ := wire["submissionId"].(string)
+	if sid == "" {
+		t.Fatalf("submissionId missing: %#v", wire)
+	}
 	if _, has := wire["domain"]; has {
 		t.Fatalf("Commit JSON must omit domain: %#v", wire["domain"])
 	}
@@ -216,6 +220,9 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	domain, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(domain.Submissions) == 0 || domain.Submissions[0].Timestamp != sid {
+		t.Fatalf("submissionId = %q domain.Submissions = %#v", sid, domain.Submissions)
 	}
 	truck := domain.Kind("truck")["261029-1"]
 	if truck["truckWeight"] != 1000.0 {

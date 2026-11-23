@@ -14,9 +14,13 @@ export type BoardEmbedApi = {
 	isEmbedOpen: (addr: TaskAddress) => boolean;
 	setEmbedOpen: (addr: TaskAddress, open: boolean) => void;
 	toggleEmbedOpen: (addr: TaskAddress) => boolean;
-	stayedFor: (addr: TaskAddress) => CommitOutcome | null;
-	onCommitted: (addr: TaskAddress, outcome: CommitOutcome) => void;
-	onContinue: (addr: TaskAddress) => void;
+	/** Stay Commit confirmation: once-recap / many Recap tab cue. */
+	confirmRecapFor: (addr: TaskAddress) => boolean;
+	onCommitted: (
+		addr: TaskAddress,
+		outcome: CommitOutcome,
+		opts?: { submitMany?: boolean }
+	) => void;
 };
 
 export const [getBoardEmbed, setBoardEmbed] = createContext<BoardEmbedApi>();

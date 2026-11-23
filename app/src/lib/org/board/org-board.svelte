@@ -7,9 +7,7 @@
 	import type { CommitOutcome } from '../commit-port.js';
 	import {
 		applyCommitFollowThrough,
-		applyContinueFollowThrough,
-		decideCommitFollowThrough,
-		decideContinueFollowThrough
+		decideCommitFollowThrough
 	} from '../commit-follow-through.js';
 	import { orgSession } from '../org-app.svelte.js';
 	import { fetchStreamTitle } from '../stream-meta.js';
@@ -51,6 +49,7 @@
 		setBoardNestCollapse
 	} from './board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from './embedded-task-panel.svelte';
+	import { stayAftermath } from './commit-stay-recap.js';
 	import {
 		addressFromBoardTask,
 		BOARD_TASK_SEARCH_KEY,
@@ -121,8 +120,8 @@
 	/** After a deep-link gate deny, do not auto-focus first actionable. */
 	let suppressAutoFocus = $state(false);
 
-	/** Stay UI keyed by address. */
-	let stayedByKey = $state.raw<Record<string, CommitOutcome>>({});
+	/** Stay Commit → land on once-recap / Recap tab (keyed by address). */
+	let confirmRecapByKey = $state.raw<Record<string, true>>({});
 
 	const scopeKey = $derived(session.scopeKey);
 
@@ -145,6 +144,10 @@
 	const actionableOnlyEmpty = $derived(model.isEmpty);
 
 	function setFocus(addr: TaskAddress) {
+		const prev = focusedAddress;
+		if (prev && taskAddressKey(prev) !== taskAddressKey(addr)) {
+			clearConfirmRecap(prev);
+		}
 		model.select(addr);
 		const el = document.querySelector(
 			`[data-address-key="${CSS.escape(taskAddressKey(addr))}"]`
@@ -153,6 +156,7 @@
 	}
 
 	function clearFocus() {
+		clearConfirmRecap();
 		model.clearSelection();
 	}
 
@@ -166,20 +170,27 @@
 		return boardFormCache.get(taskAddressKey(addr));
 	}
 
-	function stayedFor(addr: TaskAddress): CommitOutcome | null {
-		return stayedByKey[taskAddressKey(addr)] ?? null;
+	function confirmRecapFor(addr: TaskAddress): boolean {
+		return confirmRecapByKey[taskAddressKey(addr)] === true;
 	}
 
-	function clearStay(addr?: TaskAddress) {
+	function markConfirmRecap(addr: TaskAddress) {
+		const key = taskAddressKey(addr);
+		if (key in confirmRecapByKey) return;
+		confirmRecapByKey = { ...confirmRecapByKey, [key]: true };
+	}
+
+	function clearConfirmRecap(addr?: TaskAddress) {
 		if (!addr) {
-			stayedByKey = {};
+			if (Object.keys(confirmRecapByKey).length === 0) return;
+			confirmRecapByKey = {};
 			return;
 		}
 		const key = taskAddressKey(addr);
-		if (!(key in stayedByKey)) return;
-		const next = { ...stayedByKey };
+		if (!(key in confirmRecapByKey)) return;
+		const next = { ...confirmRecapByKey };
 		delete next[key];
-		stayedByKey = next;
+		confirmRecapByKey = next;
 	}
 
 	function refreshRecap(addr: TaskAddress) {
@@ -188,16 +199,29 @@
 		boardRecapCache.enqueue([addr]);
 	}
 
-	function onCommitted(addr: TaskAddress, outcome: CommitOutcome) {
+	function pinAfterCommit(addr: TaskAddress, outcome: CommitOutcome) {
+		model.pinJustCompleted(addr, outcome.submissionId);
+	}
+
+	function onCommitted(
+		addr: TaskAddress,
+		outcome: CommitOutcome,
+		opts?: { submitMany?: boolean }
+	) {
 		const decision = decideCommitFollowThrough(outcome, addr);
+		pinAfterCommit(addr, outcome);
+		refreshRecap(addr);
 		if (decision.kind === 'stay') {
-			stayedByKey = { ...stayedByKey, [taskAddressKey(addr)]: outcome };
-			refreshRecap(addr);
+			// confirmRecap = landing surface; beginFreshDraft = Form draft identity.
+			const aftermath = stayAftermath(Boolean(opts?.submitMany));
+			if (aftermath.freshDraft) {
+				boardFormCache.beginFreshDraft(addr);
+			}
+			markConfirmRecap(addr);
 			return;
 		}
-		refreshRecap(addr);
 
-		clearStay(addr);
+		clearConfirmRecap(addr);
 		const target = decision.target;
 
 		if (target.kind === 'task') {
@@ -252,37 +276,6 @@
 		});
 	}
 
-	async function onContinue(addr: TaskAddress) {
-		const outcome = stayedFor(addr);
-		if (!outcome) return;
-		const decision = decideContinueFollowThrough(outcome, addr);
-		clearStay(addr);
-		await applyContinueFollowThrough(decision, {
-			clearLinksStay: () => orgSession.clearLinksStay(),
-			navigate: (t) => {
-				if (t.kind === 'task') {
-					const nextAddr = normalizeTaskAddress(t);
-					if (outcome.nextTaskFormBundle) {
-						boardFormCache.putReady(nextAddr, outcome.nextTaskFormBundle);
-					}
-					setFocus(nextAddr);
-					void session.reload();
-					return;
-				}
-				if (t.kind === 'home') {
-					clearFocus();
-					void session.reload();
-					return;
-				}
-				navigateOrgTarget(t);
-			},
-			reload: async () => {
-				boardFormCache.invalidate(taskAddressKey(addr));
-				boardFormCache.enqueue([addr]);
-			}
-		});
-	}
-
 	const boardApi: BoardEmbedApi = {
 		getEntry,
 		get focus() {
@@ -301,9 +294,8 @@
 		toggleEmbedOpen(addr) {
 			return model.toggleBody(addr);
 		},
-		stayedFor,
-		onCommitted,
-		onContinue
+		confirmRecapFor,
+		onCommitted
 	};
 	setBoardEmbed(boardApi);
 
@@ -478,12 +470,11 @@
 					address={orphanFocus}
 					entry={getEntry(orphanFocus)}
 					focused={true}
-					stayedOutcome={stayedFor(orphanFocus)}
+					confirmRecap={confirmRecapFor(orphanFocus)}
 					open={model.isBodyOpen(orphanFocus)}
 					onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
 					onFocus={() => setFocus(orphanFocus)}
 					onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
-					onContinue={() => onContinue(orphanFocus)}
 				/>
 			</section>
 		{/if}

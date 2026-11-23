@@ -49,3 +49,12 @@ export function factTitle(items: readonly TaskRecap[], key: string): string {
 	}
 	return key;
 }
+
+/** True when this recap row is the Commit submissionId (Submission.timestamp). */
+export function recapRowMatchesSubmissionId(
+	item: Pick<TaskRecap, 'timestamp'>,
+	submissionId: string | undefined | null
+): boolean {
+	if (submissionId == null || submissionId === '') return false;
+	return item.timestamp === submissionId;
+}

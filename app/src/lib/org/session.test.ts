@@ -147,6 +147,7 @@ describe('OrgSession', () => {
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
+			submissionId: '2026-11-13T12:00:01Z',
 			worklist: nextWorklist,
 			navigation: 'overview' as const,
 			nextTaskFormBundle: null
@@ -167,6 +168,7 @@ describe('OrgSession', () => {
 			mint: { kind: 'none' }
 		});
 		expect(outcome?.jobInstanceId).toBe('NIR-1');
+		expect(outcome?.submissionId).toBe('2026-11-13T12:00:01Z');
 		expect(outcome?.navigation).toBe('overview');
 		expect(outcome?.nextTaskFormBundle).toBeNull();
 		expect(session.result?.worklist).toEqual(nextWorklist);

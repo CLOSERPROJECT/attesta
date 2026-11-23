@@ -15,6 +15,12 @@ export type BoardFormEntry = {
 	status: BoardFormEntryStatus;
 	bundle: TaskFormBundle | null;
 	error: string | null;
+	/**
+	 * Form draft identity for this address. Advances on beginFreshDraft after a
+	 * stay submitMany Commit so the embed remounts against a cleared draft bag.
+	 * Pre-submit Form↔Recap toggles do not change this.
+	 */
+	draftGeneration: number;
 };
 
 export type BoardFormCacheOptions = {
@@ -91,7 +97,8 @@ export class BoardFormCache {
 				address: addr,
 				status: 'idle',
 				bundle: null,
-				error: null
+				error: null,
+				draftGeneration: 0
 			});
 		}
 		this.#pump();
@@ -104,17 +111,39 @@ export class BoardFormCache {
 		this.#controllers.delete(key);
 		this.#queued.delete(key);
 		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
+		const priorGen = this.entries[key]?.draftGeneration ?? 0;
 		const entry: BoardFormEntry = {
 			key,
 			address: addr,
 			status: 'ready',
 			bundle,
-			error: null
+			error: null,
+			draftGeneration: priorGen
 		};
 		this.#setEntry(entry);
 		// Carry across the next beginScope (soft-nav remount).
 		this.#carryReady = this.#carryReady.filter((e) => e.key !== key);
 		this.#carryReady.push(entry);
+	}
+
+	/**
+	 * Stay submitMany Commit consumed the operator draft for this address.
+	 * Advance draftGeneration so Form remounts on the cleared bag; keep the ready bundle.
+	 * No-op when the address is not cached (nothing to re-bind).
+	 */
+	beginFreshDraft(addr: TaskAddress): void {
+		const key = taskAddressKey(addr);
+		const existing = this.entries[key];
+		if (!existing) return;
+		const entry: BoardFormEntry = {
+			...existing,
+			draftGeneration: existing.draftGeneration + 1
+		};
+		this.#setEntry(entry);
+		if (entry.status === 'ready' && entry.bundle) {
+			this.#carryReady = this.#carryReady.filter((e) => e.key !== key);
+			this.#carryReady.push(entry);
+		}
 	}
 
 	invalidate(key: string): void {
@@ -165,12 +194,14 @@ export class BoardFormCache {
 		const ac = new AbortController();
 		this.#controllers.set(key, ac);
 		this.#inflight += 1;
+		const draftGeneration = this.entries[key]?.draftGeneration ?? 0;
 		this.#setEntry({
 			key,
 			address: addr,
 			status: 'loading',
 			bundle: null,
-			error: null
+			error: null,
+			draftGeneration
 		});
 
 		try {
@@ -187,7 +218,8 @@ export class BoardFormCache {
 				address: addr,
 				status: 'ready',
 				bundle,
-				error: null
+				error: null,
+				draftGeneration: this.entries[key]?.draftGeneration ?? draftGeneration
 			});
 		} catch (err) {
 			if (gen !== this.#gen || ac.signal.aborted) return;
@@ -197,7 +229,8 @@ export class BoardFormCache {
 				address: addr,
 				status: 'error',
 				bundle: null,
-				error: message
+				error: message,
+				draftGeneration: this.entries[key]?.draftGeneration ?? draftGeneration
 			});
 		} finally {
 			this.#controllers.delete(key);

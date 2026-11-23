@@ -107,14 +107,21 @@ export function parseCommitResult(raw: unknown): CommitResult {
 					(raw as { continueNavigation?: unknown })?.continueNavigation
 				)
 			: null;
+	const submissionRaw = (raw as { submissionId?: unknown })?.submissionId;
+	const submissionId =
+		typeof submissionRaw === 'string' && submissionRaw.trim() !== ''
+			? submissionRaw
+			: undefined;
+	const { submissionId: _dropSubmissionId, ...rest } = body;
 	return {
-		...body,
+		...rest,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
 		navigation,
 		continueNavigation,
 		nextTaskFormBundle: nextBundle,
 		links,
-		httpErrors
+		httpErrors,
+		...(submissionId !== undefined ? { submissionId } : {})
 	};
 }
 

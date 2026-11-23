@@ -1,7 +1,6 @@
 <script lang="ts">
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
 	import HistoryIcon from '@lucide/svelte/icons/history';
-	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Tabs from '#lib/shadcn/ui/tabs/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -13,6 +12,7 @@
 	import BoardManyRecap from './board-many-recap.svelte';
 	import BoardOnceRecap from './board-once-recap.svelte';
 	import type { BoardFormEntry } from './board-form-cache.svelte.js';
+	import { stayConfirmSurface } from './commit-stay-recap.js';
 
 	type Tab = 'form' | 'recap';
 
@@ -23,12 +23,12 @@
 		submissions?: TimelineSubmission[];
 		focused?: boolean;
 		disabled?: boolean;
-		stayedOutcome?: CommitOutcome | null;
+		/** Stay Commit: land on once-recap / Recap tab (no under-form Continue). */
+		confirmRecap?: boolean;
 		open?: boolean;
 		tab?: Tab;
 		onOpenChange?: (open: boolean) => void;
 		onCommitted?: (outcome: CommitOutcome) => void;
-		onContinue?: () => void;
 		onFocus?: () => void;
 	};
 
@@ -39,12 +39,11 @@
 		submissions = [],
 		focused = false,
 		disabled = false,
-		stayedOutcome = null,
+		confirmRecap = false,
 		open = true,
 		tab = $bindable<Tab>('form'),
 		onOpenChange,
 		onCommitted,
-		onContinue,
 		onFocus
 	}: Props = $props();
 
@@ -57,10 +56,24 @@
 		return boardRecapCache.get(key);
 	});
 	const showOnceRecap = $derived(
-		Boolean(stayedOutcome) ||
+		Boolean(confirmRecap) ||
 			(recapEntry?.status === 'ready' && (recapEntry.items.length ?? 0) > 0)
 	);
-	const manyEmpty = $derived(submissions.length === 0 && !stayedOutcome);
+	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
+
+	/** One-shot: stay → Recap tab once; user may switch back to Form. */
+	let landedManyRecap = $state(false);
+	$effect(() => {
+		if (!confirmRecap) {
+			landedManyRecap = false;
+			return;
+		}
+		if (stayConfirmSurface(submitMany) !== 'many-recap-tab') return;
+		if (landedManyRecap) return;
+		landedManyRecap = true;
+		tab = 'recap';
+		onOpenChange?.(true);
+	});
 
 	function selectTab(next: Tab) {
 		tab = next;
@@ -76,6 +89,7 @@
 	data-focused={focused ? '1' : '0'}
 	data-tab={tab}
 	data-open={open ? '1' : '0'}
+	data-confirm-recap={confirmRecap ? '1' : '0'}
 >
 	<Tabs.Root bind:value={tab} class="w-full min-w-0 flex-col gap-0">
 		{#if open}
@@ -109,38 +123,28 @@
 
 			<div class="substep-org-body w-full min-w-0 gap-2" data-testid="embed-panel-body">
 				<Tabs.Content value="form" class="outline-none" data-testid="embed-form-pane">
-					{#if status === 'loading' || status === 'idle'}
+					{#if !submitMany && confirmRecap}
+						<BoardOnceRecap {address} data-testid="embed-once-recap" />
+					{:else if status === 'loading' || status === 'idle'}
 						<p class="m-0 text-secondary-foreground" data-testid="embed-form-skeleton">{m.loading()}</p>
 					{:else if status === 'error'}
 						<p class="text-sm text-red-700" data-testid="embed-form-error" role="alert">
 							{error}
 						</p>
 					{:else if status === 'ready' && bundle}
-						<TaskForm
-							stream={address.stream}
-							instance={address.instance}
-							jobId={address.jobId}
-							taskId={address.taskId}
-							jobInstanceId={address.jobInstanceId}
-							{bundle}
-							provisionalJob={address.provisionalJob}
-							disabled={disabled || Boolean(stayedOutcome)}
-							onCommitted={(outcome) => onCommitted?.(outcome)}
-						/>
-						{#if stayedOutcome}
-							<div class="space-y-3" data-testid="task-links-stay">
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									class="bg-[var(--input)]"
-									data-testid="task-links-continue"
-									onclick={() => onContinue?.()}
-								>
-									{m.continue()}
-								</Button>
-							</div>
-						{/if}
+						{#key entry?.draftGeneration ?? 0}
+							<TaskForm
+								stream={address.stream}
+								instance={address.instance}
+								jobId={address.jobId}
+								taskId={address.taskId}
+								jobInstanceId={address.jobInstanceId}
+								{bundle}
+								provisionalJob={address.provisionalJob}
+								{disabled}
+								onCommitted={(outcome) => onCommitted?.(outcome)}
+							/>
+						{/key}
 						{#if !submitMany && showOnceRecap}
 							<BoardOnceRecap {address} data-testid="embed-once-recap" />
 						{/if}

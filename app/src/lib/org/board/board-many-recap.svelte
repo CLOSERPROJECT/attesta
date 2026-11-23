@@ -4,7 +4,9 @@
 	import ManySubmissionsTable from '../many-submissions-table.svelte';
 	import { taskAddressKey, type TaskAddress } from '../task-address.js';
 	import { formatSubmissionCount } from '../worklist-overview.js';
+	import { boardJustCompleted } from './board-just-completed.svelte.js';
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
+	import { pinSubmissionIdForAddress } from './just-completed-recap-row.js';
 
 	type Props = {
 		address: TaskAddress;
@@ -23,6 +25,10 @@
 		void boardRecapCache.entries;
 		return boardRecapCache.get(taskAddressKey(address));
 	});
+
+	const highlightSubmissionId = $derived.by(() =>
+		pinSubmissionIdForAddress(boardJustCompleted.get(), address)
+	);
 </script>
 
 <div data-testid={testId}>
@@ -43,6 +49,6 @@
 			{formatSubmissionCount(0)}
 		</p>
 	{:else}
-		<ManySubmissionsTable items={entry.items} />
+		<ManySubmissionsTable items={entry.items} {highlightSubmissionId} />
 	{/if}
 </div>

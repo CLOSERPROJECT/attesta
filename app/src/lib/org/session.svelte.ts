@@ -274,6 +274,9 @@ export class OrgSession {
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
+				...(committed.submissionId !== undefined
+					? { submissionId: committed.submissionId }
+					: {}),
 				worklist: committed.worklist,
 				navigation: committed.navigation,
 				continueNavigation: committed.continueNavigation ?? null,

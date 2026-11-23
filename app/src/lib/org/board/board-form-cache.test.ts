@@ -91,4 +91,38 @@ describe('BoardFormCache', () => {
 		expect(cache.get(taskAddressKey(a))).toBeUndefined();
 		cache.dispose();
 	});
+
+	test('beginFreshDraft advances draftGeneration and keeps ready bundle', () => {
+		const cache = createBoardFormCache({
+			taskForm: { fetch: async () => bundle('a') }
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		const ready = bundle('a');
+		cache.putReady(a, ready);
+		const before = cache.get(taskAddressKey(a));
+		expect(before?.status).toBe('ready');
+		expect(before?.draftGeneration).toBe(0);
+
+		cache.beginFreshDraft(a);
+
+		const after = cache.get(taskAddressKey(a));
+		expect(after?.status).toBe('ready');
+		expect(after?.bundle).toBe(ready);
+		expect(after?.draftGeneration).toBe(1);
+
+		cache.beginFreshDraft(a);
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(2);
+		cache.dispose();
+	});
+
+	test('beginFreshDraft is a no-op when address has no entry', () => {
+		const cache = createBoardFormCache({
+			taskForm: { fetch: async () => bundle('a') }
+		});
+		cache.beginScope('s');
+		cache.beginFreshDraft(addr('missing'));
+		expect(cache.get(taskAddressKey(addr('missing')))).toBeUndefined();
+		cache.dispose();
+	});
 });

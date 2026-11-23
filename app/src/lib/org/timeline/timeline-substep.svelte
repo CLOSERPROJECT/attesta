@@ -53,7 +53,7 @@
 		if (!address) return undefined;
 		return boardFormCache.get(taskAddressKey(address));
 	});
-	const stayedOutcome = $derived(address ? board.stayedFor(address) : null);
+	const confirmRecap = $derived(address ? board.confirmRecapFor(address) : false);
 	const embedOpen = $derived(address ? timelineModel.isBodyOpen(address) : false);
 
 	let detailsOpen = $state(false);
@@ -122,12 +122,13 @@
 					submitMany={!!substep.submitMany}
 					{submissions}
 					{focused}
-					stayedOutcome={stayedOutcome}
+					{confirmRecap}
 					open={embedOpen}
 					onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}
 					onFocus={() => timelineModel.select(address)}
-					onCommitted={(outcome) => board.onCommitted(address, outcome)}
-					onContinue={() => board.onContinue(address)}
+					onCommitted={(outcome) =>
+						board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })
+					}
 				/>
 			</div>
 		</div>
