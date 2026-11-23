@@ -2,10 +2,13 @@
 	import { untrack } from 'svelte';
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
-	import type { VisibleStep } from '../board/board-timeline-model.svelte.js';
+	import {
+		getBoardTimelineModel,
+		type VisibleStep
+	} from '../board/board-timeline-model.svelte.js';
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import { displayStepTitle } from './outline-label.js';
-	import { streamStatusLabel } from './stream-status-label.js';
+	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
@@ -19,6 +22,7 @@
 	let { projected, stream = '', instance = '' }: Props = $props();
 
 	const nestCollapse = getBoardNestCollapse();
+	const timelineModel = getBoardTimelineModel();
 
 	const step = $derived(projected.step);
 	const stepDomId = $derived(`stream-timeline-step-${step.stepId}`);
@@ -27,6 +31,7 @@
 	const title = $derived(displayStepTitle(step.title));
 	const status = $derived(step.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
+	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
 	const visibleRows = $derived(projected.rows ?? []);
 	const visibleSubsteps = $derived(projected.substeps ?? []);
 
@@ -44,7 +49,7 @@
 		id={summaryDomId}
 		aria-labelledby={summaryDomId}
 	>
-		{#if status}
+		{#if showStatusChip}
 			<TimelineHeaderLine mark={stepMark} {title}>
 				{#snippet trail()}
 					<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>

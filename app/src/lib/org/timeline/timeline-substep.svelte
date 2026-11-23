@@ -11,7 +11,7 @@
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import { taskAddressKey } from '../task-address.js';
-	import { streamStatusLabel } from './stream-status-label.js';
+	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubmissions from './timeline-submissions.svelte';
 	import type { TimelineSubstep } from './types.js';
@@ -34,6 +34,7 @@
 	const headingId = $derived(`substep-${domId}-heading`);
 	const status = $derived(substep.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
+	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(status ? `substep-${status}` : '');
 
@@ -95,7 +96,7 @@
 				data-state={embedOpen ? 'open' : 'closed'}
 				onclick={toggleEmbed}
 			>
-				{#if status}
+				{#if showStatusChip}
 					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
 						{#snippet trail()}
 							<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
@@ -139,7 +140,7 @@
 			bind:open={detailsOpen}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
-				{#if status}
+				{#if showStatusChip}
 					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
 						{#snippet trail()}
 							<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>

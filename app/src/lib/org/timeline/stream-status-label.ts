@@ -17,3 +17,8 @@ export function streamStatusLabel(status: string): string {
 			return status;
 	}
 }
+
+/** Hide Available when the list is already filtered to actionable items. */
+export function streamStatusChipVisible(status: string, showAll: boolean): boolean {
+	return !(status === 'available' && !showAll);
+}

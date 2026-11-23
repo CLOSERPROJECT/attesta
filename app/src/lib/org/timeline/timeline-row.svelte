@@ -2,9 +2,12 @@
 	import { untrack } from 'svelte';
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
-	import type { VisibleRow } from '../board/board-timeline-model.svelte.js';
+	import {
+		getBoardTimelineModel,
+		type VisibleRow
+	} from '../board/board-timeline-model.svelte.js';
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
-	import { streamStatusLabel } from './stream-status-label.js';
+	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
 
@@ -17,11 +20,13 @@
 	let { projected, stream = '', instance = '' }: Props = $props();
 
 	const nestCollapse = getBoardNestCollapse();
+	const timelineModel = getBoardTimelineModel();
 
 	const row = $derived(projected.row);
 	const mark = $derived(projected.mark);
 	const status = $derived(row.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
+	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
 	const visibleSubsteps = $derived(projected.substeps);
 
 	let open = $state(Boolean(untrack(() => row.expanded)));
@@ -38,7 +43,7 @@
 	bind:open
 >
 	<Collapsible.Trigger class="stream-timeline-row-summary w-full items-center hover:no-underline">
-		{#if status}
+		{#if showStatusChip}
 			<TimelineHeaderLine {mark} title={row.label}>
 				{#snippet trail()}
 					<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
