@@ -45,6 +45,9 @@ func TestContainerRegSchemaExposesIncompleteDefaultFalse(t *testing.T) {
 func TestContainerRegSchemaDropsDualSourcesAndExposesContinuesContainerId(t *testing.T) {
 	schema := containerRegSchema(t)
 	props, _ := schema["properties"].(map[string]any)
+	if _, has := props["sourceLotId"]; has {
+		t.Fatal("schema property sourceLotId must be removed")
+	}
 	if _, has := props["secondarySourceLotId"]; has {
 		t.Fatal("secondarySourceLotId form enum must be removed")
 	}
@@ -67,8 +70,8 @@ func TestContainerRegSchemaDropsDualSourcesAndExposesContinuesContainerId(t *tes
 	if _, has := enums["secondarySourceLotId"]; has {
 		t.Fatal("enumReads.secondarySourceLotId must be removed")
 	}
-	if _, has := enums["sourceLotId"]; !has {
-		t.Fatal("enumReads.sourceLotId missing")
+	if _, has := enums["sourceLotId"]; has {
+		t.Fatal("enumReads.sourceLotId must be removed")
 	}
 	if _, has := reg["initialData"]; !has {
 		t.Fatal("containerReg.initialData missing")

@@ -344,7 +344,6 @@ func seedFinishLotWithDPP(ctx context.Context, c *TaskCommitter, scope Scope, lo
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: lotID,
 		Value: map[string]any{
-			"sourceLotId": lotID,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 100.0},
 			},

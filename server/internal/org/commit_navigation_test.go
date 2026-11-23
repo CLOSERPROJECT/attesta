@@ -96,7 +96,7 @@ func TestCloseLotStayOmitsTurnoTasks(t *testing.T) {
 		loadID + ".1": "done",
 		loadID + ".2": "done",
 	})
-	_ = commitContainerReg(t, c, loadID, containerRegValue(loadID, map[string][]any{
+	_ = commitContainerReg(t, c, loadID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 50.0}},
 	}))
 	closed := commitCloseLot(t, c, loadID)

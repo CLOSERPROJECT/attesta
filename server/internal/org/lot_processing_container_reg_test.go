@@ -12,8 +12,8 @@ func commitMarkProgressAllDone(t *testing.T, c *TaskCommitter, lotID, loadID str
 	})
 }
 
-func containerRegValue(loadID string, materials map[string][]any) map[string]any {
-	v := map[string]any{"sourceLotId": loadID}
+func containerRegValue(materials map[string][]any) map[string]any {
+	v := make(map[string]any, len(materials))
 	for k, rows := range materials {
 		v[k] = rows
 	}
@@ -69,7 +69,7 @@ func TestContainerRegActionableOnOpenLotWithoutMarkProgress(t *testing.T) {
 func TestCommitContainerRegMintsContainersLeavesLotOpen(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
-	result := commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
+	result := commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 80.0}},
 	}))
 	if result.Domain.Kind("lot")[loadID]["status"] != "open" {
@@ -87,10 +87,10 @@ func TestCommitContainerRegMintsContainersLeavesLotOpen(t *testing.T) {
 func TestContainerRegManySubmitSameOpenLot(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
+	_ = commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 40.0}},
 	}))
-	second := commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
+	second := commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"plastica": {map[string]any{"weight": 20.0}},
 	}))
 	var n int
@@ -109,8 +109,8 @@ func TestContainerRegManySubmitSameOpenLot(t *testing.T) {
 
 func TestContainerRegIncompleteContinuationPrefill(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
-	loadID, lotID := seedLotReadyAfterWeigh(t, c)
-	first := commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
+	_, lotID := seedLotReadyAfterWeigh(t, c)
+	first := commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 50.0, "incomplete": true}},
 	}))
 	var contID string
@@ -142,7 +142,7 @@ func TestContainerRegThenCloseLotPath(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 	commitMarkProgressAllDone(t, c, lotID, loadID)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
+	_ = commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 120.0}},
 		"plastica":       {map[string]any{"weight": 40.0}},
 	}))
@@ -199,7 +199,7 @@ func TestSecondLotRequiresCloseThenStart(t *testing.T) {
 	loadB := seedSecondSULoad(t, c)
 
 	commitMarkProgressAllDone(t, c, lotID, loadA)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadA, map[string][]any{
+	_ = commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 10.0}},
 	}))
 	_ = commitCloseLot(t, c, lotID)

@@ -570,13 +570,6 @@ steps:
                   navigation: stay
               readyWhen: >-
                 $lookup($domain.lot, $instance.id).status = "open"
-              enumReads:
-                sourceLotId: lots
-              reads:
-                lots:
-                    entity: lot
-                    where: id = $instance.id and status = "open"
-                    key: id
               # Prefill still-open incompletes as continuation rows (hidden continuesContainerId).
               initialData: >-
                 (
@@ -593,11 +586,7 @@ steps:
               schema:
                 type: object
                 title: Registrazione contenitori
-                required: [sourceLotId]
                 properties:
-                    sourceLotId:
-                        type: string
-                        title: Carico sorgente
                     polvereDiVetro:
                         type: array
                         title: Polvere di vetro
@@ -642,10 +631,7 @@ steps:
                         items: *containerWeightRow
               uiSchema:
                 ui:options:
-                    order: [sourceLotId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
-                sourceLotId:
-                    ui:components:
-                        stringField: enumField
+                    order: [polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
                 polvereDiVetro: &containerRegMaterialArrayUi
                     ui:components:
                         arrayItemField: compactArrayItemField
@@ -711,7 +697,7 @@ steps:
                           )}, []);
                           $cont := $append([], $rows[continuesContainerId].continuesContainerId);
                           $supersede := $count($cont) = 0 ? {} : $reduce($cont, function($a, $id){$merge([$a, {$id: true}])}, {});
-                          {"sourceLotId": sourceLotId, "rows": $rows, "supersede": $supersede}
+                          {"sourceLotId": $instance.id, "rows": $rows, "supersede": $supersede}
                         )
                     - op: mintMany
                       entity: container

@@ -21,7 +21,7 @@ func seedFullyProcessedLoad(t *testing.T, c *TaskCommitter) (loadID, lotID strin
 	t.Helper()
 	loadID, lotID = seedLotReadyAfterWeigh(t, c)
 	commitMarkProgressAllDone(t, c, lotID, loadID)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
+	_ = commitContainerReg(t, c, lotID, containerRegValue(map[string][]any{
 		"polvereDiVetro": {map[string]any{"weight": 100.0}},
 	}))
 	_ = commitCloseLot(t, c, lotID)

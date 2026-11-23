@@ -111,7 +111,6 @@ func TestContainerRegDoesNotSetFullyProcessed(t *testing.T) {
 		TaskPath:      "lot_processing/containerReg",
 		JobInstanceID: loadID,
 		Value: map[string]any{
-			"sourceLotId": loadID,
 			"polvereDiVetro": []any{
 				map[string]any{"weight": 120.0},
 			},
