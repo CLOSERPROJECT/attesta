@@ -25,9 +25,11 @@
 	--accent-foreground: #12210c;
 	--destructive: #c0392b;
 	--border: #dde2e0;
-	--input: #fff;
+	/* Lighter than board elev-0 (9%) so fields stay soft on the page. */
+	--input: color-mix(in srgb, var(--primary) 4%, #ffffff);
 	--ring: #1e6f5c;
 	--radius: 4px;
+	--input-radius: 2px;
 }
 
 [data-slot='input'],
@@ -35,7 +37,24 @@
 [data-slot='select-trigger'],
 [data-slot='input-group'] {
 	background-color: var(--input);
+	border-color: transparent;
+	box-shadow: none;
+	border-radius: var(--input-radius);
+}
+
+[data-slot='checkbox'] {
+	background-color: var(--input);
 	border-color: var(--border);
+	box-shadow: none;
+	border-radius: var(--input-radius);
+}
+
+/* Keep checked/indeterminate on primary (unlayered slot bg would otherwise win). */
+[data-slot='checkbox'][data-state='checked'],
+[data-slot='checkbox'][data-state='indeterminate'] {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-foreground);
 }
 
 /* shadcn Field defaults to gap-3; tighten label↔control (gap-1). */

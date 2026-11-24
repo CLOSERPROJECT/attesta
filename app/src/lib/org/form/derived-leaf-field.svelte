@@ -100,8 +100,9 @@
 	.derived-leaf input[type='number'] {
 		width: 100%;
 		max-width: 6rem;
-		border: 1px solid #d4d4d8;
-		border-radius: 0.25rem;
+		background: var(--input);
+		border: none;
+		border-radius: var(--input-radius, 2px);
 		padding: 0.25rem 0.5rem;
 	}
 	.derived-leaf button {

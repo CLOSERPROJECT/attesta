@@ -32,7 +32,7 @@
 >
 	<!-- size-9 hit target (input-like chrome); default checkbox inside; no text label. -->
 	<label
-		class="checkbox-only-hit size-9 shrink-0 rounded-md border border-input shadow-xs"
+		class="checkbox-only-hit size-9 shrink-0"
 		data-slot="input"
 		title={label}
 	>
@@ -59,6 +59,9 @@
 		min-height: 2.25rem;
 		cursor: pointer;
 		margin: 0;
+		background-color: var(--input);
+		border: 1px solid var(--border);
+		border-radius: var(--input-radius, 2px);
 	}
 
 	.checkbox-only {

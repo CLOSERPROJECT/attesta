@@ -74,7 +74,6 @@
 <style>
 	.readonly-field :global(.readonly-field__input),
 	.readonly-field :global(input) {
-		background-color: oklch(0.96 0 0);
 		color: oklch(0.45 0 0);
 		cursor: default;
 	}

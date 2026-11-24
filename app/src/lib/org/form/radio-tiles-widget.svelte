@@ -85,17 +85,19 @@
 		padding: 0.75rem;
 		min-height: 2.75rem;
 		cursor: pointer;
-		border: 1px solid var(--border);
-		background: var(--card, #fff);
-		border-radius: var(--radius);
+		border: none;
+		background: var(--input);
+		border-radius: var(--input-radius, 2px);
 		box-sizing: border-box;
 		margin: 0;
 	}
 
 	.radio-tiles__tile--selected {
-		border-color: var(--primary);
-		background: var(--background);
+		border: none;
+		background: color-mix(in srgb, var(--primary) 12%, #ffffff);
 		color: var(--foreground);
+		outline: 2px solid var(--primary);
+		outline-offset: 0;
 	}
 
 	.radio-tiles__tile--disabled {
