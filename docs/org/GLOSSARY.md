@@ -69,7 +69,7 @@ _Avoid_: Locked (as the gate state word); encoding entity open/closed law; avail
 **readyWhen**: Task-level Domain readiness (boolean expression over Domain), combined with the Task’s role gate. Distinct from **startsWhen**. Primary gate for Domain entity state and sibling/Submission prerequisites.\
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression; overloading startsWhen for Domain facts; calling readyWhen “unlock”
 
-**Submission**: Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path.\
+**Submission**: Record that a Task succeeded on a Job instance: time, actor, facts snapshot, and entitiesTouched (mint/patch of Domain entities by kind + id); keyed with Task path.\
 _Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts
 
 **Draft**: Working data of an in-progress Task before Submission. Not part of Domain until Commit succeeds.\

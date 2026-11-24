@@ -66,9 +66,68 @@ func TestMutateMintsAndAppendsSubmission(t *testing.T) {
 	if got.Submissions[0].UserName != "Ada Lovelace" {
 		t.Fatalf("userName = %#v", got.Submissions[0].UserName)
 	}
+	wantTouches := []EntityTouch{
+		{Op: "mint", Entity: "lot", ID: "load-1"},
+		{Op: "mint", Entity: "pallet", ID: "load-1.1"},
+	}
+	if !entityTouchesEqual(got.Submissions[0].EntitiesTouched, wantTouches) {
+		t.Fatalf("entitiesTouched = %#v, want %#v", got.Submissions[0].EntitiesTouched, wantTouches)
+	}
 	if len(got.JobInstances) != 1 || got.JobInstances[0].ID != "load-1" {
 		t.Fatalf("jobInstances = %#v", got.JobInstances)
 	}
+}
+
+func TestMutateRecordsEntitiesTouchedFromMintManyAndPatchEach(t *testing.T) {
+	allowed := map[string]struct{}{"lot": {}, "pallet": {}}
+	tr, err := RunTransform(EmptyDomain(), RunTransformInput{
+		JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada",
+		Facts:   map[string]any{"L1.1": map[string]any{}, "L1.2": map[string]any{}},
+		Allowed: allowed,
+		Transform: []any{
+			map[string]any{"op": "mint", "entity": "lot", "id": `"L1"`, "set": map[string]any{"client": `"NO"`}},
+			map[string]any{"op": "mintMany", "entity": "pallet", "count": "2", "id": `"L1." & $string($index+1)`, "set": map[string]any{"lotId": `"L1"`}},
+			map[string]any{"op": "patchEach", "entity": "pallet", "set": map[string]any{"ok": true}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Mutate(EmptyDomain(), tr.Request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []EntityTouch{
+		{Op: "mint", Entity: "lot", ID: "L1"},
+		{Op: "mint", Entity: "pallet", ID: "L1.1"},
+		{Op: "mint", Entity: "pallet", ID: "L1.2"},
+		{Op: "patch", Entity: "pallet", ID: "L1.1"},
+		{Op: "patch", Entity: "pallet", ID: "L1.2"},
+	}
+	if len(got.Submissions) != 1 || !entityTouchesEqual(got.Submissions[0].EntitiesTouched, want) {
+		t.Fatalf("entitiesTouched = %#v, want %#v", got.Submissions[0].EntitiesTouched, want)
+	}
+
+	cloned := cloneDomain(got)
+	if len(cloned.Submissions[0].EntitiesTouched) == 0 {
+		t.Fatal("cloneDomain must copy entitiesTouched")
+	}
+	cloned.Submissions[0].EntitiesTouched[0].ID = "mutated"
+	if got.Submissions[0].EntitiesTouched[0].ID != "L1" {
+		t.Fatal("cloneDomain must deep-copy entitiesTouched")
+	}
+}
+
+func entityTouchesEqual(got, want []EntityTouch) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestMutateDuplicateID(t *testing.T) {

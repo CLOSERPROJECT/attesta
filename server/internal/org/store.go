@@ -257,17 +257,26 @@ func cloneDomain(d Domain) Domain {
 	ensureEntities(&d)
 	out := Domain{
 		Entities:     make(map[string]EntityMap, len(d.Entities)),
-		Submissions:  append([]Submission(nil), d.Submissions...),
+		Submissions:  cloneSubmissions(d.Submissions),
 		JobInstances: append([]JobInstance(nil), d.JobInstances...),
 	}
 	for kind, m := range d.Entities {
 		out.Entities[kind] = cloneEntityMap(m)
 	}
-	if out.Submissions == nil {
-		out.Submissions = []Submission{}
-	}
 	if out.JobInstances == nil {
 		out.JobInstances = []JobInstance{}
+	}
+	return out
+}
+
+func cloneSubmissions(in []Submission) []Submission {
+	if in == nil {
+		return []Submission{}
+	}
+	out := make([]Submission, len(in))
+	for i, s := range in {
+		out[i] = s
+		out[i].EntitiesTouched = append([]EntityTouch(nil), s.EntitiesTouched...)
 	}
 	return out
 }

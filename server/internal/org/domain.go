@@ -11,17 +11,24 @@ type Domain struct {
 
 type EntityMap map[string]map[string]any
 
+// EntityTouch is one Domain entity this Submission minted or patched.
+type EntityTouch struct {
+	Op     string `json:"op"`     // "mint" | "patch"
+	Entity string `json:"entity"` // kind, e.g. "lot"
+	ID     string `json:"id"`
+}
+
 // Submission records a successful Task Commit on a Job instance.
 type Submission struct {
-	JobID         string         `json:"jobId"`
-	TaskID        string         `json:"taskId"`
-	JobInstanceID string         `json:"jobInstanceId,omitempty"`
-	Timestamp     string         `json:"timestamp"`
-	UserID        string         `json:"userId"`
+	JobID           string         `json:"jobId"`
+	TaskID          string         `json:"taskId"`
+	JobInstanceID   string         `json:"jobInstanceId,omitempty"`
+	Timestamp       string         `json:"timestamp"`
+	UserID          string         `json:"userId"`
 	// UserName is the human-facing actor label at Commit (email / display name).
-	UserName      string         `json:"userName,omitempty"`
-	Facts         map[string]any `json:"facts"`
-	IDsTouched    []string       `json:"idsTouched"`
+	UserName        string         `json:"userName,omitempty"`
+	Facts           map[string]any `json:"facts"`
+	EntitiesTouched []EntityTouch  `json:"entitiesTouched"`
 }
 
 // JobInstance is one occurrence of a repeatable Job in the Domain.
