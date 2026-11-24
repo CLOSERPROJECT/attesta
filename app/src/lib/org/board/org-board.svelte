@@ -193,6 +193,7 @@
 		confirmRecapByKey = next;
 	}
 
+	/** Recap-only when follow-through does not call afterDomainCommit (adopt / off-board). */
 	function refreshRecap(addr: TaskAddress) {
 		const key = taskAddressKey(addr);
 		boardRecapCache.invalidate(key);
@@ -210,16 +211,12 @@
 	) {
 		const decision = decideCommitFollowThrough(outcome, addr);
 		pinAfterCommit(addr, outcome);
-		refreshRecap(addr);
 		if (decision.kind === 'stay') {
-			// confirmRecap = landing surface; refreshForms / reloadTimeline = Domain may have changed.
 			const aftermath = stayAftermath(Boolean(opts?.submitMany));
-			if (aftermath.refreshForms) {
-				boardFormCache.refreshAllAfterDomainCommit();
-			}
-			if (aftermath.reloadTimeline) {
-				void session.reload();
-			}
+			void session.afterDomainCommit({
+				refreshForms: aftermath.refreshForms,
+				refreshRecapAddr: addr
+			});
 			markConfirmRecap(addr);
 			return;
 		}
@@ -233,6 +230,7 @@
 				boardFormCache.putReady(nextAddr, outcome.nextTaskFormBundle);
 			}
 			if (session.scope.kind === 'boot' && target.instance) {
+				refreshRecap(addr);
 				void session.adoptInstance(target.instance, {
 					focus: boardTaskFromAddress(nextAddr),
 					bundleAddr: nextAddr,
@@ -245,15 +243,18 @@
 				navigate: (t) => {
 					if (t.kind === 'task') {
 						setFocus(normalizeTaskAddress(t));
-						void orgSession.hydrate({
-							stream: t.stream,
-							instance: t.instance
-						});
 						if (view) {
-							void session.reload();
+							void session.afterDomainCommit({ refreshRecapAddr: addr });
+						} else {
+							refreshRecap(addr);
+							void orgSession.hydrate({
+								stream: t.stream,
+								instance: t.instance
+							});
 						}
 						return;
 					}
+					refreshRecap(addr);
 					navigateOrgTarget(t);
 				}
 			});
@@ -262,17 +263,18 @@
 
 		if (target.kind === 'home') {
 			if (session.scope.kind === 'boot') {
+				refreshRecap(addr);
 				void session.adoptInstance(target.instance, { focus: null });
 				orgSession.clearLinksStay();
 				return;
 			}
 			clearFocus();
 			orgSession.clearLinksStay();
-			void session.reload();
-			void orgSession.hydrate({ stream: target.stream, instance: target.instance });
+			void session.afterDomainCommit({ refreshRecapAddr: addr });
 			return;
 		}
 
+		refreshRecap(addr);
 		applyCommitFollowThrough(decision, {
 			clearLinksStay: () => orgSession.clearLinksStay(),
 			navigate: navigateOrgTarget

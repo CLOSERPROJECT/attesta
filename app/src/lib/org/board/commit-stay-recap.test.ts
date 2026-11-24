@@ -13,19 +13,17 @@ describe('stayConfirmSurface', () => {
 });
 
 describe('stayAftermath', () => {
-	test('submitMany stay refreshes form bundles, reloads timeline, lands on Recap tab', () => {
+	test('submitMany stay refreshes form bundles and lands on Recap tab', () => {
 		expect(stayAftermath(true)).toEqual({
 			confirmSurface: 'many-recap-tab',
-			refreshForms: true,
-			reloadTimeline: true
+			refreshForms: true
 		});
 	});
 
-	test('once stay keeps Form behind once-recap but still reloads timeline', () => {
+	test('once stay keeps Form behind once-recap (timeline refresh is session.afterDomainCommit)', () => {
 		expect(stayAftermath(false)).toEqual({
 			confirmSurface: 'once-recap',
-			refreshForms: false,
-			reloadTimeline: true
+			refreshForms: false
 		});
 	});
 });

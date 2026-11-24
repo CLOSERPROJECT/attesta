@@ -1,6 +1,6 @@
 import type { CommitOutcome } from '../commit-port.js';
 import type { TaskFormBundle } from '../form/task-form-bundle.js';
-import type { TaskAddress } from '../task-address.js';
+import { taskAddressKey, type TaskAddress } from '../task-address.js';
 import type { TimelineLoadQuery, TimelinePort } from '../timeline/timeline-port.js';
 import type { TimelineView } from '../timeline/types.js';
 import type { BoardFormCache } from './board-form-cache.svelte.js';
@@ -35,6 +35,13 @@ export type BoardSessionOptions = {
 	hydrate?: (args: { stream: string; instance: string }) => void;
 };
 
+export type AfterDomainCommitOptions = {
+	/** submitMany stay: refetch every cached form bundle in scope. */
+	refreshForms?: boolean;
+	/** Invalidate + enqueue recap for the committed Task address. */
+	refreshRecapAddr?: TaskAddress;
+};
+
 export type BoardSession = {
 	readonly scope: BoardScope;
 	readonly scopeKey: string;
@@ -43,6 +50,12 @@ export type BoardSession = {
 	error: string;
 	load(): Promise<void>;
 	reload(): Promise<void>;
+	/**
+	 * After a Domain-mutating Commit: reload timeline (+ worklist hydrate),
+	 * optionally refresh form bundles and/or the committed Task's recap.
+	 * OrgBoard declares aftermath here instead of assembling reload/forms/recap.
+	 */
+	afterDomainCommit(opts?: AfterDomainCommitOptions): Promise<void>;
 	adoptInstance(instance: string, opts?: AdoptInstanceOptions): Promise<void>;
 	/** Sync session when route props change (without soft-nav). */
 	setScope(scope: BoardScope): void;
@@ -67,7 +80,8 @@ function instanceOf(scope: BoardScope): string {
 }
 
 /**
- * Owns scope key, timeline load/reload, cache beginScope, and Play→instance soft-nav.
+ * Owns scope key, timeline load/reload, Domain-commit projection refresh
+ * (afterDomainCommit), cache beginScope, and Play→instance soft-nav.
  * OrgBoard paints from session.view / model; GUI must not invent play via /streams.
  */
 export function createBoardSession(opts: BoardSessionOptions): BoardSession {
@@ -148,6 +162,17 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 			await fetchView(timelineQueryForScope(scope), 'load');
 		},
 		async reload() {
+			await fetchView(timelineQueryForScope(scope), 'reload');
+		},
+		async afterDomainCommit(commitOpts: AfterDomainCommitOptions = {}) {
+			if (commitOpts.refreshForms) {
+				formCache.refreshAllAfterDomainCommit();
+			}
+			if (commitOpts.refreshRecapAddr) {
+				const key = taskAddressKey(commitOpts.refreshRecapAddr);
+				recapCache.invalidate(key);
+				recapCache.enqueue([commitOpts.refreshRecapAddr]);
+			}
 			await fetchView(timelineQueryForScope(scope), 'reload');
 		},
 		async adoptInstance(instance: string, adoptOpts: AdoptInstanceOptions = {}) {

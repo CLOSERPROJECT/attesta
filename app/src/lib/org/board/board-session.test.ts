@@ -283,4 +283,178 @@ describe('BoardSession', () => {
 		expect(session.loading).toBe(false);
 		expect(session.error).toBe('timeline down');
 	});
+
+	test('afterDomainCommit always reloads timeline and hydrates worklist', async () => {
+		const first = instanceView();
+		const second = { ...first, label: 'After commit' };
+		let n = 0;
+		const timeline = fakeTimeline(async () => {
+			n += 1;
+			return n === 1 ? first : second;
+		});
+		const { session, hydrate } = harness(
+			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline
+		);
+		await session.load();
+		hydrate.mockClear();
+
+		await session.afterDomainCommit();
+
+		expect(session.view?.label).toBe('After commit');
+		expect(timeline.loads).toHaveLength(2);
+		expect(hydrate).toHaveBeenCalledWith({
+			stream: 'recycling',
+			instance: '261102-1'
+		});
+	});
+
+	test('afterDomainCommit refreshForms refetches ready form bundles', async () => {
+		const formFetch = vi.fn(async () => ({
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '261102-1',
+			title: 'Register refreshed',
+			surface: 'live' as const,
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: { x: 1 } }
+		}));
+		const timeline = fakeTimeline(async () => instanceView());
+		const formCache = createBoardFormCache({ taskForm: { fetch: formFetch } });
+		const recapCache = createBoardRecapCache({
+			taskRecap: { fetch: vi.fn(async () => []) }
+		});
+		const model = new BoardTimelineModel({ syncUrl: () => {} });
+		const session = createBoardSession({
+			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline,
+			model,
+			formCache,
+			recapCache,
+			navigateToInstance: vi.fn(async () => {})
+		});
+		await session.load();
+
+		const readyAddr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		formCache.putReady(readyAddr, {
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '261102-1',
+			title: 'Register',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		});
+
+		await session.afterDomainCommit({ refreshForms: true });
+		await vi.waitFor(() => {
+			expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
+			expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe(
+				'Register refreshed'
+			);
+		});
+		expect(formFetch).toHaveBeenCalled();
+	});
+
+	test('afterDomainCommit without refreshForms leaves form bundles ready', async () => {
+		const timeline = fakeTimeline(async () => instanceView());
+		const { session, formCache } = harness(
+			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline
+		);
+		await session.load();
+		const readyAddr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		formCache.putReady(readyAddr, {
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '261102-1',
+			title: 'Register',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		});
+
+		await session.afterDomainCommit();
+
+		expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
+		expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe(
+			'Register'
+		);
+	});
+
+	test('afterDomainCommit refreshRecapAddr invalidates and re-enqueues that recap', async () => {
+		const recap = (n: number) => ({
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register',
+			timestamp: `2026-01-0${n}T00:00:00Z`,
+			userId: 'u1',
+			facts: { n },
+			links: []
+		});
+		const recapFetch = vi.fn(async () => ({ items: [recap(2)] }));
+		const timeline = fakeTimeline(async () => instanceView());
+		const formCache = createBoardFormCache({
+			taskForm: { fetch: vi.fn(async () => {
+				throw new Error('unexpected form fetch');
+			}) }
+		});
+		const recapCache = createBoardRecapCache({
+			taskRecap: { fetch: recapFetch }
+		});
+		const model = new BoardTimelineModel({ syncUrl: () => {} });
+		const session = createBoardSession({
+			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline,
+			model,
+			formCache,
+			recapCache,
+			navigateToInstance: vi.fn(async () => {})
+		});
+		await session.load();
+
+		const addr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		recapCache.putReady(addr, [recap(1)]);
+		expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(1);
+
+		await session.afterDomainCommit({ refreshRecapAddr: addr });
+		await vi.waitFor(() => {
+			expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
+			expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(2);
+		});
+		expect(recapFetch).toHaveBeenCalled();
+	});
 });
