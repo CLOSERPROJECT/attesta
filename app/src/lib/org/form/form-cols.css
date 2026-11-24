@@ -1,0 +1,42 @@
+/*
+  Named layout classes for Org uiSchema `layouts` (class:, not YAML Tailwind —
+  those are not @sourced). Author on object-properties / object-property.
+
+  auto-fit alone would grow past N on wide panels; floor each track at
+  ~(100% - gaps) / N so cols-2 stays two and cols-3 stays three, then wrap
+  when the min width no longer fits.
+*/
+.form-cols-2 {
+	--form-cols-gap: 0.75rem;
+	--form-cols-min: 16rem;
+	display: grid;
+	gap: var(--form-cols-gap);
+	grid-template-columns: repeat(
+		auto-fit,
+		minmax(
+			min(100%, max(var(--form-cols-min), calc((100% - var(--form-cols-gap)) / 2))),
+			1fr
+		)
+	);
+}
+
+.form-cols-3 {
+	--form-cols-gap: 0.75rem;
+	--form-cols-min: 12rem;
+	display: grid;
+	gap: var(--form-cols-gap);
+	grid-template-columns: repeat(
+		auto-fit,
+		minmax(
+			min(
+				100%,
+				max(var(--form-cols-min), calc((100% - 2 * var(--form-cols-gap)) / 3))
+			),
+			1fr
+		)
+	);
+}
+
+.form-cols-span {
+	grid-column: 1 / -1;
+}

@@ -5,6 +5,7 @@
 @import '@sjsf/shadcn4-theme/styles.css';
 @source '../../node_modules/@sjsf/shadcn4-theme/dist';
 @import '../lib/org/form/array-field.css';
+@import '../lib/org/form/form-cols.css';
 @custom-variant dark (&:is(.dark *));
 
 /* Org FormPlan / sjsf light tokens */
