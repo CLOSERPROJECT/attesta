@@ -1,5 +1,5 @@
 /** Post-stay confirmation surface (ADR-0006 stay; no under-form Continue / HttpLinkStrip). */
-export type StayConfirmSurface = 'once-recap' | 'many-recap-tab';
+export type StayConfirmSurface = 'once-recap' | 'many-recap';
 
 /** Stay Commit → confirmation surface + Form freshness policy. */
 export type StayAftermath = {
@@ -8,7 +8,7 @@ export type StayAftermath = {
 	 * When true, Domain may have changed: refetch form bundles for the board
 	 * scope and remount Form on a cleared draft
 	 * (BoardSession.domainChanged: follow 'stay' with submitMany).
-	 * Pre-submit Form↔Recap toggles do not run this path. Once stay does not
+	 * Pre-submit composer open/close does not run this path. Once stay does not
 	 * refresh (Form stays behind once-recap).
 	 * Stay still reloads the timeline and hydrates the Worklist via domainChanged.
 	 */
@@ -23,7 +23,7 @@ export type StayAftermath = {
 
 /** Stay Commit → which embed confirmation to land on. */
 export function stayConfirmSurface(submitMany: boolean): StayConfirmSurface {
-	return submitMany ? 'many-recap-tab' : 'once-recap';
+	return submitMany ? 'many-recap' : 'once-recap';
 }
 
 /** Stay Commit → confirmation + Form freshness after Domain Commit. */

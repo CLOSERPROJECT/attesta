@@ -1,0 +1,108 @@
+/*
+  Org form chrome: field fill/border, label gap, and form-cols layout classes.
+  Author form-cols via ui:options.layout / layoutSpan (Go expandFormLayout);
+  YAML Tailwind on layouts is not @sourced — use these named classes.
+*/
+
+[data-slot='input'],
+[data-slot='textarea'],
+[data-slot='select-trigger'],
+[data-slot='input-group'] {
+	background-color: var(--input);
+	border-color: transparent;
+	box-shadow: none;
+	border-radius: var(--input-radius);
+}
+
+[data-slot='checkbox'] {
+	background-color: var(--input);
+	border-color: var(--border);
+	box-shadow: none;
+	border-radius: var(--input-radius);
+}
+
+[data-slot='checkbox'][data-state='checked'],
+[data-slot='checkbox'][data-state='indeterminate'] {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-foreground);
+}
+
+[data-slot='field'] {
+	gap: 0.25rem;
+}
+
+.computed-field :is(input, textarea),
+.computed-field.computed-field__value,
+.readonly-field :is(input, textarea) {
+	background-color: var(--muted);
+	color: color-mix(in srgb, var(--foreground) 55%, var(--muted-foreground));
+	cursor: default;
+	box-shadow: none;
+	border-color: transparent;
+	border-radius: var(--input-radius);
+}
+
+.computed-field__value {
+	display: flex;
+	align-items: center;
+	min-height: 2.25rem;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 0.25rem 0.625rem;
+}
+
+/*
+  object-properties is owned by Org layout (not FieldGroup flex). Default stack;
+  form-cols-* switches to a capped auto-fit grid.
+*/
+.org-object-properties {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	gap: 1.75rem;
+}
+
+.form-cols-2 {
+	--form-cols-gap: 0.75rem;
+	--form-cols-row-gap: 1.5rem;
+	--form-cols-min: 16rem;
+	display: grid;
+	column-gap: var(--form-cols-gap);
+	row-gap: var(--form-cols-row-gap);
+	grid-template-columns: repeat(
+		auto-fit,
+		minmax(
+			min(100%, max(var(--form-cols-min), calc((100% - var(--form-cols-gap)) / 2))),
+			1fr
+		)
+	);
+}
+
+.form-cols-3 {
+	--form-cols-gap: 0.75rem;
+	--form-cols-row-gap: 1.5rem;
+	--form-cols-min: 12rem;
+	display: grid;
+	column-gap: var(--form-cols-gap);
+	row-gap: var(--form-cols-row-gap);
+	grid-template-columns: repeat(
+		auto-fit,
+		minmax(
+			min(
+				100%,
+				max(var(--form-cols-min), calc((100% - 2 * var(--form-cols-gap)) / 3))
+			),
+			1fr
+		)
+	);
+}
+
+.form-cols-span {
+	grid-column: 1 / -1;
+}
+
+/* Start this property on a new grid row (leave prior row short). */
+.form-cols-new-row {
+	grid-column-start: 1;
+}

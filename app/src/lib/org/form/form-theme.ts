@@ -9,15 +9,19 @@ import CheckboxOnlyField from './checkbox-only-field.svelte';
 import CompactArrayItemField from './compact-array-item-field.svelte';
 import DerivedLeafField from './derived-leaf-field.svelte';
 import FormThemeButton from './form-theme-button.svelte';
+import FormThemeSubmitButton from './form-theme-submit-button.svelte';
 import MapTableField from './map-table-field.svelte';
 import DataReportField from './data-report-field.svelte';
 import ReadonlyField from './readonly-field.svelte';
 import HiddenField from './hidden-field.svelte';
 import RadioTilesWidget from './radio-tiles-widget.svelte';
+import OrgFormLayout from './org-form-layout.svelte';
 
 // override (not extend): base shadcn already defines `button`; extend would never win.
 // dataReport / readonly / compactArrayItem / hidden / radioTilesWidget are not
 // AUTHORED_FIELD_REGISTRY — register beside button (authoredFieldThemeOverrides drops unknown keys).
+// layout: own object-properties (plain div); FieldGroup flex fights form-cols.
+// submitButton: Check icon for TaskForm primary submit (array Add stays on `button`).
 const withAuthored = overrideByRecord(shadcnTheme, {
 	...authoredFieldThemeOverrides({
 		mapTableField: MapTableField,
@@ -29,7 +33,9 @@ const withAuthored = overrideByRecord(shadcnTheme, {
 	hiddenField: HiddenField,
 	compactArrayItemField: CompactArrayItemField,
 	radioTilesWidget: RadioTilesWidget,
-	button: FormThemeButton
+	button: FormThemeButton,
+	submitButton: FormThemeSubmitButton,
+	layout: OrgFormLayout
 });
 
 export const theme = useDatePickerForDateFormat(withAuthored);

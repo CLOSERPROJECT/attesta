@@ -379,3 +379,57 @@ func TestBuildOrgTimelineViewInstanceMode(t *testing.T) {
 		t.Fatalf("instance href = %q", href)
 	}
 }
+
+func TestBuildOrgTimelineRoleBadgesFromRoleDefs(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := FixtureAllRolesOp()
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "Truck T1"}}
+	view := BuildOrgTimelineView(cfg, domain, op, "recycling", mustTimelineInstance(t, "T1"))
+	if len(view.Steps) == 0 {
+		t.Fatal("expected intake step")
+	}
+	var truckArrive *TimelineSubstepDTO
+	for i := range view.Steps[0].Substeps {
+		sub := &view.Steps[0].Substeps[i]
+		if sub.SubstepID == "intake.truckArrive" {
+			truckArrive = sub
+			break
+		}
+	}
+	if truckArrive == nil {
+		t.Fatalf("truckArrive missing: %#v", view.Steps[0].Substeps)
+	}
+	if len(truckArrive.RoleBadges) != 1 {
+		t.Fatalf("truckArrive roleBadges = %#v, want 1", truckArrive.RoleBadges)
+	}
+	badge := truckArrive.RoleBadges[0]
+	if badge.ID != "administration" || badge.Label != "Administration" || badge.Palette != "blue" {
+		t.Fatalf("truckArrive badge = %#v, want administration/Administration/blue", badge)
+	}
+
+	cfg.Jobs = OrderedObject{
+		Keys: []string{"intake"},
+		Values: map[string]any{
+			"intake": Job{
+				Title: "Ingresso",
+				Tasks: []TaskConfig{
+					{"id": "weigh", "title": "Pesa", "roles": []any{"line", "logistic"}},
+				},
+			},
+		},
+	}
+	badges := roleBadgesForPath(cfg, TaskPathRef{JobID: "intake", TaskID: "weigh"})
+	if len(badges) != 2 {
+		t.Fatalf("multi badges = %#v", badges)
+	}
+	if badges[0].ID != "line" || badges[0].Palette != "orange" {
+		t.Fatalf("line badge = %#v", badges[0])
+	}
+	if badges[1].ID != "logistic" || badges[1].Palette != "cyan" {
+		t.Fatalf("logistic badge = %#v", badges[1])
+	}
+}

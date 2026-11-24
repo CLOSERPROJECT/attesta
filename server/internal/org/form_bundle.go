@@ -37,13 +37,15 @@ type FormColumns struct {
 // ChromeRule is a display chrome entry. dataReport is evaluated server-side into
 // bindings.chromeDisplay; readonly stays client-eval for now.
 type ChromeRule struct {
-	ID         string `json:"id"`
-	Kind       string `json:"kind"`
-	Expr       string `json:"expr,omitempty"`
-	Title      string `json:"title,omitempty"`
-	Before     string `json:"before,omitempty"`
-	After      string `json:"after,omitempty"`
-	HideIfNull bool   `json:"hideIfNull,omitempty"`
+	ID           string `json:"id"`
+	Kind         string `json:"kind"`
+	Expr         string `json:"expr,omitempty"`
+	Title        string `json:"title,omitempty"`
+	Before       string `json:"before,omitempty"`
+	After        string `json:"after,omitempty"`
+	HideIfNull   bool   `json:"hideIfNull,omitempty"`
+	Placeholder  string `json:"placeholder,omitempty"`
+	LayoutNewRow bool   `json:"layoutNewRow,omitempty"`
 }
 
 // DerivedRule is a Derived key expr (concrete or expanded from map-star).
@@ -101,6 +103,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref ActionableTaskRef) (*
 	}
 	uiSchema = withDefaultPlaceholders(uiSchema, schema, chromeFieldIDs)
 	paintHideRootFormTitle(uiSchema)
+	expandFormLayout(uiSchema)
 
 	derived := compileDerivedRules(payload, projected.RowIDs)
 

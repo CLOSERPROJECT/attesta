@@ -5,6 +5,7 @@
 @import '@sjsf/shadcn4-theme/styles.css';
 @source '../../node_modules/@sjsf/shadcn4-theme/dist';
 @import '../lib/org/form/array-field.css';
+@import '../lib/org/form/form-chrome.css';
 @custom-variant dark (&:is(.dark *));
 
 /* Org FormPlan / sjsf light tokens */
@@ -25,22 +26,11 @@
 	--accent-foreground: #12210c;
 	--destructive: #c0392b;
 	--border: #dde2e0;
-	--input: #fff;
+	/* Lighter than board elev-0 (9%) so fields stay soft on the page. */
+	--input: color-mix(in srgb, var(--primary) 4%, #ffffff);
 	--ring: #1e6f5c;
 	--radius: 4px;
-}
-
-[data-slot='input'],
-[data-slot='textarea'],
-[data-slot='select-trigger'],
-[data-slot='input-group'] {
-	background-color: var(--input);
-	border-color: var(--border);
-}
-
-/* shadcn Field defaults to gap-3; tighten label↔control (gap-1). */
-[data-slot='field'] {
-	gap: 0.25rem;
+	--input-radius: 2px;
 }
 
 @theme inline {

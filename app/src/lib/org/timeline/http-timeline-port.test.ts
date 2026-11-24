@@ -70,4 +70,42 @@ describe('HttpTimelinePort', () => {
 			status: 403
 		});
 	});
+
+	test('preserves roleBadges from timeline JSON', async () => {
+		const withBadges: TimelineView = {
+			...instanceView,
+			steps: [
+				{
+					stepId: 'intake',
+					title: 'Intake',
+					substepCount: 1,
+					expanded: true,
+					substeps: [
+						{
+							substepId: 'intake.truckArrive',
+							title: 'Truck arrive',
+							status: 'available',
+							roleBadges: [
+								{ id: 'dep1', label: 'Depot', palette: 'blue' },
+								{ id: 'ops', label: 'Ops', palette: 'emerald' }
+							]
+						}
+					]
+				}
+			]
+		};
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify(withBadges), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				})
+		);
+		const port = createHttpTimelinePort({ fetch: fetchFn });
+		const got = await port.load({ stream: 'recycling', instance: '261102-1' });
+		expect(got.steps[0]?.substeps?.[0]?.roleBadges).toEqual([
+			{ id: 'dep1', label: 'Depot', palette: 'blue' },
+			{ id: 'ops', label: 'Ops', palette: 'emerald' }
+		]);
+	});
 });

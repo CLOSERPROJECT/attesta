@@ -24,11 +24,12 @@
 	}: Props = $props();
 
 	const columns = $derived(unionFactKeys(items));
+	const showLinksColumn = $derived(items.some((item) => item.links.length > 0));
 </script>
 
 {#if items.length > 0}
 	<div class="overflow-x-auto" data-testid={testId}>
-		<table class="w-full border-collapse text-sm">
+		<table class="w-full border-collapse border-y border-zinc-200 text-sm">
 			<thead>
 				<tr class="border-b border-zinc-200 text-left">
 					{#each columns as key (key)}
@@ -38,7 +39,9 @@
 					{/each}
 					<th class="px-2 py-2 align-top font-medium text-zinc-600">Timestamp</th>
 					<th class="px-2 py-2 align-top font-medium text-zinc-600">User</th>
-					<th class="px-2 py-2 align-top font-medium text-zinc-600">Links</th>
+					{#if showLinksColumn}
+						<th class="px-2 py-2 align-top font-medium text-zinc-600">Links</th>
+					{/if}
 				</tr>
 			</thead>
 			<tbody>
@@ -66,11 +69,13 @@
 						<td class="px-2 py-2 text-zinc-900">
 							{formatSubmissionUser(item)}
 						</td>
-						<td class="px-2 py-2">
-							{#if item.links.length > 0}
-								<HttpLinkStrip items={item.links} />
-							{/if}
-						</td>
+						{#if showLinksColumn}
+							<td class="px-2 py-2">
+								{#if item.links.length > 0}
+									<HttpLinkStrip items={item.links} />
+								{/if}
+							</td>
+						{/if}
 					</tr>
 				{/each}
 			</tbody>

@@ -8,10 +8,22 @@ Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, 
 
 - **Dumb executor:** plant business rules live in Config (`domain.entities`, transforms, `readyWhen`, `onCommit`). Go and `/app` only evaluate—no plant-named branches in executors. Only config-declared transforms write Domain entities.
 - **Transforms:** `bind` rebinds `$` for later ops in that list (no Domain mutate by itself). `reads` (Domain reads) project Domain at open time—never bake instance ids into Config. `derived` may persist on successful submit when configured. Chrome is display-only and stripped before Submission facts. Chrome entries may set `hideIfNull: true` (default false); compile stamps `ui:options.hideIfNull` so the SPA readonly chrome field omits itself when the live display value is null. `dynamicProperties` keys come from Domain reads.
+- **Form columns:** author `ui:options.layout: cols-2` or `cols-3` on an object uiSchema; on a property, `layoutSpan: true` (full-bleed) or `layoutNewRow: true` (start a new grid row so the previous row can stay short). Same shortcuts are accepted on chrome entries (`placeholder`, `layoutNewRow`) and stamped onto the chrome field uiSchema. Task form compile expands these into `layouts` + `form-cols-*` classes and strips the shortcuts so they never collide with sjsf’s attribute `layout` object. Do not put Tailwind classes in YAML `layouts` (not `@source`d).
 - **Domain gates:** exclusivity and open/close use Task **`readyWhen`** over Domain (and `$domain.submissions` when bind-once matters). Encode those facts in **`readyWhen`**, not in **`startsWhen`**. Do not author **`unlockFrom`** (Config rejects it; sibling/Domain gates belong in **`readyWhen`**).
 - **Submit cardinality:** multi-pass same-form work uses leaf Tasks with `submit: many` + Domain **`readyWhen`**, not Task groups ([ADR-0008](../adr/0008-org-task-submit-cardinality.md)).
 - **JSONata:** chrome / transform / QR / HttpPort bodies use jsonata-go — see [`jsonata-org.md`](jsonata-org.md) before blaming the executor.
 - **Copy tracks:** SPA chrome vs Config product copy vs English engine errors — [ADR-0013](../adr/0013-org-app-locale-tracks.md) and [`app-i18n.md`](app-i18n.md). Plant Italian labels stay in YAML.
+
+## Roles catalog (`roles`)
+
+Optional top-level authored catalog for Identity seed and timeline role badges. Membership remains Identity/Appwrite at runtime (ADR-0002/0003)—this block is catalog shape only (`slug`, `name`, palette key such as `blue` / `cyan` / `emerald`, not CSS vars). Task `roles: [slug]` gates stay slug lists and must align with this catalog when it is present. Gate slug list `OrgConfig.Roles` is derived from the authored block (order preserved) plus any task-only slugs.
+
+```yaml
+roles:
+  - slug: administration
+    name: Administration
+    palette: blue
+```
 
 ## Stream section (`stream`)
 

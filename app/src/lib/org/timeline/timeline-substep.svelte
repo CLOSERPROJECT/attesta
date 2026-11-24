@@ -1,8 +1,5 @@
 <script lang="ts">
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
-	import { cn } from '#lib/shadcn/utils.js';
 
 	import { getBoardEmbed } from '../board/board-context.js';
 	import { getBoardTimelineModel } from '../board/board-timeline-model.svelte.js';
@@ -15,6 +12,8 @@
 	import { taskAddressKey } from '../task-address.js';
 	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
+	import TimelineRoleBadges from './timeline-role-badges.svelte';
+	import { timelineRoleBadgesVisible } from './timeline-role-badge-label.js';
 	import type { TimelineSubstep } from './types.js';
 
 	type Props = {
@@ -39,6 +38,10 @@
 	const showStatusChip = $derived(
 		!!status && streamStatusChipVisible(status, timelineModel.showAll)
 	);
+	const roleBadges = $derived(
+		timelineRoleBadgesVisible(timelineModel.showAll, substep.roleBadges)
+	);
+	const showTrail = $derived(showStatusChip || roleBadges.length > 0);
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(status ? `substep-${status}` : '');
 
@@ -65,26 +68,22 @@
 		detailsOpen = false;
 	});
 
-	function toggleEmbed() {
+	function onEmbedOpenChange(next: boolean) {
 		if (!address) return;
-		const next = timelineModel.toggleBody(address);
+		timelineModel.setBodyOpen(address, next);
 		// Closing must not select — select() always re-opens the body.
 		if (next) timelineModel.select(address);
 	}
-
-	/** Padding/gaps on the summary toggle; ignore Form|Recap tablist. */
-	function onEmbedHeaderClick(e: MouseEvent) {
-		const t = e.target;
-		if (!(t instanceof Element)) return;
-		if (t.closest('[data-testid="embed-form-recap-tabs"], [role="tablist"]')) return;
-		toggleEmbed();
-	}
-
-	function onEmbedToggleClick(e: MouseEvent) {
-		e.stopPropagation();
-		toggleEmbed();
-	}
 </script>
+
+{#snippet trail()}
+	{#if roleBadges.length > 0}
+		<TimelineRoleBadges badges={roleBadges} />
+	{/if}
+	{#if showStatusChip}
+		<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+	{/if}
+{/snippet}
 
 <li
 	class={['substep', statusClass]}
@@ -92,94 +91,42 @@
 	data-board-focused={focused ? 'true' : undefined}
 >
 	{#if embed && address}
-		<div
+		<Collapsible.Root
 			class="substep-accordion js-process-substep-panel substep-embed-host"
 			data-substep-id={substep.substepId}
 			data-testid="actionable-embed"
 			data-state={embedOpen ? 'open' : 'closed'}
-			data-slot="collapsible"
 			aria-labelledby={headingId}
+			open={embedOpen}
+			onOpenChange={onEmbedOpenChange}
 		>
-			<EmbeddedTaskPanel
-				{address}
-				{entry}
-				{seed}
-				submitMany={!!substep.submitMany}
-				{submissions}
-				{focused}
-				{confirmRecap}
-				open={embedOpen}
-				bodyId={embedBodyId}
-				onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}
-				onFocus={() => timelineModel.select(address)}
-				onCommitted={(outcome) =>
-					board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })}
-				onAcceptStale={() => board.acceptStale(address)}
-			>
-				{#snippet header({ tablist })}
-					<!--
-						Header is a div: title button · optional Form|Recap tablist · chevron button.
-						Never nest tablist inside the expand trigger (interactive-in-button a11y).
-						Div click covers padding/gaps (CSS cursor:pointer); tablist clicks are ignored.
-						Title/chevron buttons keep keyboard a11y and stopPropagation to avoid double-toggle.
-					-->
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div
-						class={cn(
-							'group/accordion-trigger substep-accordion-summary substep-card-link relative flex w-full flex-1 items-center justify-between text-sm font-medium',
-							'**:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground'
-						)}
-						data-state={embedOpen ? 'open' : 'closed'}
-						onclick={onEmbedHeaderClick}
-					>
-						<button
-							type="button"
-							class="substep-embed-title-trigger min-w-0 flex-1 border-0 bg-transparent p-0 text-left outline-none hover:no-underline"
-							aria-expanded={embedOpen}
-							aria-controls={embedBodyId}
-							data-slot="collapsible-trigger"
-							data-state={embedOpen ? 'open' : 'closed'}
-							onclick={onEmbedToggleClick}
-						>
-							{#if showStatusChip}
-								<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
-									{#snippet trail()}
-										<span class="status" data-status={status} aria-label={statusChipLabel}
-											>{statusChipLabel}</span
-										>
-									{/snippet}
-								</TimelineHeaderLine>
-							{:else}
-								<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
-							{/if}
-						</button>
-						{#if tablist}
-							{@render tablist()}
-						{/if}
-						<button
-							type="button"
-							class="substep-embed-chevron-trigger border-0 bg-transparent outline-none"
-							aria-expanded={embedOpen}
-							aria-controls={embedBodyId}
-							aria-labelledby={headingId}
-							data-slot="collapsible-trigger"
-							data-state={embedOpen ? 'open' : 'closed'}
-							onclick={onEmbedToggleClick}
-						>
-							<ChevronDownIcon
-								data-slot="accordion-trigger-icon"
-								class={cn('pointer-events-none shrink-0', embedOpen && 'hidden')}
-							/>
-							<ChevronUpIcon
-								data-slot="accordion-trigger-icon"
-								class={cn('pointer-events-none shrink-0', !embedOpen && 'hidden')}
-							/>
-						</button>
-					</div>
-				{/snippet}
-			</EmbeddedTaskPanel>
-		</div>
+			<Collapsible.Trigger class="substep-accordion-summary substep-card-link w-full items-center hover:no-underline">
+				{#if showTrail}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} {trail} />
+				{:else}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
+				{/if}
+			</Collapsible.Trigger>
+			<Collapsible.Content>
+				<EmbeddedTaskPanel
+					{address}
+					{entry}
+					{seed}
+					submitMany={!!substep.submitMany}
+					{submissions}
+					{focused}
+					{confirmRecap}
+					open={embedOpen}
+					bodyId={embedBodyId}
+					onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}
+					onFocus={() => timelineModel.select(address)}
+					onCommitted={(outcome) =>
+						board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })
+					}
+					onAcceptStale={() => board.acceptStale(address)}
+				/>
+			</Collapsible.Content>
+		</Collapsible.Root>
 	{:else}
 		<Collapsible.Root
 			class="substep-accordion js-process-substep-panel"
@@ -189,14 +136,8 @@
 			bind:open={detailsOpen}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
-				{#if showStatusChip}
-					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
-						{#snippet trail()}
-							<span class="status" data-status={status} aria-label={statusChipLabel}
-								>{statusChipLabel}</span
-							>
-						{/snippet}
-					</TimelineHeaderLine>
+				{#if showTrail}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} {trail} />
 				{:else}
 					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
 				{/if}

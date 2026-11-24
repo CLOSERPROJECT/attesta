@@ -56,6 +56,24 @@ func TestMergeChromeHideIfNullStamp(t *testing.T) {
 	}
 }
 
+func TestMergeChromePlaceholderStamp(t *testing.T) {
+	chromeRaw := map[string]any{
+		"net": map[string]any{
+			"kind":        "readonly",
+			"expr":        "1",
+			"title":       "Net",
+			"placeholder": "Calcolato…",
+		},
+	}
+	rules := readChromeRules(map[string]any{"chrome": chromeRaw})
+	_, ui := mergeChromeIntoSchemas(map[string]any{}, map[string]any{}, rules, chromeRaw)
+	field, _ := ui["net"].(map[string]any)
+	opts, _ := field["ui:options"].(map[string]any)
+	if opts["placeholder"] != "Calcolato…" {
+		t.Fatalf("placeholder = %#v, want Calcolato…", opts["placeholder"])
+	}
+}
+
 func placeholderFromFieldUI(fieldUi map[string]any) string {
 	if fieldUi == nil {
 		return ""
@@ -228,5 +246,88 @@ func TestWithDefaultPlaceholdersExpandsAuthoredToShadcn(t *testing.T) {
 	shadcn, _ := opts["shadcn4Select"].(map[string]any)
 	if shadcn["placeholder"] != "–" {
 		t.Fatalf("shadcn4Select.placeholder = %#v, want – (expanded from authored)", shadcn["placeholder"])
+	}
+}
+
+func TestExpandFormLayoutColsAndSpan(t *testing.T) {
+	ui := map[string]any{
+		"ui:options": map[string]any{
+			"layout": "cols-2",
+			"order":  []any{"a", "notes"},
+		},
+		"notes": map[string]any{
+			"ui:options": map[string]any{
+				"layoutSpan": true,
+			},
+		},
+		"next": map[string]any{
+			"ui:options": map[string]any{
+				"layoutNewRow": true,
+			},
+		},
+	}
+	expandFormLayout(ui)
+
+	rootOpts, _ := ui["ui:options"].(map[string]any)
+	if _, ok := rootOpts["layout"]; ok {
+		t.Fatalf("root layout shortcut must be stripped; got %#v", rootOpts["layout"])
+	}
+	layouts, _ := rootOpts["layouts"].(map[string]any)
+	props, _ := layouts["object-properties"].(map[string]any)
+	if props["class"] != "form-cols-2" {
+		t.Fatalf("object-properties class = %#v, want form-cols-2", props["class"])
+	}
+
+	notes, _ := ui["notes"].(map[string]any)
+	notesOpts, _ := notes["ui:options"].(map[string]any)
+	if _, ok := notesOpts["layoutSpan"]; ok {
+		t.Fatalf("layoutSpan must be stripped; got %#v", notesOpts["layoutSpan"])
+	}
+	noteLayouts, _ := notesOpts["layouts"].(map[string]any)
+	prop, _ := noteLayouts["object-property"].(map[string]any)
+	if prop["class"] != "form-cols-span" {
+		t.Fatalf("object-property class = %#v, want form-cols-span", prop["class"])
+	}
+
+	next, _ := ui["next"].(map[string]any)
+	nextOpts, _ := next["ui:options"].(map[string]any)
+	if _, ok := nextOpts["layoutNewRow"]; ok {
+		t.Fatalf("layoutNewRow must be stripped; got %#v", nextOpts["layoutNewRow"])
+	}
+	nextLayouts, _ := nextOpts["layouts"].(map[string]any)
+	nextProp, _ := nextLayouts["object-property"].(map[string]any)
+	if nextProp["class"] != "form-cols-new-row" {
+		t.Fatalf("object-property class = %#v, want form-cols-new-row", nextProp["class"])
+	}
+}
+
+func TestExpandFormLayoutIdempotentClassAndLeavesAttrLayout(t *testing.T) {
+	ui := map[string]any{
+		"ui:options": map[string]any{
+			"layout": "cols-3",
+			"layouts": map[string]any{
+				"object-properties": map[string]any{
+					"class": "form-cols-3 extra",
+				},
+			},
+		},
+		"other": map[string]any{
+			"ui:options": map[string]any{
+				// sjsf attribute override shape — must not be touched
+				"layout": map[string]any{"data-x": "1"},
+			},
+		},
+	}
+	expandFormLayout(ui)
+	rootOpts, _ := ui["ui:options"].(map[string]any)
+	layouts, _ := rootOpts["layouts"].(map[string]any)
+	props, _ := layouts["object-properties"].(map[string]any)
+	if props["class"] != "form-cols-3 extra" {
+		t.Fatalf("class merge = %#v, want form-cols-3 extra", props["class"])
+	}
+	other, _ := ui["other"].(map[string]any)
+	otherOpts, _ := other["ui:options"].(map[string]any)
+	if _, ok := otherOpts["layout"].(map[string]any); !ok {
+		t.Fatalf("object layout attrs must remain; got %#v", otherOpts["layout"])
 	}
 }

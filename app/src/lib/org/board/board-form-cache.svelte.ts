@@ -14,7 +14,7 @@ export type BoardFormEntry = {
 	/**
 	 * Form draft identity for this address. Advances when a Domain Commit refresh
 	 * lands a new ready bundle (or on beginFreshDraft remount-only) so the embed
-	 * remounts against a cleared draft bag. Pre-submit Form↔Recap toggles do not
+	 * remounts against a cleared draft bag. Pre-submit composer open/close does not
 	 * change this.
 	 */
 	draftGeneration: number;
