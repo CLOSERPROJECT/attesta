@@ -6,11 +6,7 @@ import type { TimelineLoadQuery, TimelinePort } from '../timeline/timeline-port.
 import type { TimelineView } from '../timeline/types.js';
 import { createBoardFormCache } from './board-form-cache.svelte.js';
 import { createBoardRecapCache } from './board-recap-cache.svelte.js';
-import {
-	boardScopeKey,
-	createBoardSession,
-	type BoardScope
-} from './board-session.svelte.js';
+import { boardScopeKey, createBoardSession, type BoardScope } from './board-session.svelte.js';
 import { BoardTimelineModel } from './board-timeline-model.svelte.js';
 import type { BoardTaskFocus } from './board-url.js';
 
@@ -41,10 +37,7 @@ function bootView(stream = 'recycling'): TimelineView {
 	};
 }
 
-function instanceView(
-	stream = 'recycling',
-	instance = '261102-1'
-): TimelineView {
+function instanceView(stream = 'recycling', instance = '261102-1'): TimelineView {
 	return {
 		stream,
 		instance,
@@ -84,18 +77,29 @@ function fakeTimeline(
 	};
 }
 
-function harness(scope: BoardScope, timeline: TimelinePort) {
-	const formCache = createBoardFormCache({
-		taskForm: { fetch: vi.fn(async () => {
+function harness(
+	scope: BoardScope,
+	timeline: TimelinePort,
+	extras: {
+		formFetch?: ReturnType<typeof vi.fn>;
+		dropSeededDraft?: ReturnType<typeof vi.fn>;
+	} = {}
+) {
+	const formFetch =
+		extras.formFetch ??
+		vi.fn(async () => {
 			throw new Error('unexpected form fetch');
-		}) }
+		});
+	const formCache = createBoardFormCache({
+		taskForm: { fetch: formFetch }
 	});
 	const recapCache = createBoardRecapCache({
-		taskRecap: { fetch: vi.fn(async () => []) }
+		taskRecap: { fetch: vi.fn(async () => ({ items: [] })) }
 	});
 	const model = new BoardTimelineModel({ syncUrl: () => {} });
 	const navigateToInstance = vi.fn(async () => {});
 	const hydrate = vi.fn();
+	const dropSeededDraft = extras.dropSeededDraft ?? vi.fn();
 	const session = createBoardSession({
 		scope,
 		timeline,
@@ -103,16 +107,24 @@ function harness(scope: BoardScope, timeline: TimelinePort) {
 		formCache,
 		recapCache,
 		navigateToInstance,
-		hydrate
+		hydrate,
+		dropSeededDraft
 	});
-	return { session, model, formCache, recapCache, navigateToInstance, hydrate };
+	return {
+		session,
+		model,
+		formCache,
+		recapCache,
+		navigateToInstance,
+		hydrate,
+		dropSeededDraft,
+		formFetch
+	};
 }
 
 describe('boardScopeKey', () => {
 	test('encodes boot and instance distinctly', () => {
-		expect(boardScopeKey({ kind: 'boot', stream: 'recycling' })).toBe(
-			'recycling||boot'
-		);
+		expect(boardScopeKey({ kind: 'boot', stream: 'recycling' })).toBe('recycling||boot');
 		expect(
 			boardScopeKey({
 				kind: 'instance',
@@ -131,10 +143,7 @@ describe('BoardSession', () => {
 			expect('instance' in q).toBe(false);
 			return view;
 		});
-		const { session, model } = harness(
-			{ kind: 'boot', stream: 'recycling' },
-			timeline
-		);
+		const { session, model } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
 
 		await session.load();
 
@@ -156,9 +165,7 @@ describe('BoardSession', () => {
 
 		await session.load();
 
-		expect(timeline.loads).toEqual([
-			{ stream: 'recycling', instance: '261102-1' }
-		]);
+		expect(timeline.loads).toEqual([{ stream: 'recycling', instance: '261102-1' }]);
 		expect(session.view).toEqual(view);
 		expect(hydrate).toHaveBeenCalledWith({
 			stream: 'recycling',
@@ -272,10 +279,7 @@ describe('BoardSession', () => {
 		const timeline = fakeTimeline(async () => {
 			throw new Error('timeline down');
 		});
-		const { session } = harness(
-			{ kind: 'boot', stream: 'recycling' },
-			timeline
-		);
+		const { session } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
 
 		await session.load();
 
@@ -384,9 +388,7 @@ describe('BoardSession', () => {
 		});
 		await vi.waitFor(() => {
 			expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
-			expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe(
-				'Register refreshed'
-			);
+			expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe('Register refreshed');
 		});
 		expect(formFetch).toHaveBeenCalled();
 	});
@@ -429,9 +431,7 @@ describe('BoardSession', () => {
 		});
 
 		expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
-		expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe(
-			'Register'
-		);
+		expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe('Register');
 	});
 
 	test('domainChanged advance invalidates and re-enqueues that recap', async () => {
@@ -447,9 +447,11 @@ describe('BoardSession', () => {
 		const recapFetch = vi.fn(async () => ({ items: [recap(2)] }));
 		const timeline = fakeTimeline(async () => instanceView());
 		const formCache = createBoardFormCache({
-			taskForm: { fetch: vi.fn(async () => {
-				throw new Error('unexpected form fetch');
-			}) }
+			taskForm: {
+				fetch: vi.fn(async () => {
+					throw new Error('unexpected form fetch');
+				})
+			}
 		});
 		const recapCache = createBoardRecapCache({
 			taskRecap: { fetch: recapFetch }
@@ -502,9 +504,11 @@ describe('BoardSession', () => {
 		const recapFetch = vi.fn(async () => ({ items: [recap(2)] }));
 		const timeline = fakeTimeline(async () => instanceView());
 		const formCache = createBoardFormCache({
-			taskForm: { fetch: vi.fn(async () => {
-				throw new Error('unexpected form fetch');
-			}) }
+			taskForm: {
+				fetch: vi.fn(async () => {
+					throw new Error('unexpected form fetch');
+				})
+			}
 		});
 		const recapCache = createBoardRecapCache({
 			taskRecap: { fetch: recapFetch }
@@ -580,10 +584,7 @@ describe('BoardSession', () => {
 
 	test('domainChanged advance without a view does nothing on boot scope', async () => {
 		const timeline = fakeTimeline(async () => bootView());
-		const { session, hydrate } = harness(
-			{ kind: 'boot', stream: 'recycling' },
-			timeline
-		);
+		const { session, hydrate } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
 		const addr = normalizeTaskAddress({
 			stream: 'recycling',
 			instance: '261102-1',
@@ -602,5 +603,131 @@ describe('BoardSession', () => {
 
 		expect(timeline.loads).toHaveLength(0);
 		expect(hydrate).not.toHaveBeenCalled();
+	});
+
+	test('domainChanged foreign on instance revalidates open forms as stale', async () => {
+		const staleBundle: TaskFormBundle = {
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '261102-1',
+			title: 'Register',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		};
+		const freshBundle: TaskFormBundle = {
+			...staleBundle,
+			title: 'Register foreign'
+		};
+		let resolveForm!: (b: TaskFormBundle) => void;
+		const formFetch = vi.fn(
+			() =>
+				new Promise<TaskFormBundle>((resolve) => {
+					resolveForm = resolve;
+				})
+		);
+		const first = instanceView();
+		const second = { ...first, label: 'After foreign' };
+		let n = 0;
+		const timeline = fakeTimeline(async () => {
+			n += 1;
+			return n === 1 ? first : second;
+		});
+		const dropSeededDraft = vi.fn();
+		const { session, model, formCache, hydrate } = harness(
+			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline,
+			{ formFetch, dropSeededDraft }
+		);
+		await session.load();
+		hydrate.mockClear();
+
+		const addr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		formCache.putReady(addr, staleBundle);
+		model.setBodyOpen(addr, true);
+
+		const changed = session.domainChanged({ origin: 'foreign', revision: 2 });
+		expect(formCache.get(taskAddressKey(addr))?.status).toBe('ready');
+		expect(formCache.get(taskAddressKey(addr))?.bundle).toBe(staleBundle);
+
+		resolveForm(freshBundle);
+		await changed;
+		await vi.waitFor(() => {
+			expect(formCache.get(taskAddressKey(addr))?.stale).toBe(true);
+		});
+		expect(formCache.get(taskAddressKey(addr))?.bundle).toBe(staleBundle);
+		expect(session.view?.label).toBe('After foreign');
+		expect(hydrate).toHaveBeenCalledWith({
+			stream: 'recycling',
+			instance: '261102-1',
+			background: true
+		});
+
+		session.acceptStale(addr);
+		expect(dropSeededDraft).toHaveBeenCalledWith(addr);
+		expect(formCache.get(taskAddressKey(addr))?.bundle).toBe(freshBundle);
+		expect(formCache.get(taskAddressKey(addr))?.stale).toBe(false);
+	});
+
+	test('domainChanged foreign on boot only reloads the timeline', async () => {
+		const first = bootView();
+		const second = { ...first, label: 'Boot after foreign' };
+		let n = 0;
+		const timeline = fakeTimeline(async () => {
+			n += 1;
+			return n === 1 ? first : second;
+		});
+		const formFetch = vi.fn(async () => {
+			throw new Error('unexpected form fetch');
+		});
+		const { session, formCache, hydrate } = harness(
+			{ kind: 'boot', stream: 'recycling' },
+			timeline,
+			{ formFetch }
+		);
+		await session.load();
+		hydrate.mockClear();
+
+		const readyAddr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '',
+			jobId: 'intake',
+			jobInstanceId: '',
+			taskId: 'truckArrive'
+		});
+		formCache.putReady(readyAddr, {
+			jobId: 'intake',
+			taskId: 'truckArrive',
+			jobInstanceId: '',
+			title: 'Truck',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		});
+
+		await session.domainChanged({ origin: 'foreign', revision: 2 });
+
+		expect(session.view?.label).toBe('Boot after foreign');
+		expect(timeline.loads).toHaveLength(2);
+		expect(hydrate).not.toHaveBeenCalled();
+		expect(formFetch).not.toHaveBeenCalled();
+		expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
+		expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe('Truck');
 	});
 });

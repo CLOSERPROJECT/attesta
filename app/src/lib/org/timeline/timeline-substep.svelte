@@ -36,13 +36,13 @@
 	const embedBodyId = $derived(`substep-${domId}-embed`);
 	const status = $derived(substep.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
-	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
+	const showStatusChip = $derived(
+		!!status && streamStatusChipVisible(status, timelineModel.showAll)
+	);
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(status ? `substep-${status}` : '');
 
-	const parsed = $derived(
-		substep.href ? parseTaskHref(substep.href, stream, instance) : null
-	);
+	const parsed = $derived(substep.href ? parseTaskHref(substep.href, stream, instance) : null);
 	const address = $derived(parsed?.address ?? null);
 	const seed = $derived(parsed?.seed ?? {});
 	const embed = $derived(!!(substep.orgActionable && address));
@@ -113,8 +113,8 @@
 				onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}
 				onFocus={() => timelineModel.select(address)}
 				onCommitted={(outcome) =>
-					board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })
-				}
+					board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })}
+				onAcceptStale={() => board.acceptStale(address)}
 			>
 				{#snippet header({ tablist })}
 					<!--
@@ -128,7 +128,7 @@
 					<div
 						class={cn(
 							'group/accordion-trigger substep-accordion-summary substep-card-link relative flex w-full flex-1 items-center justify-between text-sm font-medium',
-							'**:data-[slot=accordion-trigger-icon]:text-muted-foreground **:data-[slot=accordion-trigger-icon]:size-4'
+							'**:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground'
 						)}
 						data-state={embedOpen ? 'open' : 'closed'}
 						onclick={onEmbedHeaderClick}
@@ -145,7 +145,9 @@
 							{#if showStatusChip}
 								<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
 									{#snippet trail()}
-										<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+										<span class="status" data-status={status} aria-label={statusChipLabel}
+											>{statusChipLabel}</span
+										>
 									{/snippet}
 								</TimelineHeaderLine>
 							{:else}
@@ -190,7 +192,9 @@
 				{#if showStatusChip}
 					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
 						{#snippet trail()}
-							<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+							<span class="status" data-status={status} aria-label={statusChipLabel}
+								>{statusChipLabel}</span
+							>
 						{/snippet}
 					</TimelineHeaderLine>
 				{:else}

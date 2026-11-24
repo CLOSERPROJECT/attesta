@@ -2,18 +2,10 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { CommitDomainError } from './commit-port.js';
 import { draftAddressForTask, draftKey } from './drafts.js';
-import {
-	orgDraftStorageKey,
-	memoryStorage,
-	readStoredDraft
-} from './draft-storage.js';
+import { orgDraftStorageKey, memoryStorage, readStoredDraft } from './draft-storage.js';
 import type { LoadDomainPort } from './load-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
-import {
-	DEFAULT_DRAFT_DEBOUNCE_MS,
-	OrgSession,
-	type DraftPersistClock
-} from './session.svelte.js';
+import { DEFAULT_DRAFT_DEBOUNCE_MS, OrgSession, type DraftPersistClock } from './session.svelte.js';
 import { emptyWorklist, type LoadResult, type Worklist } from './types.js';
 
 function manualClock(): DraftPersistClock & { flush: () => void } {
@@ -115,6 +107,36 @@ describe('OrgSession', () => {
 		await session.hydrate(hydrateScope);
 		expect(session.result).toBeNull();
 		expect(session.error).toBe('boom');
+	});
+
+	test('hydrate with keepOnError keeps the prior result when Load fails', async () => {
+		const session = new OrgSession({
+			load: {
+				load: async () => {
+					throw new Error('boom');
+				}
+			},
+			hydrate: false
+		});
+		session.result = sample;
+		await session.hydrate(hydrateScope, { keepOnError: true });
+		expect(session.result).toBe(sample);
+		expect(session.error).toBe('boom');
+	});
+
+	test('dropSeededDraft removes a seeded entry and leaves a dirty one', () => {
+		const session = new OrgSession({ hydrate: false });
+		const path = 'intake/register';
+		const key = 'NIR-1';
+		session.seedDraft(path, key, { client: 'seed' });
+		session.dropSeededDraft(path, key);
+		expect(session.getDraft(path, key)).toBeNull();
+
+		session.seedDraft(path, key, { client: 'seed' });
+		session.setDraft(path, key, { client: 'dirty' });
+		session.dropSeededDraft(path, key);
+		expect(session.getDraft(path, key)).toEqual({ client: 'dirty' });
+		expect(session.hasDirtyDraft(path, key)).toBe(true);
 	});
 
 	test('commit success replaces Worklist and clears Draft', async () => {
@@ -323,7 +345,6 @@ describe('OrgSession', () => {
 		expect(await first).toMatchObject({ jobInstanceId: 'NIR-1', navigation: 'overview' });
 		expect(commit).toHaveBeenCalledTimes(1);
 	});
-
 
 	test('provisional startingNew clears _new draft and returns response id', async () => {
 		const commit = vi.fn(async () => ({
@@ -710,12 +731,7 @@ describe('OrgSession', () => {
 		await session.hydrate(hydrateScope);
 		const path = 'intake/register';
 		const bagKey = 'NIR-1';
-		const storageKey = orgDraftStorageKey(
-			'feragame',
-			'recycling',
-			'u1',
-			draftKey(path, bagKey)
-		);
+		const storageKey = orgDraftStorageKey('feragame', 'recycling', 'u1', draftKey(path, bagKey));
 
 		session.setDraft(path, bagKey, { client: 'pending' });
 		expect(storage.getItem(storageKey)).toBeNull();
@@ -849,8 +865,6 @@ describe('OrgSession', () => {
 		session.setDraft(provisional.taskPath, provisional.draftBagInstanceKey, {
 			client: 'NO'
 		});
-		expect(
-			session.hasDirtyDraft(provisional.taskPath, provisional.draftBagInstanceKey)
-		).toBe(true);
+		expect(session.hasDirtyDraft(provisional.taskPath, provisional.draftBagInstanceKey)).toBe(true);
 	});
 });

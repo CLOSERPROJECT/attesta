@@ -27,6 +27,8 @@
 	"could_not_load_recap": "Could not load recap",
 	"embed_tab_form": "Form",
 	"embed_tab_recap": "Recap",
+	"embed_stale_notice": "Another operator updated this task.",
+	"embed_stale_reload": "Reload",
 	"submission_count_one": "{count} submission",
 	"submission_count_many": "{count} submissions",
 	"form_unavailable": "Form unavailable",

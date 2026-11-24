@@ -1,8 +1,8 @@
 import { taskAddressKey, type TaskAddress } from '../task-address.js';
 import { stayAftermath } from './commit-stay-recap.js';
 
-/** What happened to the Domain, as told to BoardSession.domainChanged. */
-export type DomainChange = {
+/** Own Commit (or other local write) told to BoardSession.domainChanged. */
+export type OwnDomainChange = {
 	origin: 'own';
 	/** Revision the Commit wrote; null when unknown. */
 	revision: number | null;
@@ -12,6 +12,9 @@ export type DomainChange = {
 	follow: 'stay' | 'advance' | 'leaving';
 	submitMany: boolean;
 };
+
+/** What happened to the Domain, as told to BoardSession.domainChanged. */
+export type DomainChange = OwnDomainChange | { origin: 'foreign'; revision: number };
 
 /** Board facts the policy needs. */
 export type BoardRefreshFacts = {
@@ -28,6 +31,14 @@ export type BoardRefreshPlan = {
 	remountForms: boolean;
 	/** Recaps to invalidate and re-enqueue. */
 	recapRefresh: TaskAddress[];
+	/** Refetch ready form bundles in place; open forms get a stale marker instead of a swap. */
+	revalidateForms: boolean;
+	/** Committed addresses in this batch: never marked stale (their own refresh covers them). */
+	holdExempt: string[];
+	/** Refetch ready recaps in place. */
+	revalidateRecaps: boolean;
+	/** Worklist hydrate keeps the prior result if the Load fails. */
+	background: boolean;
 };
 
 export function planBoardRefresh(
@@ -37,9 +48,25 @@ export function planBoardRefresh(
 	let timeline = false;
 	let worklistOnly = false;
 	let remountForms = false;
+	let revalidateForms = false;
+	let revalidateRecaps = false;
+	let background = false;
+	const holdExempt: string[] = [];
 	const recaps = new Map<string, TaskAddress>();
 
 	for (const change of changes) {
+		if (change.origin === 'foreign') {
+			timeline = true;
+			if (facts.scopeKind === 'instance') {
+				revalidateForms = true;
+				revalidateRecaps = true;
+				background = true;
+			}
+			continue;
+		}
+
+		holdExempt.push(taskAddressKey(change.addr));
+
 		if (change.follow === 'stay') {
 			timeline = true;
 			remountForms = stayAftermath(change.submitMany).refreshForms || remountForms;
@@ -51,10 +78,18 @@ export function planBoardRefresh(
 		recaps.set(taskAddressKey(change.addr), change.addr);
 	}
 
+	if (remountForms) {
+		revalidateForms = false;
+	}
+
 	return {
 		timeline,
 		worklistOnly: timeline ? false : worklistOnly,
 		remountForms,
-		recapRefresh: [...recaps.values()]
+		recapRefresh: [...recaps.values()],
+		revalidateForms,
+		holdExempt: revalidateForms ? holdExempt : [],
+		revalidateRecaps,
+		background
 	};
 }

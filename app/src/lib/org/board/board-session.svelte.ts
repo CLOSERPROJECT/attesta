@@ -12,8 +12,7 @@ import type { BoardTaskFocus } from './board-url.js';
 
 /** Route-edge scope: boot (Play / not-instanced) or minted stream instance. */
 export type BoardScope =
-	| { kind: 'boot'; stream: string }
-	| { kind: 'instance'; stream: string; instance: string };
+	{ kind: 'boot'; stream: string } | { kind: 'instance'; stream: string; instance: string };
 
 export type AdoptInstanceOptions = {
 	focus?: BoardTaskFocus | null;
@@ -34,7 +33,8 @@ export type BoardSessionOptions = {
 	formCache: BoardFormCache;
 	recapCache: BoardRecapCache;
 	navigateToInstance: NavigateToInstance;
-	hydrate?: (args: { stream: string; instance: string }) => void;
+	hydrate?: (args: { stream: string; instance: string; background?: boolean }) => void;
+	dropSeededDraft?: (addr: TaskAddress) => void;
 };
 
 export type BoardSession = {
@@ -50,6 +50,8 @@ export type BoardSession = {
 	 * projections planBoardRefresh selects. Resolves when the refresh finished.
 	 */
 	domainChanged(change: DomainChange): Promise<void>;
+	/** Operator accepted the stale notice: reseed prefill, swap in the newer bundle. */
+	acceptStale(addr: TaskAddress): void;
 	adoptInstance(instance: string, opts?: AdoptInstanceOptions): Promise<void>;
 	/** Sync session when route props change (without soft-nav). */
 	setScope(scope: BoardScope): void;
@@ -85,7 +87,7 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 	let error = $state('');
 	let gen = 0;
 
-	const { timeline, model, formCache, recapCache, navigateToInstance, hydrate } =
+	const { timeline, model, formCache, recapCache, navigateToInstance, hydrate, dropSeededDraft } =
 		opts;
 
 	function applyScopeToModel(next: BoardScope) {
@@ -96,7 +98,8 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 
 	async function fetchView(
 		query: TimelineLoadQuery,
-		mode: 'load' | 'reload'
+		mode: 'load' | 'reload',
+		fetchOpts?: { background?: boolean }
 	): Promise<void> {
 		const myGen = ++gen;
 		if (mode === 'load') {
@@ -115,7 +118,11 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 			model.setView(next);
 			error = '';
 			if (scope.kind === 'instance') {
-				hydrate?.({ stream: scope.stream, instance: scope.instance });
+				hydrate?.({
+					stream: scope.stream,
+					instance: scope.instance,
+					...(fetchOpts?.background ? { background: true } : {})
+				});
 			}
 		} catch (e: unknown) {
 			if (myGen !== gen) return;
@@ -170,11 +177,31 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 				recapCache.invalidate(taskAddressKey(addr));
 				recapCache.enqueue([addr]);
 			}
-			if (plan.timeline) {
-				await fetchView(timelineQueryForScope(scope), 'reload');
-			} else if (plan.worklistOnly && scope.kind === 'instance') {
-				hydrate?.({ stream: scope.stream, instance: scope.instance });
+			if (plan.revalidateForms) {
+				const exempt = plan.holdExempt;
+				formCache.revalidateAll({
+					hold: (e) => model.isBodyOpen(e.address) && !exempt.includes(e.key),
+					onSwap: (a) => dropSeededDraft?.(a)
+				});
 			}
+			if (plan.revalidateRecaps) {
+				recapCache.revalidateAll();
+			}
+			if (plan.timeline) {
+				await fetchView(timelineQueryForScope(scope), 'reload', {
+					background: plan.background
+				});
+			} else if (plan.worklistOnly && scope.kind === 'instance') {
+				hydrate?.({
+					stream: scope.stream,
+					instance: scope.instance,
+					...(plan.background ? { background: true } : {})
+				});
+			}
+		},
+		acceptStale(addr: TaskAddress) {
+			dropSeededDraft?.(addr);
+			formCache.acceptStale(taskAddressKey(addr));
 		},
 		async adoptInstance(instance: string, adoptOpts: AdoptInstanceOptions = {}) {
 			if (adoptOpts.bundle && adoptOpts.bundleAddr) {

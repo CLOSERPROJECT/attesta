@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { normalizeTaskAddress, type TaskAddress } from '../task-address.js';
+import { normalizeTaskAddress, taskAddressKey, type TaskAddress } from '../task-address.js';
 import {
 	planBoardRefresh,
 	type BoardRefreshFacts,
-	type DomainChange
+	type OwnDomainChange
 } from './board-refresh-plan.js';
 
 function taskAddr(taskId = 'register'): TaskAddress {
@@ -18,12 +18,19 @@ function taskAddr(taskId = 'register'): TaskAddress {
 }
 
 function change(
-	follow: DomainChange['follow'],
+	follow: OwnDomainChange['follow'],
 	addr: TaskAddress,
 	submitMany = false
-): DomainChange {
+): OwnDomainChange {
 	return { origin: 'own', revision: 7, addr, follow, submitMany };
 }
+
+const ownDefaults = {
+	revalidateForms: false,
+	holdExempt: [] as string[],
+	revalidateRecaps: false,
+	background: false
+};
 
 const viewable: BoardRefreshFacts = { scopeKind: 'instance', hasView: true };
 const noViewInstance: BoardRefreshFacts = { scopeKind: 'instance', hasView: false };
@@ -36,7 +43,8 @@ describe('planBoardRefresh', () => {
 			timeline: true,
 			worklistOnly: false,
 			remountForms: true,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -46,7 +54,8 @@ describe('planBoardRefresh', () => {
 			timeline: true,
 			worklistOnly: false,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -56,7 +65,8 @@ describe('planBoardRefresh', () => {
 			timeline: true,
 			worklistOnly: false,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -71,7 +81,8 @@ describe('planBoardRefresh', () => {
 			timeline: true,
 			worklistOnly: false,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -81,7 +92,8 @@ describe('planBoardRefresh', () => {
 			timeline: false,
 			worklistOnly: true,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -91,7 +103,8 @@ describe('planBoardRefresh', () => {
 			timeline: false,
 			worklistOnly: false,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -101,7 +114,8 @@ describe('planBoardRefresh', () => {
 			timeline: false,
 			worklistOnly: false,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -111,7 +125,8 @@ describe('planBoardRefresh', () => {
 			timeline: false,
 			worklistOnly: false,
 			remountForms: false,
-			recapRefresh: [addr]
+			recapRefresh: [addr],
+			...ownDefaults
 		});
 	});
 
@@ -132,5 +147,56 @@ describe('planBoardRefresh', () => {
 		expect(plan.timeline).toBe(true);
 		expect(plan.worklistOnly).toBe(false);
 		expect(plan.recapRefresh).toHaveLength(2);
+	});
+
+	test('foreign on instance scope revalidates forms and recaps in the background', () => {
+		expect(planBoardRefresh([{ origin: 'foreign', revision: 2 }], viewable)).toEqual({
+			timeline: true,
+			worklistOnly: false,
+			remountForms: false,
+			recapRefresh: [],
+			revalidateForms: true,
+			holdExempt: [],
+			revalidateRecaps: true,
+			background: true
+		});
+	});
+
+	test('foreign on boot scope only reloads the timeline', () => {
+		expect(planBoardRefresh([{ origin: 'foreign', revision: 2 }], noViewBoot)).toEqual({
+			timeline: true,
+			worklistOnly: false,
+			remountForms: false,
+			recapRefresh: [],
+			...ownDefaults
+		});
+	});
+
+	test('own stay plus foreign holds the own key and turns both revalidations on', () => {
+		const addr = taskAddr();
+		const plan = planBoardRefresh(
+			[change('stay', addr), { origin: 'foreign', revision: 2 }],
+			viewable
+		);
+		expect(plan.timeline).toBe(true);
+		expect(plan.remountForms).toBe(false);
+		expect(plan.revalidateForms).toBe(true);
+		expect(plan.revalidateRecaps).toBe(true);
+		expect(plan.background).toBe(true);
+		expect(plan.holdExempt).toEqual([taskAddressKey(addr)]);
+		expect(plan.recapRefresh).toEqual([addr]);
+	});
+
+	test('own stay submitMany plus foreign remounts forms and skips revalidateForms', () => {
+		const addr = taskAddr();
+		const plan = planBoardRefresh(
+			[change('stay', addr, true), { origin: 'foreign', revision: 2 }],
+			viewable
+		);
+		expect(plan.remountForms).toBe(true);
+		expect(plan.revalidateForms).toBe(false);
+		expect(plan.holdExempt).toEqual([]);
+		expect(plan.revalidateRecaps).toBe(true);
+		expect(plan.background).toBe(true);
 	});
 });

@@ -16,10 +16,7 @@ import {
 } from './draft-storage.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
 import type { LoadDomainPort } from './load-port.js';
-import {
-	operatorFromLoad,
-	type OperatorIdentity
-} from './form/operator-identity.js';
+import { operatorFromLoad, type OperatorIdentity } from './form/operator-identity.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 /** Debounce for dirty Draft localStorage writes. */
@@ -88,17 +85,14 @@ export class OrgSession {
 	constructor(options: OrgSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
-		this.#storage =
-			options.storage !== undefined ? options.storage : browserStorage();
+		this.#storage = options.storage !== undefined ? options.storage : browserStorage();
 		this.#debounceMs = options.debounceMs ?? DEFAULT_DRAFT_DEBOUNCE_MS;
 		this.#clock = options.clock ?? defaultClock;
 		if (options.hydrate !== false) {
 			void this.hydrate();
 		}
 		const attachHide =
-			options.flushOnHide !== false &&
-			typeof window !== 'undefined' &&
-			this.#storage != null;
+			options.flushOnHide !== false && typeof window !== 'undefined' && this.#storage != null;
 		if (attachHide) {
 			const onHide = () => this.flushPendingDrafts();
 			const onVis = () => {
@@ -145,11 +139,7 @@ export class OrgSession {
 	};
 
 	/** Dirty operator/QR write — counts for marks/persist until clearDraft. */
-	setDraft = (
-		taskPath: string,
-		jobInstanceId: string,
-		value: Record<string, unknown>
-	): void => {
+	setDraft = (taskPath: string, jobInstanceId: string, value: Record<string, unknown>): void => {
 		const key = draftKey(taskPath, jobInstanceId);
 		const prior = this.drafts[key];
 		this.drafts = {
@@ -157,9 +147,7 @@ export class OrgSession {
 			[key]: {
 				value,
 				dirty: true,
-				...(prior?.seededFields !== undefined
-					? { seededFields: prior.seededFields }
-					: {})
+				...(prior?.seededFields !== undefined ? { seededFields: prior.seededFields } : {})
 			}
 		};
 		this.#schedulePersist(key, value);
@@ -178,10 +166,7 @@ export class OrgSession {
 	): void => {
 		const key = draftKey(taskPath, jobInstanceId);
 		const prior = this.drafts[key];
-		const fields =
-			seededFields !== undefined
-				? seededFields
-				: prior?.seededFields;
+		const fields = seededFields !== undefined ? seededFields : prior?.seededFields;
 		this.drafts = {
 			...this.drafts,
 			[key]: {
@@ -192,10 +177,7 @@ export class OrgSession {
 		};
 	};
 
-	getSeededFields = (
-		taskPath: string,
-		draftBagInstanceKey: string
-	): readonly string[] | null => {
+	getSeededFields = (taskPath: string, draftBagInstanceKey: string): readonly string[] | null => {
 		return this.drafts[draftKey(taskPath, draftBagInstanceKey)]?.seededFields ?? null;
 	};
 
@@ -236,11 +218,18 @@ export class OrgSession {
 		}
 		const id = this.#identity;
 		if (id) {
-			removeStoredDraft(
-				this.#storage,
-				orgDraftStorageKey(id.org, id.stream, id.userId, key)
-			);
+			removeStoredDraft(this.#storage, orgDraftStorageKey(id.org, id.stream, id.userId, key));
 		}
+	};
+
+	/** Drop a prefill-only (non-dirty) draft so the next mount reseeds from a fresher bundle. Dirty drafts stay. */
+	dropSeededDraft = (taskPath: string, draftBagInstanceKey: string): void => {
+		const key = draftKey(taskPath, draftBagInstanceKey);
+		const entry = this.drafts[key];
+		if (!entry || entry.dirty) return;
+		const next = { ...this.drafts };
+		delete next[key];
+		this.drafts = next;
 	};
 
 	/** Force pending debounced writes to storage (page hide / tests). */
@@ -265,7 +254,10 @@ export class OrgSession {
 		};
 	};
 
-	hydrate = async (scope?: { stream: string; instance: string }): Promise<void> => {
+	hydrate = async (
+		scope?: { stream: string; instance: string },
+		opts?: { keepOnError?: boolean }
+	): Promise<void> => {
 		if (scope) this.setScope(scope);
 		const active = this.#scope;
 		if (!active?.stream || !active.instance) {
@@ -278,7 +270,9 @@ export class OrgSession {
 			this.result = await this.load.load(active);
 			this.#syncIdentityFromResult(this.result, active.stream);
 		} catch (err) {
-			this.result = null;
+			if (!opts?.keepOnError) {
+				this.result = null;
+			}
 			this.error = err instanceof Error ? err.message : String(err);
 		} finally {
 			this.loading = false;
@@ -350,9 +344,7 @@ export class OrgSession {
 			this.clearOpenSeed(req.taskPath);
 			return {
 				jobInstanceId: committed.jobInstanceId,
-				...(committed.submissionId !== undefined
-					? { submissionId: committed.submissionId }
-					: {}),
+				...(committed.submissionId !== undefined ? { submissionId: committed.submissionId } : {}),
 				worklist: committed.worklist,
 				navigation: committed.navigation,
 				continueNavigation: committed.continueNavigation ?? null,
@@ -414,19 +406,9 @@ export class OrgSession {
 		}
 	};
 
-	#rehydrateFromStorage = (
-		id: DraftIdentity,
-		opts: { keepMemoryDirty: boolean }
-	): void => {
-		const loaded = loadDirtyDraftsForIdentity(
-			this.#storage,
-			id.org,
-			id.stream,
-			id.userId
-		);
-		const next: Record<string, DraftEntry> = opts.keepMemoryDirty
-			? { ...this.drafts }
-			: {};
+	#rehydrateFromStorage = (id: DraftIdentity, opts: { keepMemoryDirty: boolean }): void => {
+		const loaded = loadDirtyDraftsForIdentity(this.#storage, id.org, id.stream, id.userId);
+		const next: Record<string, DraftEntry> = opts.keepMemoryDirty ? { ...this.drafts } : {};
 		for (const [key, value] of Object.entries(loaded)) {
 			const prior = next[key];
 			if (prior?.dirty) continue; // in-memory dirty wins
@@ -454,11 +436,7 @@ export class OrgSession {
 	#persistNow = (key: string, value: Record<string, unknown>): void => {
 		const id = this.#identity;
 		if (!id || !this.#storage) return;
-		writeStoredDraft(
-			this.#storage,
-			orgDraftStorageKey(id.org, id.stream, id.userId, key),
-			value
-		);
+		writeStoredDraft(this.#storage, orgDraftStorageKey(id.org, id.stream, id.userId, key), value);
 	};
 
 	#cancelPersist = (key: string): void => {
