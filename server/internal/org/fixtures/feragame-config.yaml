@@ -212,13 +212,33 @@ steps:
                     notes: {type: string, title: Note}
               uiSchema:
                 ui:options:
-                    order: [client, wasteCode, numeroFir, palletCount, truckWeightAfter, notes]
+                    order:
+                        [
+                            client,
+                            progressiveNumber,
+                            numeroFir,
+                            palletCount,
+                            truckWeightBefore,
+                            truckWeightAfter,
+                            lotNetWeight,
+                            notes,
+                            wasteCode,
+                        ]
+                    layout: cols-3
                 client:
                     ui:options:
                         enumNames: [CO, DA, DI, EC, EF, EM, ER, HI, MI, MO, NI, PR, RE, SA, SK]
+                numeroFir:
+                    ui:options:
+                        layoutNewRow: true
                 wasteCode:
                     ui:options:
                         enumNames: ['16.02.14']
+                notes:
+                    ui:components:
+                        textWidget: textareaWidget
+                    ui:options:
+                        layoutSpan: true
               chrome:
                 progressiveNumber:
                     kind: readonly
@@ -230,10 +250,18 @@ steps:
                           $prefix := $.client & '-' & $dateStamp & '-';
                           $count($filter($keys($domain.lot), function($k){ $substring($string($k), 0, $length($prefix)) = $prefix })) + 1
                         )
+                truckWeightBefore:
+                    kind: readonly
+                    title: Peso camion (prima)
+                    before: truckWeightAfter
+                    layoutNewRow: true
+                    expr: >-
+                        $lookup($domain.truck, $instance.id).lastScaleReading
                 lotNetWeight:
                     kind: readonly
                     title: Peso netto lotto
                     after: truckWeightAfter
+                    placeholder: Calcolato dopo il peso camion…
                     expr: >-
                         (
                           $prev := $lookup($domain.truck, $instance.id).lastScaleReading;
@@ -493,9 +521,7 @@ steps:
                 ui:options:
                     order:
                         [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
-                    layouts:
-                        object-properties:
-                            class: form-cols-2
+                    layout: cols-2
                 tareKind:
                     ui:options:
                         enumNames: ['industriale (25 kg)', 'euro (20 kg)', 'personalizzato']
@@ -505,9 +531,7 @@ steps:
                 panelCount:
                     ui:field: derivedLeaf
                     ui:options:
-                        layouts:
-                            object-property:
-                                class: form-cols-span
+                        layoutSpan: true
               onSubmit:
                 transform:
                     - op: patch
