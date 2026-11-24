@@ -43,6 +43,57 @@ func TestHandleLoadScopedToStreamInstance(t *testing.T) {
 	}
 }
 
+func TestHandleTimelineBoot(t *testing.T) {
+	_, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
+	h := &API{
+		DomainLoader: loader,
+		Gate: func(http.ResponseWriter, *http.Request) (OperatorIdentity, bool) {
+			return adminOp(), true
+		},
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/api/org/timeline?stream=recycling", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("boot status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var got TimelineView
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Mode != TimelineModeBoot {
+		t.Fatalf("mode = %q, want %q", got.Mode, TimelineModeBoot)
+	}
+	if got.Stream != "recycling" || got.Instance != "" {
+		t.Fatalf("boot scope = %#v", got)
+	}
+	if len(got.Steps) == 0 || len(got.Steps[0].Substeps) == 0 {
+		t.Fatalf("boot steps = %#v", got.Steps)
+	}
+	start := got.Steps[0].Substeps[0]
+	if !start.OrgActionable {
+		t.Fatalf("boot start must be orgActionable: %#v", start)
+	}
+	wantHref := AppOrgPlayTaskPath("recycling", "intake", "", "truckArrive")
+	if start.Href != wantHref {
+		t.Fatalf("boot href = %q, want %q", start.Href, wantHref)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/api/org/timeline?stream=recycling&instance=", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("blank instance boot = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var blank TimelineView
+	if err := json.Unmarshal(rec.Body.Bytes(), &blank); err != nil {
+		t.Fatal(err)
+	}
+	if blank.Mode != TimelineModeBoot {
+		t.Fatalf("blank instance mode = %q, want %q", blank.Mode, TimelineModeBoot)
+	}
+}
+
 func TestHandleTimelineScopedToStreamInstance(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckA := commitTruckArrive(t, c)
@@ -63,6 +114,9 @@ func TestHandleTimelineScopedToStreamInstance(t *testing.T) {
 	var got TimelineView
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
+	}
+	if got.Mode != TimelineModeInstance {
+		t.Fatalf("mode = %q, want %q", got.Mode, TimelineModeInstance)
 	}
 	if got.Stream != "recycling" || got.Instance != truckA {
 		t.Fatalf("scope = %#v", got)

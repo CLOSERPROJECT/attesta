@@ -15,6 +15,13 @@ export type BoardFormEntry = {
 	status: BoardFormEntryStatus;
 	bundle: TaskFormBundle | null;
 	error: string | null;
+	/**
+	 * Form draft identity for this address. Advances when a Domain Commit refresh
+	 * lands a new ready bundle (or on beginFreshDraft remount-only) so the embed
+	 * remounts against a cleared draft bag. Pre-submit Form↔Recap toggles do not
+	 * change this.
+	 */
+	draftGeneration: number;
 };
 
 export type BoardFormCacheOptions = {
@@ -45,6 +52,8 @@ export class BoardFormCache {
 	#controllers = new Map<string, AbortController>();
 	/** Survives beginScope once (Play→instance soft-nav). */
 	#carryReady: BoardFormEntry[] = [];
+	/** Keys that should advance draftGeneration when their next fetch becomes ready. */
+	#bumpDraftOnReady = new Set<string>();
 
 	constructor(options: BoardFormCacheOptions = {}) {
 		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
@@ -62,6 +71,7 @@ export class BoardFormCache {
 		this.#scopeKey = scopeKey;
 		this.#queue = [];
 		this.#queued.clear();
+		this.#bumpDraftOnReady.clear();
 		const carried = this.#carryReady;
 		this.#carryReady = [];
 		const next: Record<string, BoardFormEntry> = {};
@@ -76,7 +86,11 @@ export class BoardFormCache {
 		for (const addr of addrs) {
 			const key = taskAddressKey(addr);
 			const existing = this.entries[key];
-			if (existing?.status === 'ready' || existing?.status === 'loading') {
+			if (
+				existing?.status === 'ready' ||
+				existing?.status === 'loading' ||
+				existing?.status === 'error'
+			) {
 				continue;
 			}
 			if (this.#queued.has(key)) continue;
@@ -87,7 +101,8 @@ export class BoardFormCache {
 				address: addr,
 				status: 'idle',
 				bundle: null,
-				error: null
+				error: null,
+				draftGeneration: 0
 			});
 		}
 		this.#pump();
@@ -100,12 +115,14 @@ export class BoardFormCache {
 		this.#controllers.delete(key);
 		this.#queued.delete(key);
 		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
+		const priorGen = this.entries[key]?.draftGeneration ?? 0;
 		const entry: BoardFormEntry = {
 			key,
 			address: addr,
 			status: 'ready',
 			bundle,
-			error: null
+			error: null,
+			draftGeneration: priorGen
 		};
 		this.#setEntry(entry);
 		// Carry across the next beginScope (soft-nav remount).
@@ -113,10 +130,50 @@ export class BoardFormCache {
 		this.#carryReady.push(entry);
 	}
 
+	/**
+	 * Remount-only: advance draftGeneration while keeping the ready bundle.
+	 * Prefer BoardSession.afterDomainCommit `{ refreshForms: true }` (stay
+	 * submitMany) — that path drops stale bindings and refetches.
+	 * No-op when the address is not cached (nothing to re-bind).
+	 */
+	beginFreshDraft(addr: TaskAddress): void {
+		const key = taskAddressKey(addr);
+		const existing = this.entries[key];
+		if (!existing) return;
+		const entry: BoardFormEntry = {
+			...existing,
+			draftGeneration: existing.draftGeneration + 1
+		};
+		this.#setEntry(entry);
+		if (entry.status === 'ready' && entry.bundle) {
+			this.#carryReady = this.#carryReady.filter((e) => e.key !== key);
+			this.#carryReady.push(entry);
+		}
+	}
+
+	/**
+	 * Stay submitMany after Domain Commit: every cached form bundle in the current
+	 * scope may hold stale bindings.domain. Drop ready/error/loading entries to
+	 * loading (skeleton, not stale paint), refetch via TaskFormPort, and advance
+	 * draftGeneration when each becomes ready so Form remounts on a cleared draft
+	 * + fresh chrome bindings.
+	 */
+	refreshAllAfterDomainCommit(): void {
+		const targets = Object.values(this.entries).filter(
+			(e) =>
+				e.status === 'ready' || e.status === 'error' || e.status === 'loading'
+		);
+		for (const entry of targets) {
+			this.#bumpDraftOnReady.add(entry.key);
+			this.#restartFetch(entry.address);
+		}
+	}
+
 	invalidate(key: string): void {
 		this.#controllers.get(key)?.abort();
 		this.#controllers.delete(key);
 		this.#queued.delete(key);
+		this.#bumpDraftOnReady.delete(key);
 		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
 		const next = { ...this.entries };
 		delete next[key];
@@ -128,6 +185,7 @@ export class BoardFormCache {
 		this.#scopeKey = '';
 		this.#queue = [];
 		this.#queued.clear();
+		this.#bumpDraftOnReady.clear();
 		this.entries = {};
 	}
 
@@ -142,6 +200,31 @@ export class BoardFormCache {
 
 	#setEntry(entry: BoardFormEntry): void {
 		this.entries = { ...this.entries, [entry.key]: entry };
+	}
+
+	/** Abort in-flight work for addr and start a fresh fetch (skeleton immediately). */
+	#restartFetch(addr: TaskAddress): void {
+		const key = taskAddressKey(addr);
+		this.#controllers.get(key)?.abort();
+		this.#controllers.delete(key);
+		this.#queued.delete(key);
+		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
+		this.#carryReady = this.#carryReady.filter((e) => e.key !== key);
+		const draftGeneration = this.entries[key]?.draftGeneration ?? 0;
+		this.#setEntry({
+			key,
+			address: addr,
+			status: 'loading',
+			bundle: null,
+			error: null,
+			draftGeneration
+		});
+		if (this.#inflight < this.concurrency) {
+			void this.#fetchOne(addr, key);
+			return;
+		}
+		this.#queued.add(key);
+		this.#queue.push(addr);
 	}
 
 	#pump(): void {
@@ -161,12 +244,14 @@ export class BoardFormCache {
 		const ac = new AbortController();
 		this.#controllers.set(key, ac);
 		this.#inflight += 1;
+		const draftGeneration = this.entries[key]?.draftGeneration ?? 0;
 		this.#setEntry({
 			key,
 			address: addr,
 			status: 'loading',
 			bundle: null,
-			error: null
+			error: null,
+			draftGeneration
 		});
 
 		try {
@@ -178,25 +263,36 @@ export class BoardFormCache {
 				jobInstanceId: wireJobInstanceId(addr)
 			});
 			if (gen !== this.#gen || ac.signal.aborted) return;
-			this.#setEntry({
+			const priorGen = this.entries[key]?.draftGeneration ?? draftGeneration;
+			const bump = this.#bumpDraftOnReady.has(key);
+			if (bump) this.#bumpDraftOnReady.delete(key);
+			const entry: BoardFormEntry = {
 				key,
 				address: addr,
 				status: 'ready',
 				bundle,
-				error: null
-			});
+				error: null,
+				draftGeneration: bump ? priorGen + 1 : priorGen
+			};
+			this.#setEntry(entry);
+			if (bump) {
+				this.#carryReady = this.#carryReady.filter((e) => e.key !== key);
+				this.#carryReady.push(entry);
+			}
 		} catch (err) {
 			if (gen !== this.#gen || ac.signal.aborted) return;
+			this.#bumpDraftOnReady.delete(key);
 			const message = err instanceof Error ? err.message : String(err);
 			this.#setEntry({
 				key,
 				address: addr,
 				status: 'error',
 				bundle: null,
-				error: message
+				error: message,
+				draftGeneration: this.entries[key]?.draftGeneration ?? draftGeneration
 			});
 		} finally {
-			this.#controllers.delete(key);
+			if (this.#controllers.get(key) === ac) this.#controllers.delete(key);
 			this.#inflight = Math.max(0, this.#inflight - 1);
 			if (gen === this.#gen) this.#pump();
 		}

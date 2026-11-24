@@ -21,6 +21,55 @@ func TestMapWorklistStatusToStreamState(t *testing.T) {
 	}
 }
 
+func mustTimelineInstance(t *testing.T, id string) TimelineFocus {
+	t.Helper()
+	focus, err := TimelineInstance(id)
+	if err != nil {
+		t.Fatalf("TimelineInstance(%q): %v", id, err)
+	}
+	return focus
+}
+
+func TestProjectStreamTimelineBootEmptyDomainAnchorAvailable(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := FixtureAllRolesOp()
+
+	tl := ProjectStreamTimeline(cfg, EmptyDomain(), op, TimelineBoot())
+	if len(tl.Steps) != 2 {
+		t.Fatalf("steps = %#v, want intake + lot_processing", tl.Steps)
+	}
+
+	intake := tl.Steps[0]
+	if intake.JobID != "intake" || len(intake.Rows) != 0 {
+		t.Fatalf("intake step = %#v", intake)
+	}
+	if len(intake.Tasks) == 0 {
+		t.Fatal("intake tasks empty")
+	}
+	if intake.Tasks[0].State != StreamSubstepAvailable {
+		t.Fatalf("anchor first task = %q (%s), want available", intake.Tasks[0].State, intake.Tasks[0].ID)
+	}
+	for i := 1; i < len(intake.Tasks); i++ {
+		if intake.Tasks[i].State != StreamSubstepLocked {
+			t.Fatalf("intake task[%d] = %#v, want locked", i, intake.Tasks[i])
+		}
+	}
+
+	lots := tl.Steps[1]
+	if lots.JobID != "lot_processing" {
+		t.Fatalf("lots job = %q", lots.JobID)
+	}
+	if len(lots.Rows) != 0 {
+		t.Fatalf("boot each rows = %#v, want none", lots.Rows)
+	}
+	if len(lots.Tasks) != 0 {
+		t.Fatalf("boot each tasks = %#v, want none", lots.Tasks)
+	}
+}
+
 func streamProjectionCfg() OrgConfig {
 	cfg := streamWorklistCfg()
 	intake := cfg.Jobs.Values["intake"].(Job)
@@ -158,7 +207,7 @@ func TestProjectStreamTimelineOnceAndEachNotYetStarted(t *testing.T) {
 		sub("intake", "arrive", "T-A"),
 	}
 
-	tl := ProjectStreamTimeline(cfg, domain, op, "T-A")
+	tl := ProjectStreamTimeline(cfg, domain, op, mustTimelineInstance(t, "T-A"))
 	if len(tl.Steps) != 2 {
 		t.Fatalf("steps = %#v", tl.Steps)
 	}
@@ -234,7 +283,7 @@ func TestProjectStreamTimelineNotYetStartedShowsBlockedReason(t *testing.T) {
 		sub("lot_processing", "start", "L-open"),
 	}
 
-	tl := ProjectStreamTimeline(cfg, domain, op, "T-A")
+	tl := ProjectStreamTimeline(cfg, domain, op, mustTimelineInstance(t, "T-A"))
 	lots := tl.Steps[1]
 	var waiting *StreamTimelineRow
 	for i := range lots.Rows {
@@ -279,7 +328,7 @@ func TestProjectStreamTimelineMapsEveryWorklistStatusIncludingBlockedReason(t *t
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "T1"}}
 	domain.Submissions = []Submission{sub("intake", "arrive", "T1")}
 
-	tlOps := ProjectStreamTimeline(cfg, domain, op, "T1")
+	tlOps := ProjectStreamTimeline(cfg, domain, op, mustTimelineInstance(t, "T1"))
 	tasks := tlOps.Steps[0].Tasks
 	byID := map[string]StreamTimelineTask{}
 	for _, task := range tasks {
@@ -301,7 +350,7 @@ func TestProjectStreamTimelineMapsEveryWorklistStatusIncludingBlockedReason(t *t
 		t.Fatalf("blockedReason = %q", byID["check"].BlockedReason)
 	}
 
-	tlOffice := ProjectStreamTimeline(cfg, domain, other, "T1")
+	tlOffice := ProjectStreamTimeline(cfg, domain, other, mustTimelineInstance(t, "T1"))
 	officeTasks := tlOffice.Steps[0].Tasks
 	officeByID := map[string]StreamTimelineTask{}
 	for _, task := range officeTasks {
@@ -333,7 +382,7 @@ func TestProjectStreamTimelineExistingEachRowFinished(t *testing.T) {
 		sub("lot_processing", "close", "L1"),
 	}
 
-	tl := ProjectStreamTimeline(cfg, domain, op, "T1")
+	tl := ProjectStreamTimeline(cfg, domain, op, mustTimelineInstance(t, "T1"))
 	row := tl.Steps[1].Rows[0]
 	if row.ID != "L1" || !row.Finished {
 		t.Fatalf("row = %#v", row)

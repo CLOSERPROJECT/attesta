@@ -4,6 +4,60 @@ import (
 	"testing"
 )
 
+// Timeline after stay reload uses BuildOrgTimelineView: weigh (submit:many) stays
+// org-actionable while ≥1 unweighted pallet remains; after the last weigh it maps
+// readyWhen-false → unavailable → locked (never done — ADR-0008).
+func TestTimelineWeighStaysAvailableUntilLastUnweightedPallet(t *testing.T) {
+	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
+	truckID, loadID := plantIntakeOneLot(t, c)
+	_ = plantCommitStartLot(t, c, loadID)
+	cfg := mustActiveConfig(t, c)
+	lineOp := OperatorIdentity{UserID: "line", Org: "feragame", Roles: []string{"line"}}
+	focus := mustTimelineInstance(t, truckID)
+
+	assertWeigh := func(when string, wantStatus string, wantActionable bool) {
+		t.Helper()
+		view := BuildOrgTimelineView(cfg, mustDomain(t, c), lineOp, "recycling", focus)
+		weigh := lotProcessingWeighSubstep(t, view, loadID)
+		if weigh.Status != wantStatus {
+			t.Fatalf("weigh status %s = %q, want %q (submitMany=%v orgActionable=%v)",
+				when, weigh.Status, wantStatus, weigh.SubmitMany, weigh.OrgActionable)
+		}
+		if weigh.OrgActionable != wantActionable {
+			t.Fatalf("weigh orgActionable %s = %v, want %v (status=%q)",
+				when, weigh.OrgActionable, wantActionable, weigh.Status)
+		}
+		if !weigh.SubmitMany {
+			t.Fatalf("weigh submitMany %s = false, want true", when)
+		}
+	}
+
+	assertWeigh("after startLot", string(StreamSubstepAvailable), true)
+	_ = plantCommitWeigh(t, c, loadID, loadID+".1", 11)
+	assertWeigh("after first of two pallets", string(StreamSubstepAvailable), true)
+	_ = plantCommitWeigh(t, c, loadID, loadID+".2", 22)
+	assertWeigh("after last unweighted pallet", string(StreamSubstepLocked), false)
+}
+
+func lotProcessingWeighSubstep(t *testing.T, view TimelineView, lotID string) TimelineSubstepDTO {
+	t.Helper()
+	for _, step := range view.Steps {
+		for _, row := range step.Rows {
+			if row.ID != lotID {
+				continue
+			}
+			for _, sub := range row.Substeps {
+				if sub.SubstepID == "lot_processing.weigh" {
+					return sub
+				}
+			}
+			t.Fatalf("lot %s row missing weigh: %#v", lotID, row.Substeps)
+		}
+	}
+	t.Fatalf("lot row %s missing in %#v", lotID, view.Steps)
+	return TimelineSubstepDTO{}
+}
+
 func TestCommitWeighPatchesOnePalletLeavesOtherUnweighted(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	_, loadID, _ := commitIntakeThroughLotsClosed(t, c)

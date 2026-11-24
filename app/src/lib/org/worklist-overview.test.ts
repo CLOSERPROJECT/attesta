@@ -5,7 +5,8 @@ import * as m from '#lib/paraglide/messages.js';
 import {
 	formatFactValue,
 	formatSubmissionCount,
-	manySubmitHistoryVisible,
+	manySubmitRecapNeedsFetch,
+	manySubmitRecapVisible,
 	taskStatusLabel
 } from './worklist-overview.js';
 
@@ -24,10 +25,16 @@ describe('worklist-overview helpers (Task chrome)', () => {
 		expect(formatFactValue({ a: 1 })).toBe('{"a":1}');
 	});
 
-	test('manySubmitHistoryVisible requires many + count > 0', () => {
-		expect(manySubmitHistoryVisible('many', 2)).toBe(true);
-		expect(manySubmitHistoryVisible('many', 0)).toBe(false);
-		expect(manySubmitHistoryVisible(undefined, 3)).toBe(false);
+	test('manySubmitRecapVisible is submit === many', () => {
+		expect(manySubmitRecapVisible('many')).toBe(true);
+		expect(manySubmitRecapVisible('once')).toBe(false);
+		expect(manySubmitRecapVisible(undefined)).toBe(false);
+	});
+
+	test('manySubmitRecapNeedsFetch requires many + count > 0', () => {
+		expect(manySubmitRecapNeedsFetch('many', 2)).toBe(true);
+		expect(manySubmitRecapNeedsFetch('many', 0)).toBe(false);
+		expect(manySubmitRecapNeedsFetch(undefined, 3)).toBe(false);
 	});
 
 	test('formatSubmissionCount uses Paraglide one/many', () => {

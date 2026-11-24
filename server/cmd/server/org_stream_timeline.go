@@ -40,7 +40,16 @@ func orgJobSeedField(job org.Job) string {
 }
 
 func buildOrgTimelineSteps(cfg org.OrgConfig, domain org.Domain, timeline org.StreamTimeline, streamKey, streamInstanceID string) []TimelineStep {
-	return timelineStepsFromDTO(org.BuildOrgTimelineSteps(cfg, domain, timeline, streamKey, streamInstanceID))
+	focus := org.TimelineBoot()
+	if id := strings.TrimSpace(streamInstanceID); id != "" {
+		var err error
+		focus, err = org.TimelineInstance(id)
+		if err != nil {
+			focus = org.TimelineBoot()
+		}
+	}
+	hrefs := org.TimelineHrefPolicyFromFocus(streamKey, focus)
+	return timelineStepsFromDTO(org.BuildOrgTimelineSteps(cfg, domain, timeline, hrefs))
 }
 
 func orgTimelineSubmissions(domain org.Domain, jobID, jobInstanceID, taskID string) []TimelineSubmissionView {

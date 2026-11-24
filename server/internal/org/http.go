@@ -86,17 +86,25 @@ func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
-	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
-	if streamKey == "" || instanceID == "" {
-		http.Error(w, "stream and instance required", http.StatusBadRequest)
+	if streamKey == "" {
+		http.Error(w, "stream required", http.StatusBadRequest)
+		return
+	}
+	focus, focusErr := ResolveTimelineFocus(r.URL.Query().Get("instance"))
+	if focusErr != nil {
+		http.Error(w, "instance required", http.StatusBadRequest)
 		return
 	}
 	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), orgID, streamKey, h.DomainLoader.Configs)
 	if !ok {
 		return
 	}
-	if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
-		return
+	instanceID := ""
+	if id, ok := focus.InstanceID(); ok {
+		instanceID = id
+		if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+			return
+		}
 	}
 
 	domain := EmptyDomain()
@@ -109,7 +117,7 @@ func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	view := BuildOrgTimelineView(cfg, domain, op, scope.Stream, instanceID)
+	view := BuildOrgTimelineView(cfg, domain, op, scope.Stream, focus)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Method == http.MethodHead {

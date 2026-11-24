@@ -24,54 +24,73 @@ func containerRegSchema(t *testing.T) map[string]any {
 	return schema
 }
 
-func TestContainerRegSchemaExposesIncompleteDefaultFalse(t *testing.T) {
+func TestContainerRegSchemaFlatMaterialWeight(t *testing.T) {
 	schema := containerRegSchema(t)
 	props, _ := schema["properties"].(map[string]any)
-	arr, _ := props["polvereDiVetro"].(map[string]any)
-	items, _ := arr["items"].(map[string]any)
-	itemProps, _ := items["properties"].(map[string]any)
-	inc, _ := itemProps["incomplete"].(map[string]any)
-	if inc == nil {
-		t.Fatal("material row incomplete missing")
+	req, _ := schema["required"].([]any)
+	if len(req) != 2 || req[0] != "material" || req[1] != "weight" {
+		t.Fatalf("required = %#v, want [material weight]", req)
 	}
-	if inc["type"] != "boolean" {
-		t.Fatalf("incomplete.type = %#v, want boolean", inc["type"])
-	}
-	if inc["default"] != false {
-		t.Fatalf("incomplete.default = %#v, want false", inc["default"])
-	}
-}
-
-func TestContainerRegSchemaDropsDualSourcesAndExposesContinuesContainerId(t *testing.T) {
-	schema := containerRegSchema(t)
-	props, _ := schema["properties"].(map[string]any)
-	if _, has := props["secondarySourceLotId"]; has {
-		t.Fatal("secondarySourceLotId form enum must be removed")
+	for _, gone := range []string{"polvereDiVetro", "plastica", "sourceLotId", "secondarySourceLotId"} {
+		if _, has := props[gone]; has {
+			t.Fatalf("schema property %s must be removed", gone)
+		}
 	}
 	if _, has := schema["if"]; has {
 		t.Fatal("dualSources if/then must be removed")
 	}
-	arr, _ := props["polvereDiVetro"].(map[string]any)
-	items, _ := arr["items"].(map[string]any)
-	itemProps, _ := items["properties"].(map[string]any)
-	if _, has := itemProps["dualSources"]; has {
-		t.Fatal("dualSources row checkbox must be removed")
+	mat, _ := props["material"].(map[string]any)
+	if mat == nil || mat["type"] != "string" {
+		t.Fatalf("material = %#v, want string", mat)
 	}
-	cont, _ := itemProps["continuesContainerId"].(map[string]any)
+	weight, _ := props["weight"].(map[string]any)
+	if weight == nil || weight["type"] != "number" {
+		t.Fatalf("weight = %#v, want number", weight)
+	}
+	inc, _ := props["incomplete"].(map[string]any)
+	if inc == nil || inc["type"] != "boolean" {
+		t.Fatalf("incomplete = %#v, want boolean", inc)
+	}
+	if inc["default"] != false {
+		t.Fatalf("incomplete.default = %#v, want false", inc["default"])
+	}
+	cont, _ := props["continuesContainerId"].(map[string]any)
 	if cont == nil || cont["type"] != "string" {
 		t.Fatalf("continuesContainerId = %#v, want string", cont)
 	}
+}
 
+func TestContainerRegDerivedChromeAndNoEnumReads(t *testing.T) {
 	reg := containerRegLeafTask(t)
-	enums, _ := reg["enumReads"].(map[string]any)
-	if _, has := enums["secondarySourceLotId"]; has {
-		t.Fatal("enumReads.secondarySourceLotId must be removed")
+	derived, _ := reg["derived"].(map[string]any)
+	cont, _ := derived["continuesContainerId"].(map[string]any)
+	if cont == nil {
+		t.Fatal("derived.continuesContainerId missing")
 	}
-	if _, has := enums["sourceLotId"]; !has {
-		t.Fatal("enumReads.sourceLotId missing")
+	if expr, _ := cont["expr"].(string); expr == "" {
+		t.Fatal("derived.continuesContainerId.expr empty")
 	}
-	if _, has := reg["initialData"]; !has {
-		t.Fatal("containerReg.initialData missing")
+	chrome, _ := reg["chrome"].(map[string]any)
+	prior, _ := chrome["priorWeight"].(map[string]any)
+	if prior == nil {
+		t.Fatal("chrome.priorWeight missing")
+	}
+	if prior["hideIfNull"] != true {
+		t.Fatalf("chrome.priorWeight.hideIfNull = %#v, want true", prior["hideIfNull"])
+	}
+	if prior["kind"] != "readonly" {
+		t.Fatalf("chrome.priorWeight.kind = %#v, want readonly", prior["kind"])
+	}
+	if enums, _ := reg["enumReads"].(map[string]any); enums != nil {
+		if _, has := enums["sourceLotId"]; has {
+			t.Fatal("enumReads.sourceLotId must be removed")
+		}
+		if _, has := enums["secondarySourceLotId"]; has {
+			t.Fatal("enumReads.secondarySourceLotId must be removed")
+		}
+	}
+	if _, has := reg["initialData"]; has {
+		t.Fatal("containerReg.initialData must be removed")
 	}
 }
 
@@ -81,9 +100,7 @@ func TestContainerRegUiSchemaHidesContinuesContainerId(t *testing.T) {
 	if ui == nil {
 		t.Fatal("containerReg uiSchema missing")
 	}
-	mat, _ := ui["polvereDiVetro"].(map[string]any)
-	items, _ := mat["items"].(map[string]any)
-	contUi, _ := items["continuesContainerId"].(map[string]any)
+	contUi, _ := ui["continuesContainerId"].(map[string]any)
 	comps, _ := contUi["ui:components"].(map[string]any)
 	if comps["stringField"] != "hiddenField" {
 		t.Fatalf("continuesContainerId ui:components = %#v, want stringField: hiddenField", contUi)
@@ -91,16 +108,15 @@ func TestContainerRegUiSchemaHidesContinuesContainerId(t *testing.T) {
 	if _, has := contUi["ui:widget"]; has {
 		t.Fatal("ui:widget is RJSF-only; sjsf uses ui:components stringField: hiddenField")
 	}
-	opts, _ := contUi["ui:options"].(map[string]any)
-	if opts["presenceMark"] != true {
-		t.Fatalf("continuesContainerId ui:options.presenceMark = %#v, want true", opts["presenceMark"])
+	opts, _ := ui["ui:options"].(map[string]any)
+	order, _ := opts["order"].([]any)
+	want := []any{"material", "weight", "incomplete", "continuesContainerId"}
+	if len(order) != len(want) {
+		t.Fatalf("order = %#v, want %#v", order, want)
 	}
-	if opts["title"] != "Continua" {
-		t.Fatalf("continuesContainerId ui:options.title = %#v, want Continua", opts["title"])
-	}
-	itemOpts, _ := items["ui:options"].(map[string]any)
-	order, _ := itemOpts["order"].([]any)
-	if len(order) < 1 || order[0] != "continuesContainerId" {
-		t.Fatalf("items order = %#v, want continuesContainerId first for presence mark hug", order)
+	for i, id := range want {
+		if order[i] != id {
+			t.Fatalf("order = %#v, want %#v", order, want)
+		}
 	}
 }

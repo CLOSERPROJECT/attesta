@@ -1,39 +1,39 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
-	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
-	import { displayStepTitle, outlineLetter } from './outline-label.js';
-	import { streamStatusLabel } from './stream-status-label.js';
+	import {
+		getBoardTimelineModel,
+		type VisibleStep
+	} from '../board/board-timeline-model.svelte.js';
+	import { displayStepTitle } from './outline-label.js';
+	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
-	import type { TimelineStep } from './types.js';
 
 	type Props = {
-		step: TimelineStep;
+		projected: VisibleStep;
 		stream?: string;
 		instance?: string;
 	};
 
-	let { step, stream = '', instance = '' }: Props = $props();
+	let { projected, stream = '', instance = '' }: Props = $props();
 
-	const nestCollapse = getBoardNestCollapse();
+	const timelineModel = getBoardTimelineModel();
 
+	const step = $derived(projected.step);
 	const stepDomId = $derived(`stream-timeline-step-${step.stepId}`);
 	const summaryDomId = $derived(`${stepDomId}-summary`);
-	const rows = $derived(step.rows ?? []);
-	const substeps = $derived(step.substeps ?? []);
-	const mark = $derived(step.stepId);
+	const stepMark = $derived(projected.mark);
 	const title = $derived(displayStepTitle(step.title));
 	const status = $derived(step.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
+	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
+	const visibleRows = $derived(projected.rows ?? []);
+	const visibleSubsteps = $derived(projected.substeps ?? []);
 
-	let open = $state(Boolean(step.expanded));
-	$effect(() => {
-		const e = nestCollapse.epoch;
-		if (e === 0) return;
-		open = false;
-	});
+	let open = $state(Boolean(untrack(() => step.expanded)));
 </script>
 
 <Collapsible.Root class="stream-timeline-step" id={stepDomId} bind:open>
@@ -42,36 +42,31 @@
 		id={summaryDomId}
 		aria-labelledby={summaryDomId}
 	>
-		{#if status}
-			<TimelineHeaderLine {mark} {title}>
+		{#if showStatusChip}
+			<TimelineHeaderLine mark={stepMark} {title}>
 				{#snippet trail()}
 					<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
 				{/snippet}
 			</TimelineHeaderLine>
 		{:else}
-			<TimelineHeaderLine {mark} {title} />
+			<TimelineHeaderLine mark={stepMark} {title} />
 		{/if}
 	</Collapsible.Trigger>
 	<Collapsible.Content>
-		{#if rows.length > 0}
+		{#if visibleRows.length > 0}
 			<ul class="stream-timeline-rows">
-				{#each rows as row, i (row.id)}
+				{#each visibleRows as entry (entry.row.id)}
 					<li class="stream-timeline-row">
-						<TimelineRow
-							{row}
-							mark={`${mark}${outlineLetter(i)}`}
-							{stream}
-							{instance}
-						/>
+						<TimelineRow projected={entry} {stream} {instance} />
 					</li>
 				{/each}
 			</ul>
 		{:else}
 			<ul class="stream-timeline-substeps">
-				{#each substeps as sub, i (sub.substepId)}
+				{#each visibleSubsteps as entry (entry.sub.substepId)}
 					<TimelineSubstep
-						substep={sub}
-						mark={`${mark}.${i + 1}`}
+						substep={entry.sub}
+						mark={entry.mark}
 						{stream}
 						{instance}
 					/>

@@ -59,8 +59,11 @@ const (
 type CommitResult struct {
 	Org           string   `json:"org"`
 	JobInstanceID string   `json:"jobInstanceId"`
-	Domain        Domain   `json:"-"`
-	Worklist      Worklist `json:"worklist"`
+	// SubmissionID is the Domain Submission.Timestamp for this Commit
+	// (many-recap / LinkStore row key). Empty when no Submission was written.
+	SubmissionID string   `json:"submissionId,omitempty"`
+	Domain       Domain   `json:"-"`
+	Worklist     Worklist `json:"worklist"`
 	// Navigation is always set: task, home, or stay (legacy overview → home).
 	Navigation CommitNext `json:"navigation"`
 	// ContinueNavigation is set only when Navigation is stay (deferred Continue).
@@ -222,7 +225,11 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 		if !allowed {
 			return Domain{}, &CommitError{Kind: "unauthorized"}
 		}
-		applied, err = applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, req.Value, transform, ts, today, mintKind)
+		userName := strings.TrimSpace(op.DisplayName)
+		if userName == "" {
+			userName = strings.TrimSpace(op.UserID)
+		}
+		applied, err = applyConfigCommit(domain, cfg, job, task, ref, jobInstanceID, op.UserID, userName, req.Value, transform, ts, today, mintKind)
 		if err != nil {
 			return Domain{}, err
 		}
@@ -263,6 +270,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 	result := CommitResult{
 		Org:                org,
 		JobInstanceID:      applied.JobInstanceID,
+		SubmissionID:       ts,
 		Domain:             applied.Domain,
 		Worklist:           wl,
 		Navigation:         nav,

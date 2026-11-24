@@ -1,7 +1,11 @@
 import * as m from '#lib/paraglide/messages.js';
 
-import { streamScopeQuery, type StreamScope } from '../stream-scope.js';
-import { TimelineLoadError, type TimelinePort } from './timeline-port.js';
+import { streamScopeQuery } from '../stream-scope.js';
+import {
+	TimelineLoadError,
+	type TimelineLoadQuery,
+	type TimelinePort
+} from './timeline-port.js';
 import type { TimelineView } from './types.js';
 
 export type HttpTimelinePortOptions = {
@@ -16,10 +20,10 @@ export function createHttpTimelinePort(
 	const base = options.baseUrl ?? '';
 
 	return {
-		async load(scope: StreamScope & { instance: string }) {
+		async load(query: TimelineLoadQuery) {
 			const qs = streamScopeQuery({
-				stream: scope.stream,
-				instance: scope.instance
+				stream: query.stream,
+				instance: 'instance' in query ? query.instance : undefined
 			});
 			const res = await fetchFn(`${base}/api/org/timeline?${qs}`, {
 				method: 'GET',

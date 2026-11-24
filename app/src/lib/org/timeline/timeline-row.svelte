@@ -1,33 +1,33 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 
-	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
-	import { streamStatusLabel } from './stream-status-label.js';
+	import {
+		getBoardTimelineModel,
+		type VisibleRow
+	} from '../board/board-timeline-model.svelte.js';
+	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
-	import type { TimelineRow } from './types.js';
 
 	type Props = {
-		row: TimelineRow;
-		/** Hierarchical mark from parent step, e.g. 2A. */
-		mark: string;
+		projected: VisibleRow;
 		stream?: string;
 		instance?: string;
 	};
 
-	let { row, mark, stream = '', instance = '' }: Props = $props();
+	let { projected, stream = '', instance = '' }: Props = $props();
 
-	const nestCollapse = getBoardNestCollapse();
+	const timelineModel = getBoardTimelineModel();
 
+	const row = $derived(projected.row);
+	const mark = $derived(projected.mark);
 	const status = $derived(row.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
+	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
+	const visibleSubsteps = $derived(projected.substeps);
 
-	let open = $state(Boolean(row.expanded));
-	$effect(() => {
-		const e = nestCollapse.epoch;
-		if (e === 0) return;
-		open = false;
-	});
+	let open = $state(Boolean(untrack(() => row.expanded)));
 </script>
 
 <Collapsible.Root
@@ -36,7 +36,7 @@
 	bind:open
 >
 	<Collapsible.Trigger class="stream-timeline-row-summary w-full items-center hover:no-underline">
-		{#if status}
+		{#if showStatusChip}
 			<TimelineHeaderLine {mark} title={row.label}>
 				{#snippet trail()}
 					<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
@@ -48,10 +48,10 @@
 	</Collapsible.Trigger>
 	<Collapsible.Content>
 		<ul class="stream-timeline-substeps">
-			{#each row.substeps as sub, i (sub.substepId)}
+			{#each visibleSubsteps as entry (entry.sub.substepId)}
 				<TimelineSubstep
-					substep={sub}
-					mark={`${mark}.${i + 1}`}
+					substep={entry.sub}
+					mark={entry.mark}
 					{stream}
 					{instance}
 				/>

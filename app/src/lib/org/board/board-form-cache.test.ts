@@ -91,4 +91,107 @@ describe('BoardFormCache', () => {
 		expect(cache.get(taskAddressKey(a))).toBeUndefined();
 		cache.dispose();
 	});
+
+	test('beginFreshDraft advances draftGeneration and keeps ready bundle', () => {
+		const cache = createBoardFormCache({
+			taskForm: { fetch: async () => bundle('a') }
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		const ready = bundle('a');
+		cache.putReady(a, ready);
+		const before = cache.get(taskAddressKey(a));
+		expect(before?.status).toBe('ready');
+		expect(before?.draftGeneration).toBe(0);
+
+		cache.beginFreshDraft(a);
+
+		const after = cache.get(taskAddressKey(a));
+		expect(after?.status).toBe('ready');
+		expect(after?.bundle).toBe(ready);
+		expect(after?.draftGeneration).toBe(1);
+
+		cache.beginFreshDraft(a);
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(2);
+		cache.dispose();
+	});
+
+	test('beginFreshDraft is a no-op when address has no entry', () => {
+		const cache = createBoardFormCache({
+			taskForm: { fetch: async () => bundle('a') }
+		});
+		cache.beginScope('s');
+		cache.beginFreshDraft(addr('missing'));
+		expect(cache.get(taskAddressKey(addr('missing')))).toBeUndefined();
+		cache.dispose();
+	});
+
+	test('refreshAllAfterDomainCommit shows loading then ready with new bundle and bumps draftGeneration', async () => {
+		const stale = bundle('a');
+		stale.bindings = { domain: { lot: { 'LOT-1': {} } } };
+		const fresh = bundle('a');
+		fresh.bindings = { domain: { lot: { 'LOT-1': {}, 'LOT-2': {} } } };
+
+		let resolveFetch!: (b: TaskFormBundle) => void;
+		const fetch = vi.fn(
+			() =>
+				new Promise<TaskFormBundle>((resolve) => {
+					resolveFetch = resolve;
+				})
+		);
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('recycling|NIR-1');
+		const a = addr('a');
+		cache.putReady(a, stale);
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(0);
+
+		cache.refreshAllAfterDomainCommit();
+
+		const loading = cache.get(taskAddressKey(a));
+		expect(loading?.status).toBe('loading');
+		expect(loading?.bundle).toBeNull();
+		expect(loading?.draftGeneration).toBe(0);
+		expect(fetch).toHaveBeenCalledTimes(1);
+
+		resolveFetch(fresh);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		});
+		const ready = cache.get(taskAddressKey(a));
+		expect(ready?.bundle).toBe(fresh);
+		expect(ready?.draftGeneration).toBe(1);
+		cache.dispose();
+	});
+
+	test('refreshAllAfterDomainCommit refetches every ready entry in scope', async () => {
+		const fetch = vi.fn(async (req: { taskId: string }) => bundle(req.taskId));
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort,
+			concurrency: 4
+		});
+		cache.beginScope('recycling|NIR-1');
+		cache.putReady(addr('a'), bundle('a'));
+		cache.putReady(addr('b'), bundle('b'));
+		cache.putReady(addr('c'), bundle('c'));
+		expect(fetch).toHaveBeenCalledTimes(0);
+
+		cache.refreshAllAfterDomainCommit();
+
+		expect(cache.get(taskAddressKey(addr('a')))?.status).toBe('loading');
+		expect(cache.get(taskAddressKey(addr('b')))?.status).toBe('loading');
+		expect(cache.get(taskAddressKey(addr('c')))?.status).toBe('loading');
+
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(addr('a')))?.status).toBe('ready');
+			expect(cache.get(taskAddressKey(addr('b')))?.status).toBe('ready');
+			expect(cache.get(taskAddressKey(addr('c')))?.status).toBe('ready');
+		});
+		expect(fetch).toHaveBeenCalledTimes(3);
+		expect(cache.get(taskAddressKey(addr('a')))?.draftGeneration).toBe(1);
+		expect(cache.get(taskAddressKey(addr('b')))?.draftGeneration).toBe(1);
+		expect(cache.get(taskAddressKey(addr('c')))?.draftGeneration).toBe(1);
+		cache.dispose();
+	});
 });

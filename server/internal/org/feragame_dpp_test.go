@@ -21,9 +21,7 @@ func seedFullyProcessedLoad(t *testing.T, c *TaskCommitter) (loadID, lotID strin
 	t.Helper()
 	loadID, lotID = seedLotReadyAfterWeigh(t, c)
 	commitMarkProgressAllDone(t, c, lotID, loadID)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
-		"polvereDiVetro": {map[string]any{"weight": 100.0}},
-	}))
+	_ = commitContainerReg(t, c, lotID, containerRegValue("polvereDiVetro", 100.0))
 	_ = commitCloseLot(t, c, lotID)
 	stored, err := c.Domains.Get(t.Context(), FeragameScope())
 	if err != nil {

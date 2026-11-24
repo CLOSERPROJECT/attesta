@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	TimelineModeBoot     = "boot"
+	TimelineModeInstance = "instance"
+)
+
 // TimelineSubmissionDTO is one Domain Submission summary for the SPA / JSON timeline.
 type TimelineSubmissionDTO struct {
 	Timestamp      string `json:"timestamp,omitempty"`
@@ -50,8 +55,9 @@ type TimelineStepDTO struct {
 	Rows         []TimelineRowDTO     `json:"rows,omitempty"`
 }
 
-// TimelineView is GET /api/org/timeline for one stream instance.
+// TimelineView is GET /api/org/timeline for Boot (stream-only) or one stream instance.
 type TimelineView struct {
+	Mode     string            `json:"mode"`
 	Stream   string            `json:"stream"`
 	Instance string            `json:"instance"`
 	Label    string            `json:"label"`
@@ -59,10 +65,69 @@ type TimelineView struct {
 	Steps    []TimelineStepDTO `json:"steps"`
 }
 
-// BuildOrgTimelineView projects + enriches the operator timeline for one stream instance.
-func BuildOrgTimelineView(cfg OrgConfig, domain Domain, op OperatorIdentity, streamKey, instanceID string) TimelineView {
-	instanceID = strings.TrimSpace(instanceID)
+// TimelineHrefPolicy builds SPA Task hrefs for timeline enrichment.
+// Derived once from TimelineFocus at BuildOrgTimelineView — no boot bool in steps.
+type TimelineHrefPolicy struct {
+	streamKey        string
+	streamInstanceID string // empty ⇒ Play / boot paths
+}
+
+// TimelineHrefPolicyFromFocus maps Focus to instance vs Play href builders.
+func TimelineHrefPolicyFromFocus(streamKey string, focus TimelineFocus) TimelineHrefPolicy {
 	streamKey = strings.TrimSpace(streamKey)
+	if id, ok := focus.InstanceID(); ok {
+		return TimelineHrefPolicy{streamKey: streamKey, streamInstanceID: id}
+	}
+	return TimelineHrefPolicy{streamKey: streamKey}
+}
+
+// TaskHref is a Task form path under instance home or Play board.
+func (p TimelineHrefPolicy) TaskHref(jobID, jobInstanceID, taskID string) string {
+	if p.streamInstanceID == "" {
+		return AppOrgPlayTaskPath(p.streamKey, jobID, jobInstanceID, taskID)
+	}
+	return AppOrgTaskPath(p.streamKey, p.streamInstanceID, jobID, jobInstanceID, taskID)
+}
+
+// SeededStartHref seeds a provisional each-Job start Task.
+func (p TimelineHrefPolicy) SeededStartHref(jobID, taskID, seedField, seedValue string) string {
+	if p.streamInstanceID == "" {
+		path := AppOrgPlayTaskPath(p.streamKey, jobID, "new", taskID)
+		field := strings.TrimSpace(seedField)
+		if field == "" {
+			return path
+		}
+		q := url.Values{}
+		q.Set("seed."+field, seedValue)
+		return path + "?" + q.Encode()
+	}
+	return AppOrgSeededStartTaskPath(p.streamKey, p.streamInstanceID, jobID, taskID, seedField, seedValue)
+}
+
+// BuildOrgTimelineView projects + enriches the operator timeline for one Focus.
+func BuildOrgTimelineView(cfg OrgConfig, domain Domain, op OperatorIdentity, streamKey string, focus TimelineFocus) TimelineView {
+	streamKey = strings.TrimSpace(streamKey)
+	hrefs := TimelineHrefPolicyFromFocus(streamKey, focus)
+	timeline := ProjectStreamTimeline(cfg, domain, op, focus)
+
+	if focus.IsBoot() {
+		label := streamKey
+		if cfg.Stream != nil {
+			if title := strings.TrimSpace(cfg.Stream.Title); title != "" {
+				label = title
+			}
+		}
+		return TimelineView{
+			Mode:     TimelineModeBoot,
+			Stream:   streamKey,
+			Instance: "",
+			Label:    label,
+			Status:   "",
+			Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, hrefs),
+		}
+	}
+
+	instanceID, _ := focus.InstanceID()
 	label := instanceID
 	status := StreamInstanceActive
 	for _, summary := range ListStreamInstances(cfg, domain, op) {
@@ -76,18 +141,18 @@ func BuildOrgTimelineView(cfg OrgConfig, domain Domain, op OperatorIdentity, str
 			break
 		}
 	}
-	timeline := ProjectStreamTimeline(cfg, domain, op, instanceID)
 	return TimelineView{
+		Mode:     TimelineModeInstance,
 		Stream:   streamKey,
 		Instance: instanceID,
 		Label:    label,
 		Status:   status,
-		Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, streamKey, instanceID),
+		Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, hrefs),
 	}
 }
 
 // BuildOrgTimelineSteps enriches a ProjectStreamTimeline with Href / submissions / flags.
-func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline, streamKey, streamInstanceID string) []TimelineStepDTO {
+func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline, hrefs TimelineHrefPolicy) []TimelineStepDTO {
 	out := make([]TimelineStepDTO, 0, len(timeline.Steps))
 	for i, step := range timeline.Steps {
 		jobVal, _ := cfg.Jobs.Get(step.JobID)
@@ -100,21 +165,20 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 			StepID:       fmt.Sprintf("%d", i+1),
 			Title:        title,
 			SubstepCount: len(step.Tasks),
-			Expanded:     i == 0,
+			// Board load: expand every step/row; substep bodies stay client-collapsed.
+			Expanded: true,
 		}
 		if len(step.Rows) > 0 {
 			tlStep.Title = fmt.Sprintf("%s ×%d", title, len(step.Rows))
 			tlStep.SubstepCount = len(step.Rows)
-			tlStep.Rows = buildOrgTimelineRows(job, step, domain, streamKey, streamInstanceID)
-			if i == 0 || anyOrgRowExpanded(tlStep.Rows) {
-				tlStep.Expanded = true
-			}
+			tlStep.Rows = buildOrgTimelineRows(job, step, domain, hrefs)
 			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromRows(tlStep.Rows)); ok {
 				tlStep.Status = string(status)
 				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
 			}
 		} else {
-			tlStep.Substeps = buildOrgTimelineTaskSubsteps(job, step.JobID, streamInstanceID, step.Tasks, streamKey, streamInstanceID, false, "", domain)
+			jobInstanceID := hrefs.streamInstanceID
+			tlStep.Substeps = buildOrgTimelineTaskSubsteps(job, step.JobID, jobInstanceID, step.Tasks, hrefs, false, "", domain)
 			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(tlStep.Substeps)); ok {
 				tlStep.Status = string(status)
 				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
@@ -125,16 +189,7 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 	return out
 }
 
-func anyOrgRowExpanded(rows []TimelineRowDTO) bool {
-	for _, row := range rows {
-		if row.Expanded {
-			return true
-		}
-	}
-	return false
-}
-
-func buildOrgTimelineRows(job Job, step StreamTimelineStep, domain Domain, streamKey, streamInstanceID string) []TimelineRowDTO {
+func buildOrgTimelineRows(job Job, step StreamTimelineStep, domain Domain, hrefs TimelineHrefPolicy) []TimelineRowDTO {
 	seedField := orgJobSeedField(job)
 	rows := make([]TimelineRowDTO, 0, len(step.Rows))
 	for _, row := range step.Rows {
@@ -146,8 +201,8 @@ func buildOrgTimelineRows(job Job, step StreamTimelineStep, domain Domain, strea
 		group := TimelineRowDTO{
 			ID:       row.ID,
 			Label:    label,
-			Expanded: !row.Finished,
-			Substeps: buildOrgTimelineTaskSubsteps(job, step.JobID, row.ID, row.Tasks, streamKey, streamInstanceID, !exists, seedField, domain),
+			Expanded: true,
+			Substeps: buildOrgTimelineTaskSubsteps(job, step.JobID, row.ID, row.Tasks, hrefs, !exists, seedField, domain),
 		}
 		if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(group.Substeps)); ok {
 			group.Status = string(status)
@@ -216,7 +271,7 @@ func timelineChildStatusesFromRows(rows []TimelineRowDTO) []StreamSubstepState {
 	return out
 }
 
-func buildOrgTimelineTaskSubsteps(job Job, jobID, jobInstanceID string, tasks []StreamTimelineTask, streamKey, streamInstanceID string, provisional bool, seedField string, domain Domain) []TimelineSubstepDTO {
+func buildOrgTimelineTaskSubsteps(job Job, jobID, jobInstanceID string, tasks []StreamTimelineTask, hrefs TimelineHrefPolicy, provisional bool, seedField string, domain Domain) []TimelineSubstepDTO {
 	out := make([]TimelineSubstepDTO, 0, len(tasks))
 	ordered := OrderedTaskIDs(job.Tasks)
 	startTaskID := ""
@@ -242,9 +297,9 @@ func buildOrgTimelineTaskSubsteps(job Job, jobID, jobInstanceID string, tasks []
 		}
 		switch {
 		case provisional && task.ID == startTaskID:
-			sub.Href = AppOrgSeededStartTaskPath(streamKey, streamInstanceID, jobID, task.ID, seedField, jobInstanceID)
+			sub.Href = hrefs.SeededStartHref(jobID, task.ID, seedField, jobInstanceID)
 		case !provisional:
-			sub.Href = AppOrgTaskPath(streamKey, streamInstanceID, jobID, jobInstanceID, task.ID)
+			sub.Href = hrefs.TaskHref(jobID, jobInstanceID, task.ID)
 			sub.Submissions = OrgTimelineSubmissions(domain, jobID, jobInstanceID, task.ID)
 		}
 		out = append(out, sub)
@@ -319,11 +374,29 @@ func AppOrgInstancePath(streamKey, instanceID string) string {
 	return "/app/" + strings.TrimSpace(streamKey) + "/i/" + strings.TrimSpace(instanceID)
 }
 
+// AppOrgPlayPath is the SPA Play board (/app/{stream}/new).
+func AppOrgPlayPath(streamKey string) string {
+	return "/app/" + strings.TrimSpace(streamKey) + "/new"
+}
+
 // AppOrgTaskPath is the SPA Task form path under instance home.
 func AppOrgTaskPath(streamKey, streamInstanceID, jobID, jobInstanceID, taskID string) string {
 	return AppOrgInstancePath(streamKey, streamInstanceID) + "/" +
 		strings.TrimSpace(jobID) + "/" +
 		strings.TrimSpace(jobInstanceID) + "/" +
+		strings.TrimSpace(taskID)
+}
+
+// AppOrgPlayTaskPath is a Play-board Task href (no stream instance yet).
+// Shape: /app/{stream}/new/{job}/{jobInstance}/{task}; blank jobInstance → "new".
+func AppOrgPlayTaskPath(streamKey, jobID, jobInstanceID, taskID string) string {
+	ji := strings.TrimSpace(jobInstanceID)
+	if ji == "" {
+		ji = "new"
+	}
+	return AppOrgPlayPath(streamKey) + "/" +
+		strings.TrimSpace(jobID) + "/" +
+		ji + "/" +
 		strings.TrimSpace(taskID)
 }
 

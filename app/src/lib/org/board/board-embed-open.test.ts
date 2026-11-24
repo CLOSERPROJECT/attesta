@@ -12,42 +12,44 @@ const addr = (taskId: string): TaskAddress => ({
 });
 
 describe('BoardEmbedOpen', () => {
-	test('defaults open; collapse and reopen by key', () => {
+	test('defaults closed; open and collapse by key', () => {
 		const store = new BoardEmbedOpen();
 		const a = addr('weigh');
 		const b = addr('nir');
 
-		expect(store.isOpen(a)).toBe(true);
-		expect(store.toggle(a)).toBe(false);
 		expect(store.isOpen(a)).toBe(false);
-		expect(store.isOpen(b)).toBe(true);
-
-		store.setOpen(a, true);
+		expect(store.toggle(a)).toBe(true);
 		expect(store.isOpen(a)).toBe(true);
-		expect(Object.keys(store.closed)).toHaveLength(0);
+		expect(store.isOpen(b)).toBe(false);
+
+		store.setOpen(a, false);
+		expect(store.isOpen(a)).toBe(false);
+		expect(Object.keys(store.opened)).toHaveLength(0);
 	});
 
 	test('setOpen is idempotent', () => {
 		const store = new BoardEmbedOpen();
 		const a = addr('weigh');
-		store.setOpen(a, false);
-		store.setOpen(a, false);
-		expect(Object.keys(store.closed)).toEqual([taskAddressKey(a)]);
 		store.setOpen(a, true);
 		store.setOpen(a, true);
-		expect(Object.keys(store.closed)).toHaveLength(0);
+		expect(Object.keys(store.opened)).toEqual([taskAddressKey(a)]);
+		store.setOpen(a, false);
+		store.setOpen(a, false);
+		expect(Object.keys(store.opened)).toHaveLength(0);
 	});
 
-	test('closeAll marks every address closed', () => {
+	test('closeAll clears open keys for listed addresses', () => {
 		const store = new BoardEmbedOpen();
 		const a = addr('weigh');
 		const b = addr('nir');
+		store.setOpen(a, true);
+		store.setOpen(b, true);
 		store.closeAll([a, b]);
 		expect(store.isOpen(a)).toBe(false);
 		expect(store.isOpen(b)).toBe(false);
+		store.setOpen(a, true);
+		store.setOpen(b, true);
 		store.closeAll([a]);
-		expect(Object.keys(store.closed).sort()).toEqual(
-			[taskAddressKey(a), taskAddressKey(b)].sort()
-		);
+		expect(Object.keys(store.opened)).toEqual([taskAddressKey(b)]);
 	});
 });

@@ -35,6 +35,7 @@ type MutateRequest struct {
 	Ops              []MutateOp
 	Timestamp        string
 	UserID           string
+	UserName         string
 	AppendSubmission *bool
 	NewJobInstance   *JobInstance
 }
@@ -95,6 +96,7 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 			JobInstanceID: req.JobInstanceID,
 			Timestamp:     req.Timestamp,
 			UserID:        req.UserID,
+			UserName:      strings.TrimSpace(req.UserName),
 			Facts:         cloneFacts(req.Facts),
 			IDsTouched:    idsTouched,
 		}

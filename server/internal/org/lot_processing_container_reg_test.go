@@ -12,10 +12,13 @@ func commitMarkProgressAllDone(t *testing.T, c *TaskCommitter, lotID, loadID str
 	})
 }
 
-func containerRegValue(loadID string, materials map[string][]any) map[string]any {
-	v := map[string]any{"sourceLotId": loadID}
-	for k, rows := range materials {
-		v[k] = rows
+func containerRegValue(material string, weight float64, incomplete ...bool) map[string]any {
+	v := map[string]any{
+		"material": material,
+		"weight":   weight,
+	}
+	if len(incomplete) > 0 && incomplete[0] {
+		v["incomplete"] = true
 	}
 	return v
 }
@@ -69,9 +72,7 @@ func TestContainerRegActionableOnOpenLotWithoutMarkProgress(t *testing.T) {
 func TestCommitContainerRegMintsContainersLeavesLotOpen(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
-	result := commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
-		"polvereDiVetro": {map[string]any{"weight": 80.0}},
-	}))
+	result := commitContainerReg(t, c, lotID, containerRegValue("polvereDiVetro", 80.0))
 	if result.Domain.Kind("lot")[loadID]["status"] != "open" {
 		t.Fatalf("lot status = %#v, want open", result.Domain.Kind("lot")[loadID])
 	}
@@ -87,12 +88,8 @@ func TestCommitContainerRegMintsContainersLeavesLotOpen(t *testing.T) {
 func TestContainerRegManySubmitSameOpenLot(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
-		"polvereDiVetro": {map[string]any{"weight": 40.0}},
-	}))
-	second := commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
-		"plastica": {map[string]any{"weight": 20.0}},
-	}))
+	_ = commitContainerReg(t, c, lotID, containerRegValue("polvereDiVetro", 40.0))
+	second := commitContainerReg(t, c, lotID, containerRegValue("plastica", 20.0))
 	var n int
 	for _, s := range second.Domain.Submissions {
 		if s.JobID == "lot_processing" && s.TaskID == "containerReg" && s.JobInstanceID == lotID {
@@ -109,10 +106,8 @@ func TestContainerRegManySubmitSameOpenLot(t *testing.T) {
 
 func TestContainerRegIncompleteContinuationPrefill(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
-	loadID, lotID := seedLotReadyAfterWeigh(t, c)
-	first := commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
-		"polvereDiVetro": {map[string]any{"weight": 50.0, "incomplete": true}},
-	}))
+	_, lotID := seedLotReadyAfterWeigh(t, c)
+	first := commitContainerReg(t, c, lotID, containerRegValue("polvereDiVetro", 50.0, true))
 	var contID string
 	for id, facts := range first.Domain.Kind("container") {
 		if facts["incomplete"] == true {
@@ -128,13 +123,41 @@ func TestContainerRegIncompleteContinuationPrefill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows, _ := bundle.InitialData["polvereDiVetro"].([]any)
-	if len(rows) == 0 {
-		t.Fatalf("initialData prefill = %#v", bundle.InitialData)
+	if rule, ok := bundle.Derived["continuesContainerId"]; !ok || rule.Expr == "" {
+		t.Fatalf("derived continuesContainerId = %#v", bundle.Derived)
 	}
-	row, _ := rows[0].(map[string]any)
-	if row["continuesContainerId"] != contID {
-		t.Fatalf("continuesContainerId = %#v, want %s", row["continuesContainerId"], contID)
+	var priorChrome bool
+	for _, ch := range bundle.Chrome {
+		if ch.ID == "priorWeight" && ch.HideIfNull {
+			priorChrome = true
+			break
+		}
+	}
+	if !priorChrome {
+		t.Fatalf("chrome priorWeight hideIfNull missing: %#v", bundle.Chrome)
+	}
+
+	continued := commitContainerReg(t, c, lotID, map[string]any{
+		"material":             "polvereDiVetro",
+		"weight":               120.0,
+		"continuesContainerId": contID,
+	})
+	prior := continued.Domain.Kind("container")[contID]
+	if prior["incomplete"] != false {
+		t.Fatalf("prior incomplete = %#v, want false (superseded)", prior["incomplete"])
+	}
+	var foundNew bool
+	for id, facts := range continued.Domain.Kind("container") {
+		if id == contID {
+			continue
+		}
+		if facts["weight"] == 70.0 && facts["secondarySourceLotId"] == lotID {
+			foundNew = true
+			break
+		}
+	}
+	if !foundNew {
+		t.Fatalf("expected continuation mint weight 70 with secondarySourceLotId: %#v", continued.Domain.Kind("container"))
 	}
 }
 
@@ -142,10 +165,8 @@ func TestContainerRegThenCloseLotPath(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	loadID, lotID := seedLotReadyAfterWeigh(t, c)
 	commitMarkProgressAllDone(t, c, lotID, loadID)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadID, map[string][]any{
-		"polvereDiVetro": {map[string]any{"weight": 120.0}},
-		"plastica":       {map[string]any{"weight": 40.0}},
-	}))
+	_ = commitContainerReg(t, c, lotID, containerRegValue("polvereDiVetro", 120.0))
+	_ = commitContainerReg(t, c, lotID, containerRegValue("plastica", 40.0))
 	closed := commitCloseLot(t, c, lotID)
 	if closed.Domain.Kind("lot")[loadID]["status"] != "fullyProcessed" {
 		t.Fatalf("after closeLot = %#v", closed.Domain.Kind("lot")[loadID])
@@ -199,9 +220,7 @@ func TestSecondLotRequiresCloseThenStart(t *testing.T) {
 	loadB := seedSecondSULoad(t, c)
 
 	commitMarkProgressAllDone(t, c, lotID, loadA)
-	_ = commitContainerReg(t, c, lotID, containerRegValue(loadA, map[string][]any{
-		"polvereDiVetro": {map[string]any{"weight": 10.0}},
-	}))
+	_ = commitContainerReg(t, c, lotID, containerRegValue("polvereDiVetro", 10.0))
 	_ = commitCloseLot(t, c, lotID)
 
 	started := commitStartLot(t, c, loadB)

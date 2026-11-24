@@ -130,6 +130,7 @@ export function parseTaskHref(
 		path = path.slice('/app'.length);
 	}
 	const segments = orgPathSegments(path);
+	// Instance board: /{stream}/i/{instance}/{job}/{jobInstance}/{task}
 	if (segments.length === 6 && segments[1] === 'i') {
 		return {
 			address: normalizeTaskAddress({
@@ -138,6 +139,19 @@ export function parseTaskHref(
 				jobId: segments[3] ?? '',
 				jobInstanceId: segments[4] ?? '',
 				taskId: segments[5] ?? ''
+			}),
+			seed
+		};
+	}
+	// Play boot: /{stream}/new/{job}/{jobInstance}/{task} (stream instance blank)
+	if (segments.length === 5 && segments[1] === 'new') {
+		return {
+			address: normalizeTaskAddress({
+				stream: segments[0] ?? fallbackStream,
+				instance: fallbackInstance || '',
+				jobId: segments[2] ?? '',
+				jobInstanceId: segments[3] ?? '',
+				taskId: segments[4] ?? ''
 			}),
 			seed
 		};

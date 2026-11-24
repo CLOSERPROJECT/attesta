@@ -17,6 +17,8 @@ type TaskRecap struct {
 	TaskID        string         `json:"taskId"`
 	Timestamp     string         `json:"timestamp"`
 	UserID        string         `json:"userId"`
+	// UserName is the human-facing actor; falls back to UserID when unset (legacy rows).
+	UserName      string         `json:"userName"`
 	Facts         map[string]any `json:"facts"`
 	// Titles maps authored property keys → schema title (Italian plant copy).
 	// Omitted keys fall back to the raw fact key in the SPA.
@@ -70,12 +72,17 @@ func (l *DomainLoader) LoadTaskRecap(
 	titles := l.factTitlesFromConfig(ctx, scope, addr)
 	items := make([]TaskRecap, 0, len(matched))
 	for _, sub := range matched {
+		userName := strings.TrimSpace(sub.UserName)
+		if userName == "" {
+			userName = strings.TrimSpace(sub.UserID)
+		}
 		recap := TaskRecap{
 			JobID:         sub.JobID,
 			JobInstanceID: sub.JobInstanceID,
 			TaskID:        sub.TaskID,
 			Timestamp:     sub.Timestamp,
 			UserID:        sub.UserID,
+			UserName:      userName,
 			Facts:         cloneFacts(sub.Facts),
 			Titles:        titles,
 		}

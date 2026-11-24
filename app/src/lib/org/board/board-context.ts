@@ -10,14 +10,17 @@ export type BoardEmbedApi = {
 	focus: BoardTaskFocus | null;
 	isFocused: (addr: TaskAddress) => boolean;
 	setFocus: (addr: TaskAddress) => void;
-	/** Embed panel open; default true until user collapses. */
+	/** Embed panel open; default closed until focus / Play / user expands. */
 	isEmbedOpen: (addr: TaskAddress) => boolean;
 	setEmbedOpen: (addr: TaskAddress, open: boolean) => void;
 	toggleEmbedOpen: (addr: TaskAddress) => boolean;
-	stayedFor: (addr: TaskAddress) => CommitOutcome | null;
-	onCommitted: (addr: TaskAddress, outcome: CommitOutcome) => void;
-	onContinue: (addr: TaskAddress) => void;
-	play?: boolean;
+	/** Stay Commit confirmation: once-recap / many Recap tab cue. */
+	confirmRecapFor: (addr: TaskAddress) => boolean;
+	onCommitted: (
+		addr: TaskAddress,
+		outcome: CommitOutcome,
+		opts?: { submitMany?: boolean }
+	) => void;
 };
 
 export const [getBoardEmbed, setBoardEmbed] = createContext<BoardEmbedApi>();

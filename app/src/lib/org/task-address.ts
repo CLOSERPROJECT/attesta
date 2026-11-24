@@ -54,6 +54,13 @@ export function wireJobInstanceId(
 	return addr.provisionalJob ? PROVISIONAL_JOB_INSTANCE_ID : addr.jobInstanceId;
 }
 
+/** Commit mint.startingNew when provisional job start or Play (no stream instance). */
+export function needsStartingNewMint(
+	addr: Pick<TaskAddress, 'provisionalJob' | 'instance'>
+): boolean {
+	return addr.provisionalJob || !addr.instance;
+}
+
 /** Stable address key (`recycling|261102-1|intake|new|register`); provisional always keyed as `new`. */
 export function taskAddressKey(
 	addr: Pick<

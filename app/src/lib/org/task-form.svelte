@@ -7,10 +7,9 @@
 	import type { CommitOutcome } from './commit-port.js';
 	import { orgSession } from './org-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
-	import { isProvisionalJobInstance, normalizeJobInstanceId } from './task-address.js';
+	import { needsStartingNewMint, normalizeJobInstanceId } from './task-address.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/config-form.svelte';
-	import HttpLinkStrip from './form/http-link-strip.svelte';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {
 		catalogsFromBundleBindings,
@@ -32,10 +31,8 @@
 		jobInstanceId: string;
 		bundle: TaskFormBundle;
 		disabled?: boolean;
-		/** Play provisional Start (mint.startingNew). */
+		/** Provisional Start (mint.startingNew); also mint when instance is blank. */
 		provisionalJob?: boolean;
-		/** Play route (`/{stream}/new`); same mint law as provisionalJob. */
-		play?: boolean;
 		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
@@ -48,7 +45,6 @@
 		bundle,
 		disabled = false,
 		provisionalJob = false,
-		play = false,
 		onCommitted
 	}: Props = $props();
 
@@ -101,10 +97,9 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		if (orgSession.committing) return;
 		submitError = null;
-		const mint =
-			play || provisionalJob || isProvisionalJobInstance(jobInstanceId)
-				? ({ kind: 'startingNew' } as const)
-				: ({ kind: 'none' } as const);
+		const mint = needsStartingNewMint({ provisionalJob, instance })
+			? ({ kind: 'startingNew' } as const)
+			: ({ kind: 'none' } as const);
 		const outcome = await orgSession.commit({
 			stream,
 			instance: instance || undefined,
@@ -178,10 +173,6 @@
 	});
 
 	onDestroy(() => disposeLive());
-
-	const showLinks = $derived(
-		orgSession.lastHttpLinks.length > 0 || orgSession.lastHttpErrors.length > 0
-	);
 </script>
 
 <section
@@ -206,9 +197,5 @@
 		<p class="text-sm text-red-700" data-testid="task-submit-error" role="alert">
 			{submitError}
 		</p>
-	{/if}
-
-	{#if showLinks}
-		<HttpLinkStrip items={orgSession.lastHttpLinks} errors={orgSession.lastHttpErrors} />
 	{/if}
 </section>

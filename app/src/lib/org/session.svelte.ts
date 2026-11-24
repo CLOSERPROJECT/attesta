@@ -274,6 +274,9 @@ export class OrgSession {
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
 			return {
 				jobInstanceId: committed.jobInstanceId,
+				...(committed.submissionId !== undefined
+					? { submissionId: committed.submissionId }
+					: {}),
 				worklist: committed.worklist,
 				navigation: committed.navigation,
 				continueNavigation: committed.continueNavigation ?? null,
@@ -290,7 +293,7 @@ export class OrgSession {
 		}
 	};
 
-	/** Clear session HttpLinkStrip state (stay exit or non-stay post-Commit navigate). */
+	/** Clear session leave-link state (stay → recap, or non-stay post-Commit navigate). */
 	clearLinksStay = (): void => {
 		this.lastHttpLinks = [];
 		this.lastHttpErrors = [];

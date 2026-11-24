@@ -37,12 +37,13 @@ type FormColumns struct {
 // ChromeRule is a display chrome entry. dataReport is evaluated server-side into
 // bindings.chromeDisplay; readonly stays client-eval for now.
 type ChromeRule struct {
-	ID     string `json:"id"`
-	Kind   string `json:"kind"`
-	Expr   string `json:"expr,omitempty"`
-	Title  string `json:"title,omitempty"`
-	Before string `json:"before,omitempty"`
-	After  string `json:"after,omitempty"`
+	ID         string `json:"id"`
+	Kind       string `json:"kind"`
+	Expr       string `json:"expr,omitempty"`
+	Title      string `json:"title,omitempty"`
+	Before     string `json:"before,omitempty"`
+	After      string `json:"after,omitempty"`
+	HideIfNull bool   `json:"hideIfNull,omitempty"`
 }
 
 // DerivedRule is a Derived key expr (concrete or expanded from map-star).

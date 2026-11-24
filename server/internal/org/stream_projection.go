@@ -108,9 +108,18 @@ func ListStreamInstances(cfg OrgConfig, domain Domain, op OperatorIdentity) []St
 	return out
 }
 
-// ProjectStreamTimeline returns steps/rows/tasks for one Org stream instance.
-func ProjectStreamTimeline(cfg OrgConfig, domain Domain, op OperatorIdentity, instanceID string) StreamTimeline {
-	if cfg.Stream == nil || instanceID == "" {
+// ProjectStreamTimeline projects Config.Stream.Steps for one TimelineFocus.
+// Boot: blueprint skeleton; anchor once-step from ProjectWorklistAll/canStart; each → no rows.
+// Instance: membership-filtered Worklist for the anchor id.
+func ProjectStreamTimeline(cfg OrgConfig, domain Domain, op OperatorIdentity, focus TimelineFocus) StreamTimeline {
+	if cfg.Stream == nil {
+		return StreamTimeline{}
+	}
+	if focus.IsBoot() {
+		return projectStreamTimelineBoot(cfg, domain, op)
+	}
+	instanceID, ok := focus.InstanceID()
+	if !ok || instanceID == "" {
 		return StreamTimeline{}
 	}
 	wl := ProjectWorklist(cfg, domain, op, instanceID)
@@ -136,6 +145,59 @@ func ProjectStreamTimeline(cfg OrgConfig, domain Domain, op OperatorIdentity, in
 			tlStep.Tasks = projectOnceTasks(job, wlJob, instanceID)
 		}
 		out.Steps = append(out.Steps, tlStep)
+	}
+	return out
+}
+
+func projectStreamTimelineBoot(cfg OrgConfig, domain Domain, op OperatorIdentity) StreamTimeline {
+	wl := ProjectWorklistAll(cfg, domain, op)
+	anchorJob := cfg.Stream.Instance.Job
+	out := StreamTimeline{Steps: make([]StreamTimelineStep, 0, len(cfg.Stream.Steps))}
+	for _, step := range cfg.Stream.Steps {
+		jobVal, ok := cfg.Jobs.Get(step.Job)
+		if !ok {
+			continue
+		}
+		job, ok := AsJob(jobVal)
+		if !ok {
+			continue
+		}
+		wlJob, _ := worklistJobByID(wl, step.Job)
+		tlStep := StreamTimelineStep{
+			JobID: step.Job,
+			Title: job.Title,
+		}
+		if step.Each != nil {
+			tlStep.Rows = []StreamTimelineRow{}
+		} else if step.Job == anchorJob {
+			tlStep.Tasks = projectBootAnchorTasks(job, wlJob)
+		} else {
+			tlStep.Tasks = timelineTasksFromChrome(job, wlJob, nil, nil)
+		}
+		out.Steps = append(out.Steps, tlStep)
+	}
+	return out
+}
+
+// projectBootAnchorTasks maps Play/unfiltered Worklist canStart onto the once-step
+// Task list (same StreamSubstep vocabulary as provisional instance leaves).
+func projectBootAnchorTasks(job Job, wlJob WorklistJob) []StreamTimelineTask {
+	ordered := OrderedTaskIDs(job.Tasks)
+	out := make([]StreamTimelineTask, 0, len(ordered))
+	for i, taskID := range ordered {
+		chrome, _ := worklistTaskByID(wlJob, taskID)
+		title := chrome.Title
+		if title == "" {
+			title = taskID
+		}
+		task := StreamTimelineTask{ID: taskID, Title: title, State: StreamSubstepLocked}
+		if i == 0 && wlJob.CanStart {
+			// CanStart already folds startsWhen, first-Task readyWhen, and roles.
+			task.State = MapWorklistStatusToStreamState(
+				viewerScopedStatus(TaskStatusAvailable, true),
+			)
+		}
+		out = append(out, task)
 	}
 	return out
 }

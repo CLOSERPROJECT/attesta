@@ -14,6 +14,11 @@
 		interface ActionFields {
 			readonlyField: {};
 		}
+		interface UiOptions {
+			chromeId?: string;
+			/** When true, omit paint if chrome display value is null (errors still show). */
+			hideIfNull?: boolean;
+		}
 	}
 </script>
 
@@ -38,28 +43,33 @@
 
 	const id = $derived(uiOption('chromeId') ?? String(config.path.at(-1) ?? 'chrome'));
 	const display = $derived(chromeCtx.get(id));
+	const hideEmpty = $derived(
+		uiOption('hideIfNull') === true && display.value == null && !display.error
+	);
 
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
 	const errors = $derived(getFieldErrors(ctx, config.path));
 </script>
 
-<Template
-	type="template"
-	showTitle={true}
-	useLabel={true}
-	widgetType="textWidget"
-	{uiOption}
-	value={display.value}
-	{config}
-	{errors}
->
-	<div class="readonly-field" data-testid="readonly-field" data-chrome-id={id}>
-		<Input readonly tabindex={-1} value={display.value ?? ''} class="readonly-field__input" />
-	</div>
-	{#if display.error}
-		<p class="readonly-field__error">{display.error}</p>
-	{/if}
-</Template>
+{#if !hideEmpty}
+	<Template
+		type="template"
+		showTitle={true}
+		useLabel={true}
+		widgetType="textWidget"
+		{uiOption}
+		value={display.value}
+		{config}
+		{errors}
+	>
+		<div class="readonly-field" data-testid="readonly-field" data-chrome-id={id}>
+			<Input readonly tabindex={-1} value={display.value ?? ''} class="readonly-field__input" />
+		</div>
+		{#if display.error}
+			<p class="readonly-field__error">{display.error}</p>
+		{/if}
+	</Template>
+{/if}
 
 <style>
 	.readonly-field :global(.readonly-field__input),

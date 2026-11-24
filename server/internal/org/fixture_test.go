@@ -266,20 +266,51 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if len(containerRoles) != 1 || containerRoles[0] != "logistic" {
 		t.Fatalf("lot_processing/containerReg roles = %#v, want [logistic]", containerReg["roles"])
 	}
-	reads, _ := containerReg["reads"].(map[string]any)
-	lotsRead, _ := reads["lots"].(map[string]any)
-	where, _ := lotsRead["where"].(string)
-	if !strings.Contains(where, `status = "open"`) {
-		t.Fatalf("containerReg.reads.lots.where = %#v, want open lot", lotsRead["where"])
+	if reads, _ := containerReg["reads"].(map[string]any); reads != nil {
+		if _, has := reads["lots"]; has {
+			t.Fatal("containerReg.reads.lots must be removed")
+		}
+	}
+	if enums, _ := containerReg["enumReads"].(map[string]any); enums != nil {
+		if _, has := enums["sourceLotId"]; has {
+			t.Fatal("enumReads.sourceLotId must be removed")
+		}
+	}
+	schema, _ := containerReg["schema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	if _, has := props["polvereDiVetro"]; has {
+		t.Fatal("containerReg schema must not use material arrays")
+	}
+	if _, has := props["material"]; !has {
+		t.Fatal("containerReg schema must expose flat material")
+	}
+	derived, _ := containerReg["derived"].(map[string]any)
+	if _, has := derived["continuesContainerId"]; !has {
+		t.Fatal("containerReg.derived.continuesContainerId missing")
+	}
+	chrome, _ := containerReg["chrome"].(map[string]any)
+	prior, _ := chrome["priorWeight"].(map[string]any)
+	if prior == nil || prior["hideIfNull"] != true {
+		t.Fatalf("containerReg.chrome.priorWeight hideIfNull = %#v", prior)
 	}
 	transform, _ := containerReg["onSubmit"].(map[string]any)
 	rawOps, _ := transform["transform"].([]any)
+	var sawInstanceBind bool
 	for _, raw := range rawOps {
 		op, _ := raw.(map[string]any)
 		set, _ := op["set"].(map[string]any)
 		if status, ok := set["status"].(string); ok && strings.Contains(status, "fullyProcessed") {
 			t.Fatal("containerReg must not write fullyProcessed")
 		}
+		if op["op"] == "bind" {
+			expr, _ := op["expr"].(string)
+			if strings.Contains(expr, `"sourceLotId": $instance.id`) {
+				sawInstanceBind = true
+			}
+		}
+	}
+	if !sawInstanceBind {
+		t.Fatal("containerReg bind must set sourceLotId from $instance.id")
 	}
 	closeLot, _ := TaskByID(lp.Tasks, "closeLot")
 	closeRoles, _ := closeLot["roles"].([]any)

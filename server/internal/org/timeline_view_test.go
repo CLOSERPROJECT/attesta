@@ -1,6 +1,9 @@
 package org
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	cfg := OrgConfig{
@@ -65,7 +68,8 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 		},
 	}}
 
-	steps := BuildOrgTimelineSteps(cfg, domain, timeline, "recycling", "T1")
+	hrefs := TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, "T1"))
+	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs)
 	if len(steps) != 2 {
 		t.Fatalf("steps = %#v", steps)
 	}
@@ -235,7 +239,8 @@ func TestBuildOrgTimelineStepsStatusRollup(t *testing.T) {
 		},
 	}}
 
-	steps := BuildOrgTimelineSteps(cfg, domain, timeline, "recycling", "T1")
+	hrefs := TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, "T1"))
+	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs)
 	if len(steps) != 6 {
 		t.Fatalf("steps = %#v", steps)
 	}
@@ -305,5 +310,72 @@ func TestAppOrgSeededStartTaskPath(t *testing.T) {
 	want := "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestAppOrgPlayTaskPath(t *testing.T) {
+	got := AppOrgPlayTaskPath("recycling", "intake", "", "truckArrive")
+	want := "/app/recycling/new/intake/new/truckArrive"
+	if got != want {
+		t.Fatalf("blank jobInstance → new: got %q, want %q", got, want)
+	}
+	got = AppOrgPlayTaskPath("recycling", "intake", "T1", "truckArrive")
+	want = "/app/recycling/new/intake/T1/truckArrive"
+	if got != want {
+		t.Fatalf("explicit jobInstance: got %q, want %q", got, want)
+	}
+}
+
+func TestBuildOrgTimelineViewBootActionableHref(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := FixtureAllRolesOp()
+	view := BuildOrgTimelineView(cfg, EmptyDomain(), op, "recycling", TimelineBoot())
+	if view.Mode != TimelineModeBoot {
+		t.Fatalf("mode = %q, want %q", view.Mode, TimelineModeBoot)
+	}
+	if view.Instance != "" {
+		t.Fatalf("boot instance = %q, want empty", view.Instance)
+	}
+	if view.Stream != "recycling" {
+		t.Fatalf("stream = %q", view.Stream)
+	}
+	if len(view.Steps) == 0 || len(view.Steps[0].Substeps) == 0 {
+		t.Fatalf("boot steps = %#v", view.Steps)
+	}
+	start := view.Steps[0].Substeps[0]
+	if !start.OrgActionable {
+		t.Fatalf("boot start must be orgActionable: %#v", start)
+	}
+	taskID := strings.TrimPrefix(start.SubstepID, "intake.")
+	wantHref := AppOrgPlayTaskPath("recycling", "intake", "", taskID)
+	if start.Href != wantHref {
+		t.Fatalf("boot href = %q, want %q", start.Href, wantHref)
+	}
+}
+
+func TestBuildOrgTimelineViewInstanceMode(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := FixtureAllRolesOp()
+	domain := EmptyDomain()
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "Truck T1"}}
+	view := BuildOrgTimelineView(cfg, domain, op, "recycling", mustTimelineInstance(t, "T1"))
+	if view.Mode != TimelineModeInstance {
+		t.Fatalf("mode = %q, want %q", view.Mode, TimelineModeInstance)
+	}
+	if view.Instance != "T1" {
+		t.Fatalf("instance = %q", view.Instance)
+	}
+	if len(view.Steps) == 0 || len(view.Steps[0].Substeps) == 0 {
+		t.Fatalf("instance steps = %#v", view.Steps)
+	}
+	href := view.Steps[0].Substeps[0].Href
+	if !strings.HasPrefix(href, "/app/recycling/i/T1/") {
+		t.Fatalf("instance href = %q", href)
 	}
 }

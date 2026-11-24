@@ -70,7 +70,11 @@ func TestParallelTrucksIntakeAndLineBusyBlockedReason(t *testing.T) {
 		t.Fatalf("truck B intake view = %#v", intakeB)
 	}
 
-	tl := ProjectStreamTimeline(cfg, domain, logistic, truckB.JobInstanceID)
+	tlFocus, err := TimelineInstance(truckB.JobInstanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tl := ProjectStreamTimeline(cfg, domain, logistic, tlFocus)
 	for _, step := range tl.Steps {
 		if step.JobID != "lot_processing" {
 			continue

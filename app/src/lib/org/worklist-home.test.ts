@@ -25,8 +25,6 @@ import {
 	progressFraction,
 	taskRouteInstanceSegment
 } from './worklist-home.js';
-import { manySubmitHistoryVisible } from './worklist-overview.js';
-
 const chrome = {
 	intake: [
 		{ id: 'register', title: 'Registrazione', roles: ['administration'] },

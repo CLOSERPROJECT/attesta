@@ -72,36 +72,38 @@ describe('containerReg leaf Ajv', () => {
 	const uiSchema = (leaf?.uiSchema ?? null) as Record<string, unknown> | null;
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
-	test('sourceLotId + weight valid; dualSources / secondary enum gone', () => {
+	test('flat material+weight valid; no material arrays / dualSources', () => {
 		expect(schema).toBeTruthy();
 		expect(schema).not.toHaveProperty('if');
 		const props = (schema as { properties?: Record<string, unknown> }).properties ?? {};
+		expect(props).toHaveProperty('material');
+		expect(props).toHaveProperty('weight');
+		expect(props).toHaveProperty('incomplete');
+		expect(props).toHaveProperty('continuesContainerId');
+		expect(props).not.toHaveProperty('polvereDiVetro');
+		expect(props).not.toHaveProperty('sourceLotId');
 		expect(props).not.toHaveProperty('secondarySourceLotId');
 		expect(props).not.toHaveProperty('dualSources');
-		const rowProps =
-			(
-				(props.polvereDiVetro as { items?: { properties?: Record<string, unknown> } } | undefined)
-					?.items?.properties
-			) ?? {};
-		expect(rowProps).not.toHaveProperty('dualSources');
-		expect(rowProps).toHaveProperty('continuesContainerId');
 
 		expect(
 			validator.isValid(schema!, schema!, {
-				sourceLotId: 'lot-a',
-				polvereDiVetro: [{ weight: 10, incomplete: false }]
+				material: 'polvereDiVetro',
+				weight: 10,
+				incomplete: false
 			})
 		).toBe(true);
 		expect(
 			validator.isValid(schema!, schema!, {
-				sourceLotId: 'lot-a',
-				polvereDiVetro: [{ weight: 10, continuesContainerId: 'C-1', incomplete: false }]
+				material: 'polvereDiVetro',
+				weight: 10,
+				continuesContainerId: 'C-1',
+				incomplete: false
 			})
 		).toBe(true);
 		expect(
 			validator.isValid(schema!, schema!, {
-				sourceLotId: 'lot-a',
-				polvereDiVetro: [{ incomplete: false }]
+				material: 'polvereDiVetro',
+				incomplete: false
 			})
 		).toBe(false);
 	});
@@ -109,18 +111,12 @@ describe('containerReg leaf Ajv', () => {
 	test('continuesContainerId authored as hiddenField (not RJSF ui:widget)', () => {
 		expect(uiSchema).toBeTruthy();
 		const contUi =
-			(
-				uiSchema!.polvereDiVetro as
-					| {
-							items?: {
-								continuesContainerId?: {
-									'ui:components'?: { stringField?: string };
-									'ui:widget'?: unknown;
-								};
-							};
-					  }
-					| undefined
-			)?.items?.continuesContainerId ?? {};
+			(uiSchema!.continuesContainerId as
+				| {
+						'ui:components'?: { stringField?: string };
+						'ui:widget'?: unknown;
+				  }
+				| undefined) ?? {};
 		expect(contUi['ui:components']?.stringField).toBe('hiddenField');
 		expect(contUi).not.toHaveProperty('ui:widget');
 		const themeSrc = readFileSync(join(import.meta.dirname, 'form-theme.ts'), 'utf8');

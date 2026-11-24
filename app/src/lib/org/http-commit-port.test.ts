@@ -77,6 +77,18 @@ describe('parseSubmissionCounts', () => {
 });
 
 describe('HttpCommitDomainPort', () => {
+	test('parses submissionId as Domain Submission timestamp', () => {
+		const got = parseCommitResult({
+			...sampleResult,
+			submissionId: '2026-11-13T12:00:01Z'
+		});
+		expect(got.submissionId).toBe('2026-11-13T12:00:01Z');
+		expect(parseCommitResult(sampleResult).submissionId).toBeUndefined();
+		expect(
+			parseCommitResult({ ...sampleResult, submissionId: 12 }).submissionId
+		).toBeUndefined();
+	});
+
 	test('Commit worklist preserves instance submissionCounts', () => {
 		const got = parseCommitResult({
 			...sampleResult,

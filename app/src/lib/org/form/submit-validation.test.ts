@@ -73,5 +73,9 @@ describe('submit validation visibility', () => {
 		expect(task).not.toContain('compileTaskFormPlan');
 		expect(task).not.toContain('seedMapTableDraft');
 		expect(task).not.toContain('seedProgressDraftFromDomain');
+		// Stay leave links live on once/many recap tables, not under every TaskForm.
+		expect(task).not.toContain('HttpLinkStrip');
+		expect(task).not.toContain('lastHttpLinks');
+		expect(task).not.toContain('task-http-links');
 	});
 });
