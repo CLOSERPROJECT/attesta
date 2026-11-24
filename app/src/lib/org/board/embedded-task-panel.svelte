@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
-	import HistoryIcon from '@lucide/svelte/icons/history';
+	import ListIcon from '@lucide/svelte/icons/list';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import type { Snippet } from 'svelte';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Tabs from '#lib/shadcn/ui/tabs/index.js';
@@ -19,7 +19,7 @@
 	type Tab = 'form' | 'recap';
 
 	type HeaderArgs = {
-		/** Form|Recap tablist when submitMany and open; else undefined. */
+		/** New|Done tablist when submitMany and open; else undefined. */
 		tablist: Snippet | undefined;
 	};
 
@@ -107,7 +107,7 @@
 			data-testid="embed-tab-form"
 			onclick={() => selectTab('form')}
 		>
-			<ClipboardListIcon data-icon="inline-start" aria-hidden="true" />
+			<PlusIcon data-icon="inline-start" aria-hidden="true" />
 			{m.embed_tab_form()}
 		</Tabs.Trigger>
 		<Tabs.Trigger
@@ -116,7 +116,7 @@
 			data-testid="embed-tab-recap"
 			onclick={() => selectTab('recap')}
 		>
-			<HistoryIcon data-icon="inline-start" aria-hidden="true" />
+			<ListIcon data-icon="inline-start" aria-hidden="true" />
 			{m.embed_tab_recap()}
 		</Tabs.Trigger>
 	</Tabs.List>
