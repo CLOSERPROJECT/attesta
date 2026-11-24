@@ -106,7 +106,9 @@ type TaskCommitter struct {
 	LinkStore LinkStore
 	// DPPs persists Passport records when onSubmit.passport is set. Required for that hook.
 	DPPs DPPStore
-	Now  func() time.Time
+	// Changes hears about Domain writes; nil disables notifications (seeds, tests).
+	Changes DomainChangeNotifier
+	Now     func() time.Time
 }
 
 func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
@@ -253,6 +255,11 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 	}
 	if err != nil {
 		return CommitResult{}, err
+	}
+	if c.Changes != nil {
+		// Deferred so remote boards refetch after DPP/link side records exist, and
+		// still hear about the write if a later step fails.
+		defer c.Changes.DomainChanged(scope, revision)
 	}
 
 	streamInstanceID := strings.TrimSpace(req.StreamInstanceID)
