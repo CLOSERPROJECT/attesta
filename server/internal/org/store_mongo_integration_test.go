@@ -101,6 +101,10 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	}
 }
 
+func TestMongoDomainStoreRevisionContract(t *testing.T) {
+	assertDomainStoreRevisionContract(t, NewMongoDomainStore(livingTestMongoDB(t)))
+}
+
 func TestMongoStoresSurviveReconnect(t *testing.T) {
 	db := livingTestMongoDB(t)
 	ctx := t.Context()
@@ -222,7 +226,7 @@ func TestMongoDomainUpdateConcurrentAppendsAllLand(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, appendSubmission(string(rune('a'+i)))); err != nil {
+			if _, _, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, appendSubmission(string(rune('a'+i)))); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -257,7 +261,7 @@ func TestMongoDomainUpdateLegacyDocWithoutRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, sid := range []string{"a", "b"} {
-		if _, err := domains.Update(ctx, scope, appendSubmission(sid)); err != nil {
+		if _, _, err := domains.Update(ctx, scope, appendSubmission(sid)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -289,7 +293,7 @@ func TestMongoDomainPutBumpsRevisionSoStaleUpdateRetries(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := 0
-	_, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, func(d Domain) (Domain, error) {
+	_, _, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, func(d Domain) (Domain, error) {
 		calls++
 		if calls == 1 {
 			// Lands between this Update's read and its conditional write.
@@ -323,7 +327,7 @@ func TestMongoDomainUpdateConflictWhenRetriesExhausted(t *testing.T) {
 	if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, EmptyDomain()); err != nil {
 		t.Fatal(err)
 	}
-	_, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, func(d Domain) (Domain, error) {
+	_, _, err := domains.Update(ctx, Scope{Org: org, Stream: "main"}, func(d Domain) (Domain, error) {
 		if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, EmptyDomain()); err != nil {
 			t.Fatal(err)
 		}

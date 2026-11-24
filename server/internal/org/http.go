@@ -108,16 +108,18 @@ func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	domain := EmptyDomain()
+	var revision int64
 	if h.DomainLoader.Domains != nil {
-		if loaded, domainErr := h.DomainLoader.Domains.Get(r.Context(), scope); domainErr == nil {
-			domain = loaded
-		} else if !errors.Is(domainErr, ErrNotFound) {
+		var domainErr error
+		domain, revision, domainErr = domainSnapshot(r.Context(), h.DomainLoader.Domains, scope)
+		if domainErr != nil {
 			http.Error(w, "failed to load timeline", http.StatusInternalServerError)
 			return
 		}
 	}
 
 	view := BuildOrgTimelineView(cfg, domain, op, scope.Stream, focus)
+	view.Revision = revision
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Method == http.MethodHead {
