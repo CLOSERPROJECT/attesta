@@ -969,12 +969,12 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 	}); err == nil || !strings.Contains(err.Error(), "stores required") {
 		t.Fatalf("stores = %v", err)
 	}
-	if _, err := (&DomainLoader{Domains: &errDomainStore{err: ErrNotFound}}).LoadTaskRecap(
+	if _, err := (&DomainLoader{Domains: &errDomainStore{err: ErrNotFound}, Configs: loader.Configs}).LoadTaskRecap(
 		t.Context(), FeragameScope(), SubmissionAddress{JobID: "j", JobInstanceID: "i", TaskID: "t"},
 	); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("domain not found = %v", err)
 	}
-	if _, err := (&DomainLoader{Domains: &errDomainStore{err: errors.New("get boom")}}).LoadTaskRecap(
+	if _, err := (&DomainLoader{Domains: &errDomainStore{err: errors.New("get boom")}, Configs: loader.Configs}).LoadTaskRecap(
 		t.Context(), FeragameScope(), SubmissionAddress{JobID: "j", JobInstanceID: "i", TaskID: "t"},
 	); err == nil || !strings.Contains(err.Error(), "get boom") {
 		t.Fatalf("domain boom = %v", err)

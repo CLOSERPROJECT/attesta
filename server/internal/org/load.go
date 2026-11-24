@@ -38,7 +38,7 @@ var ErrTaskBundleForbidden = errors.New("org: task form bundle forbidden")
 type DomainLoader struct {
 	Domains DomainStore
 	Configs ConfigStore
-	// LinkStore supplies post-Commit links for TaskRecap. Nil → facts only.
+	// LinkStore supplies post-Commit links for TaskRecapTable rows. Nil → cells only.
 	LinkStore LinkStore
 }
 

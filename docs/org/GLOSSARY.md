@@ -2,7 +2,7 @@
 
 Single-organization operating picture: one or more **Org streams**, each a versioned **Org Config** with its own accumulating **Domain**. Operators work **Org stream instances** (filtered views over Domain) in `/app`; discovery and timelines live on `/my`. See [ADR-0014](../adr/0014-org-config-as-stream.md).
 
-**Org** and **Stream** remain different product nouns—see root [`GLOSSARY.md`](../../GLOSSARY.md). Formata Stream runtime: [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md). Shared membership: root glossary. Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md). Decisions: [`docs/adr/`](../adr/) (0005–0015). Config authoring: [`org-config-authoring.md`](../agents/org-config-authoring.md).
+**Org** and **Stream** remain different product nouns—see root [`GLOSSARY.md`](../../GLOSSARY.md). Formata Stream runtime: [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md). Shared membership: root glossary. Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md). Decisions: [`docs/adr/`](../adr/) (0005–0016). Config authoring: [`org-config-authoring.md`](../agents/org-config-authoring.md).
 
 ## Language
 
@@ -122,6 +122,9 @@ _Avoid_: Whole-config execution id as the load key; org-only Load without stream
 
 **Worklist**: Operator board for one Org stream instance: act-now Jobs and Task statuses. Finished rediscovery is the `/my` dashboard and timeline. See [ADR-0005](../adr/0005-org-worklist-server-projection.md), [ADR-0006](../adr/0006-org-operator-worklist-home.md), and [ADR-0014](../adr/0014-org-config-as-stream.md).\
 _Avoid_: Job surface; Chrome; Operator home (the `/my` landing); peer home bands for In progress / Completed; plant-wide Worklist across instances
+
+**Recap**: Board overview table for one Task at a Submission address. Config may project Domain entities via `entitiesTouched`, or fall back to one row per Submission. See [ADR-0016](../adr/0016-org-task-recap-entities.md).\
+_Avoid_: Stamping createdBy on entities; mint-time field snapshots; SPA re-deriving the table from Domain
 
 ## Historical / rejected
 
