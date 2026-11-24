@@ -7,6 +7,7 @@
 	import type { CommitOutcome } from './commit-port.js';
 	import { orgSession } from './org-app.svelte.js';
 	import { draftBagInstanceKey } from './drafts.js';
+	import { applyUrlSeed } from './seed-query.js';
 	import { needsStartingNewMint, normalizeJobInstanceId } from './task-address.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/config-form.svelte';
@@ -33,6 +34,11 @@
 		disabled?: boolean;
 		/** Provisional Start (mint.startingNew); also mint when instance is blank. */
 		provisionalJob?: boolean;
+		/**
+		 * `?seed.*` from timeline href (or deep-link). Empty/omitted → unseeded;
+		 * after URL strip, session open-seed memory still applies for provisional.
+		 */
+		seed?: Record<string, string>;
 		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
@@ -45,19 +51,46 @@
 		bundle,
 		disabled = false,
 		provisionalJob = false,
+		seed = {},
 		onCommitted
 	}: Props = $props();
 
 	const path = $derived(taskPath(jobId, taskId));
-	const draftInstanceKey = $derived(draftBagInstanceKey({ jobInstanceId }));
+	const hrefSeed = $derived.by(() => {
+		const out: Record<string, string> = {};
+		for (const [k, v] of Object.entries(seed)) {
+			if (k) out[k] = v;
+		}
+		return out;
+	});
+	const openSeed = $derived.by(() => {
+		if (Object.keys(hrefSeed).length > 0) return hrefSeed;
+		if (!provisionalJob && jobInstanceId) return {};
+		void orgSession.openSeeds;
+		return orgSession.getOpenSeed(path) ?? {};
+	});
+	const draftInstanceKey = $derived(
+		draftBagInstanceKey({
+			jobInstanceId,
+			seed: !jobInstanceId && Object.keys(openSeed).length > 0 ? openSeed : undefined
+		})
+	);
+	const seededFields = $derived.by(() => {
+		const fromOpen = Object.keys(openSeed);
+		if (fromOpen.length > 0) return fromOpen;
+		return [...(orgSession.getSeededFields(path, draftInstanceKey) ?? [])];
+	});
 	const drafts = $derived(orgSession.drafts);
-	/** Reset draft seed when task address / draft bag key changes (not on every projection). */
-	const draftSeedKey = $derived(`${path}|${draftInstanceKey}`);
+	/** Reset draft seed when task address / draft bag key / open seed changes. */
+	const draftSeedKey = $derived(
+		`${path}|${draftInstanceKey}|${seededFields.slice().sort().join(',')}`
+	);
 
 	let submitError = $state.raw<string | null>(null);
 	let live: LiveTaskForm | null = $state(null);
 	let seededFromBundle = $state(false);
 	let lastSeedKey = $state.raw('');
+	let lastAppliedOpenSeed = $state.raw('');
 
 	function readDraft(): Record<string, unknown> {
 		void drafts;
@@ -152,21 +185,40 @@
 		seededFromBundle = true;
 	}
 
+	function applyOpenSeedOnce() {
+		const seedKey = Object.keys(openSeed)
+			.sort()
+			.map((k) => `${k}=${openSeed[k]}`)
+			.join('&');
+		if (seedKey === lastAppliedOpenSeed) return;
+		lastAppliedOpenSeed = seedKey;
+		if (Object.keys(openSeed).length > 0) {
+			applyUrlSeed(openSeed, { jobId, taskId, jobInstanceId }, orgSession);
+			return;
+		}
+		if (provisionalJob) {
+			orgSession.clearOpenSeed(path);
+		}
+	}
+
 	$effect(() => {
 		// Do not track `drafts` here — seed/write updates the bag and would re-enter
 		// ensureLive/updatePlan forever (effect_update_depth_exceeded). Form value
 		// still tracks drafts via LiveTaskForm ports / syncDeepLocalToDraft.
 		void draftSeedKey;
 		void bundle;
+		void openSeed;
 
 		if (draftSeedKey !== lastSeedKey) {
 			lastSeedKey = draftSeedKey;
 			seededFromBundle = false;
 			submitError = null;
+			lastAppliedOpenSeed = '';
 		}
 
+		applyOpenSeedOnce();
 		seedBundleDraft(bundle);
-		const compiled = planFromTaskFormBundle(bundle);
+		const compiled = planFromTaskFormBundle(bundle, { seededFields });
 		if (live === null || live.plan.projectionKey !== compiled.projectionKey) {
 			ensureLive(compiled);
 		}
@@ -181,6 +233,7 @@
 	data-task-path={path}
 	data-instance-id={jobInstanceId || 'provisional'}
 	data-from-bundle="1"
+	data-seeded-fields={seededFields.length ? seededFields.join(',') : undefined}
 >
 	{#if live?.form}
 		<fieldset disabled={disabled || orgSession.committing} class="space-y-4">

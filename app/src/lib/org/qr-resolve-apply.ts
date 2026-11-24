@@ -19,15 +19,30 @@ export type QrApplyOutcome =
 	| QrApplyNavigate
 	| { kind: 'error'; message: string };
 
-/** Draft bag coords matching TaskForm. */
-export function qrDraftCoords(nav: QrNavigate): {
+function seedAsStrings(seed: Record<string, unknown> | undefined): Record<string, string> {
+	if (!seed) return {};
+	const out: Record<string, string> = {};
+	for (const [k, v] of Object.entries(seed)) {
+		if (!k || v == null) continue;
+		out[k] = typeof v === 'string' ? v : String(v);
+	}
+	return out;
+}
+
+/** Draft bag coords matching TaskForm (provisional + seed → isolated key). */
+export function qrDraftCoords(
+	nav: QrNavigate,
+	seed?: Record<string, unknown>
+): {
 	taskPath: string;
 	draftInstanceKey: string;
 } {
+	const stringSeed = seedAsStrings(seed);
 	return {
 		taskPath: taskPath(nav.jobId, nav.taskId),
 		draftInstanceKey: draftBagInstanceKey({
-			jobInstanceId: nav.jobInstanceId
+			jobInstanceId: nav.jobInstanceId,
+			seed: !nav.jobInstanceId && Object.keys(stringSeed).length > 0 ? stringSeed : undefined
 		})
 	};
 }
@@ -55,7 +70,7 @@ export function interpretQrResolve(
 	if (!nav) {
 		return { kind: 'error', message: qrResolveFailedMessage() };
 	}
-	const coords = qrDraftCoords(nav);
+	const coords = qrDraftCoords(nav, result.seed);
 	return {
 		kind: 'navigate',
 		target: qrNavigateTarget(nav, stream),

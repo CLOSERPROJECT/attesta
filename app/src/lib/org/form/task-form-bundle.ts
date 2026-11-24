@@ -1,6 +1,7 @@
 import type { Schema, UiSchemaRoot } from '@sjsf/form';
 import type { ChromeEntry, TaskFormPlan } from './task-form-plan.js';
 import type { DerivedKeyEntry } from './derived-keys.js';
+import { chromeForSeededFields, lockSeededUiSchema } from './lock-seeded-ui-schema.js';
 
 /** Wire Task form bundle from org Load/Commit. */
 export type TaskFormBundle = {
@@ -47,18 +48,40 @@ export function findTaskFormBundle(
 	return bundles.find((b) => bundleMatches(b, jobId, taskId, jobInstanceId)) ?? null;
 }
 
+export type PlanFromTaskFormBundleOpts = {
+	/** Field names seeded for this form open — locked in uiSchema (readonly). */
+	seededFields?: readonly string[];
+};
+
 /** Frozen FormPlan from a server Task form bundle — no authored+Domain compile. */
-export function planFromTaskFormBundle(bundle: TaskFormBundle): TaskFormPlan {
+export function planFromTaskFormBundle(
+	bundle: TaskFormBundle,
+	opts: PlanFromTaskFormBundleOpts = {}
+): TaskFormPlan {
+	const seededFields = opts.seededFields ?? [];
+	const uiSchema =
+		seededFields.length > 0
+			? lockSeededUiSchema(bundle.uiSchema, seededFields)
+			: bundle.uiSchema;
+	const chrome =
+		seededFields.length > 0
+			? chromeForSeededFields(seededFields, bundle.chrome ?? [])
+			: (bundle.chrome ?? []);
+	const baseKey = bundle.projectionKey ?? '';
+	const projectionKey =
+		seededFields.length > 0
+			? `${baseKey}#seed:${[...seededFields].sort().join(',')}`
+			: baseKey;
 	return {
 		surface: bundle.surface,
 		schemas: {
 			schema: bundle.schema,
-			uiSchema: bundle.uiSchema
+			uiSchema
 		},
 		...(bundle.derived !== undefined ? { derived: bundle.derived } : {}),
-		chrome: bundle.chrome ?? [],
+		chrome,
 		chromeFieldIds: bundle.chromeFieldIds ?? [],
-		projectionKey: bundle.projectionKey ?? '',
+		projectionKey,
 		// Chrome strip + cell omit live in Go prep; SPA seal is pass-through.
 		sealSubmission: (value) => value
 	};

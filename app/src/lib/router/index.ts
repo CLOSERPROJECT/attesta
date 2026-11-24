@@ -8,6 +8,7 @@ import { orgRouteCoordsFromPath } from '../org/nav-place.js';
 import { orgSession } from '../org/org-app.svelte.js';
 import { applyUrlSeed, takeSeedQueryParams } from '../org/seed-query.js';
 import { normalizeTaskAddress } from '../org/task-address.js';
+import { taskPath } from '../org/types.js';
 import { resolveTaskDeepLink } from '../org/worklist-nav.js';
 import layout from './layout.svelte';
 
@@ -33,6 +34,8 @@ export const { p, navigate, isActive, route } = createRouter({
 					if (Object.keys(seed).length > 0) {
 						applyUrlSeed(seed, addr, orgSession);
 						window.history.replaceState(window.history.state, '', strippedHref);
+					} else if (addr.provisionalJob) {
+						orgSession.clearOpenSeed(taskPath(addr.jobId, addr.taskId));
 					}
 				}
 

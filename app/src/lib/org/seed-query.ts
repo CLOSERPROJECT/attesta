@@ -40,21 +40,45 @@ export type SeedQueryDraftBag = {
 	seedDraft: (
 		taskPath: string,
 		draftInstanceKey: string,
-		value: Record<string, unknown>
+		value: Record<string, unknown>,
+		seededFields?: readonly string[]
 	) => void;
+	/** Keep seed field names after URL strip so the board form can lock. */
+	rememberOpenSeed?: (taskPath: string, seed: Record<string, string>) => void;
+	/** Unseeded provisional open — drop prior seed lock pointer. */
+	clearOpenSeed?: (taskPath: string) => void;
 };
 
-/** Merge seed fields into the Task draft bag (non-dirty). */
+export type ApplyUrlSeedResult = {
+	draftBagInstanceKey: string;
+	seededFields: string[];
+};
+
+/** Merge seed fields into the Task draft bag (non-dirty); seed wins for those keys. */
 export function applyUrlSeed(
 	seed: Record<string, string>,
 	addr: { jobId: string; taskId: string; jobInstanceId: string },
 	drafts: SeedQueryDraftBag
-): void {
-	if (Object.keys(seed).length === 0) return;
+): ApplyUrlSeedResult {
 	const path = taskPath(addr.jobId, addr.taskId);
-	const key = draftBagInstanceKey({ jobInstanceId: addr.jobInstanceId });
+	const seededFields = Object.keys(seed).filter(Boolean);
+	if (seededFields.length === 0) {
+		drafts.clearOpenSeed?.(path);
+		return {
+			draftBagInstanceKey: draftBagInstanceKey({
+				jobInstanceId: addr.jobInstanceId
+			}),
+			seededFields: []
+		};
+	}
+	const key = draftBagInstanceKey({
+		jobInstanceId: addr.jobInstanceId,
+		seed
+	});
 	const prior = drafts.getDraft(path, key) ?? {};
-	drafts.seedDraft(path, key, { ...prior, ...seed });
+	drafts.seedDraft(path, key, { ...prior, ...seed }, seededFields);
+	drafts.rememberOpenSeed?.(path, seed);
+	return { draftBagInstanceKey: key, seededFields };
 }
 
 /** Apply `?seed.*` once via seedDraft; returns stripped href when seed was present. */

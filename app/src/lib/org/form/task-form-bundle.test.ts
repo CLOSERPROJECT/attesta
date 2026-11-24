@@ -78,6 +78,39 @@ describe('task-form-bundle', () => {
 		});
 	});
 
+	test('planFromTaskFormBundle locks seeded fields and adds chrome paint without seal strip', () => {
+		const bundle = sampleBundle({
+			schema: {
+				type: 'object',
+				properties: { lotId: { type: 'string' }, note: { type: 'string' } }
+			},
+			uiSchema: {
+				lotId: { 'ui:components': { stringField: 'enumField' } },
+				note: { 'ui:components': { stringField: 'enumField' } }
+			} as TaskFormBundle['uiSchema'],
+			projectionKey: 'startLot-v1',
+			chromeFieldIds: []
+		});
+		const plan = planFromTaskFormBundle(bundle, { seededFields: ['lotId'] });
+		expect(plan.schemas.uiSchema.lotId).toMatchObject({
+			'ui:components': {
+				stringField: 'readonlyField',
+				enumField: 'readonlyField'
+			},
+			'ui:options': { chromeId: 'lotId' }
+		});
+		expect(plan.schemas.uiSchema.note).toEqual({
+			'ui:components': { stringField: 'enumField' }
+		});
+		expect(plan.chrome).toContainEqual({
+			id: 'lotId',
+			kind: 'readonly',
+			expr: '$.lotId'
+		});
+		expect(plan.chromeFieldIds).toEqual([]);
+		expect(plan.projectionKey).toBe('startLot-v1#seed:lotId');
+	});
+
 	test('dataReport chrome paints bindings.chromeDisplay without Domain walk', () => {
 		const bundle = sampleBundle({
 			jobId: 'line',

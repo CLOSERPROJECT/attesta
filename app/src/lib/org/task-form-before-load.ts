@@ -2,6 +2,7 @@ import { orgRouteCoordsFromPath } from './nav-place.js';
 import { applyUrlSeed, takeSeedQueryParams } from './seed-query.js';
 import { normalizeTaskAddress } from './task-address.js';
 import type { TaskFormMount } from './task-form-mount.svelte.js';
+import { taskPath } from './types.js';
 import type { Worklist } from './types.js';
 import type { TaskDeepLinkTarget } from './worklist-nav.js';
 
@@ -16,8 +17,11 @@ export type TaskFormBeforeLoadDeps = {
 		seedDraft: (
 			taskPath: string,
 			draftInstanceKey: string,
-			value: Record<string, unknown>
+			value: Record<string, unknown>,
+			seededFields?: readonly string[]
 		) => void;
+		rememberOpenSeed?: (taskPath: string, seed: Record<string, string>) => void;
+		clearOpenSeed?: (taskPath: string) => void;
 	};
 	/**
 	 * On gate deny — return `navigate(...)` so caller can `throw` it
@@ -59,6 +63,9 @@ export async function runTaskFormBeforeLoad(
 					}
 				});
 			replace(strippedHref);
+		} else if (addr.provisionalJob) {
+			// Unseeded provisional must not inherit a prior accordion seed lock.
+			deps.session.clearOpenSeed?.(taskPath(addr.jobId, addr.taskId));
 		}
 	}
 

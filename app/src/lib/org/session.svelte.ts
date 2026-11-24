@@ -79,6 +79,11 @@ export class OrgSession {
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
 	drafts = $state.raw<Record<string, DraftEntry>>({});
+	/**
+	 * Seed captured for a Task path after URL strip (board soft-nav loses `?seed.*`).
+	 * Board embeds with an href seed prop do not need this; deep-links do.
+	 */
+	openSeeds = $state.raw<Record<string, Record<string, string>>>({});
 
 	constructor(options: OrgSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
@@ -146,25 +151,75 @@ export class OrgSession {
 		value: Record<string, unknown>
 	): void => {
 		const key = draftKey(taskPath, jobInstanceId);
-		this.drafts = { ...this.drafts, [key]: { value, dirty: true } };
+		const prior = this.drafts[key];
+		this.drafts = {
+			...this.drafts,
+			[key]: {
+				value,
+				dirty: true,
+				...(prior?.seededFields !== undefined
+					? { seededFields: prior.seededFields }
+					: {})
+			}
+		};
 		this.#schedulePersist(key, value);
 	};
 
 	/**
 	 * Non-dirty seed write. Does not count for marks/persist.
 	 * If the key is already dirty, dirty sticks (no undirty-by-seed).
+	 * Optional seededFields records URL/QR provenance for operator lock.
 	 */
 	seedDraft = (
 		taskPath: string,
 		jobInstanceId: string,
-		value: Record<string, unknown>
+		value: Record<string, unknown>,
+		seededFields?: readonly string[]
 	): void => {
 		const key = draftKey(taskPath, jobInstanceId);
 		const prior = this.drafts[key];
+		const fields =
+			seededFields !== undefined
+				? seededFields
+				: prior?.seededFields;
 		this.drafts = {
 			...this.drafts,
-			[key]: { value, dirty: prior?.dirty ?? false }
+			[key]: {
+				value,
+				dirty: prior?.dirty ?? false,
+				...(fields !== undefined ? { seededFields: fields } : {})
+			}
 		};
+	};
+
+	getSeededFields = (
+		taskPath: string,
+		draftBagInstanceKey: string
+	): readonly string[] | null => {
+		return this.drafts[draftKey(taskPath, draftBagInstanceKey)]?.seededFields ?? null;
+	};
+
+	rememberOpenSeed = (taskPath: string, seed: Record<string, string>): void => {
+		if (Object.keys(seed).length === 0) {
+			this.clearOpenSeed(taskPath);
+			return;
+		}
+		this.openSeeds = {
+			...this.openSeeds,
+			[taskPath]: { ...seed }
+		};
+	};
+
+	getOpenSeed = (taskPath: string): Record<string, string> | null => {
+		const seed = this.openSeeds[taskPath];
+		return seed ? { ...seed } : null;
+	};
+
+	clearOpenSeed = (taskPath: string): void => {
+		if (!(taskPath in this.openSeeds)) return;
+		const next = { ...this.openSeeds };
+		delete next[taskPath];
+		this.openSeeds = next;
 	};
 
 	hasDirtyDraft = (taskPath: string, draftBagInstanceKey: string): boolean => {
@@ -292,6 +347,7 @@ export class OrgSession {
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
 			this.clearDraft(req.taskPath, bagKey ?? req.jobInstanceId);
+			this.clearOpenSeed(req.taskPath);
 			return {
 				jobInstanceId: committed.jobInstanceId,
 				...(committed.submissionId !== undefined

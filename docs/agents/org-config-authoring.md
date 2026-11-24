@@ -38,6 +38,10 @@ Validation (`ValidateStreamConfig` at Config load and Commit prep, mirroring DPP
 
 **Membership caveat:** a Job instance belongs to Org stream instance S when it is the anchor instance with id S, or when its Job step has `each` and its id is one of the entity ids that `each` selects with `$stream.id = S`. That only works when the row Job’s `instanceId` equals the selected entity id (Feragame: `instanceId: $.lotId`). Validation cannot check this statically—author it that way.
 
+### Seed-bound provisional start
+
+Provisional `each` timeline rows open the Job start Task with query seed `?seed.<field>=` (Feragame: `seed.lotId` from the row entity id when `instanceId` is `$.lotId`). Fields present in that URL/QR seed for the form open are operator-locked (readonly or hidden)—not re-picked. Unseeded Worklist `startLabel` / Play start without seed keeps the Config enum or select. Plant law stays in Config; this is platform seed UX, not a plant-named executor branch. Do not narrow `each.where` to hide provisional rows: accordion select-in-row is fixed by seeding start, not by shrinking membership.
+
 **Finished rule (no new field):** a Job instance is finished when every `submit: once` Task on it is done. End a Job with a once-only closing Task when “finished” should mean that beat is complete.
 
 ### `blockedReason` (Task, optional)
