@@ -1,14 +1,17 @@
 import type { CommitOutcome } from '../commit-port.js';
+import type { DomainEventsPort } from '../domain-events-port.js';
 import type { TaskFormBundle } from '../form/task-form-bundle.js';
+import type { CommitObserver } from '../session.svelte.js';
 import { taskAddressKey, type TaskAddress } from '../task-address.js';
 import type { TimelineLoadQuery, TimelinePort } from '../timeline/timeline-port.js';
 import type { TimelineView } from '../timeline/types.js';
 import type { DomainChange } from './board-refresh-plan.js';
-import { planBoardRefresh } from './board-refresh-plan.js';
+import { planBoardRefresh, type BoardRefreshPlan } from './board-refresh-plan.js';
 import type { BoardFormCache } from './board-form-cache.svelte.js';
 import type { BoardRecapCache } from './board-recap-cache.svelte.js';
 import type { BoardTimelineModel } from './board-timeline-model.svelte.js';
 import type { BoardTaskFocus } from './board-url.js';
+import { createDomainChangeTracker } from './domain-change-tracker.js';
 
 /** Route-edge scope: boot (Play / not-instanced) or minted stream instance. */
 export type BoardScope =
@@ -35,6 +38,8 @@ export type BoardSessionOptions = {
 	navigateToInstance: NavigateToInstance;
 	hydrate?: (args: { stream: string; instance: string; background?: boolean }) => void;
 	dropSeededDraft?: (addr: TaskAddress) => void;
+	events?: DomainEventsPort;
+	commits?: { observeCommits(observer: CommitObserver): () => void };
 };
 
 export type BoardSession = {
@@ -50,6 +55,8 @@ export type BoardSession = {
 	 * projections planBoardRefresh selects. Resolves when the refresh finished.
 	 */
 	domainChanged(change: DomainChange): Promise<void>;
+	/** Listen to the stream's Domain revisions and own Commit lifecycle; returns dispose. */
+	connect(): () => void;
 	/** Operator accepted the stale notice: reseed prefill, swap in the newer bundle. */
 	acceptStale(addr: TaskAddress): void;
 	adoptInstance(instance: string, opts?: AdoptInstanceOptions): Promise<void>;
@@ -90,6 +97,13 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 	const { timeline, model, formCache, recapCache, navigateToInstance, hydrate, dropSeededDraft } =
 		opts;
 
+	let queue: { change: DomainChange; resolve: () => void }[] = [];
+	let draining = false;
+
+	const tracker = createDomainChangeTracker((revision) => {
+		void domainChanged({ origin: 'foreign', revision });
+	});
+
 	function applyScopeToModel(next: BoardScope) {
 		model.setScope(streamOf(next), instanceOf(next));
 	}
@@ -117,6 +131,9 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 			view = next;
 			model.setView(next);
 			error = '';
+			if (mode === 'load') {
+				tracker.reset(next.revision ?? 0);
+			}
 			if (scope.kind === 'instance') {
 				hydrate?.({
 					stream: scope.stream,
@@ -136,6 +153,71 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 			if (myGen === gen && mode === 'load') {
 				loading = false;
 			}
+		}
+	}
+
+	async function executePlan(plan: BoardRefreshPlan): Promise<void> {
+		if (plan.remountForms) {
+			formCache.refreshAllAfterDomainCommit();
+		}
+		for (const addr of plan.recapRefresh) {
+			recapCache.invalidate(taskAddressKey(addr));
+			recapCache.enqueue([addr]);
+		}
+		if (plan.revalidateForms) {
+			const exempt = plan.holdExempt;
+			formCache.revalidateAll({
+				hold: (e) => model.isBodyOpen(e.address) && !exempt.includes(e.key),
+				onSwap: (a) => dropSeededDraft?.(a)
+			});
+		}
+		if (plan.revalidateRecaps) {
+			recapCache.revalidateAll();
+		}
+		if (plan.timeline) {
+			await fetchView(timelineQueryForScope(scope), 'reload', {
+				background: plan.background
+			});
+		} else if (plan.worklistOnly && scope.kind === 'instance') {
+			hydrate?.({
+				stream: scope.stream,
+				instance: scope.instance,
+				...(plan.background ? { background: true } : {})
+			});
+		}
+	}
+
+	function domainChanged(change: DomainChange): Promise<void> {
+		return new Promise((resolve) => {
+			queue.push({ change, resolve });
+			if (!draining) {
+				draining = true;
+				setTimeout(() => void drain(), 0);
+			}
+		});
+	}
+
+	async function drain() {
+		try {
+			while (queue.length > 0) {
+				const batch = queue;
+				queue = [];
+				try {
+					await executePlan(
+						planBoardRefresh(
+							batch.map((b) => b.change),
+							{
+								scopeKind: scope.kind,
+								hasView: view !== null
+							}
+						)
+					);
+				} finally {
+					for (const b of batch) b.resolve();
+				}
+			}
+		} finally {
+			draining = false;
 		}
 	}
 
@@ -165,39 +247,19 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 		async reload() {
 			await fetchView(timelineQueryForScope(scope), 'reload');
 		},
-		async domainChanged(change: DomainChange) {
-			const plan = planBoardRefresh([change], {
-				scopeKind: scope.kind,
-				hasView: view !== null
-			});
-			if (plan.remountForms) {
-				formCache.refreshAllAfterDomainCommit();
-			}
-			for (const addr of plan.recapRefresh) {
-				recapCache.invalidate(taskAddressKey(addr));
-				recapCache.enqueue([addr]);
-			}
-			if (plan.revalidateForms) {
-				const exempt = plan.holdExempt;
-				formCache.revalidateAll({
-					hold: (e) => model.isBodyOpen(e.address) && !exempt.includes(e.key),
-					onSwap: (a) => dropSeededDraft?.(a)
-				});
-			}
-			if (plan.revalidateRecaps) {
-				recapCache.revalidateAll();
-			}
-			if (plan.timeline) {
-				await fetchView(timelineQueryForScope(scope), 'reload', {
-					background: plan.background
-				});
-			} else if (plan.worklistOnly && scope.kind === 'instance') {
-				hydrate?.({
-					stream: scope.stream,
-					instance: scope.instance,
-					...(plan.background ? { background: true } : {})
-				});
-			}
+		domainChanged,
+		connect() {
+			if (!opts.events) return () => {};
+			const unsubEvents = opts.events.subscribe(scope.stream, (r) => tracker.remote(r));
+			const unsubCommits =
+				opts.commits?.observeCommits({
+					started: () => tracker.commitStarted(),
+					settled: (r) => tracker.commitSettled(r)
+				}) ?? (() => {});
+			return () => {
+				unsubEvents();
+				unsubCommits();
+			};
 		},
 		acceptStale(addr: TaskAddress) {
 			dropSeededDraft?.(addr);
