@@ -81,7 +81,8 @@
 				</button>
 			{/if}
 		{:else}
-			<span data-testid="derived-formula">{displayFormula()}</span>
+			<span class="computed-field computed-field__value" data-testid="derived-formula"
+				>{displayFormula()}</span>
 			{#if overridable}
 				<button type="button" data-testid="derived-override-start" onclick={startOverride}>
 					{m.derived_override()}

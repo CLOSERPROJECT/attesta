@@ -24,6 +24,8 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 		before, _ := entry["before"].(string)
 		title, _ := entry["title"].(string)
 		hideIfNull, _ := entry["hideIfNull"].(bool)
+		placeholder, _ := entry["placeholder"].(string)
+		layoutNewRow, _ := entry["layoutNewRow"].(bool)
 		switch kind {
 		case "readonly":
 			expr, _ := entry["expr"].(string)
@@ -33,7 +35,8 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 			out = append(out, ChromeRule{
 				ID: id, Kind: kind, Expr: expr,
 				Title: title, Before: before, After: after,
-				HideIfNull: hideIfNull,
+				HideIfNull: hideIfNull, Placeholder: placeholder,
+				LayoutNewRow: layoutNewRow,
 			})
 		case "dataReport":
 			expr, _ := entry["expr"].(string)
@@ -43,7 +46,8 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 			out = append(out, ChromeRule{
 				ID: id, Kind: kind, Expr: expr,
 				Title: title, Before: before, After: after,
-				HideIfNull: hideIfNull,
+				HideIfNull: hideIfNull, Placeholder: placeholder,
+				LayoutNewRow: layoutNewRow,
 			})
 		}
 	}
@@ -185,6 +189,12 @@ func mergeChromeIntoSchemas(
 		if c.HideIfNull {
 			opts["hideIfNull"] = true
 		}
+		if c.Placeholder != "" {
+			opts["placeholder"] = c.Placeholder
+		}
+		if c.LayoutNewRow {
+			opts["layoutNewRow"] = true
+		}
 		uiSchema[c.ID] = map[string]any{
 			"ui:components": map[string]any{
 				"stringField": sf,
@@ -204,6 +214,96 @@ func paintHideRootFormTitle(uiSchema map[string]any) {
 	}
 	opts["hideTitle"] = true
 	uiSchema["ui:options"] = opts
+}
+
+// expandFormLayout walks uiSchema and expands Org authoring shortcuts into sjsf
+// layouts classes, then strips the shortcuts so they never reach the SPA:
+//
+//	ui:options.layout: cols-2|cols-3  → layouts.object-properties.class form-cols-N
+//	ui:options.layoutSpan: true       → layouts.object-property.class form-cols-span
+//	ui:options.layoutNewRow: true     → layouts.object-property.class form-cols-new-row
+//
+// String layout values other than cols-2/cols-3 are left alone (sjsf layout attrs
+// are objects; a bare string is our compile key).
+func expandFormLayout(uiSchema map[string]any) {
+	if uiSchema == nil {
+		return
+	}
+	expandFormLayoutNode(uiSchema)
+}
+
+func expandFormLayoutNode(uiNode map[string]any) {
+	opts, _ := uiNode["ui:options"].(map[string]any)
+	if opts != nil {
+		opts = cloneMapJSON(opts)
+		changed := false
+		if layout, ok := opts["layout"].(string); ok {
+			switch layout {
+			case "cols-2", "cols-3":
+				mergeLayoutClass(opts, "object-properties", "form-"+layout)
+				delete(opts, "layout")
+				changed = true
+			}
+		}
+		if span, ok := opts["layoutSpan"].(bool); ok && span {
+			mergeLayoutClass(opts, "object-property", "form-cols-span")
+			delete(opts, "layoutSpan")
+			changed = true
+		}
+		if newRow, ok := opts["layoutNewRow"].(bool); ok && newRow {
+			mergeLayoutClass(opts, "object-property", "form-cols-new-row")
+			delete(opts, "layoutNewRow")
+			changed = true
+		}
+		if changed {
+			uiNode["ui:options"] = opts
+		}
+	}
+	for key, raw := range uiNode {
+		if key == "ui:options" || key == "ui:components" || key == "ui:field" {
+			continue
+		}
+		child, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		expandFormLayoutNode(child)
+	}
+}
+
+func mergeLayoutClass(opts map[string]any, layoutType, className string) {
+	layouts, _ := opts["layouts"].(map[string]any)
+	if layouts == nil {
+		layouts = map[string]any{}
+	} else {
+		layouts = cloneMapJSON(layouts)
+	}
+	slot, _ := layouts[layoutType].(map[string]any)
+	if slot == nil {
+		slot = map[string]any{}
+	} else {
+		slot = cloneMapJSON(slot)
+	}
+	prev, _ := slot["class"].(string)
+	slot["class"] = appendCSSClass(prev, className)
+	layouts[layoutType] = slot
+	opts["layouts"] = layouts
+}
+
+func appendCSSClass(prev, add string) string {
+	add = strings.TrimSpace(add)
+	if add == "" {
+		return strings.TrimSpace(prev)
+	}
+	if prev == "" {
+		return add
+	}
+	for _, part := range strings.Fields(prev) {
+		if part == add {
+			return strings.TrimSpace(prev)
+		}
+	}
+	return strings.TrimSpace(prev) + " " + add
 }
 
 func withDefaultPlaceholders(uiSchema, schema map[string]any, chromeFieldIDs []string) map[string]any {

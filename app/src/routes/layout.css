@@ -5,7 +5,7 @@
 @import '@sjsf/shadcn4-theme/styles.css';
 @source '../../node_modules/@sjsf/shadcn4-theme/dist';
 @import '../lib/org/form/array-field.css';
-@import '../lib/org/form/form-cols.css';
+@import '../lib/org/form/form-chrome.css';
 @custom-variant dark (&:is(.dark *));
 
 /* Org FormPlan / sjsf light tokens */
@@ -31,36 +31,6 @@
 	--ring: #1e6f5c;
 	--radius: 4px;
 	--input-radius: 2px;
-}
-
-[data-slot='input'],
-[data-slot='textarea'],
-[data-slot='select-trigger'],
-[data-slot='input-group'] {
-	background-color: var(--input);
-	border-color: transparent;
-	box-shadow: none;
-	border-radius: var(--input-radius);
-}
-
-[data-slot='checkbox'] {
-	background-color: var(--input);
-	border-color: var(--border);
-	box-shadow: none;
-	border-radius: var(--input-radius);
-}
-
-/* Keep checked/indeterminate on primary (unlayered slot bg would otherwise win). */
-[data-slot='checkbox'][data-state='checked'],
-[data-slot='checkbox'][data-state='indeterminate'] {
-	background-color: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-foreground);
-}
-
-/* shadcn Field defaults to gap-3; tighten label↔control (gap-1). */
-[data-slot='field'] {
-	gap: 0.25rem;
 }
 
 @theme inline {

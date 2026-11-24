@@ -14,10 +14,12 @@ import DataReportField from './data-report-field.svelte';
 import ReadonlyField from './readonly-field.svelte';
 import HiddenField from './hidden-field.svelte';
 import RadioTilesWidget from './radio-tiles-widget.svelte';
+import OrgFormLayout from './org-form-layout.svelte';
 
 // override (not extend): base shadcn already defines `button`; extend would never win.
 // dataReport / readonly / compactArrayItem / hidden / radioTilesWidget are not
 // AUTHORED_FIELD_REGISTRY — register beside button (authoredFieldThemeOverrides drops unknown keys).
+// layout: own object-properties (plain div); FieldGroup flex fights form-cols.
 const withAuthored = overrideByRecord(shadcnTheme, {
 	...authoredFieldThemeOverrides({
 		mapTableField: MapTableField,
@@ -29,7 +31,8 @@ const withAuthored = overrideByRecord(shadcnTheme, {
 	hiddenField: HiddenField,
 	compactArrayItemField: CompactArrayItemField,
 	radioTilesWidget: RadioTilesWidget,
-	button: FormThemeButton
+	button: FormThemeButton,
+	layout: OrgFormLayout
 });
 
 export const theme = useDatePickerForDateFormat(withAuthored);
