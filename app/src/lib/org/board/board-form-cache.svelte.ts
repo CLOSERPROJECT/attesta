@@ -132,8 +132,8 @@ export class BoardFormCache {
 
 	/**
 	 * Remount-only: advance draftGeneration while keeping the ready bundle.
-	 * Prefer BoardSession.afterDomainCommit `{ refreshForms: true }` (stay
-	 * submitMany) — that path drops stale bindings and refetches.
+	 * Prefer BoardSession.domainChanged with a stay submitMany — that path drops
+	 * stale bindings and refetches.
 	 * No-op when the address is not cached (nothing to re-bind).
 	 */
 	beginFreshDraft(addr: TaskAddress): void {
