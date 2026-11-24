@@ -464,3 +464,67 @@ func EntityKindsFromConfig(cfg OrgConfig) map[string]struct{} {
 	}
 	return out
 }
+
+// EntityFieldsFromConfig returns domain.entities.<kind>.fields name lists.
+// Kinds without a fields list are omitted. Malformed fields → error.
+func EntityFieldsFromConfig(cfg OrgConfig) (map[string][]string, error) {
+	out := map[string][]string{}
+	if cfg.Domain == nil {
+		return out, nil
+	}
+	raw, ok := cfg.Domain["entities"]
+	if !ok {
+		return out, nil
+	}
+	entities, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("org: domain.entities must be an object")
+	}
+	for kind, v := range entities {
+		em, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		fieldsRaw, ok := em["fields"]
+		if !ok || fieldsRaw == nil {
+			continue
+		}
+		names, err := entityFieldNames(kind, fieldsRaw)
+		if err != nil {
+			return nil, err
+		}
+		out[kind] = names
+	}
+	return out, nil
+}
+
+func entityFieldNames(kind string, fieldsRaw any) ([]string, error) {
+	switch list := fieldsRaw.(type) {
+	case []string:
+		out := make([]string, 0, len(list))
+		for i, s := range list {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return nil, fmt.Errorf("org: domain.entities.%s.fields[%d] must be a non-empty string", kind, i)
+			}
+			out = append(out, s)
+		}
+		return out, nil
+	case []any:
+		out := make([]string, 0, len(list))
+		for i, item := range list {
+			s, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("org: domain.entities.%s.fields[%d] must be a string", kind, i)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return nil, fmt.Errorf("org: domain.entities.%s.fields[%d] must be a non-empty string", kind, i)
+			}
+			out = append(out, s)
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("org: domain.entities.%s.fields must be a list", kind)
+	}
+}

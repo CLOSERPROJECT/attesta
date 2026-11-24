@@ -1,6 +1,9 @@
 package org
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // TaskConfig is one authored leaf Task under a Job. Wire JSON/YAML require
 // unique "id"; remaining keys are the payload (roles, schema, onSubmit, …).
@@ -145,6 +148,63 @@ func taskSubmitMany(t TaskConfig) bool {
 // TaskSubmitMany reports whether the Task allows repeated commits (submit: many).
 func TaskSubmitMany(t TaskConfig) bool {
 	return taskSubmitMany(t)
+}
+
+// RecapSpec is the optional Task-level recap projection over a Domain entity kind.
+type RecapSpec struct {
+	Entity  string
+	Columns []RecapColumn
+}
+
+// RecapColumn is one recap table column; Title is optional display override.
+type RecapColumn struct {
+	Field string
+	Title string
+}
+
+// taskRecap reads the optional authored recap block. Missing or empty → nil, nil.
+// Present but malformed → error (caller adds path prefix).
+func taskRecap(t TaskConfig) (*RecapSpec, error) {
+	if t == nil {
+		return nil, nil
+	}
+	raw, ok := t["recap"]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("recap must be an object")
+	}
+	if len(m) == 0 {
+		return nil, nil
+	}
+	entity, _ := m["entity"].(string)
+	entity = strings.TrimSpace(entity)
+
+	var columns []RecapColumn
+	if colsRaw, hasCols := m["columns"]; hasCols && colsRaw != nil {
+		list, ok := colsRaw.([]any)
+		if !ok {
+			return nil, fmt.Errorf("recap.columns must be a list")
+		}
+		columns = make([]RecapColumn, 0, len(list))
+		for i, item := range list {
+			cm, ok := item.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("recap.columns[%d] must be an object", i)
+			}
+			field, _ := cm["field"].(string)
+			field = strings.TrimSpace(field)
+			if field == "" {
+				return nil, fmt.Errorf("recap.columns[%d].field is required", i)
+			}
+			title, _ := cm["title"].(string)
+			columns = append(columns, RecapColumn{Field: field, Title: strings.TrimSpace(title)})
+		}
+	}
+
+	return &RecapSpec{Entity: entity, Columns: columns}, nil
 }
 
 func validateTaskSubmit(t TaskConfig, prefix string) error {

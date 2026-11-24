@@ -160,10 +160,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 	if err != nil {
 		return CommitResult{}, err
 	}
-	if err := ValidateStreamConfig(cfg); err != nil {
-		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}
-	}
-	if err := ValidateDPPConfig(cfg); err != nil {
+	if err := ValidateOrgConfig(cfg); err != nil {
 		return CommitResult{}, &CommitError{Kind: "prep", Message: err.Error()}
 	}
 
