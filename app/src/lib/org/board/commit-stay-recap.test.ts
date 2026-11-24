@@ -13,17 +13,17 @@ describe('stayConfirmSurface', () => {
 });
 
 describe('stayAftermath', () => {
-	test('submitMany stay requires a fresh empty Form draft', () => {
+	test('submitMany stay refreshes form bundles and lands on Recap tab', () => {
 		expect(stayAftermath(true)).toEqual({
 			confirmSurface: 'many-recap-tab',
-			freshDraft: true
+			refreshForms: true
 		});
 	});
 
-	test('once stay keeps Form hidden behind once-recap (no fresh-draft advance)', () => {
+	test('once stay keeps Form hidden behind once-recap (no form refresh)', () => {
 		expect(stayAftermath(false)).toEqual({
 			confirmSurface: 'once-recap',
-			freshDraft: false
+			refreshForms: false
 		});
 	});
 });
