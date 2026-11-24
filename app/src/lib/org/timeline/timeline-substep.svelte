@@ -44,6 +44,7 @@
 		substep.href ? parseTaskHref(substep.href, stream, instance) : null
 	);
 	const address = $derived(parsed?.address ?? null);
+	const seed = $derived(parsed?.seed ?? {});
 	const embed = $derived(!!(substep.orgActionable && address));
 	const focused = $derived.by(() => {
 		if (!address) return false;
@@ -102,6 +103,7 @@
 			<EmbeddedTaskPanel
 				{address}
 				{entry}
+				{seed}
 				submitMany={!!substep.submitMany}
 				{submissions}
 				{focused}

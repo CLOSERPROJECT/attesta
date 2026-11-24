@@ -15,6 +15,7 @@ export type QrScanDraftBag = {
 		draftInstanceKey: string,
 		value: Record<string, unknown>
 	) => void;
+	rememberOpenSeed?: (taskPath: string, seed: Record<string, string>) => void;
 };
 
 export type QrScanFlowDeps = {
@@ -57,6 +58,14 @@ export async function runQrScan(
 		return 'toasted';
 	}
 	const prior = deps.drafts.getDraft(outcome.taskPath, outcome.draftInstanceKey) ?? {};
+	const stringSeed: Record<string, string> = {};
+	for (const [k, v] of Object.entries(outcome.seed)) {
+		if (!k || v == null) continue;
+		stringSeed[k] = typeof v === 'string' ? v : String(v);
+	}
+	if (Object.keys(stringSeed).length > 0) {
+		deps.drafts.rememberOpenSeed?.(outcome.taskPath, stringSeed);
+	}
 	deps.drafts.setDraft(outcome.taskPath, outcome.draftInstanceKey, {
 		...prior,
 		...outcome.seed

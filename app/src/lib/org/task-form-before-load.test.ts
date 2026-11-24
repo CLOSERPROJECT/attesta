@@ -48,13 +48,31 @@ function adminWorklist(): Worklist {
 
 function sessionStub(worklist: Worklist | null) {
 	const drafts = new Map<string, Record<string, unknown>>();
+	const seededMeta = new Map<string, readonly string[]>();
+	let openSeedByPath = new Map<string, Record<string, string>>();
 	return {
 		result: worklist ? { worklist } : null,
 		getDraft: (path: string, key: string) => drafts.get(`${path}::${key}`) ?? null,
-		seedDraft: (path: string, key: string, value: Record<string, unknown>) => {
+		seedDraft: (
+			path: string,
+			key: string,
+			value: Record<string, unknown>,
+			seededFields?: readonly string[]
+		) => {
 			drafts.set(`${path}::${key}`, value);
+			if (seededFields) seededMeta.set(`${path}::${key}`, seededFields);
 		},
-		drafts
+		rememberOpenSeed: (path: string, seed: Record<string, string>) => {
+			openSeedByPath.set(path, seed);
+		},
+		clearOpenSeed: (path: string) => {
+			openSeedByPath.delete(path);
+		},
+		drafts,
+		seededMeta,
+		get openSeedByPath() {
+			return openSeedByPath;
+		}
 	};
 }
 
@@ -123,7 +141,7 @@ describe('runTaskFormBeforeLoad', () => {
 		expect(mount.bundle).toEqual(sample);
 	});
 
-	test('applies ?seed.* into draft bag and strips them from the URL', async () => {
+	test('applies ?seed.* into isolated draft bag, records provenance, strips URL', async () => {
 		const fetch = vi.fn(async () => sample);
 		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
 		const session = sessionStub(adminWorklist());
@@ -138,8 +156,29 @@ describe('runTaskFormBeforeLoad', () => {
 			replaceHref
 		});
 
-		expect(session.drafts.get('intake/register::')).toEqual({ lotId: 'L-wait' });
+		const seedKey = 'seed:lotId=L-wait';
+		expect(session.drafts.get(`intake/register::${seedKey}`)).toEqual({ lotId: 'L-wait' });
+		expect(session.seededMeta.get(`intake/register::${seedKey}`)).toEqual(['lotId']);
+		expect(session.openSeedByPath.get('intake/register')).toEqual({ lotId: 'L-wait' });
 		expect(replaceHref).toHaveBeenCalledWith(`/app${taskPath}?keep=1`);
+		expect(mount.status).toBe('ready');
+	});
+
+	test('unseeded provisional open clears prior open-seed lock pointer', async () => {
+		const fetch = vi.fn(async () => sample);
+		const mount = createTaskFormMount({ taskForm: { fetch } satisfies TaskFormPort });
+		const session = sessionStub(adminWorklist());
+		session.rememberOpenSeed('intake/register', { lotId: 'L-wait' });
+
+		await runTaskFormBeforeLoad(taskPath, {
+			mount,
+			session,
+			navigateRedirect: vi.fn(),
+			href: `https://plant.example/app${taskPath}`,
+			replaceHref: vi.fn()
+		});
+
+		expect(session.openSeedByPath.has('intake/register')).toBe(false);
 		expect(mount.status).toBe('ready');
 	});
 

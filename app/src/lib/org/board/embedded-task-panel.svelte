@@ -33,6 +33,8 @@
 		confirmRecap?: boolean;
 		open?: boolean;
 		tab?: Tab;
+		/** `?seed.*` from timeline href — locks those fields for this embed open. */
+		seed?: Record<string, string>;
 		/** Substep header row (title · tablist · chevron). Keeps tablist under Tabs.Root. */
 		header?: Snippet<[HeaderArgs]>;
 		/** Optional id for the embed body region (aria-controls). */
@@ -52,6 +54,7 @@
 		confirmRecap = false,
 		open = true,
 		tab = $bindable<Tab>('form'),
+		seed = {},
 		header,
 		bodyId,
 		onOpenChange,
@@ -127,7 +130,7 @@
 			{error}
 		</p>
 	{:else if status === 'ready' && bundle}
-		{#key entry?.draftGeneration ?? 0}
+		{#key `${entry?.draftGeneration ?? 0}|${Object.keys(seed).sort().join(',')}`}
 			<TaskForm
 				stream={address.stream}
 				instance={address.instance}
@@ -136,6 +139,7 @@
 				jobInstanceId={address.jobInstanceId}
 				{bundle}
 				provisionalJob={address.provisionalJob}
+				{seed}
 				{disabled}
 				onCommitted={(outcome) => onCommitted?.(outcome)}
 			/>

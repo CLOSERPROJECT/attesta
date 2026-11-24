@@ -603,13 +603,9 @@ steps:
                     order: [material, weight, incomplete, continuesContainerId]
                 material:
                     ui:components:
-                        stringField: enumField
-                        selectWidget: radioWidget
+                        selectWidget: radioTilesWidget
                     ui:options:
                         enumNames: [Polvere di vetro, Granella di vetro, Granella di vetro 2, Polvere di silicio, Plastica, Alluminio, Sopravaglio, Polvere di aspirazione]
-                incomplete:
-                    ui:components:
-                        booleanField: checkboxOnlyField
                 continuesContainerId:
                     ui:components:
                         stringField: hiddenField
