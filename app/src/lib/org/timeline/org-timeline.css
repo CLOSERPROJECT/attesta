@@ -39,6 +39,11 @@
 .substep {
 	min-width: 0;
 	position: relative;
+}
+
+/* Pointer only on the header hit target — not inherited into embed/form body. */
+.org-timeline-page .substep-accordion-summary,
+.org-timeline-page .substep-card-link {
 	cursor: pointer;
 }
 
