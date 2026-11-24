@@ -35,7 +35,7 @@ var _ = Service("workflow", func() {
 
 	Method("workflowHome", func() {
 		Payload(func() {
-			Field(1, "workflow_key", String)
+			Field(1, "workflow_key", String, func() { Example("default") })
 			Required("workflow_key")
 		})
 		Result(Empty)
@@ -47,7 +47,7 @@ var _ = Service("workflow", func() {
 
 	Method("startProcess", func() {
 		Payload(func() {
-			Field(1, "workflow_key", String)
+			Field(1, "workflow_key", String, func() { Example("default") })
 			Required("workflow_key")
 		})
 		Result(Empty)
@@ -61,7 +61,7 @@ var _ = Service("workflow", func() {
 
 	Method("deleteWorkflow", func() {
 		Payload(func() {
-			Field(1, "workflow_key", String)
+			Field(1, "workflow_key", String, func() { Example("default") })
 			Required("workflow_key")
 		})
 		Result(Empty)
@@ -76,8 +76,8 @@ var _ = Service("workflow", func() {
 
 	Method("readProcess", func() {
 		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "process_id", String)
+			Field(1, "workflow_key", String, func() { Example("default") })
+			Field(2, "process_id", String, func() { Example("65f1c8f0e4b0a8a1f2d3c4b5") })
 			Required("workflow_key", "process_id")
 		})
 		Result(Empty)
