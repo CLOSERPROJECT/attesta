@@ -194,4 +194,216 @@ describe('BoardFormCache', () => {
 		expect(cache.get(taskAddressKey(addr('c')))?.draftGeneration).toBe(1);
 		cache.dispose();
 	});
+
+	test('revalidateAll keeps ready status and old bundle while fetching', async () => {
+		const stale = bundle('a');
+		stale.title = 'old';
+		const fresh = bundle('a');
+		fresh.title = 'new';
+		let resolveFetch!: (b: TaskFormBundle) => void;
+		const fetch = vi.fn(
+			() =>
+				new Promise<TaskFormBundle>((resolve) => {
+					resolveFetch = resolve;
+				})
+		);
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.putReady(a, stale);
+
+		cache.revalidateAll({ hold: () => false });
+
+		const mid = cache.get(taskAddressKey(a));
+		expect(mid?.status).toBe('ready');
+		expect(mid?.bundle).toBe(stale);
+		expect(mid?.stale).toBeFalsy();
+
+		resolveFetch(fresh);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.bundle).toBe(fresh);
+		});
+		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		cache.dispose();
+	});
+
+	test('revalidateAll swaps a non-held entry and calls onSwap once', async () => {
+		const stale = bundle('a');
+		stale.title = 'old';
+		const fresh = bundle('a');
+		fresh.title = 'new';
+		const fetch = vi.fn(async () => fresh);
+		const onSwap = vi.fn();
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.putReady(a, stale);
+
+		cache.revalidateAll({ hold: () => false, onSwap });
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.bundle).toBe(fresh);
+		});
+		expect(onSwap).toHaveBeenCalledTimes(1);
+		expect(onSwap).toHaveBeenCalledWith(a);
+		expect(cache.get(taskAddressKey(a))?.stale).toBe(false);
+		cache.dispose();
+	});
+
+	test('revalidateAll holds an open entry then acceptStale swaps and bumps draftGeneration', async () => {
+		const stale = bundle('a');
+		stale.title = 'old';
+		const fresh = bundle('a');
+		fresh.title = 'new';
+		const fetch = vi.fn(async () => fresh);
+		const onSwap = vi.fn();
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.putReady(a, stale);
+
+		cache.revalidateAll({ hold: () => true, onSwap });
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.stale).toBe(true);
+		});
+		expect(cache.get(taskAddressKey(a))?.bundle).toBe(stale);
+		expect(onSwap).not.toHaveBeenCalled();
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(0);
+
+		cache.acceptStale(taskAddressKey(a));
+		expect(cache.get(taskAddressKey(a))?.bundle).toBe(fresh);
+		expect(cache.get(taskAddressKey(a))?.stale).toBe(false);
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(1);
+		cache.dispose();
+	});
+
+	test('held revalidate failure marks stale and acceptStale refetches', async () => {
+		let n = 0;
+		let resolveOk!: (b: TaskFormBundle) => void;
+		const fetch = vi.fn(() => {
+			n += 1;
+			if (n === 1) return Promise.reject(new Error('network'));
+			return new Promise<TaskFormBundle>((resolve) => {
+				resolveOk = resolve;
+			});
+		});
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		const stale = bundle('a');
+		cache.putReady(a, stale);
+
+		cache.revalidateAll({ hold: () => true });
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.stale).toBe(true);
+		});
+		expect(cache.get(taskAddressKey(a))?.bundle).toBe(stale);
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(0);
+
+		cache.acceptStale(taskAddressKey(a));
+		expect(cache.get(taskAddressKey(a))?.status).toBe('loading');
+		expect(fetch).toHaveBeenCalledTimes(2);
+
+		const fresh = bundle('a');
+		fresh.title = 'recovered';
+		resolveOk(fresh);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		});
+		expect(cache.get(taskAddressKey(a))?.bundle).toBe(fresh);
+		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(1);
+		cache.dispose();
+	});
+
+	test('revalidateAll evaluates hold when the fetch lands', async () => {
+		const stale = bundle('a');
+		const fresh = bundle('a');
+		fresh.title = 'new';
+		let resolveFetch!: (b: TaskFormBundle) => void;
+		const fetch = vi.fn(
+			() =>
+				new Promise<TaskFormBundle>((resolve) => {
+					resolveFetch = resolve;
+				})
+		);
+		let holdOpen = false;
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.putReady(a, stale);
+
+		cache.revalidateAll({ hold: () => holdOpen });
+		holdOpen = true;
+		resolveFetch(fresh);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.stale).toBe(true);
+		});
+		expect(cache.get(taskAddressKey(a))?.bundle).toBe(stale);
+		cache.dispose();
+	});
+
+	test('beginScope during revalidation discards the result', async () => {
+		const stale = bundle('a');
+		stale.title = 'old';
+		const fresh = bundle('a');
+		fresh.title = 'new';
+		let resolveFetch!: (b: TaskFormBundle) => void;
+		const fetch = vi.fn(
+			() =>
+				new Promise<TaskFormBundle>((resolve) => {
+					resolveFetch = resolve;
+				})
+		);
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s1');
+		const a = addr('a');
+		cache.putReady(a, stale);
+
+		cache.revalidateAll({ hold: () => false });
+		cache.beginScope('s2');
+		resolveFetch(fresh);
+		await Promise.resolve();
+		await Promise.resolve();
+		// putReady carries across beginScope; the in-flight revalidate must not swap.
+		expect(cache.get(taskAddressKey(a))?.bundle?.title).toBe('old');
+		cache.dispose();
+	});
+
+	test('revalidateAll refetches error entries', async () => {
+		const fetch = vi.fn(async () => {
+			throw new Error('first fail');
+		});
+		const cache = createBoardFormCache({
+			taskForm: { fetch } satisfies TaskFormPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.enqueue([a]);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('error');
+		});
+		expect(fetch).toHaveBeenCalledTimes(1);
+
+		const fresh = bundle('a');
+		fetch.mockImplementation(async () => fresh);
+		cache.revalidateAll({ hold: () => false });
+		expect(cache.get(taskAddressKey(a))?.status).toBe('loading');
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		});
+		expect(cache.get(taskAddressKey(a))?.bundle).toBe(fresh);
+		expect(fetch).toHaveBeenCalledTimes(2);
+		cache.dispose();
+	});
 });

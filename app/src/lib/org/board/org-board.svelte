@@ -5,23 +5,13 @@
 	import * as m from '#lib/paraglide/messages.js';
 
 	import type { CommitOutcome } from '../commit-port.js';
-	import {
-		applyCommitFollowThrough,
-		decideCommitFollowThrough
-	} from '../commit-follow-through.js';
+	import { applyCommitFollowThrough, decideCommitFollowThrough } from '../commit-follow-through.js';
 	import { orgSession } from '../org-app.svelte.js';
 	import { fetchStreamTitle } from '../stream-meta.js';
-	import {
-		normalizeTaskAddress,
-		taskAddressKey,
-		type TaskAddress
-	} from '../task-address.js';
+	import { normalizeTaskAddress, taskAddressKey, type TaskAddress } from '../task-address.js';
 	import { createHttpTimelinePort } from '../timeline/http-timeline-port.js';
 	import TimelineStep from '../timeline/timeline-step.svelte';
-	import {
-		navigateOrgTarget,
-		orgMyStreamDashboardPath
-	} from '../../router/navigate-target.js';
+	import { navigateOrgTarget, orgMyStreamDashboardPath } from '../../router/navigate-target.js';
 	import { navigate } from '../../router/index.js';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
@@ -30,25 +20,17 @@
 	import { Label } from '#lib/shadcn/ui/label/index.js';
 	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
-	import type { DomainChange } from './board-refresh-plan.js';
-	import {
-		createBoardSession,
-		type BoardScope
-	} from './board-session.svelte.js';
+	import type { OwnDomainChange } from './board-refresh-plan.js';
+	import { createBoardSession, type BoardScope } from './board-session.svelte.js';
+	import { draftAddressForTask } from '../drafts.js';
 	import {
 		BoardTimelineModel,
 		recapAddressesFromTimeline,
 		setBoardTimelineModel
 	} from './board-timeline-model.svelte.js';
-	import {
-		boardFormCache,
-		type BoardFormEntry
-	} from './board-form-cache.svelte.js';
+	import { boardFormCache, type BoardFormEntry } from './board-form-cache.svelte.js';
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
-	import {
-		BoardNestCollapse,
-		setBoardNestCollapse
-	} from './board-nest-collapse.svelte.js';
+	import { BoardNestCollapse, setBoardNestCollapse } from './board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from './embedded-task-panel.svelte';
 	import { stayAftermath } from './commit-stay-recap.js';
 	import {
@@ -96,9 +78,7 @@
 		recapCache: boardRecapCache,
 		navigateToInstance: async ({ stream: s, instance: i, focus }) => {
 			const search =
-				focus != null
-					? { [BOARD_TASK_SEARCH_KEY]: encodeBoardTaskParam(focus) }
-					: undefined;
+				focus != null ? { [BOARD_TASK_SEARCH_KEY]: encodeBoardTaskParam(focus) } : undefined;
 			await navigate('/:stream/i/:instance', {
 				params: { stream: s, instance: i },
 				search,
@@ -106,7 +86,14 @@
 			});
 		},
 		hydrate: (args) => {
-			void orgSession.hydrate(args);
+			void orgSession.hydrate(
+				{ stream: args.stream, instance: args.instance },
+				{ keepOnError: args.background === true }
+			);
+		},
+		dropSeededDraft: (addr) => {
+			const d = draftAddressForTask(addr);
+			orgSession.dropSeededDraft(d.taskPath, d.draftBagInstanceKey);
 		}
 	});
 
@@ -135,9 +122,7 @@
 	const cacheEntries = $derived(boardFormCache.entries);
 
 	const focusedAddress = $derived(
-		model.selection
-			? addressFromBoardTask(stream, instance, model.selection)
-			: null
+		model.selection ? addressFromBoardTask(stream, instance, model.selection) : null
 	);
 
 	const orphanFocus = $derived(model.orphanFocus);
@@ -150,9 +135,7 @@
 			clearConfirmRecap(prev);
 		}
 		model.select(addr);
-		const el = document.querySelector(
-			`[data-address-key="${CSS.escape(taskAddressKey(addr))}"]`
-		);
+		const el = document.querySelector(`[data-address-key="${CSS.escape(taskAddressKey(addr))}"]`);
 		el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 	}
 
@@ -197,7 +180,7 @@
 	function commitChanged(
 		addr: TaskAddress,
 		outcome: CommitOutcome,
-		follow: DomainChange['follow'],
+		follow: OwnDomainChange['follow'],
 		submitMany = false
 	) {
 		void session.domainChanged({
@@ -213,11 +196,7 @@
 		model.pinJustCompleted(addr, outcome.submissionId);
 	}
 
-	function onCommitted(
-		addr: TaskAddress,
-		outcome: CommitOutcome,
-		opts?: { submitMany?: boolean }
-	) {
+	function onCommitted(addr: TaskAddress, outcome: CommitOutcome, opts?: { submitMany?: boolean }) {
 		const decision = decideCommitFollowThrough(outcome, addr);
 		pinAfterCommit(addr, outcome);
 		if (decision.kind === 'stay') {
@@ -301,7 +280,8 @@
 			return model.toggleBody(addr);
 		},
 		confirmRecapFor,
-		onCommitted
+		onCommitted,
+		acceptStale: (addr) => session.acceptStale(addr)
 	};
 	setBoardEmbed(boardApi);
 
@@ -389,7 +369,6 @@
 			navigateOrgTarget(gate);
 		}
 	});
-
 </script>
 
 <div
@@ -428,15 +407,10 @@
 		</header>
 		{#if view}
 			<div class="stream-show-all-filter">
-				<Label
-					class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}
-				>
+				<Label class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}>
 					<Checkbox
 						class="js-show-all-filter border-foreground/35 bg-background shadow-none"
-						bind:checked={
-							() => model.showAll,
-							(v) => model.setShowAll(!!v)
-						}
+						bind:checked={() => model.showAll, (v) => model.setShowAll(!!v)}
 						data-testid="show-all-filter"
 					/>
 					{m.show_all()}
@@ -481,6 +455,7 @@
 					onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
 					onFocus={() => setFocus(orphanFocus)}
 					onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
+					onAcceptStale={() => session.acceptStale(orphanFocus)}
 				/>
 			</section>
 		{/if}
@@ -492,7 +467,9 @@
 						<div
 							class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground"
 						>
-							<p class="m-0 text-xs font-medium leading-5 text-muted-foreground">No matching tasks</p>
+							<p class="m-0 text-xs leading-5 font-medium text-muted-foreground">
+								No matching tasks
+							</p>
 							<p class="m-0 text-xs leading-4 text-muted-foreground">
 								Turn on Show all to see the full stream timeline.
 							</p>

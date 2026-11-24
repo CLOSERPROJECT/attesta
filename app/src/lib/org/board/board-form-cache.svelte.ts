@@ -1,10 +1,6 @@
 import type { TaskFormBundle } from '../form/task-form-bundle.js';
 import { createHttpTaskFormPort } from '../http-task-form-port.js';
-import {
-	taskAddressKey,
-	wireJobInstanceId,
-	type TaskAddress
-} from '../task-address.js';
+import { taskAddressKey, wireJobInstanceId, type TaskAddress } from '../task-address.js';
 import type { TaskFormPort } from '../task-form-port.js';
 
 export type BoardFormEntryStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -22,6 +18,8 @@ export type BoardFormEntry = {
 	 * change this.
 	 */
 	draftGeneration: number;
+	/** Newer bundle is waiting (open form held); see acceptStale. */
+	stale?: boolean;
 };
 
 export type BoardFormCacheOptions = {
@@ -54,6 +52,7 @@ export class BoardFormCache {
 	#carryReady: BoardFormEntry[] = [];
 	/** Keys that should advance draftGeneration when their next fetch becomes ready. */
 	#bumpDraftOnReady = new Set<string>();
+	#pendingBundles = new Map<string, TaskFormBundle>();
 
 	constructor(options: BoardFormCacheOptions = {}) {
 		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
@@ -72,6 +71,7 @@ export class BoardFormCache {
 		this.#queue = [];
 		this.#queued.clear();
 		this.#bumpDraftOnReady.clear();
+		this.#pendingBundles.clear();
 		const carried = this.#carryReady;
 		this.#carryReady = [];
 		const next: Record<string, BoardFormEntry> = {};
@@ -114,6 +114,7 @@ export class BoardFormCache {
 		this.#controllers.get(key)?.abort();
 		this.#controllers.delete(key);
 		this.#queued.delete(key);
+		this.#pendingBundles.delete(key);
 		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
 		const priorGen = this.entries[key]?.draftGeneration ?? 0;
 		const entry: BoardFormEntry = {
@@ -160,8 +161,7 @@ export class BoardFormCache {
 	 */
 	refreshAllAfterDomainCommit(): void {
 		const targets = Object.values(this.entries).filter(
-			(e) =>
-				e.status === 'ready' || e.status === 'error' || e.status === 'loading'
+			(e) => e.status === 'ready' || e.status === 'error' || e.status === 'loading'
 		);
 		for (const entry of targets) {
 			this.#bumpDraftOnReady.add(entry.key);
@@ -169,11 +169,53 @@ export class BoardFormCache {
 		}
 	}
 
+	/**
+	 * Background refetch of ready bundles; nothing drops to a skeleton. When a fetch
+	 * lands, hold(entry) decides: held → keep the mounted bundle, stash the new one,
+	 * mark stale; otherwise swap the bundle in and call onSwap.
+	 */
+	revalidateAll(opts: {
+		hold: (entry: BoardFormEntry) => boolean;
+		onSwap?: (addr: TaskAddress) => void;
+	}): void {
+		for (const entry of Object.values(this.entries)) {
+			if (entry.status === 'ready') {
+				void this.#revalidateOne(entry.address, entry.key, opts);
+			} else if (entry.status === 'error' || entry.status === 'loading') {
+				this.#restartFetch(entry.address);
+			}
+		}
+	}
+
+	/** Operator accepted the stale notice: swap the stashed bundle or refetch. */
+	acceptStale(key: string): void {
+		const current = this.entries[key];
+		if (!current?.stale) return;
+		const pending = this.#pendingBundles.get(key);
+		if (pending) {
+			this.#pendingBundles.delete(key);
+			const entry: BoardFormEntry = {
+				...current,
+				bundle: pending,
+				stale: false,
+				draftGeneration: current.draftGeneration + 1
+			};
+			this.#setEntry(entry);
+			if (this.#carryReady.some((e) => e.key === key)) {
+				this.#carryReady = this.#carryReady.map((e) => (e.key === key ? entry : e));
+			}
+			return;
+		}
+		this.#bumpDraftOnReady.add(key);
+		this.#restartFetch(current.address);
+	}
+
 	invalidate(key: string): void {
 		this.#controllers.get(key)?.abort();
 		this.#controllers.delete(key);
 		this.#queued.delete(key);
 		this.#bumpDraftOnReady.delete(key);
+		this.#pendingBundles.delete(key);
 		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
 		const next = { ...this.entries };
 		delete next[key];
@@ -186,6 +228,7 @@ export class BoardFormCache {
 		this.#queue = [];
 		this.#queued.clear();
 		this.#bumpDraftOnReady.clear();
+		this.#pendingBundles.clear();
 		this.entries = {};
 	}
 
@@ -208,6 +251,7 @@ export class BoardFormCache {
 		this.#controllers.get(key)?.abort();
 		this.#controllers.delete(key);
 		this.#queued.delete(key);
+		this.#pendingBundles.delete(key);
 		this.#queue = this.#queue.filter((a) => taskAddressKey(a) !== key);
 		this.#carryReady = this.#carryReady.filter((e) => e.key !== key);
 		const draftGeneration = this.entries[key]?.draftGeneration ?? 0;
@@ -236,6 +280,54 @@ export class BoardFormCache {
 			const existing = this.entries[key];
 			if (existing?.status === 'ready') continue;
 			void this.#fetchOne(addr, key);
+		}
+	}
+
+	async #revalidateOne(
+		addr: TaskAddress,
+		key: string,
+		opts: {
+			hold: (entry: BoardFormEntry) => boolean;
+			onSwap?: (addr: TaskAddress) => void;
+		}
+	): Promise<void> {
+		const gen = this.#gen;
+		this.#controllers.get(key)?.abort();
+		const ac = new AbortController();
+		this.#controllers.set(key, ac);
+
+		try {
+			const bundle = await this.taskFormPort.fetch({
+				stream: addr.stream,
+				instance: addr.instance || undefined,
+				jobId: addr.jobId,
+				taskId: addr.taskId,
+				jobInstanceId: wireJobInstanceId(addr)
+			});
+			if (gen !== this.#gen || ac.signal.aborted) return;
+			const current = this.entries[key];
+			if (current?.status !== 'ready') return;
+			if (opts.hold(current)) {
+				this.#pendingBundles.set(key, bundle);
+				this.#setEntry({ ...current, stale: true });
+			} else {
+				const entry: BoardFormEntry = { ...current, bundle, stale: false };
+				this.#setEntry(entry);
+				if (this.#carryReady.some((e) => e.key === key)) {
+					this.#carryReady = this.#carryReady.map((e) => (e.key === key ? entry : e));
+				}
+				opts.onSwap?.(addr);
+			}
+		} catch {
+			if (gen !== this.#gen || ac.signal.aborted) return;
+			const current = this.entries[key];
+			if (current?.status !== 'ready') return;
+			if (opts.hold(current)) {
+				this.#pendingBundles.delete(key);
+				this.#setEntry({ ...current, stale: true });
+			}
+		} finally {
+			if (this.#controllers.get(key) === ac) this.#controllers.delete(key);
 		}
 	}
 
@@ -299,9 +391,7 @@ export class BoardFormCache {
 	}
 }
 
-export function createBoardFormCache(
-	options: BoardFormCacheOptions = {}
-): BoardFormCache {
+export function createBoardFormCache(options: BoardFormCacheOptions = {}): BoardFormCache {
 	return new BoardFormCache(options);
 }
 

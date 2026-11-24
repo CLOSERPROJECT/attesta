@@ -1,14 +1,6 @@
 import { createHttpTaskRecapPort } from '../http-task-recap-port.js';
-import {
-	taskAddressKey,
-	wireJobInstanceId,
-	type TaskAddress
-} from '../task-address.js';
-import {
-	TaskRecapError,
-	type TaskRecap,
-	type TaskRecapPort
-} from '../task-recap-port.js';
+import { taskAddressKey, wireJobInstanceId, type TaskAddress } from '../task-address.js';
+import { TaskRecapError, type TaskRecap, type TaskRecapPort } from '../task-recap-port.js';
 
 export type BoardRecapEntryStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -118,6 +110,22 @@ export class BoardRecapCache {
 		this.#carryReady.push(entry);
 	}
 
+	/**
+	 * Background refetch of ready lists; old items stay visible until the new
+	 * list lands. Error entries are dropped and re-enqueued.
+	 */
+	revalidateAll(): void {
+		for (const entry of Object.values(this.entries)) {
+			if (entry.status === 'ready') {
+				void this.#revalidateOne(entry.address, entry.key);
+			} else if (entry.status === 'error') {
+				const addr = entry.address;
+				this.invalidate(entry.key);
+				this.enqueue([addr]);
+			}
+		}
+	}
+
 	invalidate(key: string): void {
 		this.#controllers.get(key)?.abort();
 		this.#controllers.delete(key);
@@ -158,6 +166,38 @@ export class BoardRecapCache {
 			const existing = this.entries[key];
 			if (existing?.status === 'ready') continue;
 			void this.#fetchOne(addr, key);
+		}
+	}
+
+	async #revalidateOne(addr: TaskAddress, key: string): Promise<void> {
+		const gen = this.#gen;
+		this.#controllers.get(key)?.abort();
+		const ac = new AbortController();
+		this.#controllers.set(key, ac);
+
+		try {
+			const list = await this.taskRecapPort.fetch({
+				stream: addr.stream,
+				instance: addr.instance || undefined,
+				jobId: addr.jobId,
+				taskId: addr.taskId,
+				jobInstanceId: wireJobInstanceId(addr)
+			});
+			if (gen !== this.#gen || ac.signal.aborted) return;
+			const current = this.entries[key];
+			if (current?.status !== 'ready') return;
+			this.#setEntry({ ...current, items: list.items, error: null });
+		} catch (err) {
+			if (gen !== this.#gen || ac.signal.aborted) return;
+			if (err instanceof TaskRecapError && err.status === 404) {
+				const current = this.entries[key];
+				if (current?.status !== 'ready') return;
+				this.#setEntry({ ...current, items: [], error: null });
+				return;
+			}
+			/* keep old items on any other failure */
+		} finally {
+			if (this.#controllers.get(key) === ac) this.#controllers.delete(key);
 		}
 	}
 
@@ -211,16 +251,14 @@ export class BoardRecapCache {
 				error: message
 			});
 		} finally {
-			this.#controllers.delete(key);
+			if (this.#controllers.get(key) === ac) this.#controllers.delete(key);
 			this.#inflight = Math.max(0, this.#inflight - 1);
 			if (gen === this.#gen) this.#pump();
 		}
 	}
 }
 
-export function createBoardRecapCache(
-	options: BoardRecapCacheOptions = {}
-): BoardRecapCache {
+export function createBoardRecapCache(options: BoardRecapCacheOptions = {}): BoardRecapCache {
 	return new BoardRecapCache(options);
 }
 

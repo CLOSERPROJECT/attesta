@@ -2,6 +2,7 @@
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import type { Snippet } from 'svelte';
+	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as Tabs from '#lib/shadcn/ui/tabs/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -42,6 +43,7 @@
 		onOpenChange?: (open: boolean) => void;
 		onCommitted?: (outcome: CommitOutcome) => void;
 		onFocus?: () => void;
+		onAcceptStale?: () => void;
 	};
 
 	let {
@@ -59,7 +61,8 @@
 		bodyId,
 		onOpenChange,
 		onCommitted,
-		onFocus
+		onFocus,
+		onAcceptStale
 	}: Props = $props();
 
 	const status = $derived(entry?.status ?? 'idle');
@@ -71,8 +74,7 @@
 		return boardRecapCache.get(key);
 	});
 	const showOnceRecap = $derived(
-		Boolean(confirmRecap) ||
-			(recapEntry?.status === 'ready' && (recapEntry.items.length ?? 0) > 0)
+		Boolean(confirmRecap) || (recapEntry?.status === 'ready' && (recapEntry.items.length ?? 0) > 0)
 	);
 	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
 
@@ -130,6 +132,24 @@
 			{error}
 		</p>
 	{:else if status === 'ready' && bundle}
+		{#if entry?.stale}
+			<div
+				class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/60 px-3 py-2 text-sm"
+				role="status"
+				data-testid="embed-stale-notice"
+			>
+				<span>{m.embed_stale_notice()}</span>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					data-testid="embed-stale-reload"
+					onclick={() => onAcceptStale?.()}
+				>
+					{m.embed_stale_reload()}
+				</Button>
+			</div>
+		{/if}
 		{#key `${entry?.draftGeneration ?? 0}|${Object.keys(seed).sort().join(',')}`}
 			<TaskForm
 				stream={address.stream}
@@ -190,11 +210,7 @@
 		{/if}
 
 		{#if open}
-			<div
-				id={bodyId}
-				class="substep-org-body w-full min-w-0 gap-2"
-				data-testid="embed-panel-body"
-			>
+			<div id={bodyId} class="substep-org-body w-full min-w-0 gap-2" data-testid="embed-panel-body">
 				<div class="outline-none" data-testid="embed-form-pane">
 					{@render formPane()}
 				</div>

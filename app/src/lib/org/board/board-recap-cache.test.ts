@@ -144,4 +144,80 @@ describe('BoardRecapCache', () => {
 		expect(fetch).toHaveBeenCalledTimes(2);
 		cache.dispose();
 	});
+
+	test('revalidateAll keeps old items until the new list lands', async () => {
+		let resolveFetch!: (list: { items: TaskRecap[] }) => void;
+		const fetch = vi.fn(
+			() =>
+				new Promise<{ items: TaskRecap[] }>((resolve) => {
+					resolveFetch = resolve;
+				})
+		);
+		const cache = createBoardRecapCache({
+			taskRecap: { fetch } satisfies TaskRecapPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		const oldItems = [recap('a', 1)];
+		cache.putReady(a, oldItems);
+
+		cache.revalidateAll();
+		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		expect(cache.get(taskAddressKey(a))?.items).toBe(oldItems);
+
+		const nextItems = [recap('a', 2)];
+		resolveFetch({ items: nextItems });
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.items).toEqual(nextItems);
+		});
+		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		cache.dispose();
+	});
+
+	test('revalidateAll keeps old items when refetch fails', async () => {
+		const fetch = vi.fn(async () => {
+			throw new TaskRecapError('boom', 500);
+		});
+		const cache = createBoardRecapCache({
+			taskRecap: { fetch } satisfies TaskRecapPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		const oldItems = [recap('a', 1)];
+		cache.putReady(a, oldItems);
+
+		cache.revalidateAll();
+		await vi.waitFor(() => {
+			expect(fetch).toHaveBeenCalled();
+		});
+		await Promise.resolve();
+		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		expect(cache.get(taskAddressKey(a))?.items).toBe(oldItems);
+		cache.dispose();
+	});
+
+	test('revalidateAll re-enqueues error entries', async () => {
+		const fetch = vi.fn(async () => {
+			throw new TaskRecapError('bad request', 400);
+		});
+		const cache = createBoardRecapCache({
+			taskRecap: { fetch } satisfies TaskRecapPort
+		});
+		cache.beginScope('s');
+		const a = addr('a');
+		cache.enqueue([a]);
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('error');
+		});
+		expect(fetch).toHaveBeenCalledTimes(1);
+
+		fetch.mockImplementation(async () => ({ items: [recap('a', 2)] }));
+		cache.revalidateAll();
+		await vi.waitFor(() => {
+			expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
+		});
+		expect(cache.get(taskAddressKey(a))?.items[0]?.facts.a).toBe(2);
+		expect(fetch).toHaveBeenCalledTimes(2);
+		cache.dispose();
+	});
 });
