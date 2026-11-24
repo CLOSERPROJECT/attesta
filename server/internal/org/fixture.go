@@ -139,10 +139,7 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 		}
 		cfg.Stream = &stream
 	}
-	if err := ValidateStreamConfig(cfg); err != nil {
-		return OrgConfig{}, err
-	}
-	if err := ValidateDPPConfig(cfg); err != nil {
+	if err := ValidateOrgConfig(cfg); err != nil {
 		return OrgConfig{}, err
 	}
 	return cfg, nil
