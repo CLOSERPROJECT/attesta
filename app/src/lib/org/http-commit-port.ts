@@ -107,12 +107,17 @@ export function parseCommitResult(raw: unknown): CommitResult {
 					(raw as { continueNavigation?: unknown })?.continueNavigation
 				)
 			: null;
-	const submissionRaw = (raw as { submissionId?: unknown })?.submissionId;
+	const { submissionId: submissionRaw, revision: revisionRaw, ...rest } = body;
 	const submissionId =
 		typeof submissionRaw === 'string' && submissionRaw.trim() !== ''
 			? submissionRaw
 			: undefined;
-	const { submissionId: _dropSubmissionId, ...rest } = body;
+	const revision =
+		typeof revisionRaw === 'number' &&
+		Number.isInteger(revisionRaw) &&
+		revisionRaw >= 0
+			? revisionRaw
+			: undefined;
 	return {
 		...rest,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
@@ -121,7 +126,8 @@ export function parseCommitResult(raw: unknown): CommitResult {
 		nextTaskFormBundle: nextBundle,
 		links,
 		httpErrors,
-		...(submissionId !== undefined ? { submissionId } : {})
+		...(submissionId !== undefined ? { submissionId } : {}),
+		...(revision !== undefined ? { revision } : {})
 	};
 }
 

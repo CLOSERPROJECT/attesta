@@ -47,4 +47,6 @@ export type TimelineView = {
 	label: string;
 	status: string;
 	steps: TimelineStep[];
+	/** Domain revision this view reflects (lower bound). */
+	revision?: number;
 };
