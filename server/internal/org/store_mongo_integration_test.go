@@ -33,7 +33,7 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	domain.Submissions = []Submission{{
 		JobID: "intake", TaskID: "register", JobInstanceID: "NIR-1",
 		UserID: "ada", Facts: map[string]any{"f.g": "h"},
-		IDsTouched: []string{"NIR-1"},
+		EntitiesTouched: []EntityTouch{{Op: "mint", Entity: "lot", ID: "NIR-1"}},
 	}}
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "NIR-1", Label: "L"}}
 	if err := domains.Put(ctx, Scope{Org: org, Stream: "main"}, domain); err != nil {

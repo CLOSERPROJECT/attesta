@@ -513,8 +513,8 @@ func TestProjectWorklistFlatRegisterMintsLotWithoutGroup(t *testing.T) {
 		t.Fatal("expected minted lot")
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "register" || !containsString(last.IDsTouched, loadID) {
-		t.Fatalf("register submission must touch lot id %q: %#v", loadID, last)
+	if last.TaskID != "register" || !entitiesTouchedHas(last.EntitiesTouched, "mint", "lot", loadID) {
+		t.Fatalf("register submission must mint lot id %q: %#v", loadID, last)
 	}
 }
 
@@ -534,8 +534,8 @@ func TestProjectWorklistFlatWeighTouchesPallet(t *testing.T) {
 		t.Fatalf("weigh = %q, want actionable (many + leftover pallet)", inst.Tasks["weigh"])
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
-	if last.TaskID != "weigh" || !containsString(last.IDsTouched, palletID) {
-		t.Fatalf("weigh submission must touch pallet %q: %#v", palletID, last)
+	if last.TaskID != "weigh" || !entitiesTouchedHas(last.EntitiesTouched, "patch", "pallet", palletID) {
+		t.Fatalf("weigh submission must patch pallet %q: %#v", palletID, last)
 	}
 	if _, ok := result.Domain.Kind("pallet")[palletID]; !ok {
 		t.Fatalf("pallet %q missing under Domain: %#v", palletID, result.Domain.Kind("pallet"))
@@ -716,4 +716,13 @@ func TestProjectWorklistReadyWhenFold(t *testing.T) {
 			t.Fatal("omit readyWhen ⇒ canStart true")
 		}
 	})
+}
+
+func entitiesTouchedHas(touches []EntityTouch, op, entity, id string) bool {
+	for _, t := range touches {
+		if t.Op == op && t.Entity == entity && t.ID == id {
+			return true
+		}
+	}
+	return false
 }

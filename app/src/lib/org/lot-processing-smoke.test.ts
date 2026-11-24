@@ -35,7 +35,7 @@ function sub(
 		timestamp: 't',
 		userId: 'ada',
 		facts,
-		idsTouched: []
+		entitiesTouched: []
 	};
 }
 
