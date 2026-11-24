@@ -212,10 +212,13 @@
 		pinAfterCommit(addr, outcome);
 		refreshRecap(addr);
 		if (decision.kind === 'stay') {
-			// confirmRecap = landing surface; refreshForms = Domain may have changed.
+			// confirmRecap = landing surface; refreshForms / reloadTimeline = Domain may have changed.
 			const aftermath = stayAftermath(Boolean(opts?.submitMany));
 			if (aftermath.refreshForms) {
 				boardFormCache.refreshAllAfterDomainCommit();
+			}
+			if (aftermath.reloadTimeline) {
+				void session.reload();
 			}
 			markConfirmRecap(addr);
 			return;
