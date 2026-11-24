@@ -63,7 +63,7 @@ export type CommitResult = {
 
 export type CommitOutcome = {
 	jobInstanceId: string;
-	/** Domain Submission timestamp; matches TaskRecap.timestamp for row highlight. */
+	/** Domain Submission timestamp; matches TaskRecapRow.submissionId for row highlight. */
 	submissionId?: string;
 	worklist: Worklist;
 	navigation: CommitNavigation;

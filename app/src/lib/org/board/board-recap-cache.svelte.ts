@@ -1,6 +1,11 @@
 import { createHttpTaskRecapPort } from '../http-task-recap-port.js';
 import { taskAddressKey, wireJobInstanceId, type TaskAddress } from '../task-address.js';
-import { TaskRecapError, type TaskRecap, type TaskRecapPort } from '../task-recap-port.js';
+import {
+	EMPTY_TASK_RECAP_TABLE,
+	TaskRecapError,
+	type TaskRecapPort,
+	type TaskRecapTable
+} from '../task-recap-port.js';
 
 export type BoardRecapEntryStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -8,7 +13,7 @@ export type BoardRecapEntry = {
 	key: string;
 	address: TaskAddress;
 	status: BoardRecapEntryStatus;
-	items: TaskRecap[];
+	table: TaskRecapTable;
 	error: string | null;
 };
 
@@ -22,7 +27,7 @@ const DEFAULT_CONCURRENCY = 5;
 
 /**
  * Address-keyed task-recap cache with a bounded parallel preload queue.
- * Abort in-flight work on scope change / dispose. HTTP 404 / empty list → ready [].
+ * Abort in-flight work on scope change / dispose. HTTP 404 / empty table → ready empty.
  */
 export class BoardRecapCache {
 	readonly taskRecapPort: TaskRecapPort;
@@ -84,7 +89,7 @@ export class BoardRecapCache {
 				key,
 				address: addr,
 				status: 'idle',
-				items: [],
+				table: EMPTY_TASK_RECAP_TABLE,
 				error: null
 			});
 		}
@@ -92,7 +97,7 @@ export class BoardRecapCache {
 	}
 
 	/** Seed after Commit — skips network for this address. */
-	putReady(addr: TaskAddress, items: TaskRecap[]): void {
+	putReady(addr: TaskAddress, table: TaskRecapTable): void {
 		const key = taskAddressKey(addr);
 		this.#controllers.get(key)?.abort();
 		this.#controllers.delete(key);
@@ -102,7 +107,7 @@ export class BoardRecapCache {
 			key,
 			address: addr,
 			status: 'ready',
-			items,
+			table,
 			error: null
 		};
 		this.#setEntry(entry);
@@ -111,8 +116,8 @@ export class BoardRecapCache {
 	}
 
 	/**
-	 * Background refetch of ready lists; old items stay visible until the new
-	 * list lands. Error entries are dropped and re-enqueued.
+	 * Background refetch of ready tables; old rows stay visible until the new
+	 * table lands. Error entries are dropped and re-enqueued.
 	 */
 	revalidateAll(): void {
 		for (const entry of Object.values(this.entries)) {
@@ -176,7 +181,7 @@ export class BoardRecapCache {
 		this.#controllers.set(key, ac);
 
 		try {
-			const list = await this.taskRecapPort.fetch({
+			const table = await this.taskRecapPort.fetch({
 				stream: addr.stream,
 				instance: addr.instance || undefined,
 				jobId: addr.jobId,
@@ -186,16 +191,16 @@ export class BoardRecapCache {
 			if (gen !== this.#gen || ac.signal.aborted) return;
 			const current = this.entries[key];
 			if (current?.status !== 'ready') return;
-			this.#setEntry({ ...current, items: list.items, error: null });
+			this.#setEntry({ ...current, table, error: null });
 		} catch (err) {
 			if (gen !== this.#gen || ac.signal.aborted) return;
 			if (err instanceof TaskRecapError && err.status === 404) {
 				const current = this.entries[key];
 				if (current?.status !== 'ready') return;
-				this.#setEntry({ ...current, items: [], error: null });
+				this.#setEntry({ ...current, table: EMPTY_TASK_RECAP_TABLE, error: null });
 				return;
 			}
-			/* keep old items on any other failure */
+			/* keep old table on any other failure */
 		} finally {
 			if (this.#controllers.get(key) === ac) this.#controllers.delete(key);
 		}
@@ -210,12 +215,12 @@ export class BoardRecapCache {
 			key,
 			address: addr,
 			status: 'loading',
-			items: [],
+			table: EMPTY_TASK_RECAP_TABLE,
 			error: null
 		});
 
 		try {
-			const list = await this.taskRecapPort.fetch({
+			const table = await this.taskRecapPort.fetch({
 				stream: addr.stream,
 				instance: addr.instance || undefined,
 				jobId: addr.jobId,
@@ -227,7 +232,7 @@ export class BoardRecapCache {
 				key,
 				address: addr,
 				status: 'ready',
-				items: list.items,
+				table,
 				error: null
 			});
 		} catch (err) {
@@ -237,7 +242,7 @@ export class BoardRecapCache {
 					key,
 					address: addr,
 					status: 'ready',
-					items: [],
+					table: EMPTY_TASK_RECAP_TABLE,
 					error: null
 				});
 				return;
@@ -247,7 +252,7 @@ export class BoardRecapCache {
 				key,
 				address: addr,
 				status: 'error',
-				items: [],
+				table: EMPTY_TASK_RECAP_TABLE,
 				error: message
 			});
 		} finally {

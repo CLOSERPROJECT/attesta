@@ -35,15 +35,15 @@ describe('pinSubmissionIdForAddress', () => {
 });
 
 describe('recapRowMatchesSubmissionId', () => {
-	test('matches TaskRecap timestamp to Commit submissionId', () => {
+	test('matches TaskRecapRow.submissionId to Commit submissionId', () => {
 		const id = '2026-11-13T12:00:01Z';
-		expect(recapRowMatchesSubmissionId({ timestamp: id }, id)).toBe(true);
+		expect(recapRowMatchesSubmissionId({ submissionId: id }, id)).toBe(true);
 		expect(
-			recapRowMatchesSubmissionId({ timestamp: '2026-11-13T12:00:00Z' }, id)
+			recapRowMatchesSubmissionId({ submissionId: '2026-11-13T12:00:00Z' }, id)
 		).toBe(false);
-		expect(recapRowMatchesSubmissionId({ timestamp: id }, undefined)).toBe(
+		expect(recapRowMatchesSubmissionId({ submissionId: id }, undefined)).toBe(
 			false
 		);
-		expect(recapRowMatchesSubmissionId({ timestamp: id }, '')).toBe(false);
+		expect(recapRowMatchesSubmissionId({ submissionId: id }, '')).toBe(false);
 	});
 });
