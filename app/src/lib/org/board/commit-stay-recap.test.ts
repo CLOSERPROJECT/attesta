@@ -24,7 +24,7 @@ describe('stayAftermath', () => {
 		});
 	});
 
-	test('once stay keeps Form behind once-recap (timeline refresh is session.afterDomainCommit)', () => {
+	test('once stay keeps Form behind once-recap (timeline refresh is session.domainChanged)', () => {
 		expect(stayAftermath(false)).toEqual({
 			confirmSurface: 'once-recap',
 			refreshForms: false,

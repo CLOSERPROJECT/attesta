@@ -7,10 +7,10 @@ export type StayAftermath = {
 	/**
 	 * When true, Domain may have changed: refetch form bundles for the board
 	 * scope and remount Form on a cleared draft
-	 * (BoardSession.afterDomainCommit `{ refreshForms: true }`).
+	 * (BoardSession.domainChanged: follow 'stay' with submitMany).
 	 * Pre-submit Form↔Recap toggles do not run this path. Once stay does not
 	 * refresh (Form stays behind once-recap).
-	 * Timeline + worklist hydrate always run via afterDomainCommit.
+	 * Stay still reloads the timeline and hydrates the Worklist via domainChanged.
 	 */
 	refreshForms: boolean;
 	/**

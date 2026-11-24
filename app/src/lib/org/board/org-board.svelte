@@ -30,6 +30,7 @@
 	import { Label } from '#lib/shadcn/ui/label/index.js';
 	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
+	import type { DomainChange } from './board-refresh-plan.js';
 	import {
 		createBoardSession,
 		type BoardScope
@@ -193,11 +194,19 @@
 		confirmRecapByKey = next;
 	}
 
-	/** Recap-only when follow-through does not call afterDomainCommit (adopt / off-board). */
-	function refreshRecap(addr: TaskAddress) {
-		const key = taskAddressKey(addr);
-		boardRecapCache.invalidate(key);
-		boardRecapCache.enqueue([addr]);
+	function commitChanged(
+		addr: TaskAddress,
+		outcome: CommitOutcome,
+		follow: DomainChange['follow'],
+		submitMany = false
+	) {
+		void session.domainChanged({
+			origin: 'own',
+			revision: outcome.revision ?? null,
+			addr,
+			follow,
+			submitMany
+		});
 	}
 
 	function pinAfterCommit(addr: TaskAddress, outcome: CommitOutcome) {
@@ -216,10 +225,7 @@
 			if (aftermath.clearUnderFormLinks) {
 				orgSession.clearLinksStay();
 			}
-			void session.afterDomainCommit({
-				refreshForms: aftermath.refreshForms,
-				refreshRecapAddr: addr
-			});
+			commitChanged(addr, outcome, 'stay', Boolean(opts?.submitMany));
 			markConfirmRecap(addr);
 			return;
 		}
@@ -233,7 +239,7 @@
 				boardFormCache.putReady(nextAddr, outcome.nextTaskFormBundle);
 			}
 			if (session.scope.kind === 'boot' && target.instance) {
-				refreshRecap(addr);
+				commitChanged(addr, outcome, 'leaving');
 				void session.adoptInstance(target.instance, {
 					focus: boardTaskFromAddress(nextAddr),
 					bundleAddr: nextAddr,
@@ -246,18 +252,10 @@
 				navigate: (t) => {
 					if (t.kind === 'task') {
 						setFocus(normalizeTaskAddress(t));
-						if (view) {
-							void session.afterDomainCommit({ refreshRecapAddr: addr });
-						} else {
-							refreshRecap(addr);
-							void orgSession.hydrate({
-								stream: t.stream,
-								instance: t.instance
-							});
-						}
+						commitChanged(addr, outcome, 'advance');
 						return;
 					}
-					refreshRecap(addr);
+					commitChanged(addr, outcome, 'leaving');
 					navigateOrgTarget(t);
 				}
 			});
@@ -266,18 +264,18 @@
 
 		if (target.kind === 'home') {
 			if (session.scope.kind === 'boot') {
-				refreshRecap(addr);
+				commitChanged(addr, outcome, 'leaving');
 				void session.adoptInstance(target.instance, { focus: null });
 				orgSession.clearLinksStay();
 				return;
 			}
 			clearFocus();
 			orgSession.clearLinksStay();
-			void session.afterDomainCommit({ refreshRecapAddr: addr });
+			commitChanged(addr, outcome, 'advance');
 			return;
 		}
 
-		refreshRecap(addr);
+		commitChanged(addr, outcome, 'leaving');
 		applyCommitFollowThrough(decision, {
 			clearLinksStay: () => orgSession.clearLinksStay(),
 			navigate: navigateOrgTarget

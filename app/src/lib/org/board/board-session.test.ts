@@ -284,7 +284,7 @@ describe('BoardSession', () => {
 		expect(session.error).toBe('timeline down');
 	});
 
-	test('afterDomainCommit always reloads timeline and hydrates worklist', async () => {
+	test('domainChanged stay reloads timeline and hydrates worklist', async () => {
 		const first = instanceView();
 		const second = { ...first, label: 'After commit' };
 		let n = 0;
@@ -299,7 +299,20 @@ describe('BoardSession', () => {
 		await session.load();
 		hydrate.mockClear();
 
-		await session.afterDomainCommit();
+		const addr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'stay',
+			submitMany: false
+		});
 
 		expect(session.view?.label).toBe('After commit');
 		expect(timeline.loads).toHaveLength(2);
@@ -309,7 +322,7 @@ describe('BoardSession', () => {
 		});
 	});
 
-	test('afterDomainCommit refreshForms refetches ready form bundles', async () => {
+	test('domainChanged stay submitMany refetches ready form bundles', async () => {
 		const formFetch = vi.fn(async () => ({
 			jobId: 'intake',
 			taskId: 'register',
@@ -362,7 +375,13 @@ describe('BoardSession', () => {
 			bindings: { domain: {} }
 		});
 
-		await session.afterDomainCommit({ refreshForms: true });
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr: readyAddr,
+			follow: 'stay',
+			submitMany: true
+		});
 		await vi.waitFor(() => {
 			expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
 			expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe(
@@ -372,7 +391,7 @@ describe('BoardSession', () => {
 		expect(formFetch).toHaveBeenCalled();
 	});
 
-	test('afterDomainCommit without refreshForms leaves form bundles ready', async () => {
+	test('domainChanged stay without submitMany leaves form bundles ready', async () => {
 		const timeline = fakeTimeline(async () => instanceView());
 		const { session, formCache } = harness(
 			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
@@ -401,7 +420,13 @@ describe('BoardSession', () => {
 			bindings: { domain: {} }
 		});
 
-		await session.afterDomainCommit();
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr: readyAddr,
+			follow: 'stay',
+			submitMany: false
+		});
 
 		expect(formCache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
 		expect(formCache.get(taskAddressKey(readyAddr))?.bundle?.title).toBe(
@@ -409,7 +434,7 @@ describe('BoardSession', () => {
 		);
 	});
 
-	test('afterDomainCommit refreshRecapAddr invalidates and re-enqueues that recap', async () => {
+	test('domainChanged advance invalidates and re-enqueues that recap', async () => {
 		const recap = (n: number) => ({
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -450,11 +475,132 @@ describe('BoardSession', () => {
 		recapCache.putReady(addr, [recap(1)]);
 		expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(1);
 
-		await session.afterDomainCommit({ refreshRecapAddr: addr });
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'advance',
+			submitMany: false
+		});
 		await vi.waitFor(() => {
 			expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
 			expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(2);
 		});
 		expect(recapFetch).toHaveBeenCalled();
+	});
+
+	test('domainChanged leaving refreshes only the recap', async () => {
+		const recap = (n: number) => ({
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register',
+			timestamp: `2026-01-0${n}T00:00:00Z`,
+			userId: 'u1',
+			facts: { n },
+			links: []
+		});
+		const recapFetch = vi.fn(async () => ({ items: [recap(2)] }));
+		const timeline = fakeTimeline(async () => instanceView());
+		const formCache = createBoardFormCache({
+			taskForm: { fetch: vi.fn(async () => {
+				throw new Error('unexpected form fetch');
+			}) }
+		});
+		const recapCache = createBoardRecapCache({
+			taskRecap: { fetch: recapFetch }
+		});
+		const model = new BoardTimelineModel({ syncUrl: () => {} });
+		const hydrate = vi.fn();
+		const session = createBoardSession({
+			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline,
+			model,
+			formCache,
+			recapCache,
+			navigateToInstance: vi.fn(async () => {}),
+			hydrate
+		});
+		await session.load();
+		hydrate.mockClear();
+
+		const addr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		recapCache.putReady(addr, [recap(1)]);
+
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'leaving',
+			submitMany: false
+		});
+
+		await vi.waitFor(() => {
+			expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
+			expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(2);
+		});
+		expect(recapFetch).toHaveBeenCalled();
+		expect(timeline.loads).toHaveLength(1);
+		expect(hydrate).not.toHaveBeenCalled();
+	});
+
+	test('domainChanged advance without a view hydrates on instance scope', async () => {
+		const timeline = fakeTimeline(async () => instanceView());
+		const { session, hydrate } = harness(
+			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline
+		);
+		const addr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'advance',
+			submitMany: false
+		});
+
+		expect(timeline.loads).toHaveLength(0);
+		expect(hydrate).toHaveBeenCalledWith({
+			stream: 'recycling',
+			instance: '261102-1'
+		});
+	});
+
+	test('domainChanged advance without a view does nothing on boot scope', async () => {
+		const timeline = fakeTimeline(async () => bootView());
+		const { session, hydrate } = harness(
+			{ kind: 'boot', stream: 'recycling' },
+			timeline
+		);
+		const addr = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'advance',
+			submitMany: false
+		});
+
+		expect(timeline.loads).toHaveLength(0);
+		expect(hydrate).not.toHaveBeenCalled();
 	});
 });

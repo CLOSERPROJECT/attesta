@@ -3,6 +3,8 @@ import type { TaskFormBundle } from '../form/task-form-bundle.js';
 import { taskAddressKey, type TaskAddress } from '../task-address.js';
 import type { TimelineLoadQuery, TimelinePort } from '../timeline/timeline-port.js';
 import type { TimelineView } from '../timeline/types.js';
+import type { DomainChange } from './board-refresh-plan.js';
+import { planBoardRefresh } from './board-refresh-plan.js';
 import type { BoardFormCache } from './board-form-cache.svelte.js';
 import type { BoardRecapCache } from './board-recap-cache.svelte.js';
 import type { BoardTimelineModel } from './board-timeline-model.svelte.js';
@@ -35,13 +37,6 @@ export type BoardSessionOptions = {
 	hydrate?: (args: { stream: string; instance: string }) => void;
 };
 
-export type AfterDomainCommitOptions = {
-	/** submitMany stay: refetch every cached form bundle in scope. */
-	refreshForms?: boolean;
-	/** Invalidate + enqueue recap for the committed Task address. */
-	refreshRecapAddr?: TaskAddress;
-};
-
 export type BoardSession = {
 	readonly scope: BoardScope;
 	readonly scopeKey: string;
@@ -51,11 +46,10 @@ export type BoardSession = {
 	load(): Promise<void>;
 	reload(): Promise<void>;
 	/**
-	 * After a Domain-mutating Commit: reload timeline (+ worklist hydrate),
-	 * optionally refresh form bundles and/or the committed Task's recap.
-	 * OrgBoard declares aftermath here instead of assembling reload/forms/recap.
+	 * The Domain changed (own Commit today; remote writes later). Refreshes the
+	 * projections planBoardRefresh selects. Resolves when the refresh finished.
 	 */
-	afterDomainCommit(opts?: AfterDomainCommitOptions): Promise<void>;
+	domainChanged(change: DomainChange): Promise<void>;
 	adoptInstance(instance: string, opts?: AdoptInstanceOptions): Promise<void>;
 	/** Sync session when route props change (without soft-nav). */
 	setScope(scope: BoardScope): void;
@@ -80,8 +74,8 @@ function instanceOf(scope: BoardScope): string {
 }
 
 /**
- * Owns scope key, timeline load/reload, Domain-commit projection refresh
- * (afterDomainCommit), cache beginScope, and Play→instance soft-nav.
+ * Owns scope key, timeline load/reload, Domain-change projection refresh
+ * (domainChanged), cache beginScope, and Play→instance soft-nav.
  * OrgBoard paints from session.view / model; GUI must not invent play via /streams.
  */
 export function createBoardSession(opts: BoardSessionOptions): BoardSession {
@@ -164,16 +158,23 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 		async reload() {
 			await fetchView(timelineQueryForScope(scope), 'reload');
 		},
-		async afterDomainCommit(commitOpts: AfterDomainCommitOptions = {}) {
-			if (commitOpts.refreshForms) {
+		async domainChanged(change: DomainChange) {
+			const plan = planBoardRefresh([change], {
+				scopeKind: scope.kind,
+				hasView: view !== null
+			});
+			if (plan.remountForms) {
 				formCache.refreshAllAfterDomainCommit();
 			}
-			if (commitOpts.refreshRecapAddr) {
-				const key = taskAddressKey(commitOpts.refreshRecapAddr);
-				recapCache.invalidate(key);
-				recapCache.enqueue([commitOpts.refreshRecapAddr]);
+			for (const addr of plan.recapRefresh) {
+				recapCache.invalidate(taskAddressKey(addr));
+				recapCache.enqueue([addr]);
 			}
-			await fetchView(timelineQueryForScope(scope), 'reload');
+			if (plan.timeline) {
+				await fetchView(timelineQueryForScope(scope), 'reload');
+			} else if (plan.worklistOnly && scope.kind === 'instance') {
+				hydrate?.({ stream: scope.stream, instance: scope.instance });
+			}
 		},
 		async adoptInstance(instance: string, adoptOpts: AdoptInstanceOptions = {}) {
 			if (adoptOpts.bundle && adoptOpts.bundleAddr) {
