@@ -7,6 +7,7 @@
 	import type { CommitOutcome } from '../commit-port.js';
 	import { applyCommitFollowThrough, decideCommitFollowThrough } from '../commit-follow-through.js';
 	import { orgSession } from '../org-app.svelte.js';
+	import { createSseDomainEventsPort } from '../sse-domain-events-port.js';
 	import { fetchStreamTitle } from '../stream-meta.js';
 	import { normalizeTaskAddress, taskAddressKey, type TaskAddress } from '../task-address.js';
 	import { createHttpTimelinePort } from '../timeline/http-timeline-port.js';
@@ -73,6 +74,8 @@
 		// One-shot init; `$effect` below keeps scope in sync with route props.
 		scope: untrack(() => scope),
 		timeline: timelinePort,
+		events: createSseDomainEventsPort(),
+		commits: orgSession,
 		model,
 		formCache: boardFormCache,
 		recapCache: boardRecapCache,
@@ -298,6 +301,12 @@
 	$effect(() => {
 		session.setScope(scope);
 		void session.load();
+	});
+
+	// One events subscription per stream; instance changes keep it (Domain is per stream).
+	$effect(() => {
+		void stream;
+		return untrack(() => session.connect());
 	});
 
 	// URL → selection (opens body only when focus changes — see setFocusFromUrl).
