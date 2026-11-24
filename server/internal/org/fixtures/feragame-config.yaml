@@ -204,6 +204,17 @@ steps:
                   $count($domain.submissions[jobId = "intake" and taskId = "truckArrive" and jobInstanceId = $instance.id]) >= 1
                   and $count($domain.submissions[jobId = "intake" and taskId = "weightCheck" and jobInstanceId = $instance.id]) = 0
                 )
+              recap:
+                  entity: lot
+                  columns:
+                      - field: client
+                        title: Cliente
+                      - field: numeroFir
+                        title: Numero FIR
+                      - field: netWeight
+                        title: Peso netto
+                      - field: palletCount
+                        title: Bancali
               schema:
                 type: object
                 required: [client, numeroFir, palletCount, truckWeightAfter]
@@ -477,6 +488,18 @@ steps:
                     and $not($exists(weight))
                   ]) >= 1
                 )
+              recap:
+                  entity: pallet
+                  columns:
+                      - field: lotId
+                      - field: weight
+                        title: Peso
+                      - field: tareKind
+                        title: Tara
+                      - field: idoneita
+                        title: IR / NIR
+                      - field: panelCount
+                        title: Pannelli
               reads:
                 pallets:
                     entity: pallet

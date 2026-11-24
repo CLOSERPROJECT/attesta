@@ -13,40 +13,44 @@ func TestLoadTaskRecapFactsWithoutLinks(t *testing.T) {
 	c, _, loader := testTaskCommitter(t, AllowAllAuthorizer{})
 	truckID := commitTruckArrive(t, c)
 
-	list, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
+	table, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), SubmissionAddress{
 		JobID: "intake", JobInstanceID: truckID, TaskID: "truckArrive",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list.Items) != 1 {
-		t.Fatalf("items = %#v", list.Items)
+	if table.Mode != taskRecapModeSubmission {
+		t.Fatalf("mode = %q", table.Mode)
 	}
-	recap := list.Items[0]
-	if recap.UserID != "ada" || recap.Timestamp == "" {
-		t.Fatalf("actor/time = %#v", recap)
+	if len(table.Rows) != 1 {
+		t.Fatalf("rows = %#v", table.Rows)
 	}
-	if recap.UserName != "ada" {
-		t.Fatalf("userName = %#v (want UserID fallback)", recap.UserName)
+	row := table.Rows[0]
+	if row.UserID != "ada" || row.Timestamp == "" || row.SubmissionID != row.Timestamp {
+		t.Fatalf("actor/time = %#v", row)
 	}
-	if recap.Facts["truckWeight"] != 1000.0 {
-		t.Fatalf("facts = %#v", recap.Facts)
+	if row.UserName != "ada" {
+		t.Fatalf("userName = %#v (want UserID fallback)", row.UserName)
 	}
-	if _, has := recap.Facts["date"]; has {
-		t.Fatalf("truckArrive facts must omit date: %#v", recap.Facts)
+	if row.Cells["truckWeight"] != 1000.0 {
+		t.Fatalf("cells = %#v", row.Cells)
 	}
-	if _, has := recap.Facts["turno"]; has {
-		t.Fatalf("truckArrive facts must omit turno: %#v", recap.Facts)
+	if _, has := row.Cells["date"]; has {
+		t.Fatalf("truckArrive facts must omit date: %#v", row.Cells)
 	}
-	if recap.Titles["truckWeight"] != "Peso lordo camion" {
-		t.Fatalf("titles = %#v", recap.Titles)
+	if _, has := row.Cells["turno"]; has {
+		t.Fatalf("truckArrive facts must omit turno: %#v", row.Cells)
 	}
-	if len(recap.Links) != 0 {
-		t.Fatalf("truckArrive has no links: %#v", recap.Links)
+	col := columnByKey(table.Columns, "truckWeight")
+	if col == nil || col.Title != "Peso lordo camion" {
+		t.Fatalf("columns = %#v", table.Columns)
+	}
+	if len(row.Links) != 0 {
+		t.Fatalf("truckArrive has no links: %#v", row.Links)
 	}
 }
 
-func TestLoadTaskRecapManySubmitOldestFirstWithPerRowLinks(t *testing.T) {
+func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	clock := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
@@ -75,29 +79,36 @@ func TestLoadTaskRecapManySubmitOldestFirstWithPerRowLinks(t *testing.T) {
 	_ = commitLotRegister(t, c, truckID, lot2)
 
 	addr := SubmissionAddress{JobID: "intake", JobInstanceID: truckID, TaskID: "register"}
-	list, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), addr)
+	table, err := loader.LoadTaskRecap(t.Context(), FeragameScope(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list.Items) != 2 {
-		t.Fatalf("items = %#v", list.Items)
+	if table.Mode != taskRecapModeEntity {
+		t.Fatalf("mode = %q", table.Mode)
 	}
-	if list.Items[0].Timestamp >= list.Items[1].Timestamp {
-		t.Fatalf("want oldest first: %q then %q", list.Items[0].Timestamp, list.Items[1].Timestamp)
+	if len(table.Rows) != 2 {
+		t.Fatalf("rows = %#v", table.Rows)
 	}
-	if list.Items[0].Facts["client"] != "CO" || list.Items[1].Facts["client"] != "DA" {
-		t.Fatalf("facts order = %#v %#v", list.Items[0].Facts, list.Items[1].Facts)
+	if table.Rows[0].Timestamp >= table.Rows[1].Timestamp {
+		t.Fatalf("want oldest first: %q then %q", table.Rows[0].Timestamp, table.Rows[1].Timestamp)
 	}
-	if len(list.Items[0].Links) != 2 || list.Items[0].Links[0].URL != "blob:labels-1" ||
-		list.Items[0].Links[1].Filename != "reg1.csv" {
-		t.Fatalf("first links = %#v", list.Items[0].Links)
+	if table.Rows[0].Cells["client"] != "CO" || table.Rows[1].Cells["client"] != "DA" {
+		t.Fatalf("cells order = %#v %#v", table.Rows[0].Cells, table.Rows[1].Cells)
 	}
-	if len(list.Items[1].Links) != 2 || list.Items[1].Links[0].URL != "blob:labels-2" ||
-		list.Items[1].Links[1].Filename != "reg2.csv" {
-		t.Fatalf("second links = %#v", list.Items[1].Links)
+	if table.Rows[0].Touch != "minted" || table.Rows[1].Touch != "minted" {
+		t.Fatalf("touch = %q %q", table.Rows[0].Touch, table.Rows[1].Touch)
 	}
-	if list.Items[0].Titles["client"] != "Cliente" || list.Items[1].Titles["client"] != "Cliente" {
-		t.Fatalf("titles = %#v %#v", list.Items[0].Titles, list.Items[1].Titles)
+	if len(table.Rows[0].Links) != 2 || table.Rows[0].Links[0].URL != "blob:labels-1" ||
+		table.Rows[0].Links[1].Filename != "reg1.csv" {
+		t.Fatalf("first links = %#v", table.Rows[0].Links)
+	}
+	if len(table.Rows[1].Links) != 2 || table.Rows[1].Links[0].URL != "blob:labels-2" ||
+		table.Rows[1].Links[1].Filename != "reg2.csv" {
+		t.Fatalf("second links = %#v", table.Rows[1].Links)
+	}
+	col := columnByKey(table.Columns, "client")
+	if col == nil || col.Title != "Cliente" {
+		t.Fatalf("columns = %#v", table.Columns)
 	}
 }
 
@@ -157,12 +168,12 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("register recap status = %d body=%s", rec.Code, rec.Body.String())
 	}
-	var wire TaskRecapList
+	var wire TaskRecapTable
 	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if len(wire.Items) != 1 || wire.Items[0].TaskID != "register" ||
-		len(wire.Items[0].Links) != 2 || wire.Items[0].UserID != "ada" {
+	if wire.Mode != taskRecapModeEntity || len(wire.Rows) != 1 || wire.Rows[0].Touch != "minted" ||
+		len(wire.Rows[0].Links) != 2 || wire.Rows[0].UserID != "ada" {
 		t.Fatalf("wire = %#v", wire)
 	}
 
@@ -172,12 +183,12 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("flat recap = %d", rec.Code)
 	}
-	var onceWire TaskRecapList
+	var onceWire TaskRecapTable
 	if err := json.Unmarshal(rec.Body.Bytes(), &onceWire); err != nil {
 		t.Fatal(err)
 	}
-	if len(onceWire.Items) != 1 {
-		t.Fatalf("once items = %#v", onceWire.Items)
+	if onceWire.Mode != taskRecapModeSubmission || len(onceWire.Rows) != 1 {
+		t.Fatalf("once wire = %#v", onceWire)
 	}
 
 	rec = httptest.NewRecorder()
@@ -206,4 +217,13 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logistic recap = %d body=%s", rec.Code, rec.Body.String())
 	}
+}
+
+func columnByKey(cols []TaskRecapCol, key string) *TaskRecapCol {
+	for i := range cols {
+		if cols[i].Key == key {
+			return &cols[i]
+		}
+	}
+	return nil
 }
