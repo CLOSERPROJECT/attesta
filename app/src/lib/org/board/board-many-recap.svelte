@@ -1,9 +1,9 @@
 <script lang="ts">
+	import Inbox from '@lucide/svelte/icons/inbox';
 	import * as m from '#lib/paraglide/messages.js';
 
 	import ManySubmissionsTable from '../many-submissions-table.svelte';
 	import { taskAddressKey, type TaskAddress } from '../task-address.js';
-	import { formatSubmissionCount } from '../worklist-overview.js';
 	import { boardJustCompleted } from './board-just-completed.svelte.js';
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
 	import { pinSubmissionIdForAddress } from './just-completed-recap-row.js';
@@ -33,9 +33,13 @@
 
 <div data-testid={testId}>
 	{#if empty}
-		<p class="text-sm text-zinc-500" data-testid="many-recap-empty">
-			{formatSubmissionCount(0)}
-		</p>
+		<div
+			class="flex items-center justify-center gap-2 rounded-md bg-muted/60 px-3 py-3 text-muted-foreground"
+			data-testid="many-recap-empty"
+		>
+			<Inbox class="size-4 shrink-0" aria-hidden="true" />
+			<p class="m-0 text-sm">{m.no_data_yet()}</p>
+		</div>
 	{:else if !entry || entry.status === 'idle' || entry.status === 'loading'}
 		<p class="text-sm text-zinc-500" data-testid="many-recap-loading">
 			{m.loading_recap()}
@@ -45,9 +49,13 @@
 			{entry.error ?? m.could_not_load_recap()}
 		</p>
 	{:else if entry.items.length === 0}
-		<p class="text-sm text-zinc-500" data-testid="many-recap-empty">
-			{formatSubmissionCount(0)}
-		</p>
+		<div
+			class="flex items-center justify-center gap-2 rounded-md bg-muted/60 px-3 py-3 text-muted-foreground"
+			data-testid="many-recap-empty"
+		>
+			<Inbox class="size-4 shrink-0" aria-hidden="true" />
+			<p class="m-0 text-sm">{m.no_data_yet()}</p>
+		</div>
 	{:else}
 		<ManySubmissionsTable items={entry.items} {highlightSubmissionId} />
 	{/if}

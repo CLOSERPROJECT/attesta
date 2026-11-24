@@ -509,7 +509,7 @@
 }
 
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
-	padding: calc(var(--spacing) * 3);
+	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3);
 }
 
 /* Open nest: space under the header before children (no hairline — card edges already outline). */
