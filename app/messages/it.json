@@ -29,6 +29,8 @@
 	"embed_tab_recap": "Fatti",
 	"embed_stale_notice": "Un altro operatore ha aggiornato questa attività.",
 	"embed_stale_reload": "Ricarica",
+	"embed_composer_add": "Nuovo",
+	"embed_composer_discard": "Annulla",
 	"submission_count_one": "{count} invio",
 	"submission_count_many": "{count} invii",
 	"form_unavailable": "Modulo non disponibile",

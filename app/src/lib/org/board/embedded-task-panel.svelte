@@ -1,27 +1,17 @@
 <script lang="ts">
-	import ListIcon from '@lucide/svelte/icons/list';
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import type { Snippet } from 'svelte';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
-	import * as Tabs from '#lib/shadcn/ui/tabs/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
 	import type { CommitOutcome } from '../commit-port.js';
 	import TaskForm from '../task-form.svelte';
-	import { taskAddressKey, type TaskAddress } from '../task-address.js';
+	import { type TaskAddress, taskAddressKey } from '../task-address.js';
 	import type { TimelineSubmission } from '../timeline/types.js';
+	import { boardFormCache, type BoardFormEntry } from './board-form-cache.svelte.js';
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
 	import BoardManyRecap from './board-many-recap.svelte';
 	import BoardOnceRecap from './board-once-recap.svelte';
-	import type { BoardFormEntry } from './board-form-cache.svelte.js';
 	import { stayConfirmSurface } from './commit-stay-recap.js';
-
-	type Tab = 'form' | 'recap';
-
-	type HeaderArgs = {
-		/** New|Done tablist when submitMany and open; else undefined. */
-		tablist: Snippet | undefined;
-	};
 
 	type Props = {
 		address: TaskAddress;
@@ -30,14 +20,11 @@
 		submissions?: TimelineSubmission[];
 		focused?: boolean;
 		disabled?: boolean;
-		/** Stay Commit: land on once-recap / Recap tab (no under-form Continue). */
+		/** Stay Commit: land on once-recap / close many composer (no under-form Continue). */
 		confirmRecap?: boolean;
 		open?: boolean;
-		tab?: Tab;
 		/** `?seed.*` from timeline href — locks those fields for this embed open. */
 		seed?: Record<string, string>;
-		/** Substep header row (title · tablist · chevron). Keeps tablist under Tabs.Root. */
-		header?: Snippet<[HeaderArgs]>;
 		/** Optional id for the embed body region (aria-controls). */
 		bodyId?: string;
 		onOpenChange?: (open: boolean) => void;
@@ -55,9 +42,7 @@
 		disabled = false,
 		confirmRecap = false,
 		open = true,
-		tab = $bindable<Tab>('form'),
 		seed = {},
-		header,
 		bodyId,
 		onOpenChange,
 		onCommitted,
@@ -78,49 +63,34 @@
 	);
 	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
 
-	/** One-shot: stay → Recap tab once; user may switch back to Form. */
-	let landedManyRecap = $state(false);
+	/** Many-submit: composer under the recap table (closed by default). */
+	let composerOpen = $state(false);
+
+	/** One-shot: stay → close composer; recap table stays visible. */
+	let closedComposerOnStay = $state(false);
 	$effect(() => {
 		if (!confirmRecap) {
-			landedManyRecap = false;
+			closedComposerOnStay = false;
 			return;
 		}
-		if (stayConfirmSurface(submitMany) !== 'many-recap-tab') return;
-		if (landedManyRecap) return;
-		landedManyRecap = true;
-		tab = 'recap';
+		if (stayConfirmSurface(submitMany) !== 'many-recap') return;
+		if (closedComposerOnStay) return;
+		closedComposerOnStay = true;
+		composerOpen = false;
 		onOpenChange?.(true);
 	});
 
-	function selectTab(next: Tab) {
-		tab = next;
+	function openComposer() {
+		composerOpen = true;
 		onOpenChange?.(true);
-		if (next === 'form') onFocus?.();
+		onFocus?.();
+	}
+
+	function discardComposer() {
+		composerOpen = false;
+		boardFormCache.beginFreshDraft(address);
 	}
 </script>
-
-{#snippet formRecapTablist()}
-	<Tabs.List variant="line" class="embed-tabs-list p-0" data-testid="embed-form-recap-tabs">
-		<Tabs.Trigger
-			value="form"
-			class="embed-tabs-trigger"
-			data-testid="embed-tab-form"
-			onclick={() => selectTab('form')}
-		>
-			<PlusIcon data-icon="inline-start" aria-hidden="true" />
-			{m.embed_tab_form()}
-		</Tabs.Trigger>
-		<Tabs.Trigger
-			value="recap"
-			class="embed-tabs-trigger"
-			data-testid="embed-tab-recap"
-			onclick={() => selectTab('recap')}
-		>
-			<ListIcon data-icon="inline-start" aria-hidden="true" />
-			{m.embed_tab_recap()}
-		</Tabs.Trigger>
-	</Tabs.List>
-{/snippet}
 
 {#snippet formPane()}
 	{#if !submitMany && confirmRecap}
@@ -175,46 +145,50 @@
 	data-testid="embedded-task-panel"
 	data-address-key={key}
 	data-focused={focused ? '1' : '0'}
-	data-tab={tab}
+	data-composer={submitMany ? (composerOpen ? 'open' : 'closed') : undefined}
 	data-open={open ? '1' : '0'}
 	data-confirm-recap={confirmRecap ? '1' : '0'}
 >
-	{#if submitMany}
-		<Tabs.Root bind:value={tab} class="w-full min-w-0 flex-col gap-0">
-			{#if header}
-				{@render header({ tablist: open ? formRecapTablist : undefined })}
-			{:else if open}
-				{@render formRecapTablist()}
-			{/if}
-
-			{#if open}
-				<div
-					id={bodyId}
-					class="substep-org-body w-full min-w-0 gap-2"
-					data-testid="embed-panel-body"
-				>
-					<Tabs.Content value="form" class="outline-none" data-testid="embed-form-pane">
+	{#if open}
+		<div
+			id={bodyId}
+			class="substep-org-body w-full min-w-0 gap-2"
+			data-testid="embed-panel-body"
+		>
+			{#if submitMany}
+				{#if !address.provisionalJob && address.jobInstanceId}
+					<BoardManyRecap {address} empty={manyEmpty} data-testid="embed-many-recap" />
+				{/if}
+				{#if !composerOpen}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						data-testid="embed-composer-open"
+						onclick={openComposer}
+					>
+						<PlusIcon data-icon="inline-start" aria-hidden="true" />
+						{m.embed_composer_add()}
+					</Button>
+				{:else}
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						data-testid="embed-composer-discard"
+						onclick={discardComposer}
+					>
+						{m.embed_composer_discard()}
+					</Button>
+					<div class="outline-none" data-testid="embed-form-pane">
 						{@render formPane()}
-					</Tabs.Content>
-					<Tabs.Content value="recap" class="outline-none" data-testid="embed-recap-pane">
-						{#if !address.provisionalJob && address.jobInstanceId}
-							<BoardManyRecap {address} empty={manyEmpty} data-testid="embed-many-recap" />
-						{/if}
-					</Tabs.Content>
-				</div>
-			{/if}
-		</Tabs.Root>
-	{:else}
-		{#if header}
-			{@render header({ tablist: undefined })}
-		{/if}
-
-		{#if open}
-			<div id={bodyId} class="substep-org-body w-full min-w-0 gap-2" data-testid="embed-panel-body">
+					</div>
+				{/if}
+			{:else}
 				<div class="outline-none" data-testid="embed-form-pane">
 					{@render formPane()}
 				</div>
-			</div>
-		{/if}
+			{/if}
+		</div>
 	{/if}
 </div>

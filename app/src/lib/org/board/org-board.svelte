@@ -111,7 +111,7 @@
 	/** After a deep-link gate deny, do not auto-focus first actionable. */
 	let suppressAutoFocus = $state(false);
 
-	/** Stay Commit → land on once-recap / Recap tab (keyed by address). */
+	/** Stay Commit → land on once-recap / many-recap (keyed by address). */
 	let confirmRecapByKey = $state.raw<Record<string, true>>({});
 
 	const scopeKey = $derived(session.scopeKey);

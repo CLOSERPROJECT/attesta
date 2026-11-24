@@ -6,8 +6,8 @@ import { describe, expect, test } from 'vitest';
 import { stayAftermath, stayConfirmSurface } from './commit-stay-recap.js';
 
 describe('stayConfirmSurface', () => {
-	test('submitMany stay lands on Recap tab', () => {
-		expect(stayConfirmSurface(true)).toBe('many-recap-tab');
+	test('submitMany stay lands on many-recap', () => {
+		expect(stayConfirmSurface(true)).toBe('many-recap');
 	});
 
 	test('once stay lands on done/recap surface', () => {
@@ -16,9 +16,9 @@ describe('stayConfirmSurface', () => {
 });
 
 describe('stayAftermath', () => {
-	test('submitMany stay refreshes form bundles and lands on Recap tab', () => {
+	test('submitMany stay refreshes form bundles and lands on many-recap', () => {
 		expect(stayAftermath(true)).toEqual({
-			confirmSurface: 'many-recap-tab',
+			confirmSurface: 'many-recap',
 			refreshForms: true,
 			clearUnderFormLinks: true
 		});

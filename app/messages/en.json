@@ -29,6 +29,8 @@
 	"embed_tab_recap": "Done",
 	"embed_stale_notice": "Another operator updated this task.",
 	"embed_stale_reload": "Reload",
+	"embed_composer_add": "New",
+	"embed_composer_discard": "Discard",
 	"submission_count_one": "{count} submission",
 	"submission_count_many": "{count} submissions",
 	"form_unavailable": "Form unavailable",
