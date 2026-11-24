@@ -85,6 +85,24 @@ func (s *MongoDomainStore) find(ctx context.Context, scope Scope) (mongoDomainDo
 	return doc, nil
 }
 
+func (s *MongoDomainStore) Revision(ctx context.Context, scope Scope) (int64, error) {
+	scope, err := scope.Normalize()
+	if err != nil {
+		return 0, fmt.Errorf("org mongo domain revision: %w", err)
+	}
+	var doc struct {
+		Revision int64 `bson:"revision"`
+	}
+	err = s.coll().FindOne(ctx, bson.M{"_id": scopeKey(scope)}, options.FindOne().SetProjection(bson.M{"revision": 1})).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("org mongo domain revision: %w", err)
+	}
+	return doc.Revision, nil
+}
+
 func (s *MongoDomainStore) Put(ctx context.Context, scope Scope, domain Domain) error {
 	scope, err := scope.Normalize()
 	if err != nil {
@@ -97,16 +115,16 @@ func (s *MongoDomainStore) Put(ctx context.Context, scope Scope, domain Domain) 
 	return nil
 }
 
-func (s *MongoDomainStore) Update(ctx context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, error) {
+func (s *MongoDomainStore) Update(ctx context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, int64, error) {
 	scope, err := scope.Normalize()
 	if err != nil {
-		return Domain{}, fmt.Errorf("org mongo domain update: %w", err)
+		return Domain{}, 0, fmt.Errorf("org mongo domain update: %w", err)
 	}
 	for range maxDomainUpdateAttempts {
 		doc, err := s.find(ctx, scope)
 		missing := errors.Is(err, ErrNotFound)
 		if err != nil && !missing {
-			return Domain{}, err
+			return Domain{}, 0, err
 		}
 		current := EmptyDomain()
 		if !missing {
@@ -114,7 +132,7 @@ func (s *MongoDomainStore) Update(ctx context.Context, scope Scope, fn func(Doma
 		}
 		next, err := fn(current)
 		if err != nil {
-			return Domain{}, err
+			return Domain{}, 0, err
 		}
 		// Upsert only when the doc was missing: a concurrent insert then trips the _id unique index.
 		res, err := s.coll().UpdateOne(ctx, domainRevisionFilter(scope, doc.Revision), domainWriteUpdate(scope, next), options.Update().SetUpsert(missing))
@@ -122,14 +140,14 @@ func (s *MongoDomainStore) Update(ctx context.Context, scope Scope, fn func(Doma
 			continue
 		}
 		if err != nil {
-			return Domain{}, fmt.Errorf("org mongo domain update: %w", err)
+			return Domain{}, 0, fmt.Errorf("org mongo domain update: %w", err)
 		}
 		if res.MatchedCount == 0 && res.UpsertedCount == 0 {
 			continue
 		}
-		return next, nil
+		return next, doc.Revision + 1, nil
 	}
-	return Domain{}, ErrDomainConflict
+	return Domain{}, 0, ErrDomainConflict
 }
 
 // domainRevisionFilter treats a missing revision field (docs written before

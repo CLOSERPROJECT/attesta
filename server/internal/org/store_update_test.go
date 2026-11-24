@@ -12,14 +12,14 @@ import (
 
 type conflictDomainStore struct{ DomainStore }
 
-func (conflictDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, error) {
-	return Domain{}, ErrDomainConflict
+func (conflictDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, int64, error) {
+	return Domain{}, 0, ErrDomainConflict
 }
 
 func TestMemoryDomainStoreUpdateMissingOrgPassesEmptyDomain(t *testing.T) {
 	s := NewMemoryDomainStore()
 	var seen Domain
-	got, err := s.Update(t.Context(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
+	got, _, err := s.Update(t.Context(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
 		seen = d
 		d.Submissions = append(d.Submissions, Submission{JobID: "j", TaskID: "t"})
 		return d, nil
@@ -39,7 +39,7 @@ func TestMemoryDomainStoreUpdateMissingOrgPassesEmptyDomain(t *testing.T) {
 func TestMemoryDomainStoreUpdateFnErrorWritesNothing(t *testing.T) {
 	s := NewMemoryDomainStore()
 	boom := errors.New("boom")
-	_, err := s.Update(t.Context(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
+	_, _, err := s.Update(t.Context(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
 		d.Submissions = append(d.Submissions, Submission{JobID: "j"})
 		return d, boom
 	})
@@ -59,7 +59,7 @@ func TestMemoryDomainStoreUpdateConcurrentAppendsAllLand(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.Update(context.Background(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
+			_, _, err := s.Update(context.Background(), Scope{Org: "acme", Stream: "main"}, func(d Domain) (Domain, error) {
 				d.Submissions = append(d.Submissions, Submission{JobID: "j", TaskID: "t", JobInstanceID: string(rune('a' + i))})
 				return d, nil
 			})
