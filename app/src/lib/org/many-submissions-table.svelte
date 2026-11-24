@@ -29,7 +29,7 @@
 
 {#if items.length > 0}
 	<div class="overflow-x-auto" data-testid={testId}>
-		<table class="w-full border-collapse text-sm">
+		<table class="w-full border-collapse border-y border-zinc-200 text-sm">
 			<thead>
 				<tr class="border-b border-zinc-200 text-left">
 					{#each columns as key (key)}

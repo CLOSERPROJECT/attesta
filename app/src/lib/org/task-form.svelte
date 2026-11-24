@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, type Snippet } from 'svelte';
 	import type { FailureValidationResult } from '@sjsf/form';
 
 	import * as m from '#lib/paraglide/messages.js';
@@ -39,6 +39,8 @@
 		 * after URL strip, session open-seed memory still applies for provisional.
 		 */
 		seed?: Record<string, string>;
+		/** Optional chrome left of the sjsf submit button (same row). */
+		submitStart?: Snippet;
 		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
@@ -52,6 +54,7 @@
 		disabled = false,
 		provisionalJob = false,
 		seed = {},
+		submitStart,
 		onCommitted
 	}: Props = $props();
 
@@ -237,10 +240,25 @@
 >
 	{#if live?.form}
 		<fieldset disabled={disabled || orgSession.committing} class="space-y-4">
-			<ConfigForm
-				form={live.form}
-				class="flex flex-col gap-4 [&_button[type=submit]]:mt-6 [&_button[type=submit]]:self-end"
-			/>
+			<div class={submitStart ? 'relative' : undefined}>
+				<ConfigForm
+					form={live.form}
+					class={[
+						'flex flex-col gap-4 [&_button[type=submit]]:mt-6',
+						submitStart
+							? '[&_button[type=submit]]:ms-auto'
+							: '[&_button[type=submit]]:self-end'
+					]}
+				/>
+				{#if submitStart}
+					<div
+						class="absolute bottom-0 left-0 flex items-center"
+						data-testid="task-form-submit-start"
+					>
+						{@render submitStart()}
+					</div>
+				{/if}
+			</div>
 		</fieldset>
 	{:else}
 		<p class="text-sm text-zinc-500" data-testid="live-form-missing">{m.form_unavailable()}</p>

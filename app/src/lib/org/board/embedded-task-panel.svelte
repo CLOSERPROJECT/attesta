@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -92,6 +93,19 @@
 	}
 </script>
 
+{#snippet discardAction()}
+	<Button
+		type="button"
+		variant="outline"
+		size="sm"
+		data-testid="embed-composer-discard"
+		onclick={discardComposer}
+	>
+		<XIcon data-icon="inline-start" aria-hidden="true" />
+		{m.embed_composer_discard()}
+	</Button>
+{/snippet}
+
 {#snippet formPane()}
 	{#if !submitMany && confirmRecap}
 		<BoardOnceRecap {address} data-testid="embed-once-recap" />
@@ -131,6 +145,7 @@
 				provisionalJob={address.provisionalJob}
 				{seed}
 				{disabled}
+				submitStart={submitMany && composerOpen ? discardAction : undefined}
 				onCommitted={(outcome) => onCommitted?.(outcome)}
 			/>
 		{/key}
@@ -159,31 +174,26 @@
 				{#if !address.provisionalJob && address.jobInstanceId}
 					<BoardManyRecap {address} empty={manyEmpty} data-testid="embed-many-recap" />
 				{/if}
-				{#if !composerOpen}
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						data-testid="embed-composer-open"
-						onclick={openComposer}
-					>
-						<PlusIcon data-icon="inline-start" aria-hidden="true" />
-						{m.embed_composer_add()}
-					</Button>
-				{:else}
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						data-testid="embed-composer-discard"
-						onclick={discardComposer}
-					>
-						{m.embed_composer_discard()}
-					</Button>
-					<div class="outline-none" data-testid="embed-form-pane">
-						{@render formPane()}
-					</div>
-				{/if}
+				<div class="mt-8" data-testid="embed-composer-region">
+					{#if !composerOpen}
+						<div class="flex justify-end">
+							<Button
+								type="button"
+								variant="default"
+								size="sm"
+								data-testid="embed-composer-open"
+								onclick={openComposer}
+							>
+								<PlusIcon data-icon="inline-start" aria-hidden="true" />
+								{m.embed_composer_add()}
+							</Button>
+						</div>
+					{:else}
+						<div class="outline-none" data-testid="embed-form-pane">
+							{@render formPane()}
+						</div>
+					{/if}
+				</div>
 			{:else}
 				<div class="outline-none" data-testid="embed-form-pane">
 					{@render formPane()}
