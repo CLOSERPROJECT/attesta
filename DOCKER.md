@@ -111,6 +111,7 @@ Coolify-specific notes:
 - Attesta’s compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
 - The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
 - MariaDB uses stock `image: mariadb:10.11` (same as the local Appwrite baseline). Demo identity data comes from the Go seed after console bootstrap.
+- `/api/org/events` is a long-lived Server-Sent Events response for Org Domain revision invalidation ([ADR-0015](docs/adr/0015-org-domain-change-feed.md)): any proxy in front of Attesta must not buffer it (the server sends `X-Accel-Buffering: no` and a keepalive comment every 25 seconds). Live board refresh assumes a single Attesta container.
 
 ### Coolify Preview env checklist
 

@@ -2,7 +2,7 @@
 
 Single-organization operating picture: one or more **Org streams**, each a versioned **Org Config** with its own accumulating **Domain**. Operators work **Org stream instances** (filtered views over Domain) in `/app`; discovery and timelines live on `/my`. See [ADR-0014](../adr/0014-org-config-as-stream.md).
 
-**Org** and **Stream** remain different product nouns—see root [`GLOSSARY.md`](../../GLOSSARY.md). Formata Stream runtime: [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md). Shared membership: root glossary. Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md). Decisions: [`docs/adr/`](../adr/) (0005–0014). Config authoring: [`org-config-authoring.md`](../agents/org-config-authoring.md).
+**Org** and **Stream** remain different product nouns—see root [`GLOSSARY.md`](../../GLOSSARY.md). Formata Stream runtime: [`docs/stream/GLOSSARY.md`](../stream/GLOSSARY.md). Shared membership: root glossary. Map: [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md). Decisions: [`docs/adr/`](../adr/) (0005–0015). Config authoring: [`org-config-authoring.md`](../agents/org-config-authoring.md).
 
 ## Language
 
@@ -20,8 +20,11 @@ _Avoid_: Implied “latest file on disk” without an (org, stream) pointer
 **Domain**: The Org stream’s accumulating facts: entities with stable ids plus append-only submission history. One Domain per Org stream.\
 _Avoid_: One Domain per Org stream instance; Formata Stream instance; Process progress bag
 
-**Domain store**: The persistence of Domain (entities + submit entries). Commit writes are optimistic: a `revision` on the Domain document makes a concurrent write retry the Commit's gates instead of overwriting it.\
+**Domain store**: The persistence of Domain (entities + submit entries). Commit writes are optimistic: concurrent writers retry the Commit's gates against the current **Domain revision** instead of overwriting.\
 _Avoid_: Forms writing entities directly
+
+**Domain revision**: The count of writes to one Org stream's Domain, +1 per write; boards compare it to know their projections are stale. See [ADR-0015](../adr/0015-org-domain-change-feed.md).\
+_Avoid_: version (Config version is a different noun), etag
 
 ### Org stream
 

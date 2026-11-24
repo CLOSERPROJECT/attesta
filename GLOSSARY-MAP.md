@@ -10,7 +10,7 @@ Every vocabulary file is named `GLOSSARY.md`. This map is `GLOSSARY-MAP.md`. How
 
 ## Product surfaces
 
-- [Org](./docs/org/GLOSSARY.md) (`/app`, Org-backed `/my`): platform Org Config, Domain, **Org stream** / **Org stream instance**, Jobs/Tasks, Worklist, Commit, Passport-as-capability. Source of truth for Attesta product law and Org ADRs (0005–0014).
+- [Org](./docs/org/GLOSSARY.md) (`/app`, Org-backed `/my`): platform Org Config, Domain, **Org stream** / **Org stream instance**, Jobs/Tasks, Worklist, Commit, Passport-as-capability. Source of truth for Attesta product law and Org ADRs (0005–0015).
 - [Stream](./docs/stream/GLOSSARY.md) (`/my`, Formata): multi-org Formata Streams, Stream instances, Steps/Substeps, HTMX operator UI. Historical Formata runtime; `/my` also lists Org-backed streams (nouns for those live in the Org glossary).
 
 ## Plant payloads (Org Config instances)
