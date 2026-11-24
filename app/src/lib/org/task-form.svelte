@@ -10,7 +10,6 @@
 	import { needsStartingNewMint, normalizeJobInstanceId } from './task-address.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/config-form.svelte';
-	import HttpLinkStrip from './form/http-link-strip.svelte';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {
 		catalogsFromBundleBindings,
@@ -174,10 +173,6 @@
 	});
 
 	onDestroy(() => disposeLive());
-
-	const showLinks = $derived(
-		orgSession.lastHttpLinks.length > 0 || orgSession.lastHttpErrors.length > 0
-	);
 </script>
 
 <section
@@ -202,9 +197,5 @@
 		<p class="text-sm text-red-700" data-testid="task-submit-error" role="alert">
 			{submitError}
 		</p>
-	{/if}
-
-	{#if showLinks}
-		<HttpLinkStrip items={orgSession.lastHttpLinks} errors={orgSession.lastHttpErrors} />
 	{/if}
 </section>

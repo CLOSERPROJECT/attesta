@@ -293,7 +293,7 @@ describe('OrgSession', () => {
 		expect(outcome?.nextTaskFormBundle).toEqual(next);
 	});
 
-	test('navigation stay keeps HttpLinkStrip; clearLinksStay clears it', async () => {
+	test('navigation stay parks Commit links until clearLinksStay (board stay clears for recap)', async () => {
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'T1',

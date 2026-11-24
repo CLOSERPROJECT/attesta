@@ -213,6 +213,9 @@
 		pinAfterCommit(addr, outcome);
 		if (decision.kind === 'stay') {
 			const aftermath = stayAftermath(Boolean(opts?.submitMany));
+			if (aftermath.clearUnderFormLinks) {
+				orgSession.clearLinksStay();
+			}
 			void session.afterDomainCommit({
 				refreshForms: aftermath.refreshForms,
 				refreshRecapAddr: addr
