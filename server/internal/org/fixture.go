@@ -58,6 +58,22 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 	jobs := newOrderedObject()
 	roleSet := map[string]struct{}{}
 	var roleOrder []string
+	var roleDefs []RoleDef
+
+	if rolesNode := child(doc, "roles"); rolesNode != nil {
+		authored, err := parseAuthoredRoles(rolesNode)
+		if err != nil {
+			return OrgConfig{}, err
+		}
+		roleDefs = authored
+		for _, def := range authored {
+			if _, ok := roleSet[def.Slug]; ok {
+				continue
+			}
+			roleSet[def.Slug] = struct{}{}
+			roleOrder = append(roleOrder, def.Slug)
+		}
+	}
 
 	for i := 0; i < len(stepsMap.Content); i += 2 {
 		jobID := stepsMap.Content[i].Value
@@ -77,11 +93,12 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 	}
 
 	cfg := OrgConfig{
-		ID:      id,
-		Org:     org,
-		Version: DefaultFixtureVersion,
-		Jobs:    jobs,
-		Roles:   roleOrder,
+		ID:       id,
+		Org:      org,
+		Version:  DefaultFixtureVersion,
+		Jobs:     jobs,
+		RoleDefs: roleDefs,
+		Roles:    roleOrder,
 	}
 	if domainNode := child(doc, "domain"); domainNode != nil {
 		var domain any
@@ -267,6 +284,35 @@ func FixtureAllRolesOp() OperatorIdentity {
 		Org:         "feragame",
 		Roles:       []string{"administration", "logistic", "line"},
 	}
+}
+
+func parseAuthoredRoles(node *yaml.Node) ([]RoleDef, error) {
+	if node == nil || node.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("roles must be a list")
+	}
+	out := make([]RoleDef, 0, len(node.Content))
+	seen := map[string]struct{}{}
+	for i, item := range node.Content {
+		m := mappingContent(item)
+		if m == nil {
+			return nil, fmt.Errorf("roles[%d] must be a mapping", i)
+		}
+		slug, err := requiredString(m, "slug")
+		if err != nil {
+			return nil, fmt.Errorf("roles[%d]: %w", i, err)
+		}
+		if _, dup := seen[slug]; dup {
+			return nil, fmt.Errorf("roles[%d]: duplicate slug %q", i, slug)
+		}
+		seen[slug] = struct{}{}
+		name, _ := optionalString(m, "name")
+		if name == "" {
+			name = slug
+		}
+		palette, _ := optionalString(m, "palette")
+		out = append(out, RoleDef{Slug: slug, Name: name, Palette: palette})
+	}
+	return out, nil
 }
 
 func rolesFromTask(payload any) []string {

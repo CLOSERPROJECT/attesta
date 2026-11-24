@@ -341,9 +341,38 @@
 	display: inline-flex;
 	align-items: center;
 	flex-shrink: 0;
+	/* Role group ↔ status: wider than pill↔pill inside .timeline-role-badges. */
+	gap: calc(var(--spacing) * 1.5);
 	margin-left: auto;
 	/* Clear the absolute chevron column. */
 	margin-right: calc(var(--spacing) * 2);
+}
+
+.org-timeline-page .timeline-role-badges {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--spacing) * 1);
+}
+
+/* White-bg role pills (not Formata’s chroma-tinted .role-pill). */
+.org-timeline-page .timeline-role-pill {
+	display: inline-flex;
+	align-items: center;
+	box-sizing: border-box;
+	margin: 0;
+	/* Match .status padding; inset stroke so border does not grow the box. */
+	padding: 0.2rem 0.35rem;
+	border: none;
+	border-radius: var(--radius);
+	box-shadow: inset 0 0 0 1px var(--role-chroma, var(--muted-foreground));
+	font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+	font-size: 0.6875rem;
+	font-weight: var(--font-weight-medium);
+	letter-spacing: 0.02em;
+	line-height: 1.25;
+	white-space: nowrap;
+	color: var(--role-chroma, var(--muted-foreground));
+	background-color: var(--background);
 }
 
 .org-timeline-page .timeline-header-count {

@@ -1004,7 +1004,7 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 		t.Fatalf("each err progress = %#v", prog)
 	}
 
-	rows := buildOrgTimelineRows(Job{Title: "Lot"}, StreamTimelineStep{
+	rows := buildOrgTimelineRows(OrgConfig{}, Job{Title: "Lot"}, StreamTimelineStep{
 		JobID: "lot_processing",
 		Rows:  []StreamTimelineRow{{ID: "L1", Label: "  ", Finished: true}},
 	}, domain, TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, truck)))

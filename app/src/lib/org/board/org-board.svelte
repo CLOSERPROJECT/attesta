@@ -45,6 +45,7 @@
 	import { resolveTaskDeepLink } from '../worklist-nav.js';
 
 	import '../timeline/org-timeline.css';
+	import '../timeline/role-palette.css';
 
 	type Props = {
 		scope: BoardScope;

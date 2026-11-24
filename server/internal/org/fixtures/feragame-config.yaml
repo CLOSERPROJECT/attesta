@@ -9,6 +9,17 @@
 
 id: feragame-config
 org: feragame
+# Authored catalog for Identity seed + timeline badges; task roles: stay in this slug set.
+roles:
+    - slug: administration
+      name: Administration
+      palette: blue
+    - slug: logistic
+      name: Logistic
+      palette: cyan
+    - slug: line
+      name: Line
+      palette: orange
 stream:
     key: recycling
     title: Lavorazione rifiuti

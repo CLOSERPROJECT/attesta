@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/CLOSERPROJECT/attesta/server/internal/org"
+)
 
 type demoFixtureOrg struct {
 	Name  string
@@ -23,22 +27,43 @@ type demoFixture struct {
 
 // Feragame demo org / operators (Cerbos Commit demos on /app).
 const (
-	demoFeragameOrgSlug           = "feragame"
-	demoOrgAdminUserEmail         = "admin@feragame.com"
-	demoAdministrationUserEmail    = "administration@feragame.com"
-	demoLogisticUserEmail = "logistic@feragame.com"
-	demoLineUserEmail     = "line@feragame.com"
+	demoFeragameOrgSlug         = "feragame"
+	demoOrgAdminUserEmail       = "admin@feragame.com"
+	demoAdministrationUserEmail = "administration@feragame.com"
+	demoLogisticUserEmail       = "logistic@feragame.com"
+	demoLineUserEmail           = "line@feragame.com"
 )
 
 func feragameOrgDef() demoFixtureOrg {
-	return demoFixtureOrg{
-		Name: "Feragame",
-		Roles: []IdentityRole{
-			{Slug: "administration", Name: "Administration", Palette: "blue"},
-			{Slug: "logistic", Name: "Logistic", Palette: "cyan"},
-			{Slug: "line", Name: "Line", Palette: "emerald"},
-		},
+	cfg, err := org.LoadFeragameConfigFixture()
+	if err != nil {
+		panic("feragame org roles: " + err.Error())
 	}
+	roles := identityRolesFromDefs(cfg.RoleDefs)
+	if len(roles) == 0 {
+		panic("feragame org roles: fixture roles block empty")
+	}
+	return demoFixtureOrg{Name: "Feragame", Roles: roles}
+}
+
+func identityRolesFromDefs(defs []org.RoleDef) []IdentityRole {
+	out := make([]IdentityRole, 0, len(defs))
+	for _, def := range defs {
+		slug := strings.TrimSpace(def.Slug)
+		if slug == "" {
+			continue
+		}
+		name := strings.TrimSpace(def.Name)
+		if name == "" {
+			name = slug
+		}
+		out = append(out, IdentityRole{
+			Slug:    slug,
+			Name:    name,
+			Palette: strings.TrimSpace(def.Palette),
+		})
+	}
+	return out
 }
 
 func feragameLivingUsers() []demoFixtureUser {

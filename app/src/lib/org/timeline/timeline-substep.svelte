@@ -12,6 +12,8 @@
 	import { taskAddressKey } from '../task-address.js';
 	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
+	import TimelineRoleBadges from './timeline-role-badges.svelte';
+	import { timelineRoleBadgesVisible } from './timeline-role-badge-label.js';
 	import type { TimelineSubstep } from './types.js';
 
 	type Props = {
@@ -36,6 +38,10 @@
 	const showStatusChip = $derived(
 		!!status && streamStatusChipVisible(status, timelineModel.showAll)
 	);
+	const roleBadges = $derived(
+		timelineRoleBadgesVisible(timelineModel.showAll, substep.roleBadges)
+	);
+	const showTrail = $derived(showStatusChip || roleBadges.length > 0);
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(status ? `substep-${status}` : '');
 
@@ -70,6 +76,15 @@
 	}
 </script>
 
+{#snippet trail()}
+	{#if roleBadges.length > 0}
+		<TimelineRoleBadges badges={roleBadges} />
+	{/if}
+	{#if showStatusChip}
+		<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
+	{/if}
+{/snippet}
+
 <li
 	class={['substep', statusClass]}
 	data-org-actionable={substep.orgActionable ? 'true' : undefined}
@@ -86,12 +101,8 @@
 			onOpenChange={onEmbedOpenChange}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary substep-card-link w-full items-center hover:no-underline">
-				{#if showStatusChip}
-					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
-						{#snippet trail()}
-							<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
-						{/snippet}
-					</TimelineHeaderLine>
+				{#if showTrail}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} {trail} />
 				{:else}
 					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
 				{/if}
@@ -125,14 +136,8 @@
 			bind:open={detailsOpen}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary w-full items-center hover:no-underline">
-				{#if showStatusChip}
-					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId}>
-						{#snippet trail()}
-							<span class="status" data-status={status} aria-label={statusChipLabel}
-								>{statusChipLabel}</span
-							>
-						{/snippet}
-					</TimelineHeaderLine>
+				{#if showTrail}
+					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} {trail} />
 				{:else}
 					<TimelineHeaderLine {mark} title={substep.title} titleId={headingId} />
 				{/if}

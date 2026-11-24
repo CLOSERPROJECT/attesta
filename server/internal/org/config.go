@@ -6,6 +6,14 @@ import (
 	"fmt"
 )
 
+// RoleDef is one authored org role (Identity seed + timeline badge meta).
+// Membership stays in Identity; this is catalog shape only (ADR-0002/0003).
+type RoleDef struct {
+	Slug    string `json:"slug"`
+	Name    string `json:"name,omitempty"`
+	Palette string `json:"palette,omitempty"`
+}
+
 // OrgConfig is one Config version of the org's authored operating picture.
 type OrgConfig struct {
 	ID       string         `json:"id"`
@@ -16,8 +24,11 @@ type OrgConfig struct {
 	QR       *QrConfig      `json:"qr,omitempty"`
 	DPP      *DPPConfig     `json:"dpp,omitempty"`
 	Stream   *StreamConfig  `json:"stream,omitempty"`
-	Roles    []string       `json:"roles,omitempty"`
-	Jobs     OrderedObject  `json:"jobs"`
+	// RoleDefs is the authored slug/name/palette catalog when present.
+	RoleDefs []RoleDef `json:"roleDefs,omitempty"`
+	// Roles is the gate slug list (from RoleDefs and/or task roles:).
+	Roles []string      `json:"roles,omitempty"`
+	Jobs  OrderedObject `json:"jobs"`
 }
 
 // UnmarshalJSON decodes each Job from raw JSON so Jobs OrderedObject keeps
@@ -32,6 +43,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 		QR       *QrConfig       `json:"qr,omitempty"`
 		DPP      *DPPConfig      `json:"dpp,omitempty"`
 		Stream   *StreamConfig   `json:"stream,omitempty"`
+		RoleDefs []RoleDef       `json:"roleDefs,omitempty"`
 		Roles    []string        `json:"roles,omitempty"`
 		Jobs     json.RawMessage `json:"jobs"`
 	}
@@ -50,6 +62,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 	c.QR = wire.QR
 	c.DPP = wire.DPP
 	c.Stream = wire.Stream
+	c.RoleDefs = append([]RoleDef(nil), wire.RoleDefs...)
 	c.Roles = wire.Roles
 	c.Jobs = jobs
 	return nil

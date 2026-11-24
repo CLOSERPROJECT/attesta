@@ -18,6 +18,22 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if len(roles) != 1 || roles[0] != "administration" {
 		t.Fatalf("truckArrive rolesAllowed = %#v, want [administration]", roles)
 	}
+	if len(cfg.RoleDefs) != 3 {
+		t.Fatalf("RoleDefs = %#v, want 3 authored roles", cfg.RoleDefs)
+	}
+	wantDefs := []RoleDef{
+		{Slug: "administration", Name: "Administration", Palette: "blue"},
+		{Slug: "logistic", Name: "Logistic", Palette: "cyan"},
+		{Slug: "line", Name: "Line", Palette: "orange"},
+	}
+	for i, want := range wantDefs {
+		if cfg.RoleDefs[i] != want {
+			t.Fatalf("RoleDefs[%d] = %#v, want %#v", i, cfg.RoleDefs[i], want)
+		}
+	}
+	if got := strings.Join(cfg.Roles, ","); got != "administration,logistic,line" {
+		t.Fatalf("Roles = %v, want authored order", cfg.Roles)
+	}
 
 	if cfg.ID != "feragame-config" {
 		t.Fatalf("id = %q", cfg.ID)

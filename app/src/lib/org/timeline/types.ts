@@ -6,6 +6,13 @@ export type TimelineSubmission = {
 	userId?: string;
 };
 
+/** Allowed-role pill on a timeline substep (Config RoleDefs / Identity catalog). */
+export type TimelineRoleBadge = {
+	id: string;
+	label: string;
+	palette: string;
+};
+
 export type TimelineSubstep = {
 	substepId: string;
 	title: string;
@@ -15,6 +22,7 @@ export type TimelineSubstep = {
 	submitMany?: boolean;
 	blockedReason?: string;
 	href?: string;
+	roleBadges?: TimelineRoleBadge[];
 	submissions?: TimelineSubmission[];
 };
 

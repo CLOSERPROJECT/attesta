@@ -14,6 +14,17 @@ Product nouns: [`docs/org/GLOSSARY.md`](../org/GLOSSARY.md) (**Dumb executor**, 
 - **JSONata:** chrome / transform / QR / HttpPort bodies use jsonata-go — see [`jsonata-org.md`](jsonata-org.md) before blaming the executor.
 - **Copy tracks:** SPA chrome vs Config product copy vs English engine errors — [ADR-0013](../adr/0013-org-app-locale-tracks.md) and [`app-i18n.md`](app-i18n.md). Plant Italian labels stay in YAML.
 
+## Roles catalog (`roles`)
+
+Optional top-level authored catalog for Identity seed and timeline role badges. Membership remains Identity/Appwrite at runtime (ADR-0002/0003)—this block is catalog shape only (`slug`, `name`, palette key such as `blue` / `cyan` / `emerald`, not CSS vars). Task `roles: [slug]` gates stay slug lists and must align with this catalog when it is present. Gate slug list `OrgConfig.Roles` is derived from the authored block (order preserved) plus any task-only slugs.
+
+```yaml
+roles:
+  - slug: administration
+    name: Administration
+    palette: blue
+```
+
 ## Stream section (`stream`)
 
 Every Org Config has a required `stream` block ([ADR-0014](../adr/0014-org-config-as-stream.md)). It names the Org stream for `/my` and lists timeline steps over Jobs.
