@@ -493,6 +493,9 @@ steps:
                 ui:options:
                     order:
                         [palletId, weight, averagePanelWeight, tareKind, customTareWeight, idoneita, panelCount]
+                    layouts:
+                        object-properties:
+                            class: form-cols-2
                 tareKind:
                     ui:options:
                         enumNames: ['industriale (25 kg)', 'euro (20 kg)', 'personalizzato']
@@ -501,6 +504,10 @@ steps:
                         enumNames: [NIR, IR]
                 panelCount:
                     ui:field: derivedLeaf
+                    ui:options:
+                        layouts:
+                            object-property:
+                                class: form-cols-span
               onSubmit:
                 transform:
                     - op: patch
