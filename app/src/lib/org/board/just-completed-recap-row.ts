@@ -3,7 +3,7 @@ import type { JustCompletedPin } from './board-just-completed.svelte.js';
 
 /**
  * Commit `submissionId` for this many-recap address, when the pin targets it.
- * Identity is the Domain Submission timestamp (recap row key).
+ * Matches TaskRecapRow.submissionId (latest-touch Submission timestamp).
  */
 export function pinSubmissionIdForAddress(
 	pin: JustCompletedPin | null,

@@ -28,6 +28,13 @@ function change(
 const ownDefaults = {
 	revalidateForms: false,
 	holdExempt: [] as string[],
+	revalidateRecaps: true,
+	background: false
+};
+
+const idleDefaults = {
+	revalidateForms: false,
+	holdExempt: [] as string[],
 	revalidateRecaps: false,
 	background: false
 };
@@ -168,7 +175,7 @@ describe('planBoardRefresh', () => {
 			worklistOnly: false,
 			remountForms: false,
 			recapRefresh: [],
-			...ownDefaults
+			...idleDefaults
 		});
 	});
 

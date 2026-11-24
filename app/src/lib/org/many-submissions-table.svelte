@@ -1,42 +1,46 @@
 <script lang="ts">
 	import HttpLinkStrip from './form/http-link-strip.svelte';
 	import {
-		factTitle,
 		formatSubmissionTimestamp,
 		formatSubmissionUser,
-		recapRowMatchesSubmissionId,
-		unionFactKeys
+		formatTouchLabel,
+		recapRowMatchesSubmissionId
 	} from './submission-table.js';
-	import type { TaskRecap } from './task-recap-port.js';
+	import type { TaskRecapTable } from './task-recap-port.js';
 	import { formatFactValue } from './worklist-overview.js';
 
 	type Props = {
-		items: TaskRecap[];
+		table: TaskRecapTable;
 		/** Just-completed Commit submissionId (Submission.timestamp) to highlight. */
 		highlightSubmissionId?: string;
 		'data-testid'?: string;
 	};
 
 	let {
-		items,
+		table,
 		highlightSubmissionId,
 		'data-testid': testId = 'many-submissions-table'
 	}: Props = $props();
 
-	const columns = $derived(unionFactKeys(items));
-	const showLinksColumn = $derived(items.some((item) => item.links.length > 0));
+	const showTouchColumn = $derived(table.mode === 'entity');
+	const showLinksColumn = $derived(
+		table.rows.some((row) => (row.links?.length ?? 0) > 0)
+	);
 </script>
 
-{#if items.length > 0}
+{#if table.rows.length > 0}
 	<div class="overflow-x-auto" data-testid={testId}>
 		<table class="w-full border-collapse border-y border-zinc-200 text-sm">
 			<thead>
 				<tr class="border-b border-zinc-200 text-left">
-					{#each columns as key (key)}
+					{#each table.columns as col (col.key)}
 						<th class="px-2 py-2 align-top font-medium text-zinc-600">
-							{factTitle(items, key)}
+							{col.title}
 						</th>
 					{/each}
+					{#if showTouchColumn}
+						<th class="px-2 py-2 align-top font-medium text-zinc-600">Touch</th>
+					{/if}
 					<th class="px-2 py-2 align-top font-medium text-zinc-600">Timestamp</th>
 					<th class="px-2 py-2 align-top font-medium text-zinc-600">User</th>
 					{#if showLinksColumn}
@@ -45,9 +49,9 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each items as item, index (`${item.timestamp}:${item.jobInstanceId}:${index}`)}
+				{#each table.rows as row (row.key)}
 					{@const highlighted = recapRowMatchesSubmissionId(
-						item,
+						row,
 						highlightSubmissionId
 					)}
 					<tr
@@ -58,21 +62,26 @@
 						data-just-completed={highlighted ? '1' : undefined}
 						data-testid={highlighted ? 'many-recap-just-completed' : undefined}
 					>
-						{#each columns as key (key)}
+						{#each table.columns as col (col.key)}
 							<td class="px-2 py-2 text-zinc-900">
-								{formatFactValue(item.facts[key])}
+								{formatFactValue(row.cells[col.key])}
 							</td>
 						{/each}
+						{#if showTouchColumn}
+							<td class="px-2 py-2 text-zinc-900">
+								{formatTouchLabel(row.touch)}
+							</td>
+						{/if}
 						<td class="px-2 py-2 text-zinc-900">
-							{formatSubmissionTimestamp(item.timestamp)}
+							{formatSubmissionTimestamp(row.timestamp)}
 						</td>
 						<td class="px-2 py-2 text-zinc-900">
-							{formatSubmissionUser(item)}
+							{formatSubmissionUser(row)}
 						</td>
 						{#if showLinksColumn}
 							<td class="px-2 py-2">
-								{#if item.links.length > 0}
-									<HttpLinkStrip items={item.links} />
+								{#if (row.links?.length ?? 0) > 0}
+									<HttpLinkStrip items={row.links ?? []} />
 								{/if}
 							</td>
 						{/if}

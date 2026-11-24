@@ -24,6 +24,10 @@
 	<p class="text-sm text-red-700" role="alert" data-testid="once-recap-error">
 		{entry.error ?? m.could_not_load_recap()}
 	</p>
-{:else if entry.items.length > 0}
-	<OnceSubmissionTable item={entry.items[0]} data-testid={testId} />
+{:else if entry.table.rows.length > 0}
+	<OnceSubmissionTable
+		columns={entry.table.columns}
+		row={entry.table.rows[0]}
+		data-testid={testId}
+	/>
 {/if}

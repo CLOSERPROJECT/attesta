@@ -60,7 +60,8 @@
 		return boardRecapCache.get(key);
 	});
 	const showOnceRecap = $derived(
-		Boolean(confirmRecap) || (recapEntry?.status === 'ready' && (recapEntry.items.length ?? 0) > 0)
+		Boolean(confirmRecap) ||
+			(recapEntry?.status === 'ready' && (recapEntry.table.rows.length ?? 0) > 0)
 	);
 	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
 
