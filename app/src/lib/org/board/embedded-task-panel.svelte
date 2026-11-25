@@ -200,11 +200,12 @@
 					data-testid="embed-composer-region"
 				>
 					{#if !showComposer}
-						<div class="flex justify-end">
+						<div class="flex justify-center">
 							<Button
 								type="button"
 								variant="default"
-								size="sm"
+								size="default"
+								class="w-56 max-w-full shrink"
 								data-testid="embed-composer-open"
 								onclick={openComposer}
 							>
