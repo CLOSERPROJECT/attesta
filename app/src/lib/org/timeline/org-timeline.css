@@ -100,6 +100,10 @@
 	--org-pad-l: calc(var(--spacing) * 3);
 	/* Embed body + many form pane share this; recap band uses 2× / −1× for full-bleed align. */
 	--org-embed-pad-x: calc(var(--spacing) * 3);
+	/* Just-completed bar parked in band left pad (outside table). */
+	--many-recap-bar-width: 3px;
+	--many-recap-bar-gap: 10px;
+	--many-recap-wash-ms: 700ms;
 	/* Chevron column: same right edge + slot width at every nest level. */
 	--org-chevron-pad: calc(var(--spacing) * 3);
 	--org-chevron-slot: 1.25rem;
@@ -545,6 +549,54 @@
 
 .org-timeline-page .substep-embed .embed-many-recap-band td {
 	font-weight: 400;
+}
+
+/*
+ * Just-completed Commit: primary bar is an absolute sibling outside <table>, parked in the
+ * Done band’s left padding (barWidth + gap). Table stays flush with the form (edgePad).
+ * Wash: hold → fade via opacity/color transition (JS sets data attrs; CSS owns the tween).
+ */
+.org-timeline-page .substep-embed .embed-many-recap-band .many-recap-highlight-host {
+	position: relative;
+}
+
+.org-timeline-page .substep-embed .embed-many-recap-band .many-recap-just-completed-bar {
+	position: absolute;
+	left: calc(-1 * (var(--many-recap-bar-width) + var(--many-recap-bar-gap)));
+	width: var(--many-recap-bar-width);
+	background-color: var(--primary);
+	opacity: 1;
+	pointer-events: none;
+	z-index: 1;
+	transition: opacity var(--many-recap-wash-ms) ease;
+}
+
+.org-timeline-page
+	.substep-embed
+	.embed-many-recap-band
+	.many-recap-just-completed-bar--fade {
+	opacity: 0;
+}
+
+.org-timeline-page .substep-embed .embed-many-recap-band .many-recap-cell {
+	color: var(--muted-foreground);
+	transition: color var(--many-recap-wash-ms) ease;
+}
+
+.org-timeline-page
+	.substep-embed
+	.embed-many-recap-band
+	tr[data-just-completed]
+	> .many-recap-cell {
+	color: var(--foreground);
+}
+
+.org-timeline-page
+	.substep-embed
+	.embed-many-recap-band
+	tr[data-just-completed-fade]
+	> .many-recap-cell {
+	color: var(--muted-foreground);
 }
 
 /* Open nest: space under the header before children (no hairline — card edges already outline). */
