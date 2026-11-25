@@ -14,8 +14,6 @@ export type LoadResult = {
 	worklist: Worklist;
 	/** Always empty on home Load (ADR-0006); Task mounts use addressed fetch. */
 	taskFormBundles: TaskFormBundle[];
-	/** Domain revision this Load reflects (lower bound). */
-	revision?: number;
 };
 
 /** Server-projected operator board (startsWhen / readyWhen; done after once Submission). */

@@ -57,8 +57,6 @@ export type CommitResult = {
 	links?: HttpLinkItem[];
 	/** HttpPort failures; Domain remains committed server-side. */
 	httpErrors?: string[];
-	/** Domain revision this Commit wrote. */
-	revision?: number;
 };
 
 export type CommitOutcome = {
@@ -69,8 +67,6 @@ export type CommitOutcome = {
 	navigation: CommitNavigation;
 	continueNavigation: ContinueNavigation | null;
 	nextTaskFormBundle: TaskFormBundle | null;
-	/** Domain revision this Commit wrote. */
-	revision?: number;
 };
 
 export type CommitDomainPort = {

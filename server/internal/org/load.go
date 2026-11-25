@@ -20,9 +20,7 @@ type LoadResult struct {
 	UserID      string `json:"userId"`
 	DisplayName string `json:"displayName"`
 	// Roles are the caller's Config role slugs (OperatorIdentity; not Cerbos).
-	Roles []string `json:"roles"`
-	// Revision is the Domain revision this Load reflects (lower bound).
-	Revision int64     `json:"revision"`
+	Roles    []string  `json:"roles"`
 	Domain   Domain    `json:"-"`
 	Config   OrgConfig `json:"-"`
 	Worklist Worklist  `json:"worklist"`
@@ -68,9 +66,12 @@ func (l *DomainLoader) LoadForStreamInstance(ctx context.Context, scope Scope, o
 		return LoadResult{}, err
 	}
 
-	domain, revision, err := domainSnapshot(ctx, l.Domains, scope)
+	domain, err := l.Domains.Get(ctx, scope)
 	if err != nil {
-		return LoadResult{}, err
+		if !errors.Is(err, ErrNotFound) {
+			return LoadResult{}, err
+		}
+		domain = EmptyDomain()
 	}
 
 	var wl Worklist
@@ -90,30 +91,11 @@ func (l *DomainLoader) LoadForStreamInstance(ctx context.Context, scope Scope, o
 		UserID:              strings.TrimSpace(op.UserID),
 		DisplayName:         displayName,
 		Roles:               append([]string(nil), op.Roles...),
-		Revision:            revision,
 		Domain:              domain,
 		Config:              cfg,
 		Worklist:            wl,
 		TaskFormBundles:     []*TaskFormBundle{},
 	}, nil
-}
-
-// domainSnapshot reads the revision before the Domain, so the reported revision
-// is never newer than the data returned. A stale report costs the client one extra
-// refresh; the opposite order could hide a write.
-func domainSnapshot(ctx context.Context, domains DomainStore, scope Scope) (Domain, int64, error) {
-	revision, err := domains.Revision(ctx, scope)
-	if err != nil && !errors.Is(err, ErrNotFound) {
-		return Domain{}, 0, err
-	}
-	domain, err := domains.Get(ctx, scope)
-	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			return Domain{}, 0, err
-		}
-		domain = EmptyDomain()
-	}
-	return domain, revision, nil
 }
 
 // LoadTaskBundle returns one Task form bundle for jobId+taskId+jobInstanceId

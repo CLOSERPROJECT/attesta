@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // OperatorIdentity is the verified session actor injected by the host.
@@ -29,10 +28,6 @@ type API struct {
 	Gate          Gate
 	// Artifacts fetches sidecar bytes with the shared secret; nil → artifact route unavailable.
 	Artifacts *SidecarHttpPort
-	// Changes feeds GET /api/org/events; nil → route unavailable (500).
-	Changes DomainChangeFeed
-	// EventsHeartbeat is the keepalive interval on /api/org/events (0 → 25s).
-	EventsHeartbeat time.Duration
 }
 
 // StreamPlayStart is the anchor Job's first Task (Play / mint.startingNew).
@@ -65,8 +60,6 @@ func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleStreams(w, r)
 	case path == "/api/org/timeline":
 		h.handleTimeline(w, r)
-	case path == "/api/org/events":
-		h.handleEvents(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
 		h.handleArtifact(w, r, strings.TrimPrefix(path, ArtifactProxyPathPrefix))
 	default:
@@ -115,18 +108,16 @@ func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	domain := EmptyDomain()
-	var revision int64
 	if h.DomainLoader.Domains != nil {
-		var domainErr error
-		domain, revision, domainErr = domainSnapshot(r.Context(), h.DomainLoader.Domains, scope)
-		if domainErr != nil {
+		if loaded, domainErr := h.DomainLoader.Domains.Get(r.Context(), scope); domainErr == nil {
+			domain = loaded
+		} else if !errors.Is(domainErr, ErrNotFound) {
 			http.Error(w, "failed to load timeline", http.StatusInternalServerError)
 			return
 		}
 	}
 
 	view := BuildOrgTimelineView(cfg, domain, op, scope.Stream, focus)
-	view.Revision = revision
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Method == http.MethodHead {

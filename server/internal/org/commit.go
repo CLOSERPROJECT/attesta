@@ -57,15 +57,13 @@ const (
 // Continue targeting) a Task. Domain stays on the Go value for tests; omitted
 // from JSON. Task mounts use addressed GET /api/org/task-form.
 type CommitResult struct {
-	Org           string `json:"org"`
-	JobInstanceID string `json:"jobInstanceId"`
+	Org           string   `json:"org"`
+	JobInstanceID string   `json:"jobInstanceId"`
 	// SubmissionID is the Domain Submission.Timestamp for this Commit
 	// (many-recap / LinkStore row key). Empty when no Submission was written.
-	SubmissionID string `json:"submissionId,omitempty"`
-	// Revision is the Domain revision this Commit wrote.
-	Revision int64    `json:"revision"`
-	Domain   Domain   `json:"-"`
-	Worklist Worklist `json:"worklist"`
+	SubmissionID string   `json:"submissionId,omitempty"`
+	Domain       Domain   `json:"-"`
+	Worklist     Worklist `json:"worklist"`
 	// Navigation is always set: task, home, or stay (legacy overview → home).
 	Navigation CommitNext `json:"navigation"`
 	// ContinueNavigation is set only when Navigation is stay (deferred Continue).
@@ -106,9 +104,7 @@ type TaskCommitter struct {
 	LinkStore LinkStore
 	// DPPs persists Passport records when onSubmit.passport is set. Required for that hook.
 	DPPs DPPStore
-	// Changes hears about Domain writes; nil disables notifications (seeds, tests).
-	Changes DomainChangeNotifier
-	Now     func() time.Time
+	Now  func() time.Time
 }
 
 func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIdentity, req CommitRequest) (CommitResult, error) {
@@ -203,7 +199,7 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 
 	// Gates are re-evaluated on each retry so a concurrent Commit cannot slip past readyWhen.
 	var applied appliedCommit
-	_, revision, err := c.Domains.Update(ctx, scope, func(domain Domain) (Domain, error) {
+	_, err = c.Domains.Update(ctx, scope, func(domain Domain) (Domain, error) {
 		streamID := EffectiveStreamInstanceID(cfg, domain, ref.JobID, jobInstanceID, req.StreamInstanceID)
 		allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 			Operator:      op,
@@ -253,11 +249,6 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 	if err != nil {
 		return CommitResult{}, err
 	}
-	if c.Changes != nil {
-		// Deferred so remote boards refetch after DPP/link side records exist, and
-		// still hear about the write if a later step fails.
-		defer c.Changes.DomainChanged(scope, revision)
-	}
 
 	streamInstanceID := strings.TrimSpace(req.StreamInstanceID)
 	if streamInstanceID == "" && mintKind == MintKindStartingNew && cfg.Stream != nil && ref.JobID == cfg.Stream.Instance.Job {
@@ -277,7 +268,6 @@ func (c *TaskCommitter) Commit(ctx context.Context, scope Scope, op OperatorIden
 		Org:                org,
 		JobInstanceID:      applied.JobInstanceID,
 		SubmissionID:       ts,
-		Revision:           revision,
 		Domain:             applied.Domain,
 		Worklist:           wl,
 		Navigation:         nav,
