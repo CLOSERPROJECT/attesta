@@ -254,7 +254,7 @@ steps:
                     ui:options:
                         layoutNewRow: true
                         shadcn4Text:
-                            style: 'text-transform: uppercase'
+                            class: org-text-uppercase
                 wasteCode:
                     ui:options:
                         enumNames: ['16.02.14']
