@@ -32,6 +32,8 @@
 	"no_data_yet": "Ancora nessun dato",
 	"embed_composer_add": "Nuovo",
 	"embed_composer_discard": "Annulla",
+	"embed_many_already_registered": "Già registrati",
+	"embed_many_new_entry": "Nuovo codice FIR",
 	"submission_count_one": "{count} invio",
 	"submission_count_many": "{count} invii",
 	"form_unavailable": "Modulo non disponibile",

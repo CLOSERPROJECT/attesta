@@ -512,6 +512,14 @@
 	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3);
 }
 
+/* Submit-many: muted history band full-bleed within embed body padding. */
+.org-timeline-page .substep-embed .embed-many-recap-band {
+	display: grid;
+	gap: calc(var(--spacing) * 2);
+	margin-inline: calc(var(--spacing) * -3);
+	padding: calc(var(--spacing) * 3);
+}
+
 /* Open nest: space under the header before children (no hairline — card edges already outline). */
 .org-timeline-page .stream-timeline-step[data-state='open'] > [data-slot='collapsible-content'],
 .org-timeline-page

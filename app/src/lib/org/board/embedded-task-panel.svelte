@@ -51,6 +51,9 @@
 		onAcceptStale
 	}: Props = $props();
 
+	const uid = $props.id();
+	const manyRecapEyebrowId = `${uid}-many-recap-eyebrow`;
+
 	const status = $derived(entry?.status ?? 'idle');
 	const bundle = $derived(entry?.bundle ?? null);
 	const error = $derived(entry?.error ?? null);
@@ -174,9 +177,25 @@
 		>
 			{#if submitMany}
 				{#if !manyEmpty && !address.provisionalJob && address.jobInstanceId}
-					<BoardManyRecap {address} empty={false} data-testid="embed-many-recap" />
+					<section
+						class="embed-many-recap-band bg-muted/60"
+						data-testid="embed-many-recap-band"
+						aria-labelledby={manyRecapEyebrowId}
+					>
+						<p
+							id={manyRecapEyebrowId}
+							class="m-0 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+							data-testid="embed-many-recap-eyebrow"
+						>
+							{m.embed_many_already_registered()}
+						</p>
+						<BoardManyRecap {address} empty={false} data-testid="embed-many-recap" />
+					</section>
 				{/if}
-				<div class={manyEmpty ? undefined : 'mt-8'} data-testid="embed-composer-region">
+				<div
+					class={manyEmpty ? undefined : 'pt-4'}
+					data-testid="embed-composer-region"
+				>
 					{#if !showComposer}
 						<div class="flex justify-end">
 							<Button
@@ -192,6 +211,12 @@
 						</div>
 					{:else}
 						<div class="outline-none" data-testid="embed-form-pane">
+							<h3
+								class="m-0 mb-3 text-base font-semibold text-foreground"
+								data-testid="embed-many-new-entry-title"
+							>
+								{m.embed_many_new_entry()}
+							</h3>
 							{@render formPane()}
 						</div>
 					{/if}
