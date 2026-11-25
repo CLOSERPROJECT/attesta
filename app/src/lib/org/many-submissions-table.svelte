@@ -58,18 +58,18 @@
 						data-testid={highlighted ? 'many-recap-just-completed' : undefined}
 					>
 						{#each table.columns as col (col.key)}
-							<td class="px-2 py-2 text-muted-foreground">
+							<td class="px-2 py-2 font-normal text-muted-foreground">
 								{formatFactValue(row.cells[col.key])}
 							</td>
 						{/each}
-						<td class="px-2 py-2 text-muted-foreground">
+						<td class="px-2 py-2 font-normal text-muted-foreground">
 							{formatSubmissionTimestamp(row.timestamp)}
 						</td>
-						<td class="px-2 py-2 text-muted-foreground">
+						<td class="px-2 py-2 font-normal text-muted-foreground">
 							{formatSubmissionUser(row)}
 						</td>
 						{#if showLinksColumn}
-							<td class="px-2 py-2">
+							<td class="px-2 py-2 font-normal">
 								{#if (row.links?.length ?? 0) > 0}
 									<HttpLinkStrip items={row.links ?? []} />
 								{/if}
