@@ -9,11 +9,15 @@
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
+	import DraftBozzaMark from '../draft-bozza-mark.svelte';
+	import { draftAddressForTask } from '../drafts.js';
+	import { orgSession } from '../org-app.svelte.js';
 	import { taskAddressKey } from '../task-address.js';
 	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRoleBadges from './timeline-role-badges.svelte';
 	import { timelineRoleBadgesVisible } from './timeline-role-badge-label.js';
+	import { timelineSubstepTrailVisible } from './timeline-substep-trail.js';
 	import type { TimelineSubstep } from './types.js';
 
 	type Props = {
@@ -41,13 +45,30 @@
 	const roleBadges = $derived(
 		timelineRoleBadgesVisible(timelineModel.showAll, substep.roleBadges)
 	);
-	const showTrail = $derived(showStatusChip || roleBadges.length > 0);
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(status ? `substep-${status}` : '');
 
 	const parsed = $derived(substep.href ? parseTaskHref(substep.href, stream, instance) : null);
 	const address = $derived(parsed?.address ?? null);
 	const seed = $derived(parsed?.seed ?? {});
+	const showDraft = $derived.by(() => {
+		void orgSession.drafts;
+		if (!address) return false;
+		const d = draftAddressForTask({
+			jobId: address.jobId,
+			taskId: address.taskId,
+			jobInstanceId: address.jobInstanceId,
+			seed: Object.keys(seed).length > 0 ? seed : undefined
+		});
+		return orgSession.hasDirtyDraft(d.taskPath, d.draftBagInstanceKey);
+	});
+	const showTrail = $derived(
+		timelineSubstepTrailVisible({
+			showStatusChip,
+			roleBadgeCount: roleBadges.length,
+			showDraft
+		})
+	);
 	const embed = $derived(!!(substep.orgActionable && address));
 	const focused = $derived.by(() => {
 		if (!address) return false;
@@ -79,6 +100,9 @@
 {#snippet trail()}
 	{#if roleBadges.length > 0}
 		<TimelineRoleBadges badges={roleBadges} />
+	{/if}
+	{#if showDraft}
+		<DraftBozzaMark />
 	{/if}
 	{#if showStatusChip}
 		<span class="status" data-status={status} aria-label={statusChipLabel}>{statusChipLabel}</span>
