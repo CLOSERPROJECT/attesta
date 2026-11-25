@@ -47,6 +47,11 @@
 	outline: none;
 }
 
+.computed-field :is(input, textarea)::placeholder,
+.readonly-field :is(input, textarea)::placeholder {
+	color: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+}
+
 .computed-field :is(input, textarea):is(:focus, :focus-visible),
 .readonly-field :is(input, textarea):is(:focus, :focus-visible) {
 	box-shadow: none;
