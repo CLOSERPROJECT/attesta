@@ -1,5 +1,3 @@
-import type { TaskRecap } from './task-recap-port.js';
-
 /**
  * Format a submission ISO timestamp with the runtime locale
  * (browser i18n when `locale` is omitted).
@@ -19,7 +17,7 @@ export function formatSubmissionTimestamp(
 
 /** Prefer human-facing userName; fall back to userId. */
 export function formatSubmissionUser(
-	item: Pick<TaskRecap, 'userName' | 'userId'>
+	item: { userName?: string; userId?: string }
 ): string {
 	const name = item.userName?.trim();
 	if (name) return name;
@@ -27,34 +25,11 @@ export function formatSubmissionUser(
 	return id || '—';
 }
 
-/** Stable fact-key union: walk items in order, append unseen keys. */
-export function unionFactKeys(items: readonly TaskRecap[]): string[] {
-	const keys: string[] = [];
-	const seen = new Set<string>();
-	for (const item of items) {
-		for (const key of Object.keys(item.facts)) {
-			if (key.length === 0 || seen.has(key)) continue;
-			seen.add(key);
-			keys.push(key);
-		}
-	}
-	return keys;
-}
-
-/** First non-empty authored title for `key`, else the key itself. */
-export function factTitle(items: readonly TaskRecap[], key: string): string {
-	for (const item of items) {
-		const title = item.titles?.[key];
-		if (title) return title;
-	}
-	return key;
-}
-
-/** True when this recap row is the Commit submissionId (Submission.timestamp). */
+/** True when this recap row is the Commit submissionId. */
 export function recapRowMatchesSubmissionId(
-	item: Pick<TaskRecap, 'timestamp'>,
+	row: { submissionId: string },
 	submissionId: string | undefined | null
 ): boolean {
 	if (submissionId == null || submissionId === '') return false;
-	return item.timestamp === submissionId;
+	return row.submissionId === submissionId;
 }

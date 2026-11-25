@@ -3,21 +3,27 @@ import { describe, expect, test, vi } from 'vitest';
 import { createHttpTaskRecapPort } from './http-task-recap-port.js';
 import { TaskRecapError } from './task-recap-port.js';
 
-const sampleItem = {
-	jobId: 'intake',
-	jobInstanceId: 'T1',
-	taskId: 'register',
+const sampleRow = {
+	key: 'lot-1',
+	cells: { client: 'NO' },
+	submissionId: '2026-10-29T15:00:00Z',
 	timestamp: '2026-10-29T15:00:00Z',
 	userId: 'ada',
-	facts: { client: 'NO' },
-	titles: { client: 'Cliente', numeroFir: 'Numero FIR' },
+	userName: 'Ada',
 	links: [
 		{ label: 'Stampa', url: 'blob:labels', action: 'link' },
 		{ label: 'CSV', url: 'blob:csv', action: 'download', filename: 'reg.csv' }
 	]
 };
 
-const sample = { items: [sampleItem] };
+const sampleTable = {
+	mode: 'entity' as const,
+	columns: [
+		{ key: 'client', title: 'Cliente' },
+		{ key: 'numeroFir', title: 'Numero FIR' }
+	],
+	rows: [sampleRow]
+};
 
 describe('HttpTaskRecapPort', () => {
 	test('sends stream + instance with flat address; normalizes missing links', async () => {
@@ -27,14 +33,16 @@ describe('HttpTaskRecapPort', () => {
 			);
 			return new Response(
 				JSON.stringify({
-					items: [
+					mode: 'submission',
+					columns: [{ key: 'date', title: 'Date' }],
+					rows: [
 						{
-							jobId: 'intake',
-							jobInstanceId: 'T1',
-							taskId: 'truckArrive',
+							key: '2026-10-29T15:00:00Z',
+							cells: { date: '2026-10-19' },
+							submissionId: '2026-10-29T15:00:00Z',
 							timestamp: '2026-10-29T15:00:00Z',
 							userId: 'ada',
-							facts: { date: '2026-10-19' }
+							userName: 'Ada'
 						}
 					]
 				}),
@@ -49,28 +57,33 @@ describe('HttpTaskRecapPort', () => {
 			taskId: 'truckArrive',
 			jobInstanceId: 'T1'
 		});
-		expect(got.items).toHaveLength(1);
-		expect(got.items[0]?.links).toEqual([]);
-		expect(got.items[0]?.facts.date).toBe('2026-10-19');
-		expect(got.items[0]?.titles).toBeUndefined();
+		expect(got.mode).toBe('submission');
+		expect(got.rows).toHaveLength(1);
+		expect(got.rows[0]?.links).toBeUndefined();
+		expect(got.rows[0]?.cells.date).toBe('2026-10-19');
+		expect(got.columns[0]?.title).toBe('Date');
 	});
 
-	test('parses many items oldest-first wire', async () => {
+	test('parses entity table with links', async () => {
 		const fetchFn = vi.fn(
 			async () =>
 				new Response(
 					JSON.stringify({
-						items: [
+						mode: 'entity',
+						columns: sampleTable.columns,
+						rows: [
 							{
-								...sampleItem,
-								timestamp: '2026-10-29T14:00:00Z',
-								facts: { client: 'CO' },
+								...sampleRow,
+								key: 'lot-a',
+								cells: { client: 'CO' },
 								links: [{ label: 'A', url: 'blob:a', action: 'link' }]
 							},
 							{
-								...sampleItem,
-								timestamp: '2026-10-29T15:00:00Z',
-								facts: { client: 'DA' },
+								...sampleRow,
+								key: 'lot-b',
+								cells: { client: 'DA' },
+								submissionId: '2026-10-29T16:00:00Z',
+								timestamp: '2026-10-29T16:00:00Z',
 								links: [{ label: 'B', url: 'blob:b', action: 'link' }]
 							}
 						]
@@ -86,17 +99,18 @@ describe('HttpTaskRecapPort', () => {
 			taskId: 'register',
 			jobInstanceId: 'T1'
 		});
-		expect(got.items).toHaveLength(2);
-		expect(got.items[0]?.facts.client).toBe('CO');
-		expect(got.items[1]?.facts.client).toBe('DA');
-		expect(got.items[0]?.links[0]?.url).toBe('blob:a');
-		expect(got.items[1]?.links[0]?.url).toBe('blob:b');
+		expect(got.mode).toBe('entity');
+		expect(got.rows).toHaveLength(2);
+		expect(got.rows[0]?.cells.client).toBe('CO');
+		expect(got.rows[1]?.cells.client).toBe('DA');
+		expect(got.rows[0]?.links?.[0]?.url).toBe('blob:a');
+		expect(got.rows[1]?.links?.[0]?.url).toBe('blob:b');
 	});
 
-	test('rejects single-object body without items', async () => {
+	test('rejects body without mode/rows', async () => {
 		const fetchFn = vi.fn(
 			async () =>
-				new Response(JSON.stringify(sampleItem), {
+				new Response(JSON.stringify({ items: [sampleRow] }), {
 					status: 200,
 					headers: { 'Content-Type': 'application/json' }
 				})

@@ -46,7 +46,7 @@ stream:
         where: truckId = $stream.id
 ```
 
-Validation (`ValidateStreamConfig` at Config load and Commit prep, mirroring DPP): `stream` present; `key` is a slug and not `i`/`new`; `instance.job` is a repeatable Job listed in `steps`; every `steps[].job` exists; `each.entity` is in `domain.entities`; `each.where` compiles. `$stream` is accepted in expressions here and bound when evaluating under an Org stream instance.
+Validation (`ValidateOrgConfig` at Config load and Commit prep — stream, DPP, and Task `recap`): `stream` present; `key` is a slug and not `i`/`new`; `instance.job` is a repeatable Job listed in `steps`; every `steps[].job` exists; `each.entity` is in `domain.entities`; `each.where` compiles. `$stream` is accepted in expressions here and bound when evaluating under an Org stream instance.
 
 **Membership caveat:** a Job instance belongs to Org stream instance S when it is the anchor instance with id S, or when its Job step has `each` and its id is one of the entity ids that `each` selects with `$stream.id = S`. That only works when the row Job’s `instanceId` equals the selected entity id (Feragame: `instanceId: $.lotId`). Validation cannot check this statically—author it that way.
 
@@ -59,6 +59,21 @@ Provisional `each` timeline rows open the Job start Task with query seed `?seed.
 ### `blockedReason` (Task, optional)
 
 JSONata string evaluated when `readyWhen` is false; shown next to the unavailable Task on the `/my` timeline. Compile-checked at Config load; evaluation happens with Worklist projection.
+
+### `recap` (Task, optional)
+
+Optional overview table over a Domain entity kind. Field names are validated against `domain.entities.<kind>.fields` (allowlist of names only — not JSON Schema).
+
+```yaml
+recap:
+  entity: lot
+  columns:
+    - field: numeroFir
+      title: FIR          # optional display override
+    - field: netWeight
+```
+
+Rules when authored: `entity` must be a declared `domain.entities` kind that declares `fields`; at least one column; each `columns[].field` must appear in that list; no duplicate fields. Omit `recap` (or leave it empty) when the Task has no overview table.
 
 ## Commit navigation (`onCommit`)
 

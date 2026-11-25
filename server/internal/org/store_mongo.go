@@ -47,14 +47,14 @@ type mongoDomainDoc struct {
 }
 
 type mongoSubmissionDoc struct {
-	JobID         string         `bson:"jobId"`
-	TaskID        string         `bson:"taskId"`
-	JobInstanceID string         `bson:"jobInstanceId,omitempty"`
-	Timestamp     string         `bson:"timestamp"`
-	UserID        string         `bson:"userId"`
-	UserName      string         `bson:"userName,omitempty"`
-	Facts         map[string]any `bson:"facts"`
-	IDsTouched    []string       `bson:"idsTouched"`
+	JobID           string         `bson:"jobId"`
+	TaskID          string         `bson:"taskId"`
+	JobInstanceID   string         `bson:"jobInstanceId,omitempty"`
+	Timestamp       string         `bson:"timestamp"`
+	UserID          string         `bson:"userId"`
+	UserName        string         `bson:"userName,omitempty"`
+	Facts           map[string]any `bson:"facts"`
+	EntitiesTouched []EntityTouch  `bson:"entitiesTouched"`
 }
 
 func (s *MongoDomainStore) coll() *mongo.Collection {
@@ -419,14 +419,14 @@ func encodeSubmissions(in []Submission) []mongoSubmissionDoc {
 	out := make([]mongoSubmissionDoc, len(in))
 	for i, s := range in {
 		out[i] = mongoSubmissionDoc{
-			JobID:         s.JobID,
-			TaskID:        s.TaskID,
-			JobInstanceID: s.JobInstanceID,
-			Timestamp:     s.Timestamp,
-			UserID:        s.UserID,
-			UserName:      s.UserName,
-			Facts:         encodeStringKeyedMap(s.Facts),
-			IDsTouched:    append([]string(nil), s.IDsTouched...),
+			JobID:           s.JobID,
+			TaskID:          s.TaskID,
+			JobInstanceID:   s.JobInstanceID,
+			Timestamp:       s.Timestamp,
+			UserID:          s.UserID,
+			UserName:        s.UserName,
+			Facts:           encodeStringKeyedMap(s.Facts),
+			EntitiesTouched: append([]EntityTouch(nil), s.EntitiesTouched...),
 		}
 	}
 	return out
@@ -439,14 +439,14 @@ func decodeSubmissions(in []mongoSubmissionDoc) []Submission {
 	out := make([]Submission, len(in))
 	for i, s := range in {
 		out[i] = Submission{
-			JobID:         s.JobID,
-			TaskID:        s.TaskID,
-			JobInstanceID: s.JobInstanceID,
-			Timestamp:     s.Timestamp,
-			UserID:        s.UserID,
-			UserName:      s.UserName,
-			Facts:         decodeStringKeyedMap(s.Facts),
-			IDsTouched:    append([]string(nil), s.IDsTouched...),
+			JobID:           s.JobID,
+			TaskID:          s.TaskID,
+			JobInstanceID:   s.JobInstanceID,
+			Timestamp:       s.Timestamp,
+			UserID:          s.UserID,
+			UserName:        s.UserName,
+			Facts:           decodeStringKeyedMap(s.Facts),
+			EntitiesTouched: append([]EntityTouch(nil), s.EntitiesTouched...),
 		}
 	}
 	return out

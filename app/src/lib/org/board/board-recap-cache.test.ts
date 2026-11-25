@@ -1,17 +1,27 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import { normalizeTaskAddress, taskAddressKey } from '../task-address.js';
-import { TaskRecapError, type TaskRecap, type TaskRecapPort } from '../task-recap-port.js';
+import {
+	EMPTY_TASK_RECAP_TABLE,
+	TaskRecapError,
+	type TaskRecapPort,
+	type TaskRecapTable
+} from '../task-recap-port.js';
 import { createBoardRecapCache } from './board-recap-cache.svelte.js';
 
-const recap = (taskId: string, n = 1): TaskRecap => ({
-	jobId: 'intake',
-	jobInstanceId: 'NIR-1',
-	taskId,
-	timestamp: '2024-01-01T00:00:00Z',
-	userId: 'u1',
-	facts: { a: n },
-	links: []
+const recap = (taskId: string, n = 1): TaskRecapTable => ({
+	mode: 'submission',
+	columns: [{ key: 'a', title: 'A' }],
+	rows: [
+		{
+			key: `${taskId}-${n}`,
+			cells: { a: n },
+			submissionId: '2024-01-01T00:00:00Z',
+			timestamp: '2024-01-01T00:00:00Z',
+			userId: 'u1',
+			userName: 'U1'
+		}
+	]
 });
 
 function addr(taskId: string) {
@@ -28,7 +38,7 @@ describe('BoardRecapCache', () => {
 	test('preloads with concurrency cap and putReady skips fetch', async () => {
 		const fetch = vi.fn(async (req: { taskId: string }) => {
 			await new Promise((r) => setTimeout(r, 20));
-			return { items: [recap(req.taskId)] };
+			return recap(req.taskId);
 		});
 		const cache = createBoardRecapCache({
 			taskRecap: { fetch } satisfies TaskRecapPort,
@@ -39,7 +49,7 @@ describe('BoardRecapCache', () => {
 		expect(fetch).toHaveBeenCalledTimes(2);
 
 		const readyAddr = addr('e');
-		cache.putReady(readyAddr, [recap('e')]);
+		cache.putReady(readyAddr, recap('e'));
 		expect(cache.get(taskAddressKey(readyAddr))?.status).toBe('ready');
 		expect(fetch).toHaveBeenCalledTimes(2);
 
@@ -52,10 +62,10 @@ describe('BoardRecapCache', () => {
 	});
 
 	test('scope change aborts queue and clears entries', async () => {
-		let resolveFetch!: (list: { items: TaskRecap[] }) => void;
+		let resolveFetch!: (table: TaskRecapTable) => void;
 		const fetch = vi.fn(
 			() =>
-				new Promise<{ items: TaskRecap[] }>((resolve) => {
+				new Promise<TaskRecapTable>((resolve) => {
 					resolveFetch = resolve;
 				})
 		);
@@ -68,7 +78,7 @@ describe('BoardRecapCache', () => {
 		expect(cache.get(taskAddressKey(addr('a')))?.status).toBe('loading');
 		cache.beginScope('s2');
 		expect(cache.get(taskAddressKey(addr('a')))).toBeUndefined();
-		resolveFetch({ items: [recap('a')] });
+		resolveFetch(recap('a'));
 		await Promise.resolve();
 		expect(cache.get(taskAddressKey(addr('a')))).toBeUndefined();
 		cache.dispose();
@@ -76,17 +86,17 @@ describe('BoardRecapCache', () => {
 
 	test('invalidate drops entry', () => {
 		const cache = createBoardRecapCache({
-			taskRecap: { fetch: async () => ({ items: [recap('a')] }) }
+			taskRecap: { fetch: async () => recap('a') }
 		});
 		cache.beginScope('s');
 		const a = addr('a');
-		cache.putReady(a, [recap('a')]);
+		cache.putReady(a, recap('a'));
 		cache.invalidate(taskAddressKey(a));
 		expect(cache.get(taskAddressKey(a))).toBeUndefined();
 		cache.dispose();
 	});
 
-	test('HTTP 404 maps to ready with empty items', async () => {
+	test('HTTP 404 maps to ready with empty table', async () => {
 		const fetch = vi.fn(async () => {
 			throw new TaskRecapError('missing', 404);
 		});
@@ -98,12 +108,12 @@ describe('BoardRecapCache', () => {
 		await vi.waitFor(() => {
 			expect(cache.get(taskAddressKey(addr('a')))?.status).toBe('ready');
 		});
-		expect(cache.get(taskAddressKey(addr('a')))?.items).toEqual([]);
+		expect(cache.get(taskAddressKey(addr('a')))?.table).toEqual(EMPTY_TASK_RECAP_TABLE);
 		cache.dispose();
 	});
 
-	test('empty list maps to ready with empty items', async () => {
-		const fetch = vi.fn(async () => ({ items: [] }));
+	test('empty table maps to ready with empty rows', async () => {
+		const fetch = vi.fn(async () => EMPTY_TASK_RECAP_TABLE);
 		const cache = createBoardRecapCache({
 			taskRecap: { fetch } satisfies TaskRecapPort
 		});
@@ -112,7 +122,7 @@ describe('BoardRecapCache', () => {
 		await vi.waitFor(() => {
 			expect(cache.get(taskAddressKey(addr('a')))?.status).toBe('ready');
 		});
-		expect(cache.get(taskAddressKey(addr('a')))?.items).toEqual([]);
+		expect(cache.get(taskAddressKey(addr('a')))?.table.rows).toEqual([]);
 		cache.dispose();
 	});
 
@@ -145,11 +155,11 @@ describe('BoardRecapCache', () => {
 		cache.dispose();
 	});
 
-	test('revalidateAll keeps old items until the new list lands', async () => {
-		let resolveFetch!: (list: { items: TaskRecap[] }) => void;
+	test('revalidateAll keeps old table until the new table lands', async () => {
+		let resolveFetch!: (table: TaskRecapTable) => void;
 		const fetch = vi.fn(
 			() =>
-				new Promise<{ items: TaskRecap[] }>((resolve) => {
+				new Promise<TaskRecapTable>((resolve) => {
 					resolveFetch = resolve;
 				})
 		);
@@ -158,23 +168,23 @@ describe('BoardRecapCache', () => {
 		});
 		cache.beginScope('s');
 		const a = addr('a');
-		const oldItems = [recap('a', 1)];
-		cache.putReady(a, oldItems);
+		const oldTable = recap('a', 1);
+		cache.putReady(a, oldTable);
 
 		cache.revalidateAll();
 		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
-		expect(cache.get(taskAddressKey(a))?.items).toBe(oldItems);
+		expect(cache.get(taskAddressKey(a))?.table).toBe(oldTable);
 
-		const nextItems = [recap('a', 2)];
-		resolveFetch({ items: nextItems });
+		const nextTable = recap('a', 2);
+		resolveFetch(nextTable);
 		await vi.waitFor(() => {
-			expect(cache.get(taskAddressKey(a))?.items).toEqual(nextItems);
+			expect(cache.get(taskAddressKey(a))?.table).toEqual(nextTable);
 		});
 		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
 		cache.dispose();
 	});
 
-	test('revalidateAll keeps old items when refetch fails', async () => {
+	test('revalidateAll keeps old table when refetch fails', async () => {
 		const fetch = vi.fn(async () => {
 			throw new TaskRecapError('boom', 500);
 		});
@@ -183,8 +193,8 @@ describe('BoardRecapCache', () => {
 		});
 		cache.beginScope('s');
 		const a = addr('a');
-		const oldItems = [recap('a', 1)];
-		cache.putReady(a, oldItems);
+		const oldTable = recap('a', 1);
+		cache.putReady(a, oldTable);
 
 		cache.revalidateAll();
 		await vi.waitFor(() => {
@@ -192,12 +202,12 @@ describe('BoardRecapCache', () => {
 		});
 		await Promise.resolve();
 		expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
-		expect(cache.get(taskAddressKey(a))?.items).toBe(oldItems);
+		expect(cache.get(taskAddressKey(a))?.table).toBe(oldTable);
 		cache.dispose();
 	});
 
 	test('revalidateAll re-enqueues error entries', async () => {
-		const fetch = vi.fn(async () => {
+		const fetch = vi.fn(async (): Promise<TaskRecapTable> => {
 			throw new TaskRecapError('bad request', 400);
 		});
 		const cache = createBoardRecapCache({
@@ -211,12 +221,12 @@ describe('BoardRecapCache', () => {
 		});
 		expect(fetch).toHaveBeenCalledTimes(1);
 
-		fetch.mockImplementation(async () => ({ items: [recap('a', 2)] }));
+		fetch.mockImplementation(async () => recap('a', 2));
 		cache.revalidateAll();
 		await vi.waitFor(() => {
 			expect(cache.get(taskAddressKey(a))?.status).toBe('ready');
 		});
-		expect(cache.get(taskAddressKey(a))?.items[0]?.facts.a).toBe(2);
+		expect(cache.get(taskAddressKey(a))?.table.rows[0]?.cells.a).toBe(2);
 		expect(fetch).toHaveBeenCalledTimes(2);
 		cache.dispose();
 	});

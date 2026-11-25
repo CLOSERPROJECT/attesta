@@ -101,6 +101,12 @@ export type Domain = {
 
 export type EntityMap = Record<string, Record<string, unknown>>;
 
+export type EntityTouch = {
+	op: 'mint' | 'patch';
+	entity: string;
+	id: string;
+};
+
 export type Submission = {
 	jobId: string;
 	taskId: string;
@@ -108,7 +114,7 @@ export type Submission = {
 	timestamp: string;
 	userId: string;
 	facts: Record<string, unknown>;
-	idsTouched: string[];
+	entitiesTouched: EntityTouch[];
 };
 
 export type JobInstance = {

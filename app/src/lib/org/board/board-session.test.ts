@@ -101,7 +101,13 @@ function harness(
 		taskForm: { fetch: formFetch }
 	});
 	const recapCache = createBoardRecapCache({
-		taskRecap: { fetch: vi.fn(async () => ({ items: [] })) }
+		taskRecap: {
+				fetch: vi.fn(async () => ({
+					mode: 'submission' as const,
+					columns: [],
+					rows: []
+				}))
+			}
 	});
 	const model = new BoardTimelineModel({ syncUrl: () => {} });
 	const navigateToInstance = vi.fn(async () => {});
@@ -442,16 +448,21 @@ describe('BoardSession', () => {
 	});
 
 	test('domainChanged advance invalidates and re-enqueues that recap', async () => {
-		const recap = (n: number) => ({
-			jobId: 'intake',
-			jobInstanceId: '261102-1',
-			taskId: 'register',
-			timestamp: `2026-01-0${n}T00:00:00Z`,
-			userId: 'u1',
-			facts: { n },
-			links: []
+		const recapTable = (taskId: string, n: number) => ({
+			mode: 'submission' as const,
+			columns: [{ key: 'n', title: 'N' }],
+			rows: [
+				{
+					key: `${taskId}-${n}`,
+					cells: { n },
+					submissionId: `2026-01-0${n}T00:00:00Z`,
+					timestamp: `2026-01-0${n}T00:00:00Z`,
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
 		});
-		const recapFetch = vi.fn(async () => ({ items: [recap(2)] }));
+		const recapFetch = vi.fn(async () => recapTable('register', 2));
 		const timeline = fakeTimeline(async () => instanceView());
 		const formCache = createBoardFormCache({
 			taskForm: {
@@ -481,8 +492,8 @@ describe('BoardSession', () => {
 			jobInstanceId: '261102-1',
 			taskId: 'register'
 		});
-		recapCache.putReady(addr, [recap(1)]);
-		expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(1);
+		recapCache.putReady(addr, recapTable('register', 1));
+		expect(recapCache.get(taskAddressKey(addr))?.table.rows[0]?.cells.n).toBe(1);
 
 		await session.domainChanged({
 			origin: 'own',
@@ -493,22 +504,27 @@ describe('BoardSession', () => {
 		});
 		await vi.waitFor(() => {
 			expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
-			expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(2);
+			expect(recapCache.get(taskAddressKey(addr))?.table.rows[0]?.cells.n).toBe(2);
 		});
 		expect(recapFetch).toHaveBeenCalled();
 	});
 
 	test('domainChanged leaving refreshes only the recap', async () => {
-		const recap = (n: number) => ({
-			jobId: 'intake',
-			jobInstanceId: '261102-1',
-			taskId: 'register',
-			timestamp: `2026-01-0${n}T00:00:00Z`,
-			userId: 'u1',
-			facts: { n },
-			links: []
+		const recapTable = (taskId: string, n: number) => ({
+			mode: 'submission' as const,
+			columns: [{ key: 'n', title: 'N' }],
+			rows: [
+				{
+					key: `${taskId}-${n}`,
+					cells: { n },
+					submissionId: `2026-01-0${n}T00:00:00Z`,
+					timestamp: `2026-01-0${n}T00:00:00Z`,
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
 		});
-		const recapFetch = vi.fn(async () => ({ items: [recap(2)] }));
+		const recapFetch = vi.fn(async () => recapTable('register', 2));
 		const timeline = fakeTimeline(async () => instanceView());
 		const formCache = createBoardFormCache({
 			taskForm: {
@@ -541,7 +557,7 @@ describe('BoardSession', () => {
 			jobInstanceId: '261102-1',
 			taskId: 'register'
 		});
-		recapCache.putReady(addr, [recap(1)]);
+		recapCache.putReady(addr, recapTable('register', 1));
 
 		await session.domainChanged({
 			origin: 'own',
@@ -553,11 +569,85 @@ describe('BoardSession', () => {
 
 		await vi.waitFor(() => {
 			expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
-			expect(recapCache.get(taskAddressKey(addr))?.items[0]?.facts.n).toBe(2);
+			expect(recapCache.get(taskAddressKey(addr))?.table.rows[0]?.cells.n).toBe(2);
 		});
 		expect(recapFetch).toHaveBeenCalled();
 		expect(timeline.loads).toHaveLength(1);
 		expect(hydrate).not.toHaveBeenCalled();
+	});
+
+	test('domainChanged own also revalidates other ready recaps in place', async () => {
+		const recapTable = (taskId: string, n: number) => ({
+			mode: 'entity' as const,
+			columns: [{ key: 'n', title: 'N' }],
+			rows: [
+				{
+					key: `${taskId}-row`,
+					cells: { n },
+					submissionId: `2026-01-0${n}T00:00:00Z`,
+					timestamp: `2026-01-0${n}T00:00:00Z`,
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
+		});
+		const recapFetch = vi.fn(async (req: { taskId: string }) =>
+			recapTable(req.taskId, 2)
+		);
+		const timeline = fakeTimeline(async () => instanceView());
+		const formCache = createBoardFormCache({
+			taskForm: {
+				fetch: vi.fn(async () => {
+					throw new Error('unexpected form fetch');
+				})
+			}
+		});
+		const recapCache = createBoardRecapCache({
+			taskRecap: { fetch: recapFetch }
+		});
+		const model = new BoardTimelineModel({ syncUrl: () => {} });
+		const session = createBoardSession({
+			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			timeline,
+			model,
+			formCache,
+			recapCache,
+			navigateToInstance: vi.fn(async () => {})
+		});
+		await session.load();
+
+		const weigh = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'weigh'
+		});
+		const register = normalizeTaskAddress({
+			stream: 'recycling',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		recapCache.putReady(weigh, recapTable('weigh', 1));
+		recapCache.putReady(register, recapTable('register', 1));
+		const oldRegister = recapCache.get(taskAddressKey(register))?.table;
+
+		await session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr: weigh,
+			follow: 'advance',
+			submitMany: false
+		});
+
+		await vi.waitFor(() => {
+			expect(recapCache.get(taskAddressKey(weigh))?.table.rows[0]?.cells.n).toBe(2);
+			expect(recapCache.get(taskAddressKey(register))?.table.rows[0]?.cells.n).toBe(2);
+		});
+		expect(recapCache.get(taskAddressKey(register))?.status).toBe('ready');
+		expect(recapCache.get(taskAddressKey(register))?.table).not.toBe(oldRegister);
 	});
 
 	test('domainChanged advance without a view hydrates on instance scope', async () => {
@@ -778,7 +868,13 @@ describe('BoardSession', () => {
 			}
 		});
 		const recapCache = createBoardRecapCache({
-			taskRecap: { fetch: vi.fn(async () => ({ items: [] })) }
+			taskRecap: {
+				fetch: vi.fn(async () => ({
+					mode: 'submission' as const,
+					columns: [],
+					rows: []
+				}))
+			}
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
@@ -911,7 +1007,13 @@ describe('BoardSession', () => {
 
 		const formCache = createBoardFormCache({ taskForm: { fetch: formFetch } });
 		const recapCache = createBoardRecapCache({
-			taskRecap: { fetch: vi.fn(async () => ({ items: [] })) }
+			taskRecap: {
+				fetch: vi.fn(async () => ({
+					mode: 'submission' as const,
+					columns: [],
+					rows: []
+				}))
+			}
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({

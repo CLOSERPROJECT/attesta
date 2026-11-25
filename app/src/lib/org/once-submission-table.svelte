@@ -4,33 +4,33 @@
 		formatSubmissionTimestamp,
 		formatSubmissionUser
 	} from './submission-table.js';
-	import type { TaskRecap } from './task-recap-port.js';
+	import type { TaskRecapCol, TaskRecapRow } from './task-recap-port.js';
 	import { formatFactValue } from './worklist-overview.js';
 
 	type Props = {
-		item: TaskRecap;
+		columns: TaskRecapCol[];
+		row: TaskRecapRow;
 		'data-testid'?: string;
 	};
 
-	let { item, 'data-testid': testId = 'once-submission-table' }: Props = $props();
+	let { columns, row, 'data-testid': testId = 'once-submission-table' }: Props =
+		$props();
 
-	const factEntries = $derived(
-		Object.entries(item.facts).filter(([k]) => k.length > 0)
-	);
-	const titles = $derived(item.titles ?? {});
-	const timestamp = $derived(formatSubmissionTimestamp(item.timestamp));
-	const user = $derived(formatSubmissionUser(item));
+	const timestamp = $derived(formatSubmissionTimestamp(row.timestamp));
+	const user = $derived(formatSubmissionUser(row));
 </script>
 
 <div class="space-y-3" data-testid={testId}>
 	<table class="w-full border-collapse text-sm">
 		<tbody>
-			{#each factEntries as [key, value] (key)}
+			{#each columns as column (column.key)}
 				<tr class="border-b border-zinc-100">
 					<th class="py-2 pr-3 text-left font-medium text-zinc-600">
-						{titles[key] ?? key}
+						{column.title}
 					</th>
-					<td class="py-2 text-zinc-900">{formatFactValue(value)}</td>
+					<td class="py-2 text-zinc-900">
+						{formatFactValue(row.cells[column.key])}
+					</td>
 				</tr>
 			{/each}
 			<tr class="border-b border-zinc-100">
@@ -43,7 +43,7 @@
 			</tr>
 		</tbody>
 	</table>
-	{#if item.links.length > 0}
-		<HttpLinkStrip items={item.links} />
+	{#if (row.links?.length ?? 0) > 0}
+		<HttpLinkStrip items={row.links ?? []} />
 	{/if}
 </div>

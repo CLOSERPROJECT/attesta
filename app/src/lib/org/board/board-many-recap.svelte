@@ -48,7 +48,7 @@
 		<p class="text-sm text-red-700" role="alert" data-testid="many-recap-error">
 			{entry.error ?? m.could_not_load_recap()}
 		</p>
-	{:else if entry.items.length === 0}
+	{:else if entry.table.rows.length === 0}
 		<div
 			class="flex items-center justify-center gap-2 rounded-md bg-muted/60 px-3 py-3 text-muted-foreground"
 			data-testid="many-recap-empty"
@@ -57,6 +57,6 @@
 			<p class="m-0 text-sm">{m.no_data_yet()}</p>
 		</div>
 	{:else}
-		<ManySubmissionsTable items={entry.items} {highlightSubmissionId} />
+		<ManySubmissionsTable table={entry.table} {highlightSubmissionId} />
 	{/if}
 </div>

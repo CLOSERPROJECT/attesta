@@ -56,3 +56,6 @@ coverage.out
 tmp/
 .scratch/
 .cursor/sandbox.json
+
+# Local factory-mobile UI / ergonomics research (notes + source PDFs)
+docs/research/factory-mobile-ui-*

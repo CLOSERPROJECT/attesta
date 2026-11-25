@@ -5,10 +5,11 @@ import { parseHttpLinkItem } from './parse-http-link-item.js';
 import { appendStreamScope } from './stream-scope.js';
 import {
 	TaskRecapError,
-	type TaskRecap,
-	type TaskRecapList,
+	type TaskRecapCol,
 	type TaskRecapPort,
-	type TaskRecapRequest
+	type TaskRecapRequest,
+	type TaskRecapRow,
+	type TaskRecapTable
 } from './task-recap-port.js';
 
 export type HttpTaskRecapPortOptions = {
@@ -29,58 +30,68 @@ function taskRecapUrl(base: string, req: TaskRecapRequest): string {
 	return `${base}/api/org/task-recap?${params}`;
 }
 
-function parseTaskRecap(raw: unknown): TaskRecap {
-	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
+function parseColumns(raw: unknown): TaskRecapCol[] {
+	if (!Array.isArray(raw)) return [];
+	const cols: TaskRecapCol[] = [];
+	for (const item of raw) {
+		if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+		const body = item as Record<string, unknown>;
+		const key = typeof body.key === 'string' ? body.key : '';
+		if (!key) continue;
+		const title = typeof body.title === 'string' && body.title.trim() !== '' ? body.title : key;
+		cols.push({ key, title });
 	}
-	const body = raw as Record<string, unknown>;
-	const linksRaw = Array.isArray(body.links) ? body.links : [];
+	return cols;
+}
+
+function parseLinks(raw: unknown): HttpLinkItem[] | undefined {
+	if (!Array.isArray(raw) || raw.length === 0) return undefined;
 	const links: HttpLinkItem[] = [];
-	for (const item of linksRaw) {
+	for (const item of raw) {
 		const parsed = parseHttpLinkItem(item);
 		if (parsed) links.push(parsed);
 	}
-	const facts =
-		body.facts && typeof body.facts === 'object' && !Array.isArray(body.facts)
-			? (body.facts as Record<string, unknown>)
-			: {};
-	const titlesRaw =
-		body.titles && typeof body.titles === 'object' && !Array.isArray(body.titles)
-			? (body.titles as Record<string, unknown>)
-			: undefined;
-	let titles: Record<string, string> | undefined;
-	if (titlesRaw) {
-		titles = {};
-		for (const [key, value] of Object.entries(titlesRaw)) {
-			if (typeof value === 'string' && value.trim() !== '') {
-				titles[key] = value;
-			}
-		}
-		if (Object.keys(titles).length === 0) titles = undefined;
-	}
-	return {
-		jobId: typeof body.jobId === 'string' ? body.jobId : '',
-		jobInstanceId: typeof body.jobInstanceId === 'string' ? body.jobInstanceId : '',
-		taskId: typeof body.taskId === 'string' ? body.taskId : '',
-		timestamp: typeof body.timestamp === 'string' ? body.timestamp : '',
-		userId: typeof body.userId === 'string' ? body.userId : '',
-		userName: typeof body.userName === 'string' ? body.userName : undefined,
-		facts,
-		titles,
-		links
-	};
+	return links.length > 0 ? links : undefined;
 }
 
-function parseTaskRecapList(raw: unknown): TaskRecapList {
+function parseRow(raw: unknown): TaskRecapRow {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
 		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
 	}
 	const body = raw as Record<string, unknown>;
-	const itemsRaw = Array.isArray(body.items) ? body.items : null;
-	if (!itemsRaw) {
+	const cells =
+		body.cells && typeof body.cells === 'object' && !Array.isArray(body.cells)
+			? (body.cells as Record<string, unknown>)
+			: {};
+	return {
+		key: typeof body.key === 'string' ? body.key : '',
+		cells,
+		submissionId: typeof body.submissionId === 'string' ? body.submissionId : '',
+		timestamp: typeof body.timestamp === 'string' ? body.timestamp : '',
+		userId: typeof body.userId === 'string' ? body.userId : '',
+		userName: typeof body.userName === 'string' ? body.userName : '',
+		links: parseLinks(body.links)
+	};
+}
+
+function parseTaskRecapTable(raw: unknown): TaskRecapTable {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
 		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
 	}
-	return { items: itemsRaw.map(parseTaskRecap) };
+	const body = raw as Record<string, unknown>;
+	const mode = body.mode === 'entity' || body.mode === 'submission' ? body.mode : null;
+	if (!mode) {
+		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
+	}
+	const rowsRaw = Array.isArray(body.rows) ? body.rows : null;
+	if (!rowsRaw) {
+		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
+	}
+	return {
+		mode,
+		columns: parseColumns(body.columns),
+		rows: rowsRaw.map(parseRow)
+	};
 }
 
 export function createHttpTaskRecapPort(
@@ -104,7 +115,7 @@ export function createHttpTaskRecapPort(
 					res.status
 				);
 			}
-			return parseTaskRecapList(await res.json());
+			return parseTaskRecapTable(await res.json());
 		}
 	};
 }

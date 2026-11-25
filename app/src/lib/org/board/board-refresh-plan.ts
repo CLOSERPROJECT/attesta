@@ -76,6 +76,8 @@ export function planBoardRefresh(
 			worklistOnly = true;
 		}
 		recaps.set(taskAddressKey(change.addr), change.addr);
+		// Entity recaps on other Tasks may show Domain fields this Commit patched.
+		revalidateRecaps = true;
 	}
 
 	if (remountForms) {

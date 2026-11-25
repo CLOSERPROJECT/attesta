@@ -52,7 +52,7 @@ func (e MutateError) Error() string {
 
 func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 	next := cloneDomain(domain)
-	idsTouched := make([]string, 0, len(req.Ops))
+	entitiesTouched := make([]EntityTouch, 0, len(req.Ops))
 
 	for _, op := range req.Ops {
 		switch o := op.(type) {
@@ -65,7 +65,7 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 				return Domain{}, MutateError{Kind: "duplicate-id", Entity: o.Entity, ID: o.ID}
 			}
 			(*m)[o.ID] = cloneFacts(o.Set)
-			idsTouched = append(idsTouched, o.ID)
+			entitiesTouched = append(entitiesTouched, EntityTouch{Op: "mint", Entity: string(o.Entity), ID: o.ID})
 		case PatchOp:
 			m, err := entityMap(&next, o.Entity)
 			if err != nil {
@@ -76,7 +76,7 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 				return Domain{}, MutateError{Kind: "missing-id", Entity: o.Entity, ID: o.ID}
 			}
 			(*m)[o.ID] = applyFactsPatch(existing, o.Set)
-			idsTouched = append(idsTouched, o.ID)
+			entitiesTouched = append(entitiesTouched, EntityTouch{Op: "patch", Entity: string(o.Entity), ID: o.ID})
 		default:
 			return Domain{}, fmt.Errorf("org: unknown mutate op %T", op)
 		}
@@ -91,14 +91,14 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 			return Domain{}, fmt.Errorf("org: userId required when appending a Submission")
 		}
 		sub := Submission{
-			JobID:         req.JobID,
-			TaskID:        req.TaskID,
-			JobInstanceID: req.JobInstanceID,
-			Timestamp:     req.Timestamp,
-			UserID:        req.UserID,
-			UserName:      strings.TrimSpace(req.UserName),
-			Facts:         cloneFacts(req.Facts),
-			IDsTouched:    idsTouched,
+			JobID:           req.JobID,
+			TaskID:          req.TaskID,
+			JobInstanceID:   req.JobInstanceID,
+			Timestamp:       req.Timestamp,
+			UserID:          req.UserID,
+			UserName:        strings.TrimSpace(req.UserName),
+			Facts:           cloneFacts(req.Facts),
+			EntitiesTouched: entitiesTouched,
 		}
 		next.Submissions = append(next.Submissions, sub)
 	}

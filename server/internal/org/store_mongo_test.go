@@ -69,7 +69,7 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 	domain.Submissions = []Submission{{
 		JobID: "intake", TaskID: "register", JobInstanceID: "a.b",
 		UserID: "ada", Facts: map[string]any{"p.q": "r"},
-		IDsTouched: []string{"a.b"},
+		EntitiesTouched: []EntityTouch{{Op: "mint", Entity: "lot", ID: "a.b"}},
 	}}
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "a.b", Label: "L"}}
 	doc := domainToMongoDoc(Scope{Org: "org", Stream: "main"}, domain)
@@ -94,6 +94,9 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 	}
 	if len(got.Submissions) != 1 || got.Submissions[0].Facts["p.q"] != "r" {
 		t.Fatalf("decode submissions = %#v", got.Submissions)
+	}
+	if len(got.Submissions[0].EntitiesTouched) != 1 || got.Submissions[0].EntitiesTouched[0] != (EntityTouch{Op: "mint", Entity: "lot", ID: "a.b"}) {
+		t.Fatalf("decode entitiesTouched = %#v", got.Submissions[0].EntitiesTouched)
 	}
 
 	emptyDoc := domainToMongoDoc(Scope{Org: "org", Stream: "main"}, Domain{})

@@ -7,28 +7,36 @@ export type TaskRecapRequest = StreamScope & {
 	jobInstanceId: string;
 };
 
-/** Thin done-Task overview expand payload (no full schema / Domain). */
-export type TaskRecap = {
-	jobId: string;
-	jobInstanceId: string;
-	taskId: string;
-	timestamp: string;
-	userId: string;
-	/** Human-facing actor; legacy rows may omit and fall back to userId. */
-	userName?: string;
-	facts: Record<string, unknown>;
-	/** Authored schema property titles keyed by fact key; missing → use key. */
-	titles?: Record<string, string>;
-	links: HttpLinkItem[];
+export type TaskRecapCol = {
+	key: string;
+	title: string;
 };
 
-/** List wire for once (0–1) and many (N); oldest timestamp first. */
-export type TaskRecapList = {
-	items: TaskRecap[];
+export type TaskRecapRow = {
+	key: string;
+	cells: Record<string, unknown>;
+	submissionId: string;
+	timestamp: string;
+	userId: string;
+	userName: string;
+	links?: HttpLinkItem[];
+};
+
+/** Server-projected overview table for one Submission address. */
+export type TaskRecapTable = {
+	mode: 'entity' | 'submission';
+	columns: TaskRecapCol[];
+	rows: TaskRecapRow[];
+};
+
+export const EMPTY_TASK_RECAP_TABLE: TaskRecapTable = {
+	mode: 'submission',
+	columns: [],
+	rows: []
 };
 
 export type TaskRecapPort = {
-	fetch(req: TaskRecapRequest): Promise<TaskRecapList>;
+	fetch(req: TaskRecapRequest): Promise<TaskRecapTable>;
 };
 
 export class TaskRecapError extends Error {

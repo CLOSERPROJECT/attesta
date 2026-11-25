@@ -382,7 +382,7 @@ func TestEvalPassportIdentityAndStringEdges(t *testing.T) {
 	}
 }
 
-func TestFactTitlesFromConfigAndSchemaEarlyReturns(t *testing.T) {
+func TestSchemaPropertyTitlesEarlyReturns(t *testing.T) {
 	if schemaPropertyTitles(nil) != nil {
 		t.Fatal("nil schema")
 	}
@@ -400,77 +400,4 @@ func TestFactTitlesFromConfigAndSchemaEarlyReturns(t *testing.T) {
 	if got["a"] != "Alpha" {
 		t.Fatalf("title = %#v", got)
 	}
-
-	if (&DomainLoader{}).factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
-		t.Fatal("nil configs")
-	}
-	configs := NewMemoryConfigStore()
-	l := &DomainLoader{Configs: configs}
-	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
-		t.Fatal("no active")
-	}
-	if err := configs.Put(t.Context(), Scope{Org: "org", Stream: "test"}, "v1", OrgConfig{
-		ID: "c", Org: "org", Version: "v1",
-		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{"j": "bad"}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := configs.SetActiveVersion(t.Context(), Scope{Org: "org", Stream: "test"}, "v1"); err != nil {
-		t.Fatal(err)
-	}
-	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
-		t.Fatal("non-job")
-	}
-	if err := configs.Put(t.Context(), Scope{Org: "org", Stream: "test"}, "v1", OrgConfig{
-		ID: "c", Org: "org", Version: "v1",
-		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{
-			"j": Job{Tasks: []TaskConfig{{"id": "other"}}},
-		}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "missing", TaskID: "t"}) != nil {
-		t.Fatal("missing job")
-	}
-	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
-		t.Fatal("missing leaf")
-	}
-	if err := configs.Put(t.Context(), Scope{Org: "org", Stream: "test"}, "v1", OrgConfig{
-		ID: "c", Org: "org", Version: "v1",
-		Jobs: OrderedObject{Keys: []string{"j"}, Values: map[string]any{
-			"j": Job{Tasks: []TaskConfig{{"id": "t"}}},
-		}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if l.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
-		t.Fatal("nil payload schema")
-	}
-
-	boomGet := &DomainLoader{Configs: &activeOKGetErrConfigStore{
-		active: "v1",
-		err:    errors.New("get boom"),
-	}}
-	if boomGet.factTitlesFromConfig(t.Context(), Scope{Org: "org", Stream: "test"}, SubmissionAddress{JobID: "j", TaskID: "t"}) != nil {
-		t.Fatal("get boom")
-	}
-}
-
-type activeOKGetErrConfigStore struct {
-	active string
-	err    error
-}
-
-func (s *activeOKGetErrConfigStore) Get(context.Context, Scope, string) (OrgConfig, error) {
-	return OrgConfig{}, s.err
-}
-func (s *activeOKGetErrConfigStore) Put(context.Context, Scope, string, OrgConfig) error { return nil }
-func (s *activeOKGetErrConfigStore) ActiveVersion(context.Context, Scope) (string, error) {
-	return s.active, nil
-}
-func (s *activeOKGetErrConfigStore) SetActiveVersion(context.Context, Scope, string) error {
-	return nil
-}
-func (s *activeOKGetErrConfigStore) ListStreams(context.Context, string) ([]string, error) {
-	return nil, nil
 }
