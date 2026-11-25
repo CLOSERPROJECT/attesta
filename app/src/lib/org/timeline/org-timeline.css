@@ -208,6 +208,11 @@
 	background: var(--org-elev-1);
 }
 
+.org-timeline-page .substep-accordion[data-state='open'] > .substep-accordion-summary,
+.org-timeline-page .substep-embed-host[data-state='open'] .substep-accordion-summary {
+	background: var(--org-elev-3);
+}
+
 .org-timeline-page .stream-timeline-row-accordion {
 	background: var(--org-elev-2);
 	border-width: 1px 1px 1px 6px;
@@ -655,6 +660,7 @@
 	.org-timeline-page .substep-embed-host[data-state='open'] .substep-accordion-summary {
 		position: sticky;
 		top: 0;
+		background: var(--org-elev-3);
 		z-index: 10;
 	}
 }
