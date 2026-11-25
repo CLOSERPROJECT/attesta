@@ -65,8 +65,9 @@
 	);
 	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
 
-	/** Many-submit: composer under the recap table (closed by default). */
 	let composerOpen = $state(false);
+	/** Empty land shows the form; Add only once submissions exist. */
+	const showComposer = $derived(composerOpen || manyEmpty);
 
 	/** One-shot: stay → close composer; recap table stays visible. */
 	let closedComposerOnStay = $state(false);
@@ -146,7 +147,7 @@
 				provisionalJob={address.provisionalJob}
 				{seed}
 				{disabled}
-				submitStart={submitMany && composerOpen ? discardAction : undefined}
+				submitStart={submitMany && showComposer ? discardAction : undefined}
 				onCommitted={(outcome) => onCommitted?.(outcome)}
 			/>
 		{/key}
@@ -161,7 +162,7 @@
 	data-testid="embedded-task-panel"
 	data-address-key={key}
 	data-focused={focused ? '1' : '0'}
-	data-composer={submitMany ? (composerOpen ? 'open' : 'closed') : undefined}
+	data-composer={submitMany ? (showComposer ? 'open' : 'closed') : undefined}
 	data-open={open ? '1' : '0'}
 	data-confirm-recap={confirmRecap ? '1' : '0'}
 >
@@ -172,11 +173,11 @@
 			data-testid="embed-panel-body"
 		>
 			{#if submitMany}
-				{#if !address.provisionalJob && address.jobInstanceId}
-					<BoardManyRecap {address} empty={manyEmpty} data-testid="embed-many-recap" />
+				{#if !manyEmpty && !address.provisionalJob && address.jobInstanceId}
+					<BoardManyRecap {address} empty={false} data-testid="embed-many-recap" />
 				{/if}
-				<div class="mt-8" data-testid="embed-composer-region">
-					{#if !composerOpen}
+				<div class={manyEmpty ? undefined : 'mt-8'} data-testid="embed-composer-region">
+					{#if !showComposer}
 						<div class="flex justify-end">
 							<Button
 								type="button"
