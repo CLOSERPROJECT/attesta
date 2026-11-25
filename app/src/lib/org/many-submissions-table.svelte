@@ -32,14 +32,14 @@
 			<thead>
 				<tr class="border-b border-zinc-200 text-left">
 					{#each table.columns as col (col.key)}
-						<th class="px-2 py-2 align-top font-medium text-zinc-600">
+						<th class="px-2 py-2 align-top font-medium text-muted-foreground">
 							{col.title}
 						</th>
 					{/each}
-					<th class="px-2 py-2 align-top font-medium text-zinc-600">Timestamp</th>
-					<th class="px-2 py-2 align-top font-medium text-zinc-600">User</th>
+					<th class="px-2 py-2 align-top font-medium text-muted-foreground">Timestamp</th>
+					<th class="px-2 py-2 align-top font-medium text-muted-foreground">User</th>
 					{#if showLinksColumn}
-						<th class="px-2 py-2 align-top font-medium text-zinc-600">Links</th>
+						<th class="px-2 py-2 align-top font-medium text-muted-foreground">Links</th>
 					{/if}
 				</tr>
 			</thead>
@@ -58,14 +58,14 @@
 						data-testid={highlighted ? 'many-recap-just-completed' : undefined}
 					>
 						{#each table.columns as col (col.key)}
-							<td class="px-2 py-2 text-zinc-900">
+							<td class="px-2 py-2 text-muted-foreground">
 								{formatFactValue(row.cells[col.key])}
 							</td>
 						{/each}
-						<td class="px-2 py-2 text-zinc-900">
+						<td class="px-2 py-2 text-muted-foreground">
 							{formatSubmissionTimestamp(row.timestamp)}
 						</td>
-						<td class="px-2 py-2 text-zinc-900">
+						<td class="px-2 py-2 text-muted-foreground">
 							{formatSubmissionUser(row)}
 						</td>
 						{#if showLinksColumn}

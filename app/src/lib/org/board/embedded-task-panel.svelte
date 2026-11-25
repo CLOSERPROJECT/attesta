@@ -212,7 +212,7 @@
 					{:else}
 						<div class="outline-none" data-testid="embed-form-pane">
 							<h3
-								class="m-0 mb-3 text-sm font-normal text-foreground"
+								class="m-0 mb-4 text-sm font-normal text-muted-foreground"
 								data-testid="embed-many-new-entry-title"
 							>
 								{m.embed_many_new_entry()}
