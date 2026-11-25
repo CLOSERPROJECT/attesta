@@ -45,8 +45,8 @@
 	}
 
 	.draft-bozza-mark :global(.draft-bozza-mark__icon) {
-		width: 0.75rem;
-		height: 0.75rem;
+		width: 0.625rem;
+		height: 0.625rem;
 		flex-shrink: 0;
 	}
 </style>
