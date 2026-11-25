@@ -253,6 +253,8 @@ steps:
                 numeroFir:
                     ui:options:
                         layoutNewRow: true
+                        shadcn4Text:
+                            style: 'text-transform: uppercase'
                 wasteCode:
                     ui:options:
                         enumNames: ['16.02.14']
@@ -309,7 +311,7 @@ steps:
                             $prefix := $.client & '-' & $dateStamp & '-';
                             $count($filter($keys($domain.lot), function($k){ $substring($string($k), 0, $length($prefix)) = $prefix })) + 1
                           )
-                        numeroFir: $.numeroFir
+                        numeroFir: $uppercase($.numeroFir)
                         wasteCode: $.wasteCode
                         palletCount: $.palletCount
                         truckId: $instance.id
@@ -339,7 +341,7 @@ steps:
                           "date": $substring($replace($today, '-', ''), 2),
                           "client": $.client,
                           "clientProgressive": $lot.clientProgressive,
-                          "numeroFir": $.numeroFir,
+                          "numeroFir": $lot.numeroFir,
                           "wasteCode": $.wasteCode,
                           "palletCount": $.palletCount,
                           "netWeight": $lot.netWeight,
@@ -356,7 +358,7 @@ steps:
                         {
 
                           "client": $.client,
-                          "numeroFir": $.numeroFir,
+                          "numeroFir": $lot.numeroFir,
                           "palletCount": $.palletCount,
                           "truckWeightAfter": $.truckWeightAfter,
                           "netWeight": $lot.netWeight,
