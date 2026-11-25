@@ -14,6 +14,33 @@
 	border-radius: var(--input-radius);
 }
 
+/*
+ * iOS focus-zoom guard: keep editable field type at 1rem below md (same as shadcn
+ * Input/Textarea `text-base md:text-sm`). Applied here so Select/radio tiles match
+ * without editing shadcn components. md = 768px (Tailwind).
+ */
+[data-slot='input'],
+[data-slot='textarea'],
+[data-slot='select-trigger'],
+[data-slot='input-group'],
+.derived-leaf input,
+.radio-tiles__tile {
+	font-size: var(--text-base, 1rem);
+	line-height: var(--text-base--line-height, 1.5);
+}
+
+@media (width >= 768px) {
+	[data-slot='input'],
+	[data-slot='textarea'],
+	[data-slot='select-trigger'],
+	[data-slot='input-group'],
+	.derived-leaf input,
+	.radio-tiles__tile {
+		font-size: var(--text-sm, 0.875rem);
+		line-height: var(--text-sm--line-height, calc(1.25 / 0.875));
+	}
+}
+
 [data-slot='checkbox'] {
 	background-color: var(--input);
 	border-color: var(--border);
