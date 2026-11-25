@@ -78,7 +78,11 @@ func projectEntityRecap(spec RecapSpec, domain Domain, matched []Submission) Tas
 	for _, c := range spec.Columns {
 		title := c.Title
 		if title == "" {
-			title = c.Field
+			if c.Field == taskRecapFieldID {
+				title = "Id"
+			} else {
+				title = c.Field
+			}
 		}
 		cols = append(cols, TaskRecapCol{Key: c.Field, Title: title})
 	}
@@ -122,6 +126,10 @@ func projectEntityRecap(spec RecapSpec, domain Domain, matched []Submission) Tas
 		a := byID[id]
 		cells := make(map[string]any, len(spec.Columns))
 		for _, c := range spec.Columns {
+			if c.Field == taskRecapFieldID {
+				cells[taskRecapFieldID] = id
+				continue
+			}
 			if v, has := facts[c.Field]; has {
 				cells[c.Field] = v
 			}

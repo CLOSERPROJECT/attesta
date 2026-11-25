@@ -93,6 +93,9 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	if table.Rows[0].Cells["numeroFir"] != "FIR-1" || table.Rows[1].Cells["numeroFir"] != "FIR-2" {
 		t.Fatalf("cells order = %#v %#v", table.Rows[0].Cells, table.Rows[1].Cells)
 	}
+	if table.Rows[0].Cells["id"] != table.Rows[0].Key || table.Rows[1].Cells["id"] != table.Rows[1].Key {
+		t.Fatalf("id cells = %#v %#v", table.Rows[0].Cells["id"], table.Rows[1].Cells["id"])
+	}
 	if len(table.Rows[0].Links) != 1 || table.Rows[0].Links[0].URL != "blob:labels-1" {
 		t.Fatalf("first links = %#v", table.Rows[0].Links)
 	}
@@ -100,6 +103,7 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 		t.Fatalf("second links = %#v", table.Rows[1].Links)
 	}
 	wantCols := []TaskRecapCol{
+		{Key: "id", Title: "Id"},
 		{Key: "numeroFir", Title: "Numero FIR"},
 		{Key: "netWeight", Title: "Peso netto"},
 		{Key: "palletCount", Title: "Bancali"},

@@ -45,6 +45,19 @@ func TestValidateRecapConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "reserved id column",
+			task: TaskConfig{
+				"id": "arrive",
+				"recap": map[string]any{
+					"entity": "lot",
+					"columns": []any{
+						map[string]any{"field": "id", "title": "Id"},
+						map[string]any{"field": "numeroFir"},
+					},
+				},
+			},
+		},
+		{
 			name: "task without recap ok",
 			task: TaskConfig{"id": "arrive"},
 		},

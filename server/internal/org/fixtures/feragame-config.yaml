@@ -207,6 +207,8 @@ steps:
               recap:
                   entity: lot
                   columns:
+                      - field: id
+                        title: Id
                       - field: numeroFir
                         title: Numero FIR
                       - field: netWeight
