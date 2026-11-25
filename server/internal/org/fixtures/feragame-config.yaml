@@ -350,26 +350,6 @@ steps:
                             function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
                           )]
                         }
-                    - method: '"POST"'
-                      url: '"/effects/register-csv"'
-                      label: '"Scarica CSV registrazione"'
-                      action: download
-                      body: >-
-                        {
-
-                          "client": $.client,
-                          "numeroFir": $lot.numeroFir,
-                          "palletCount": $.palletCount,
-                          "truckWeightAfter": $.truckWeightAfter,
-                          "netWeight": $lot.netWeight,
-                          "notes": $.notes,
-                          "lotId": $lot.id,
-                          "truckId": $instance.id,
-                          "palletIds": [$each(
-                            $sift($domain.pallet, function($v){$v.lotId = $lot.id}),
-                            function($v, $k){$k}
-                          )]
-                        }
             - id: weightCheck
               roles: [administration]
               readyWhen: >-

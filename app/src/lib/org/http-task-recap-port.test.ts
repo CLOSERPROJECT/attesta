@@ -10,10 +10,7 @@ const sampleRow = {
 	timestamp: '2026-10-29T15:00:00Z',
 	userId: 'ada',
 	userName: 'Ada',
-	links: [
-		{ label: 'Stampa', url: 'blob:labels', action: 'link' },
-		{ label: 'CSV', url: 'blob:csv', action: 'download', filename: 'reg.csv' }
-	]
+	links: [{ label: 'Stampa', url: 'blob:labels', action: 'link' }]
 };
 
 const sampleTable = {

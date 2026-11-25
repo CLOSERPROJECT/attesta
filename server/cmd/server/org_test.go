@@ -303,7 +303,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if len(domain.Submissions) < 2 || domain.Submissions[len(domain.Submissions)-1].TaskID != "register" {
 		t.Fatalf("submissions = %#v", domain.Submissions)
 	}
-	if len(committed.Links) != 2 {
+	if len(committed.Links) != 1 {
 		t.Fatalf("wired HttpPort links = %#v", committed.Links)
 	}
 	if committed.Links[0].Label != "Stampa etichette" || committed.Links[0].Action != org.HttpActionLink {
@@ -311,12 +311,6 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	}
 	if !strings.HasPrefix(committed.Links[0].URL, "data:application/pdf;base64,") {
 		t.Fatalf("labels url = %q", committed.Links[0].URL)
-	}
-	if committed.Links[1].Label != "Scarica CSV registrazione" || committed.Links[1].Action != org.HttpActionDownload {
-		t.Fatalf("link1 = %#v", committed.Links[1])
-	}
-	if committed.Links[1].Filename == "" {
-		t.Fatalf("csv filename empty: %#v", committed.Links[1])
 	}
 	if len(committed.HttpErrors) != 0 {
 		t.Fatalf("httpErrors = %#v", committed.HttpErrors)

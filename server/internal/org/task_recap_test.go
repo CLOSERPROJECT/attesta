@@ -55,9 +55,7 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels-1"},
-			{URL: "blob:csv-1", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg1.csv"`}},
 			{URL: "blob:labels-2"},
-			{URL: "blob:csv-2", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg2.csv"`}},
 		},
 	}
 	links := NewMemoryLinkStore()
@@ -95,12 +93,10 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	if table.Rows[0].Cells["client"] != "CO" || table.Rows[1].Cells["client"] != "DA" {
 		t.Fatalf("cells order = %#v %#v", table.Rows[0].Cells, table.Rows[1].Cells)
 	}
-	if len(table.Rows[0].Links) != 2 || table.Rows[0].Links[0].URL != "blob:labels-1" ||
-		table.Rows[0].Links[1].Filename != "reg1.csv" {
+	if len(table.Rows[0].Links) != 1 || table.Rows[0].Links[0].URL != "blob:labels-1" {
 		t.Fatalf("first links = %#v", table.Rows[0].Links)
 	}
-	if len(table.Rows[1].Links) != 2 || table.Rows[1].Links[0].URL != "blob:labels-2" ||
-		table.Rows[1].Links[1].Filename != "reg2.csv" {
+	if len(table.Rows[1].Links) != 1 || table.Rows[1].Links[0].URL != "blob:labels-2" {
 		t.Fatalf("second links = %#v", table.Rows[1].Links)
 	}
 	col := columnByKey(table.Columns, "client")
@@ -139,7 +135,6 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
 		},
 	}
 	links := NewMemoryLinkStore()
@@ -170,7 +165,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	if wire.Mode != taskRecapModeEntity || len(wire.Rows) != 1 ||
-		len(wire.Rows[0].Links) != 2 || wire.Rows[0].UserID != "ada" {
+		len(wire.Rows[0].Links) != 1 || wire.Rows[0].UserID != "ada" {
 		t.Fatalf("wire = %#v", wire)
 	}
 

@@ -52,15 +52,7 @@ const sampleResult = {
 		sealFieldIds: ['codiceFir'],
 		bindings: { domain: {} }
 	},
-	links: [
-		{ label: 'Stampa etichette', url: 'blob:labels', action: 'link' as const },
-		{
-			label: 'Scarica CSV',
-			url: 'blob:csv',
-			action: 'download' as const,
-			filename: 'reg.csv'
-		}
-	],
+	links: [{ label: 'Stampa etichette', url: 'blob:labels', action: 'link' as const }],
 	httpErrors: [] as string[]
 };
 
