@@ -17,6 +17,8 @@ import type { ChromeDataReport, TaskFormPlan } from './task-form-plan.js';
 export type LiveTaskFormPorts = {
 	getValue: () => Record<string, unknown>;
 	setValue: (next: Record<string, unknown>) => void;
+	/** First sync tick — OrgSession.seedDraft (non-dirty); later edits use setValue. */
+	seedValue: (next: Record<string, unknown>) => void;
 	/** JSONata `$domain` binding (readonly / derived) — may be a thin projection. */
 	getDomain: () => unknown;
 	getCatalogs?: () => unknown;

@@ -104,6 +104,10 @@
 		orgSession.setDraft(path, draftInstanceKey, next);
 	}
 
+	function seedDraftValue(next: Record<string, unknown>) {
+		orgSession.seedDraft(path, draftInstanceKey, next);
+	}
+
 	/** Live Chrome/Derived `$domain` — bindings bag only. */
 	function liveDomain(): unknown {
 		return domainFromBundleBindings(bundle.bindings) ?? emptySnapshot();
@@ -154,6 +158,7 @@
 			live = new LiveTaskForm(compiled, {
 				getValue: () => readDraft(),
 				setValue: (next) => writeDraft(next),
+				seedValue: (next) => seedDraftValue(next),
 				getDomain: () => liveDomain(),
 				getCatalogs: () => liveCatalogs(),
 				getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
