@@ -82,7 +82,7 @@
 }
 
 .form-cols-2 {
-	--form-cols-gap: 0.75rem;
+	--form-cols-gap: 1.5rem;
 	--form-cols-row-gap: 1.5rem;
 	--form-cols-min: 16rem;
 	display: grid;
@@ -98,7 +98,7 @@
 }
 
 .form-cols-3 {
-	--form-cols-gap: 0.75rem;
+	--form-cols-gap: 1.5rem;
 	--form-cols-row-gap: 1.5rem;
 	--form-cols-min: 12rem;
 	display: grid;
