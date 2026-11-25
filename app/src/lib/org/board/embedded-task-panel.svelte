@@ -193,7 +193,7 @@
 					</section>
 				{/if}
 				<div
-					class={manyEmpty ? undefined : 'pt-4'}
+					class={manyEmpty ? undefined : 'pt-5'}
 					data-testid="embed-composer-region"
 				>
 					{#if !showComposer}
