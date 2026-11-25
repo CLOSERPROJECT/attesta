@@ -213,7 +213,7 @@
 							</Button>
 						</div>
 					{:else}
-						<div class="outline-none px-3 pt-2 pb-2" data-testid="embed-form-pane">
+						<div class="outline-none pt-2 pb-2" data-testid="embed-form-pane">
 							<h3
 								class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
 								data-testid="embed-many-new-entry-title"

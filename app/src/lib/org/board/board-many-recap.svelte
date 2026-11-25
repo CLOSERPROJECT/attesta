@@ -31,7 +31,7 @@
 	);
 </script>
 
-<div data-testid={testId}>
+<div class="min-w-0" data-testid={testId}>
 	{#if empty}
 		<div
 			class="flex items-center justify-center gap-2 rounded-md bg-muted/60 px-3 py-3 text-muted-foreground"

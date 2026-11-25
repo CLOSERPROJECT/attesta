@@ -35,28 +35,30 @@
 </script>
 
 {#if table.rows.length > 0}
-	<div class="overflow-x-auto" data-testid={testId}>
-		<table class="w-full border-collapse border-t border-zinc-200 text-sm">
+	<div class="min-w-0 overflow-x-auto" data-testid={testId}>
+		<table class="w-max min-w-full border-collapse border-t border-zinc-200 text-sm">
 			<thead>
 				<tr class="border-b border-zinc-200 text-left">
 					{#each table.columns as col, i (col.key)}
-						<th class="{edgePad(i)} py-2 align-top font-semibold text-muted-foreground">
+						<th
+							class="{edgePad(i)} whitespace-nowrap py-2 align-top font-semibold text-muted-foreground"
+						>
 							{col.title}
 						</th>
 					{/each}
 					<th
-						class="{edgePad(table.columns.length)} py-2 align-top font-semibold text-muted-foreground"
+						class="{edgePad(table.columns.length)} whitespace-nowrap py-2 align-top font-semibold text-muted-foreground"
 					>
 						Timestamp
 					</th>
 					<th
-						class="{edgePad(table.columns.length + 1)} py-2 align-top font-semibold text-muted-foreground"
+						class="{edgePad(table.columns.length + 1)} whitespace-nowrap py-2 align-top font-semibold text-muted-foreground"
 					>
 						User
 					</th>
 					{#if showLinksColumn}
 						<th
-							class="{edgePad(table.columns.length + 2)} py-2 align-top font-semibold text-muted-foreground"
+							class="{edgePad(table.columns.length + 2)} whitespace-nowrap py-2 align-top font-semibold text-muted-foreground"
 						>
 							Links
 						</th>
@@ -78,20 +80,26 @@
 						data-testid={highlighted ? 'many-recap-just-completed' : undefined}
 					>
 						{#each table.columns as col, i (col.key)}
-							<td class="{edgePad(i)} py-2 font-normal text-muted-foreground">
+							<td
+								class="{edgePad(i)} whitespace-nowrap py-2 font-normal text-muted-foreground"
+							>
 								{formatFactValue(row.cells[col.key])}
 							</td>
 						{/each}
-						<td class="{edgePad(table.columns.length)} py-2 font-normal text-muted-foreground">
+						<td
+							class="{edgePad(table.columns.length)} whitespace-nowrap py-2 font-normal text-muted-foreground"
+						>
 							{formatSubmissionTimestamp(row.timestamp)}
 						</td>
 						<td
-							class="{edgePad(table.columns.length + 1)} py-2 font-normal text-muted-foreground"
+							class="{edgePad(table.columns.length + 1)} whitespace-nowrap py-2 font-normal text-muted-foreground"
 						>
 							{formatSubmissionUser(row)}
 						</td>
 						{#if showLinksColumn}
-							<td class="{edgePad(table.columns.length + 2)} py-2 font-normal">
+							<td
+								class="{edgePad(table.columns.length + 2)} whitespace-nowrap py-2 font-normal"
+							>
 								{#if (row.links?.length ?? 0) > 0}
 									<HttpLinkStrip items={row.links ?? []} />
 								{/if}

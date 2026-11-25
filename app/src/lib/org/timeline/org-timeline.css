@@ -98,6 +98,8 @@
 	--org-elev-2: color-mix(in srgb, var(--primary) 8%, #ffffff); /* rows/instances */
 	--org-elev-3: #ffffff; /* substeps + tabs */
 	--org-pad-l: calc(var(--spacing) * 3);
+	/* Embed body + many form pane share this; recap band uses 2× / −1× for full-bleed align. */
+	--org-embed-pad-x: calc(var(--spacing) * 3);
 	/* Chevron column: same right edge + slot width at every nest level. */
 	--org-chevron-pad: calc(var(--spacing) * 3);
 	--org-chevron-slot: 1.25rem;
@@ -119,6 +121,14 @@
 @media (width >= 640px) {
 	.org-timeline-page {
 		padding: calc(var(--spacing) * 3);
+	}
+}
+
+/* Mobile: nest indent + embed/form/band horizontal pads at 50% of desktop (*3 → *1.5). */
+@media (width < 640px) {
+	.org-timeline-page {
+		--org-pad-l: calc(var(--spacing) * 1.5);
+		--org-embed-pad-x: calc(var(--spacing) * 1.5);
 	}
 }
 
@@ -509,16 +519,23 @@
 }
 
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
-	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3);
+	padding: 0 var(--org-embed-pad-x) calc(var(--spacing) * 3);
+}
+
+/* Many new-entry form: same inline pad as embed body (coupled via --org-embed-pad-x). */
+.org-timeline-page .substep-embed[data-composer] [data-testid='embed-form-pane'] {
+	padding-inline: var(--org-embed-pad-x);
 }
 
 /* Submit-many: muted history band full-bleed within embed body padding.
- * Inline pad *6 matches form pane (body *3 + form px-3) so table/eyebrow align with fields. */
+ * Inline pad 2× --org-embed-pad-x matches form pane (body + form) so table/eyebrow align with fields. */
 .org-timeline-page .substep-embed .embed-many-recap-band {
 	display: grid;
 	gap: calc(var(--spacing) * 2);
-	margin-inline: calc(var(--spacing) * -3);
-	padding: calc(var(--spacing) * 3) calc(var(--spacing) * 6);
+	/* Allow inner overflow-x to engage — grid min-width:auto otherwise expands with the table. */
+	min-width: 0;
+	margin-inline: calc(var(--org-embed-pad-x) * -1);
+	padding: calc(var(--spacing) * 3) calc(var(--org-embed-pad-x) * 2);
 }
 
 /* th semibold vs td normal — literal weights so theme tokens cannot flatten the contrast. */
