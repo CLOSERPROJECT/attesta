@@ -207,8 +207,6 @@ steps:
               recap:
                   entity: lot
                   columns:
-                      - field: client
-                        title: Cliente
                       - field: numeroFir
                         title: Numero FIR
                       - field: netWeight

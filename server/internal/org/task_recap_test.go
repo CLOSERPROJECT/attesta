@@ -90,7 +90,7 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	if table.Rows[0].Timestamp >= table.Rows[1].Timestamp {
 		t.Fatalf("want oldest first: %q then %q", table.Rows[0].Timestamp, table.Rows[1].Timestamp)
 	}
-	if table.Rows[0].Cells["client"] != "CO" || table.Rows[1].Cells["client"] != "DA" {
+	if table.Rows[0].Cells["numeroFir"] != "FIR-1" || table.Rows[1].Cells["numeroFir"] != "FIR-2" {
 		t.Fatalf("cells order = %#v %#v", table.Rows[0].Cells, table.Rows[1].Cells)
 	}
 	if len(table.Rows[0].Links) != 1 || table.Rows[0].Links[0].URL != "blob:labels-1" {
@@ -99,9 +99,21 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	if len(table.Rows[1].Links) != 1 || table.Rows[1].Links[0].URL != "blob:labels-2" {
 		t.Fatalf("second links = %#v", table.Rows[1].Links)
 	}
-	col := columnByKey(table.Columns, "client")
-	if col == nil || col.Title != "Cliente" {
+	wantCols := []TaskRecapCol{
+		{Key: "numeroFir", Title: "Numero FIR"},
+		{Key: "netWeight", Title: "Peso netto"},
+		{Key: "palletCount", Title: "Bancali"},
+	}
+	if len(table.Columns) != len(wantCols) {
 		t.Fatalf("columns = %#v", table.Columns)
+	}
+	for i, want := range wantCols {
+		if table.Columns[i] != want {
+			t.Fatalf("columns[%d] = %#v, want %#v (all=%#v)", i, table.Columns[i], want, table.Columns)
+		}
+	}
+	if table.Rows[0].Key == "" || table.Rows[1].Key == "" {
+		t.Fatalf("entity id keys missing: %#v %#v", table.Rows[0], table.Rows[1])
 	}
 }
 
