@@ -1,4 +1,6 @@
 <script lang="ts">
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
@@ -184,9 +186,10 @@
 					>
 						<p
 							id={manyRecapEyebrowId}
-							class="m-0 text-sm font-bold text-muted-foreground"
+							class="m-0 flex items-center gap-1.5 text-sm font-bold text-muted-foreground"
 							data-testid="embed-many-recap-eyebrow"
 						>
+							<CheckIcon class="size-3.5 shrink-0" aria-hidden="true" />
 							{m.embed_many_already_registered()}
 						</p>
 						<BoardManyRecap {address} empty={false} data-testid="embed-many-recap" />
@@ -210,11 +213,12 @@
 							</Button>
 						</div>
 					{:else}
-						<div class="outline-none" data-testid="embed-form-pane">
+						<div class="outline-none px-3 pt-2 pb-2" data-testid="embed-form-pane">
 							<h3
-								class="m-0 mb-4 text-sm font-normal text-muted-foreground"
+								class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
 								data-testid="embed-many-new-entry-title"
 							>
+								<PencilIcon class="size-3.5 shrink-0" aria-hidden="true" />
 								{m.embed_many_new_entry()}
 							</h3>
 							{@render formPane()}

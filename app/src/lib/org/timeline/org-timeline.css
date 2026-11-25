@@ -512,12 +512,22 @@
 	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3);
 }
 
-/* Submit-many: muted history band full-bleed within embed body padding. */
+/* Submit-many: muted history band full-bleed within embed body padding.
+ * Inline pad *6 matches form pane (body *3 + form px-3) so table/eyebrow align with fields. */
 .org-timeline-page .substep-embed .embed-many-recap-band {
 	display: grid;
 	gap: calc(var(--spacing) * 2);
 	margin-inline: calc(var(--spacing) * -3);
-	padding: calc(var(--spacing) * 3);
+	padding: calc(var(--spacing) * 3) calc(var(--spacing) * 6);
+}
+
+/* th semibold vs td normal — literal weights so theme tokens cannot flatten the contrast. */
+.org-timeline-page .substep-embed .embed-many-recap-band th {
+	font-weight: 600;
+}
+
+.org-timeline-page .substep-embed .embed-many-recap-band td {
+	font-weight: 400;
 }
 
 /* Open nest: space under the header before children (no hairline — card edges already outline). */

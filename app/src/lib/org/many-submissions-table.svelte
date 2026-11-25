@@ -24,6 +24,14 @@
 	const showLinksColumn = $derived(
 		table.rows.some((row) => (row.links?.length ?? 0) > 0)
 	);
+	/** Fact cols + Timestamp + User + optional Links. */
+	const colCount = $derived(table.columns.length + 2 + (showLinksColumn ? 1 : 0));
+
+	function edgePad(index: number): string {
+		const pl = index === 0 ? 'pl-0' : 'pl-2';
+		const pr = index === colCount - 1 ? 'pr-0' : 'pr-2';
+		return `${pl} ${pr}`;
+	}
 </script>
 
 {#if table.rows.length > 0}
@@ -31,15 +39,27 @@
 		<table class="w-full border-collapse border-t border-zinc-200 text-sm">
 			<thead>
 				<tr class="border-b border-zinc-200 text-left">
-					{#each table.columns as col (col.key)}
-						<th class="px-2 py-2 align-top font-medium text-muted-foreground">
+					{#each table.columns as col, i (col.key)}
+						<th class="{edgePad(i)} py-2 align-top font-semibold text-muted-foreground">
 							{col.title}
 						</th>
 					{/each}
-					<th class="px-2 py-2 align-top font-medium text-muted-foreground">Timestamp</th>
-					<th class="px-2 py-2 align-top font-medium text-muted-foreground">User</th>
+					<th
+						class="{edgePad(table.columns.length)} py-2 align-top font-semibold text-muted-foreground"
+					>
+						Timestamp
+					</th>
+					<th
+						class="{edgePad(table.columns.length + 1)} py-2 align-top font-semibold text-muted-foreground"
+					>
+						User
+					</th>
 					{#if showLinksColumn}
-						<th class="px-2 py-2 align-top font-medium text-muted-foreground">Links</th>
+						<th
+							class="{edgePad(table.columns.length + 2)} py-2 align-top font-semibold text-muted-foreground"
+						>
+							Links
+						</th>
 					{/if}
 				</tr>
 			</thead>
@@ -57,19 +77,21 @@
 						data-just-completed={highlighted ? '1' : undefined}
 						data-testid={highlighted ? 'many-recap-just-completed' : undefined}
 					>
-						{#each table.columns as col (col.key)}
-							<td class="px-2 py-2 font-normal text-muted-foreground">
+						{#each table.columns as col, i (col.key)}
+							<td class="{edgePad(i)} py-2 font-normal text-muted-foreground">
 								{formatFactValue(row.cells[col.key])}
 							</td>
 						{/each}
-						<td class="px-2 py-2 font-normal text-muted-foreground">
+						<td class="{edgePad(table.columns.length)} py-2 font-normal text-muted-foreground">
 							{formatSubmissionTimestamp(row.timestamp)}
 						</td>
-						<td class="px-2 py-2 font-normal text-muted-foreground">
+						<td
+							class="{edgePad(table.columns.length + 1)} py-2 font-normal text-muted-foreground"
+						>
 							{formatSubmissionUser(row)}
 						</td>
 						{#if showLinksColumn}
-							<td class="px-2 py-2 font-normal">
+							<td class="{edgePad(table.columns.length + 2)} py-2 font-normal">
 								{#if (row.links?.length ?? 0) > 0}
 									<HttpLinkStrip items={row.links ?? []} />
 								{/if}
