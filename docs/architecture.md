@@ -30,7 +30,6 @@ browser
 - **`cmd/server`** is the process shell: mux, Appwrite session, `/my` handlers (Formata and Org-backed), mounts `org.API`, serves `/app`.
 - **`server/internal/org`** is the Org **dumb executor**: evaluates Active Config against Domain (Worklist projection, Commit, passport mint, HttpPort, stream instance/timeline projection). Plant open/close law lives in Config, not in Go or `app/` branches.
 - **`app/`** is a dumb client: Draft is browser-local (ADR-0009); Domain writes only happen through Commit on `/api/org`. Routes are scoped to one Org stream instance.
-- After Commit, the executor publishes the new **Domain revision** on an in-process, stream-scoped change feed; `/app` boards subscribe per stream and refresh through the same Load path as after their own submit ([ADR-0015](adr/0015-org-domain-change-feed.md)).
 
 ## Shared infrastructure seams
 
