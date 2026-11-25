@@ -199,107 +199,6 @@ describe('OrgSession', () => {
 		expect(session.commitError).toBeNull();
 	});
 
-	test('commit reports started then the written revision to observers', async () => {
-		const events: string[] = [];
-		const commit = vi.fn(async () => ({
-			org: 'feragame',
-			jobInstanceId: 'NIR-1',
-			revision: 3,
-			worklist: emptyWorklist(),
-			navigation: 'overview' as const,
-			nextTaskFormBundle: null
-		}));
-		const session = new OrgSession({
-			load: { load: async () => sample },
-			commit: { commit },
-			hydrate: false
-		});
-		session.result = structuredClone(sample);
-		session.observeCommits({
-			started: () => events.push('started'),
-			settled: (revision) => events.push(`settled:${revision}`)
-		});
-
-		const outcome = await session.commit({
-			stream: 'recycling',
-			instance: '261102-1',
-			taskPath: 'intake/register',
-			jobInstanceId: 'NIR-1',
-			value: { client: 'NO' },
-			mint: { kind: 'none' }
-		});
-
-		expect(events).toEqual(['started', 'settled:3']);
-		expect(outcome?.revision).toBe(3);
-	});
-
-	test('commit tells observers settled(null) when the port fails', async () => {
-		const started = vi.fn();
-		const settled = vi.fn();
-		const session = new OrgSession({
-			load: { load: async () => sample },
-			commit: {
-				commit: async () => {
-					throw new CommitDomainError('forbidden', 403);
-				}
-			},
-			hydrate: false
-		});
-		session.result = structuredClone(sample);
-		session.setScope(hydrateScope);
-		session.observeCommits({ started, settled });
-
-		const outcome = await session.commit({
-			stream: 'recycling',
-			instance: '261102-1',
-			taskPath: 'intake/register',
-			jobInstanceId: 'NIR-1',
-			value: { client: 'NO' },
-			mint: { kind: 'none' }
-		});
-
-		expect(outcome).toBeNull();
-		expect(started).toHaveBeenCalledOnce();
-		expect(settled).toHaveBeenCalledOnce();
-		expect(settled).toHaveBeenLastCalledWith(null);
-	});
-
-	test('unsubscribing a commit observer stops further calls', async () => {
-		const started = vi.fn();
-		const settled = vi.fn();
-		const commit = vi.fn(async () => ({
-			org: 'feragame',
-			jobInstanceId: 'NIR-1',
-			worklist: emptyWorklist(),
-			navigation: 'overview' as const,
-			nextTaskFormBundle: null
-		}));
-		const session = new OrgSession({
-			load: { load: async () => sample },
-			commit: { commit },
-			hydrate: false
-		});
-		session.result = structuredClone(sample);
-		const stop = session.observeCommits({ started, settled });
-		const req = {
-			stream: 'recycling',
-			instance: '261102-1',
-			taskPath: 'intake/register',
-			jobInstanceId: 'NIR-1',
-			value: { client: 'NO' },
-			mint: { kind: 'none' as const }
-		};
-
-		await session.commit(req);
-		expect(started).toHaveBeenCalledOnce();
-		expect(settled).toHaveBeenCalledOnce();
-
-		stop();
-		await session.commit(req);
-		expect(started).toHaveBeenCalledOnce();
-		expect(settled).toHaveBeenCalledOnce();
-	});
-
 	test('commit ignores concurrent second call while committing', async () => {
 		let release!: (value: {
 			org: string;
@@ -320,11 +219,7 @@ describe('OrgSession', () => {
 			hydrate: false
 		});
 		session.result = structuredClone(sample);
-		const started = vi.fn();
-		session.observeCommits({ started, settled: vi.fn() });
 		const req = {
-			stream: 'recycling',
-			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
@@ -334,7 +229,6 @@ describe('OrgSession', () => {
 		const second = session.commit(req);
 		expect(commit).toHaveBeenCalledTimes(1);
 		expect(await second).toBeNull();
-		expect(started).toHaveBeenCalledTimes(1);
 		release({
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
