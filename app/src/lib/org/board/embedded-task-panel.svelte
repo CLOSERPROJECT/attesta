@@ -184,7 +184,7 @@
 					>
 						<p
 							id={manyRecapEyebrowId}
-							class="m-0 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+							class="m-0 text-sm font-bold text-muted-foreground"
 							data-testid="embed-many-recap-eyebrow"
 						>
 							{m.embed_many_already_registered()}
@@ -212,7 +212,7 @@
 					{:else}
 						<div class="outline-none" data-testid="embed-form-pane">
 							<h3
-								class="m-0 mb-3 text-base font-semibold text-foreground"
+								class="m-0 mb-3 text-sm font-normal text-foreground"
 								data-testid="embed-many-new-entry-title"
 							>
 								{m.embed_many_new_entry()}
