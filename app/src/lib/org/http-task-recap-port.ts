@@ -54,11 +54,6 @@ function parseLinks(raw: unknown): HttpLinkItem[] | undefined {
 	return links.length > 0 ? links : undefined;
 }
 
-function parseTouch(raw: unknown): TaskRecapRow['touch'] | undefined {
-	if (raw === 'minted' || raw === 'patched') return raw;
-	return undefined;
-}
-
 function parseRow(raw: unknown): TaskRecapRow {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
 		throw new TaskRecapError(m.invalid_task_recap_body(), 500);
@@ -68,8 +63,7 @@ function parseRow(raw: unknown): TaskRecapRow {
 		body.cells && typeof body.cells === 'object' && !Array.isArray(body.cells)
 			? (body.cells as Record<string, unknown>)
 			: {};
-	const touch = parseTouch(body.touch);
-	const row: TaskRecapRow = {
+	return {
 		key: typeof body.key === 'string' ? body.key : '',
 		cells,
 		submissionId: typeof body.submissionId === 'string' ? body.submissionId : '',
@@ -78,8 +72,6 @@ function parseRow(raw: unknown): TaskRecapRow {
 		userName: typeof body.userName === 'string' ? body.userName : '',
 		links: parseLinks(body.links)
 	};
-	if (touch) row.touch = touch;
-	return row;
 }
 
 function parseTaskRecapTable(raw: unknown): TaskRecapTable {

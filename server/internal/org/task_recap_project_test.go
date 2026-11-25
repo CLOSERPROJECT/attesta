@@ -50,7 +50,7 @@ func TestProjectTaskRecapMintAndPatchSameEntityKeepsMinted(t *testing.T) {
 		t.Fatalf("table = %#v", table)
 	}
 	row := table.Rows[0]
-	if row.Key != "L1" || row.Touch != "minted" {
+	if row.Key != "L1" {
 		t.Fatalf("row = %#v", row)
 	}
 	if row.UserID != "bob" || row.UserName != "Bob" || row.SubmissionID != "2026-01-01T11:00:00Z" {
@@ -105,7 +105,7 @@ func TestProjectTaskRecapMintManyTwoEntities(t *testing.T) {
 	if table.Rows[0].Key != "P.1" || table.Rows[1].Key != "P.2" {
 		t.Fatalf("keys = %q %q", table.Rows[0].Key, table.Rows[1].Key)
 	}
-	if table.Rows[0].Touch != "minted" || table.Rows[1].Cells["weight"] != 20.0 {
+	if table.Rows[1].Cells["weight"] != 20.0 {
 		t.Fatalf("rows = %#v", table.Rows)
 	}
 }
@@ -160,7 +160,7 @@ func TestProjectTaskRecapPatchesKeepLatestActorAcrossSubmissions(t *testing.T) {
 	if table.Rows[0].Key != "P.2" || table.Rows[0].UserName != "Bob" {
 		t.Fatalf("first = %#v", table.Rows[0])
 	}
-	if table.Rows[1].Key != "P.1" || table.Rows[1].UserName != "Cara" || table.Rows[1].Touch != "patched" {
+	if table.Rows[1].Key != "P.1" || table.Rows[1].UserName != "Cara" {
 		t.Fatalf("second = %#v", table.Rows[1])
 	}
 	if table.Rows[1].Cells["weight"] != 99.0 {
@@ -291,7 +291,7 @@ func TestProjectTaskRecapSubmissionModeUnionKeys(t *testing.T) {
 	if table.Columns[1].Key != "a" || table.Columns[1].Title != "Alpha" || table.Columns[2].Key != "c" || table.Columns[2].Title != "c" {
 		t.Fatalf("union = %#v", table.Columns)
 	}
-	if len(table.Rows) != 2 || table.Rows[0].Touch != "" || table.Rows[1].UserName != "Bob" {
+	if len(table.Rows) != 2 || table.Rows[1].UserName != "Bob" {
 		t.Fatalf("rows = %#v", table.Rows)
 	}
 	if table.Rows[0].Key != "t1" || table.Rows[0].Cells["b"] != 1 {

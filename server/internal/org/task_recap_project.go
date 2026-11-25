@@ -28,8 +28,7 @@ type TaskRecapCol struct {
 type TaskRecapRow struct {
 	Key          string         `json:"key"`
 	Cells        map[string]any `json:"cells"`
-	Touch        string         `json:"touch,omitempty"` // minted|patched; entity mode only
-	SubmissionID string         `json:"submissionId"`     // Submission.Timestamp of the row's latest touch
+	SubmissionID string         `json:"submissionId"` // Submission.Timestamp of the row's latest touch
 	Timestamp    string         `json:"timestamp"`
 	UserID       string         `json:"userId"`
 	UserName     string         `json:"userName"`
@@ -85,7 +84,6 @@ func projectEntityRecap(spec RecapSpec, domain Domain, matched []Submission) Tas
 	}
 
 	type agg struct {
-		minted    bool
 		latest    Submission
 		seenTouch bool
 	}
@@ -106,9 +104,6 @@ func projectEntityRecap(spec RecapSpec, domain Domain, matched []Submission) Tas
 				a = &agg{}
 				byID[id] = a
 				order = append(order, id)
-			}
-			if touch.Op == "mint" {
-				a.minted = true
 			}
 			if !a.seenTouch || sub.Timestamp >= a.latest.Timestamp {
 				a.latest = sub
@@ -131,14 +126,9 @@ func projectEntityRecap(spec RecapSpec, domain Domain, matched []Submission) Tas
 				cells[c.Field] = v
 			}
 		}
-		touch := "patched"
-		if a.minted {
-			touch = "minted"
-		}
 		rows = append(rows, TaskRecapRow{
 			Key:          id,
 			Cells:        cells,
-			Touch:        touch,
 			SubmissionID: a.latest.Timestamp,
 			Timestamp:    a.latest.Timestamp,
 			UserID:       a.latest.UserID,

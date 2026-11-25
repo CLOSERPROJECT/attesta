@@ -2,8 +2,7 @@
 	import HttpLinkStrip from './form/http-link-strip.svelte';
 	import {
 		formatSubmissionTimestamp,
-		formatSubmissionUser,
-		formatTouchLabel
+		formatSubmissionUser
 	} from './submission-table.js';
 	import type { TaskRecapCol, TaskRecapRow } from './task-recap-port.js';
 	import { formatFactValue } from './worklist-overview.js';
@@ -19,9 +18,6 @@
 
 	const timestamp = $derived(formatSubmissionTimestamp(row.timestamp));
 	const user = $derived(formatSubmissionUser(row));
-	const touchLabel = $derived(
-		row.touch != null ? formatTouchLabel(row.touch) : null
-	);
 </script>
 
 <div class="space-y-3" data-testid={testId}>
@@ -37,12 +33,6 @@
 					</td>
 				</tr>
 			{/each}
-			{#if touchLabel != null}
-				<tr class="border-b border-zinc-100">
-					<th class="py-2 pr-3 text-left font-medium text-zinc-600">Touch</th>
-					<td class="py-2 text-zinc-900">{touchLabel}</td>
-				</tr>
-			{/if}
 			<tr class="border-b border-zinc-100">
 				<th class="py-2 pr-3 text-left font-medium text-zinc-600">Timestamp</th>
 				<td class="py-2 text-zinc-900">{timestamp}</td>

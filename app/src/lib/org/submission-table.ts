@@ -25,13 +25,6 @@ export function formatSubmissionUser(
 	return id || '—';
 }
 
-/** Entity-mode touch label: minted → Created, patched → Updated. */
-export function formatTouchLabel(touch: 'minted' | 'patched' | undefined): string {
-	if (touch === 'minted') return 'Created';
-	if (touch === 'patched') return 'Updated';
-	return '—';
-}
-
 /** True when this recap row is the Commit submissionId. */
 export function recapRowMatchesSubmissionId(
 	row: { submissionId: string },

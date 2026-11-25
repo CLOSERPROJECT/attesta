@@ -6,7 +6,6 @@ import { TaskRecapError } from './task-recap-port.js';
 const sampleRow = {
 	key: 'lot-1',
 	cells: { client: 'NO' },
-	touch: 'minted' as const,
 	submissionId: '2026-10-29T15:00:00Z',
 	timestamp: '2026-10-29T15:00:00Z',
 	userId: 'ada',
@@ -65,7 +64,7 @@ describe('HttpTaskRecapPort', () => {
 		expect(got.columns[0]?.title).toBe('Date');
 	});
 
-	test('parses entity table with touch and links', async () => {
+	test('parses entity table with links', async () => {
 		const fetchFn = vi.fn(
 			async () =>
 				new Response(
@@ -77,14 +76,12 @@ describe('HttpTaskRecapPort', () => {
 								...sampleRow,
 								key: 'lot-a',
 								cells: { client: 'CO' },
-								touch: 'minted',
 								links: [{ label: 'A', url: 'blob:a', action: 'link' }]
 							},
 							{
 								...sampleRow,
 								key: 'lot-b',
 								cells: { client: 'DA' },
-								touch: 'patched',
 								submissionId: '2026-10-29T16:00:00Z',
 								timestamp: '2026-10-29T16:00:00Z',
 								links: [{ label: 'B', url: 'blob:b', action: 'link' }]
@@ -105,9 +102,7 @@ describe('HttpTaskRecapPort', () => {
 		expect(got.mode).toBe('entity');
 		expect(got.rows).toHaveLength(2);
 		expect(got.rows[0]?.cells.client).toBe('CO');
-		expect(got.rows[0]?.touch).toBe('minted');
 		expect(got.rows[1]?.cells.client).toBe('DA');
-		expect(got.rows[1]?.touch).toBe('patched');
 		expect(got.rows[0]?.links?.[0]?.url).toBe('blob:a');
 		expect(got.rows[1]?.links?.[0]?.url).toBe('blob:b');
 	});

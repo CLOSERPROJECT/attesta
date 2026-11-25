@@ -3,7 +3,6 @@
 	import {
 		formatSubmissionTimestamp,
 		formatSubmissionUser,
-		formatTouchLabel,
 		recapRowMatchesSubmissionId
 	} from './submission-table.js';
 	import type { TaskRecapTable } from './task-recap-port.js';
@@ -22,7 +21,6 @@
 		'data-testid': testId = 'many-submissions-table'
 	}: Props = $props();
 
-	const showTouchColumn = $derived(table.mode === 'entity');
 	const showLinksColumn = $derived(
 		table.rows.some((row) => (row.links?.length ?? 0) > 0)
 	);
@@ -38,9 +36,6 @@
 							{col.title}
 						</th>
 					{/each}
-					{#if showTouchColumn}
-						<th class="px-2 py-2 align-top font-medium text-zinc-600">Touch</th>
-					{/if}
 					<th class="px-2 py-2 align-top font-medium text-zinc-600">Timestamp</th>
 					<th class="px-2 py-2 align-top font-medium text-zinc-600">User</th>
 					{#if showLinksColumn}
@@ -67,11 +62,6 @@
 								{formatFactValue(row.cells[col.key])}
 							</td>
 						{/each}
-						{#if showTouchColumn}
-							<td class="px-2 py-2 text-zinc-900">
-								{formatTouchLabel(row.touch)}
-							</td>
-						{/if}
 						<td class="px-2 py-2 text-zinc-900">
 							{formatSubmissionTimestamp(row.timestamp)}
 						</td>

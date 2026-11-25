@@ -15,8 +15,6 @@ export type TaskRecapCol = {
 export type TaskRecapRow = {
 	key: string;
 	cells: Record<string, unknown>;
-	/** Entity mode only: minted → Created, patched → Updated. */
-	touch?: 'minted' | 'patched';
 	submissionId: string;
 	timestamp: string;
 	userId: string;

@@ -95,9 +95,6 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	if table.Rows[0].Cells["client"] != "CO" || table.Rows[1].Cells["client"] != "DA" {
 		t.Fatalf("cells order = %#v %#v", table.Rows[0].Cells, table.Rows[1].Cells)
 	}
-	if table.Rows[0].Touch != "minted" || table.Rows[1].Touch != "minted" {
-		t.Fatalf("touch = %q %q", table.Rows[0].Touch, table.Rows[1].Touch)
-	}
 	if len(table.Rows[0].Links) != 2 || table.Rows[0].Links[0].URL != "blob:labels-1" ||
 		table.Rows[0].Links[1].Filename != "reg1.csv" {
 		t.Fatalf("first links = %#v", table.Rows[0].Links)
@@ -172,7 +169,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if wire.Mode != taskRecapModeEntity || len(wire.Rows) != 1 || wire.Rows[0].Touch != "minted" ||
+	if wire.Mode != taskRecapModeEntity || len(wire.Rows) != 1 ||
 		len(wire.Rows[0].Links) != 2 || wire.Rows[0].UserID != "ada" {
 		t.Fatalf("wire = %#v", wire)
 	}

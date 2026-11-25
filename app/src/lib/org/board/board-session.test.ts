@@ -584,7 +584,6 @@ describe('BoardSession', () => {
 				{
 					key: `${taskId}-row`,
 					cells: { n },
-					touch: 'minted' as const,
 					submissionId: `2026-01-0${n}T00:00:00Z`,
 					timestamp: `2026-01-0${n}T00:00:00Z`,
 					userId: 'u1',

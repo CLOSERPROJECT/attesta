@@ -3,7 +3,6 @@ import { describe, expect, test } from 'vitest';
 import {
 	formatSubmissionTimestamp,
 	formatSubmissionUser,
-	formatTouchLabel,
 	recapRowMatchesSubmissionId
 } from './submission-table.js';
 
@@ -25,12 +24,6 @@ describe('submission-table helpers', () => {
 		expect(formatSubmissionUser({ userId: 'id-1', userName: 'Ada' })).toBe('Ada');
 		expect(formatSubmissionUser({ userId: 'id-1' })).toBe('id-1');
 		expect(formatSubmissionUser({ userId: '', userName: '' })).toBe('—');
-	});
-
-	test('formatTouchLabel maps minted/patched', () => {
-		expect(formatTouchLabel('minted')).toBe('Created');
-		expect(formatTouchLabel('patched')).toBe('Updated');
-		expect(formatTouchLabel(undefined)).toBe('—');
 	});
 
 	test('recapRowMatchesSubmissionId matches submissionId', () => {
