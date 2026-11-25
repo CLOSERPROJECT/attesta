@@ -28,6 +28,19 @@
 	color: var(--primary-foreground);
 }
 
+/* Mouse + keyboard: shadcn widgets only use focus-visible; operators click into fields. */
+[data-slot='input']:is(:focus, :focus-visible, :focus-within),
+[data-slot='textarea']:is(:focus, :focus-visible, :focus-within),
+[data-slot='select-trigger']:is(:focus, :focus-visible),
+[data-slot='checkbox']:is(:focus, :focus-visible),
+[data-slot='input-group']:focus-within,
+.derived-leaf input:is(:focus, :focus-visible),
+.radio-tiles__tile:focus-within {
+	border-color: var(--ring);
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
+}
+
 [data-slot='field'] {
 	gap: 0.25rem;
 }
