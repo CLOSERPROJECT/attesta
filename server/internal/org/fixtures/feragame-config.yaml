@@ -263,6 +263,7 @@ steps:
                         textWidget: textareaWidget
                     ui:options:
                         layoutSpan: true
+                        placeholder: Inserisci Note…
               chrome:
                 progressiveNumber:
                     kind: readonly

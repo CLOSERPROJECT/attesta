@@ -381,7 +381,7 @@ func applyDefaultPlaceholders(uiNode, schemaNode map[string]any, skipRoot map[st
 	return changed
 }
 
-var shadcnPlaceholderWidgets = []string{"shadcn4Text", "shadcn4Number", "shadcn4Select"}
+var shadcnPlaceholderWidgets = []string{"shadcn4Text", "shadcn4Number", "shadcn4Select", "textarea"}
 
 func writeDefaultPlaceholder(fieldUi map[string]any, text string) {
 	_ = stampPlaceholder(fieldUi, text, true)
