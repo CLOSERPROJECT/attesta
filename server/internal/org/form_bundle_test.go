@@ -427,7 +427,7 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	committed, err := c.Commit(t.Context(), FeragameScope(), all, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
-		Value:         map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value:         map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -37,7 +37,7 @@ stream:
 domain:
     entities:
         truck:
-            fields: [truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
+            fields: [truckWeight, lastScaleReading]
         lot:
             fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, status, locked, issued]
         pallet:
@@ -367,52 +367,53 @@ steps:
               schema:
                 type: object
                 title: Controllo camion vs lotti
-                required: [checkedTruckWeight, checkedLotSum]
-                properties:
-                    checkedTruckWeight: {type: number, exclusiveMinimum: 0, title: Peso camion verificato}
-                    checkedLotSum: {type: number, exclusiveMinimum: 0, title: Somma pesi netti lotti verificata}
-              uiSchema:
-                ui:options:
-                    order: [checkedTruckWeight, checkedLotSum]
+                properties: {}
               chrome:
                 registeredData:
                     kind: dataReport
                     title: Dati registrati
-                    before: checkedTruckWeight
                     expr: |-
                         (
                           $truck := $lookup($domain.truck, $instance.id);
                           $gross := $truck.truckWeight;
-                          $lotSum := $sum($append([], $domain.lot.*[truckId=$instance.id].netWeight));
                           $tare := $truck.lastScaleReading;
-                          $m := $max([$gross - $tare, $lotSum]);
-                          $pct := $m = 0 ? 0 : 100 * $min([$gross - $tare, $lotSum]) / $m;
+                          $expectedNet := $type($gross) = "number" and $type($tare) = "number" ? $gross - $tare : undefined;
+                          $lotIds := $sort($keys($sift($domain.lot, function($v){$v.truckId = $instance.id})));
+                          $lotSum := $sum($append([], $domain.lot.*[truckId=$instance.id].netWeight[$type($)="number"]));
+                          $delta := $type($expectedNet) = "number" ? $lotSum - $expectedNet : undefined;
+                          $m := $type($expectedNet) = "number" ? $max([$expectedNet, $lotSum]) : 0;
+                          $pct := $m = 0 ? 0 : 100 * $min([$expectedNet, $lotSum]) / $m;
                           $tone := $pct >= 98 ? "green" : $pct >= 90 ? "warning" : "danger";
                           $kg := function($v){ $type($v) = "number" ? $string($v) : null };
+                          $deltaLabel := $type($delta) != "number" ? null : ($delta > 0 ? "+" & $string($delta) : $string($delta)) & " kg";
+                          $lotRows := $count($lotIds) = 0 ? [] : $map($lotIds, function($id){(
+                            $lot := $lookup($domain.lot, $id);
+                            {"label": "Lotto " & $id, "value": $kg($lot.netWeight), "error": null, "tone": null}
+                          )});
                           {
                             "value": null,
                             "error": null,
-                            "rows": [
-                              {"label": "Peso lordo camion", "value": $kg($gross), "error": null, "tone": null},
-                              {"label": "Ultima lettura (tara)", "value": $kg($tare), "error": null, "tone": null},
-                              {"label": "Σ netti lotti", "value": $kg($lotSum), "error": null, "tone": null},
-                              {"label": "Corrispondenza %", "value": $string($pct), "error": null, "tone": $tone}
-                            ]
+                            "rows": $append(
+                              [{"label": "Peso lordo camion", "value": $kg($gross), "error": null, "tone": null}],
+                              $append(
+                                $lotRows,
+                                [
+                                  {"label": "Tara camion", "value": $kg($tare), "error": null, "tone": null},
+                                  {"label": "Netto atteso (lordo−tara)", "value": $kg($expectedNet), "error": null, "tone": null},
+                                  {"label": "Σ netti lotti", "value": $kg($lotSum), "error": null, "tone": null},
+                                  {"label": "Δ (Σ − netto atteso)", "value": $deltaLabel, "error": null, "tone": $tone}
+                                ]
+                              )
+                            )
                           }
                         )
                 currentOperator:
                     kind: readonly
                     title: Operatore corrente
                     expr: $operator.displayName
-                    after: checkedLotSum
+                    after: registeredData
               onSubmit:
-                transform:
-                    - op: patch
-                      entity: truck
-                      id: '$instance.id'
-                      set:
-                        checkedTruckWeight: $.checkedTruckWeight
-                        checkedLotSum: $.checkedLotSum
+                transform: []
     lot_processing:
         repeatable: true
         title: Lavorazione

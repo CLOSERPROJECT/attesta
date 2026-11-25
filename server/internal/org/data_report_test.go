@@ -37,7 +37,8 @@ func dataReportProbeDomain() Domain {
 			"T1": {"workingDayId": "2026-10-19", "truckWeight": 1000.0, "lastScaleReading": 200.0},
 		},
 		"lot": {
-			"L1": {"netWeight": 800.0, "truckId": "T1", "client": "NO"},
+			"L1": {"netWeight": 500.0, "truckId": "T1", "client": "NO"},
+			"L2": {"netWeight": 300.0, "truckId": "T1", "client": "CO"},
 		},
 		"pallet": {
 			"P1": {"lotId": "L1", "weight": 125.0, "progress": "done"},
@@ -151,7 +152,7 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 			t.Fatalf("%s tone = %#v, want %#v", label, row["tone"], tone)
 		}
 	}
-	assertRow("Netto lotto", "800", nil)
+	assertRow("Netto lotto", "500", nil)
 	assertRow("Massa netta pannelli", "185", nil)
 	assertRow("Plastica", "70", "info")
 	assertRow("Alluminio", "30", "info")
@@ -195,7 +196,7 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Probe: truck T1 gross 1000, last reading 200; lot net 800 → match vs Σ lots.
+	// Probe: truck T1 gross 1000, tare 200 → expected net 800; lots L1+L2 = 800 → Δ 0.
 	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), ActionableTaskRef{
 		JobID: "intake", TaskID: "weightCheck", JobInstanceID: "T1",
 	})
@@ -261,14 +262,28 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 		t.Fatalf("flat weightCheck DTO must not set sections: %#v", display["sections"])
 	}
 	rows, _ := display["rows"].([]any)
-	if len(rows) != 4 {
+	if len(rows) != 7 {
 		t.Fatalf("rows = %#v", rows)
 	}
+	labels := make([]string, 0, len(rows))
 	byLabel := map[string]map[string]any{}
 	for _, rawRow := range rows {
 		row, _ := rawRow.(map[string]any)
 		label, _ := row["label"].(string)
+		labels = append(labels, label)
 		byLabel[label] = row
+	}
+	wantOrder := []string{
+		"Peso lordo camion", "Lotto L1", "Lotto L2", "Tara camion",
+		"Netto atteso (lordo−tara)", "Σ netti lotti", "Δ (Σ − netto atteso)",
+	}
+	if len(labels) != len(wantOrder) {
+		t.Fatalf("row labels = %#v, want %#v", labels, wantOrder)
+	}
+	for i, want := range wantOrder {
+		if labels[i] != want {
+			t.Fatalf("row[%d] = %q, want %q (all %#v)", i, labels[i], want, labels)
+		}
 	}
 	assertRow := func(label, value string, tone any) {
 		t.Helper()
@@ -287,9 +302,12 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 		}
 	}
 	assertRow("Peso lordo camion", "1000", nil)
-	assertRow("Ultima lettura (tara)", "200", nil)
+	assertRow("Lotto L1", "500", nil)
+	assertRow("Lotto L2", "300", nil)
+	assertRow("Tara camion", "200", nil)
+	assertRow("Netto atteso (lordo−tara)", "800", nil)
 	assertRow("Σ netti lotti", "800", nil)
-	assertRow("Corrispondenza %", "100", "green")
+	assertRow("Δ (Σ − netto atteso)", "0 kg", "green")
 }
 
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {

@@ -93,7 +93,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 
 	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value:    map[string]any{},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -105,9 +105,6 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	}
 	if len(after.Submissions) != len(before.Submissions) {
 		t.Fatalf("domain mutated on readyWhen deny: before=%d after=%d", len(before.Submissions), len(after.Submissions))
-	}
-	if _, has := after.Kind("truck")[truckID]["checkedTruckWeight"]; has {
-		t.Fatal("checkedTruckWeight must not appear when readyWhen denies")
 	}
 }
 
@@ -121,12 +118,13 @@ func TestCommitWeightCheckAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
 
 	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value:    map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("truck")[truckID]["checkedTruckWeight"] != 1000.0 {
-		t.Fatalf("domain = %#v", result.Domain.Kind("truck")[truckID])
+	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
+	if last.TaskID != "weightCheck" {
+		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }

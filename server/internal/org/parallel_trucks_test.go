@@ -48,8 +48,7 @@ func TestParallelTrucksIntakeAndLineBusyBlockedReason(t *testing.T) {
 		t.Fatal("expected lot on truck B")
 	}
 
-	netA, _ := regA.Domain.Kind("lot")[lotA]["netWeight"].(float64)
-	plantCommitWeightCheck(t, c, truckA, 1000.0, netA)
+	plantCommitWeightCheck(t, c, truckA)
 	started := plantCommitStartLot(t, c, lotA)
 	if started.Domain.Kind("lot")[lotA]["status"] != "open" {
 		t.Fatalf("lot A status = %#v, want open", started.Domain.Kind("lot")[lotA])

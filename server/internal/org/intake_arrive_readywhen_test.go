@@ -108,7 +108,7 @@ func TestCommitRegisterDeniedByReadyWhenBeforeArrive(t *testing.T) {
 	_, err = c.Commit(t.Context(), FeragameScope(), admin, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: "T1",
-		Value:         map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 100.0},
+		Value:         map[string]any{},
 	})
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
 		t.Fatalf("weightCheck Commit before truckArrive must deny via readyWhen: %v", err)

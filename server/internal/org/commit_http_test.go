@@ -209,7 +209,7 @@ func TestCommitWithoutHTTPSkipsPort(t *testing.T) {
 
 	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value: map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)

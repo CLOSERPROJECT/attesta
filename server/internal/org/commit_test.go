@@ -212,17 +212,17 @@ func TestCommitWeightCheckAfterRegister(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value:    map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("truck")[truckID]["checkedTruckWeight"] != 1000.0 {
-		t.Fatalf("truck = %#v", result.Domain.Kind("truck")[truckID])
-	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
 	if last.TaskID != "weightCheck" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
+	}
+	if _, has := result.Domain.Kind("truck")[truckID]["checkedTruckWeight"]; has {
+		t.Fatalf("confirm-only weightCheck must not patch checkedTruckWeight: %#v", result.Domain.Kind("truck")[truckID])
 	}
 }
 

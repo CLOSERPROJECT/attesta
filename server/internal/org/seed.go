@@ -270,10 +270,7 @@ func seedStagedDemoDomain(ctx context.Context, domains DomainStore, configs Conf
 	if _, err := seedCommit(ctx, c, scope, admin, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: SeedTruckID,
-		Value: map[string]any{
-			"checkedTruckWeight": 1000.0,
-			"checkedLotSum":      600.0,
-		},
+		Value:         map[string]any{},
 	}); err != nil {
 		return err
 	}
