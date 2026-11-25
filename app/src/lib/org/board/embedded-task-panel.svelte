@@ -147,7 +147,7 @@
 				provisionalJob={address.provisionalJob}
 				{seed}
 				{disabled}
-				submitStart={submitMany && showComposer ? discardAction : undefined}
+				submitStart={submitMany && composerOpen ? discardAction : undefined}
 				onCommitted={(outcome) => onCommitted?.(outcome)}
 			/>
 		{/key}
