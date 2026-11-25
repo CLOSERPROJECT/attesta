@@ -71,7 +71,6 @@ type TimelineView struct {
 	Label    string            `json:"label"`
 	Status   string            `json:"status"`
 	Steps    []TimelineStepDTO `json:"steps"`
-	Revision int64             `json:"revision"`
 }
 
 // TimelineHrefPolicy builds SPA Task hrefs for timeline enrichment.

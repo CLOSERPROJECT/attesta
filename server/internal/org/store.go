@@ -35,18 +35,13 @@ func ScopeFromConfig(cfg OrgConfig) (Scope, error) {
 // DomainStore persists the stream Domain document.
 type DomainStore interface {
 	Get(ctx context.Context, scope Scope) (Domain, error)
-	// Revision counts successful writes to scope: 0 when no Domain is stored, and
-	// exactly +1 per successful Put or Update. Clients compare revisions to detect
-	// writes they did not see, so the +1 step is part of the contract.
-	Revision(ctx context.Context, scope Scope) (int64, error)
 	// Put overwrites unconditionally (seeds, wipes). Commit-path writes use Update.
 	Put(ctx context.Context, scope Scope, domain Domain) error
 	// Update runs fn on the current Domain (EmptyDomain when missing) and writes
 	// its result only if no other write landed in between. fn may run more than
 	// once and must not have side effects; its error is returned unchanged.
-	// Returns the written Domain and the revision of this write, or
-	// ErrDomainConflict when retries are exhausted.
-	Update(ctx context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, int64, error)
+	// Returns ErrDomainConflict when retries are exhausted.
+	Update(ctx context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, error)
 }
 
 // ConfigStore persists versioned Org Config documents and the Active Config version pointer.
@@ -66,16 +61,12 @@ var ErrDomainConflict = fmt.Errorf("org: domain changed concurrently")
 
 // MemoryDomainStore is an in-memory DomainStore.
 type MemoryDomainStore struct {
-	mu        sync.RWMutex
-	byKey     map[string]Domain
-	revisions map[string]int64
+	mu    sync.RWMutex
+	byKey map[string]Domain
 }
 
 func NewMemoryDomainStore() *MemoryDomainStore {
-	return &MemoryDomainStore{
-		byKey:     map[string]Domain{},
-		revisions: map[string]int64{},
-	}
+	return &MemoryDomainStore{byKey: map[string]Domain{}}
 }
 
 func (s *MemoryDomainStore) Get(_ context.Context, scope Scope) (Domain, error) {
@@ -92,16 +83,6 @@ func (s *MemoryDomainStore) Get(_ context.Context, scope Scope) (Domain, error) 
 	return cloneDomain(domain), nil
 }
 
-func (s *MemoryDomainStore) Revision(_ context.Context, scope Scope) (int64, error) {
-	scope, err := scope.Normalize()
-	if err != nil {
-		return 0, err
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.revisions[scopeKey(scope)], nil
-}
-
 func (s *MemoryDomainStore) Put(_ context.Context, scope Scope, domain Domain) error {
 	scope, err := scope.Normalize()
 	if err != nil {
@@ -109,16 +90,14 @@ func (s *MemoryDomainStore) Put(_ context.Context, scope Scope, domain Domain) e
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key := scopeKey(scope)
-	s.byKey[key] = cloneDomain(domain)
-	s.revisions[key]++
+	s.byKey[scopeKey(scope)] = cloneDomain(domain)
 	return nil
 }
 
-func (s *MemoryDomainStore) Update(_ context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, int64, error) {
+func (s *MemoryDomainStore) Update(_ context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, error) {
 	scope, err := scope.Normalize()
 	if err != nil {
-		return Domain{}, 0, err
+		return Domain{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -129,11 +108,10 @@ func (s *MemoryDomainStore) Update(_ context.Context, scope Scope, fn func(Domai
 	}
 	next, err := fn(cloneDomain(current))
 	if err != nil {
-		return Domain{}, 0, err
+		return Domain{}, err
 	}
 	s.byKey[key] = cloneDomain(next)
-	s.revisions[key]++
-	return next, s.revisions[key], nil
+	return next, nil
 }
 
 // MemoryConfigStore is an in-memory ConfigStore.
