@@ -1236,6 +1236,7 @@ func (e *errDomainStore) Put(context.Context, Scope, Domain) error { return e.er
 func (e *errDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, int64, error) {
 	return Domain{}, 0, e.err
 }
+func (e *errDomainStore) DeleteExceptStream(context.Context, string, string) error { return e.err }
 
 func TestChromeCompileHelpersAndSequenceEdges(t *testing.T) {
 	rules := readChromeRules(map[string]any{

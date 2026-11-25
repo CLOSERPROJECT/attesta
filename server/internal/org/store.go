@@ -47,6 +47,9 @@ type DomainStore interface {
 	// Returns the written Domain and the revision of this write, or
 	// ErrDomainConflict when retries are exhausted.
 	Update(ctx context.Context, scope Scope, fn func(Domain) (Domain, error)) (Domain, int64, error)
+	// DeleteExceptStream removes every Domain for org whose stream key is not keepStream.
+	// Seed uses this to drop retired fixture stream keys while keeping keepStream.
+	DeleteExceptStream(ctx context.Context, org, keepStream string) error
 }
 
 // ConfigStore persists versioned Org Config documents and the Active Config version pointer.
@@ -57,6 +60,9 @@ type ConfigStore interface {
 	SetActiveVersion(ctx context.Context, scope Scope, version string) error
 	// ListStreams returns stream keys that have an Active Config pointer for org.
 	ListStreams(ctx context.Context, org string) ([]string, error)
+	// DeleteExceptStream removes Active Config pointers and versioned configs for
+	// org whose stream key is not keepStream. Seed uses this to drop retired keys.
+	DeleteExceptStream(ctx context.Context, org, keepStream string) error
 }
 
 // ErrNotFound is returned when a Domain or Org Config document is missing.
@@ -134,6 +140,30 @@ func (s *MemoryDomainStore) Update(_ context.Context, scope Scope, fn func(Domai
 	s.byKey[key] = cloneDomain(next)
 	s.revisions[key]++
 	return next, s.revisions[key], nil
+}
+
+func (s *MemoryDomainStore) DeleteExceptStream(_ context.Context, org, keepStream string) error {
+	org = strings.TrimSpace(org)
+	keepStream = strings.TrimSpace(keepStream)
+	if org == "" || keepStream == "" {
+		return fmt.Errorf("org: DeleteExceptStream requires org and keepStream")
+	}
+	prefix := org + "\x00"
+	keepKey := scopeKey(Scope{Org: org, Stream: keepStream})
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key := range s.byKey {
+		if !strings.HasPrefix(key, prefix) || key == keepKey {
+			continue
+		}
+		stream := strings.TrimPrefix(key, prefix)
+		if stream == "" || strings.Contains(stream, "\x00") {
+			continue
+		}
+		delete(s.byKey, key)
+		delete(s.revisions, key)
+	}
+	return nil
 }
 
 // MemoryConfigStore is an in-memory ConfigStore.
@@ -251,6 +281,40 @@ func (s *MemoryConfigStore) ListStreams(_ context.Context, org string) ([]string
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+func (s *MemoryConfigStore) DeleteExceptStream(_ context.Context, org, keepStream string) error {
+	org = strings.TrimSpace(org)
+	keepStream = strings.TrimSpace(keepStream)
+	if org == "" || keepStream == "" {
+		return fmt.Errorf("org: DeleteExceptStream requires org and keepStream")
+	}
+	prefix := org + "\x00"
+	keepActive := scopeKey(Scope{Org: org, Stream: keepStream})
+	keepConfigPrefix := keepActive + "\x00"
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key := range s.active {
+		if !strings.HasPrefix(key, prefix) || key == keepActive {
+			continue
+		}
+		stream := strings.TrimPrefix(key, prefix)
+		if stream == "" || strings.Contains(stream, "\x00") {
+			continue
+		}
+		delete(s.active, key)
+	}
+	for key := range s.byOrgVer {
+		if !strings.HasPrefix(key, prefix) || strings.HasPrefix(key, keepConfigPrefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(key, prefix)
+		if rest == "" || !strings.Contains(rest, "\x00") {
+			continue
+		}
+		delete(s.byOrgVer, key)
+	}
+	return nil
 }
 
 func cloneDomain(d Domain) Domain {

@@ -150,6 +150,19 @@ func (s *MongoDomainStore) Update(ctx context.Context, scope Scope, fn func(Doma
 	return Domain{}, 0, ErrDomainConflict
 }
 
+func (s *MongoDomainStore) DeleteExceptStream(ctx context.Context, org, keepStream string) error {
+	org = strings.TrimSpace(org)
+	keepStream = strings.TrimSpace(keepStream)
+	if org == "" || keepStream == "" {
+		return fmt.Errorf("org: DeleteExceptStream requires org and keepStream")
+	}
+	_, err := s.coll().DeleteMany(ctx, bson.M{"org": org, "stream": bson.M{"$ne": keepStream}})
+	if err != nil {
+		return fmt.Errorf("org mongo domain delete except stream: %w", err)
+	}
+	return nil
+}
+
 // domainRevisionFilter treats a missing revision field (docs written before
 // revisions existed) as revision 0.
 func domainRevisionFilter(scope Scope, revision int64) bson.M {
@@ -347,6 +360,22 @@ func (s *MongoConfigStore) ListStreams(ctx context.Context, org string) ([]strin
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+func (s *MongoConfigStore) DeleteExceptStream(ctx context.Context, org, keepStream string) error {
+	org = strings.TrimSpace(org)
+	keepStream = strings.TrimSpace(keepStream)
+	if org == "" || keepStream == "" {
+		return fmt.Errorf("org: DeleteExceptStream requires org and keepStream")
+	}
+	filter := bson.M{"org": org, "stream": bson.M{"$ne": keepStream}}
+	if _, err := s.active().DeleteMany(ctx, filter); err != nil {
+		return fmt.Errorf("org mongo active delete except stream: %w", err)
+	}
+	if _, err := s.configs().DeleteMany(ctx, filter); err != nil {
+		return fmt.Errorf("org mongo config delete except stream: %w", err)
+	}
+	return nil
 }
 
 func domainToMongoDoc(scope Scope, domain Domain) mongoDomainDoc {

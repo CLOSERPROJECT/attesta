@@ -75,11 +75,19 @@ const (
 //   - SeedScopeFeragameDomain / Full: Active Config + always wipe + stage
 //     (KeepDomain is invalid).
 //
+// Every SeedDemo path first drops retired stream keys under the fixture org
+// (Active Config, versioned configs, Domain) so renamed-fixture orphans do not
+// survive a normal seed. KeepDomain still leaves the fixture stream's Domain
+// (+ passports) untouched.
+//
 // Demo/fixture only — product hosts must not require this demo seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
 func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opts SeedOptions) (OrgConfig, error) {
 	if configs == nil {
 		return OrgConfig{}, fmt.Errorf("org: config store required")
+	}
+	if err := pruneRetiredFixtureStreams(ctx, domains, configs); err != nil {
+		return OrgConfig{}, err
 	}
 	switch opts.Scope {
 	case SeedScopeFeragameConfig, SeedScopeFeragameIdentity:
@@ -101,6 +109,22 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 		}
 		return seedDemoBoth(ctx, domains, configs, opts)
 	}
+}
+
+// pruneRetiredFixtureStreams removes Active Config, configs, and Domain for every
+// stream under the Feragame fixture org except the fixture stream key.
+func pruneRetiredFixtureStreams(ctx context.Context, domains DomainStore, configs ConfigStore) error {
+	scope := FeragameScope()
+	if err := configs.DeleteExceptStream(ctx, scope.Org, scope.Stream); err != nil {
+		return fmt.Errorf("org seed: prune retired configs: %w", err)
+	}
+	if domains == nil {
+		return nil
+	}
+	if err := domains.DeleteExceptStream(ctx, scope.Org, scope.Stream); err != nil {
+		return fmt.Errorf("org seed: prune retired domains: %w", err)
+	}
+	return nil
 }
 
 func seedDemoBoth(ctx context.Context, domains DomainStore, configs ConfigStore, opts SeedOptions) (OrgConfig, error) {

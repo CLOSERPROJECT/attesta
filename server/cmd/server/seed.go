@@ -11,7 +11,8 @@ import (
 	"github.com/CLOSERPROJECT/attesta/server/internal/org"
 )
 
-// Empty-only presence marker: when this org exists and Replace is false, Seed is a no-op.
+// Empty-only presence marker: when this org exists and Replace is false, Seed skips
+// identity/taxonomy/catalog rewrite but still applies org SeedDemo when OrgConfigs is set.
 const demoFixtureMarkerOrgSlug = "organization-1"
 
 // Narrow IdentityStore surface for Seed; full IdentityStore remains the HTTP/session type.
@@ -73,8 +74,9 @@ func seedScopeFeragameNeedsIdentity(scope org.SeedScope) bool {
 	return scope == org.SeedScopeFeragameIdentity || scope == org.SeedScopeFeragameFull
 }
 
-// Empty-only (default): if the marker org already exists, returns nil without writing.
-// Pass Replace to rewrite.
+// Empty-only (default): if the marker org already exists, skip identity/taxonomy/catalog
+// rewrite and still apply org SeedDemo (prune retired streams + fixture Active Config).
+// Pass Replace to rewrite identity/taxonomy/catalog and wipe Domain.
 //
 // Apply order is intentional: identity → taxonomy → catalog streams → instances → org.
 // Feragame scopes skip Formata; identity/full hard-reset Feragame Appwrite only.
@@ -100,7 +102,10 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 		_, err := deps.Identity.GetOrganizationBySlug(ctx, demoFixtureMarkerOrgSlug)
 		switch {
 		case err == nil:
-			return nil
+			// Empty-only: skip identity/taxonomy/catalog rewrite, but still apply
+			// org SeedDemo so retired Feragame stream keys are pruned and Active
+			// Config stays aligned with the fixture.
+			return applyOrgSeed(ctx, deps)
 		case errors.Is(err, ErrIdentityNotFound):
 		default:
 			return fmt.Errorf("seed: marker org lookup: %w", err)
