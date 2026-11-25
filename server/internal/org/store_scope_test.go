@@ -82,7 +82,7 @@ func TestStreamsKeepSeparateDomainsAndActiveVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(streams) != 2 || streams[0] != "other" || streams[1] != "recycling" {
+	if len(streams) != 2 || streams[0] != "other" || streams[1] != "pv-recovery" {
 		t.Fatalf("streams = %#v", streams)
 	}
 }

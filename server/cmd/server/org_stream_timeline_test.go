@@ -17,8 +17,8 @@ func TestOrgJobSeedFieldFromInstanceID(t *testing.T) {
 }
 
 func TestAppOrgSeededStartTaskPath(t *testing.T) {
-	got := appOrgSeededStartTaskPath("recycling", "T1", "lot_processing", "startLot", "lotId", "L-wait")
-	want := "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
+	got := appOrgSeededStartTaskPath("pv-recovery", "T1", "lot_processing", "startLot", "lotId", "L-wait")
+	want := "/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
@@ -90,14 +90,14 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 		},
 	}}
 
-	steps := buildOrgTimelineSteps(cfg, domain, timeline, "recycling", "T1")
+	steps := buildOrgTimelineSteps(cfg, domain, timeline, "pv-recovery", "T1")
 	if len(steps) != 2 {
 		t.Fatalf("steps = %#v", steps)
 	}
 	if steps[0].Summary.Title != "Ingresso" || len(steps[0].Substeps) != 2 || len(steps[0].Rows) != 0 {
 		t.Fatalf("once step = %#v", steps[0])
 	}
-	if steps[0].Substeps[0].Href != "/app/recycling/i/T1/intake/T1/arrive" {
+	if steps[0].Substeps[0].Href != "/app/pv-recovery/i/T1/intake/T1/arrive" {
 		t.Fatalf("once href = %q", steps[0].Substeps[0].Href)
 	}
 	if steps[0].Substeps[0].OrgActionable || !steps[0].Substeps[1].OrgActionable {
@@ -119,7 +119,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 		t.Fatalf("each step = %#v", steps[1])
 	}
 	open := steps[1].Rows[0]
-	if open.Substeps[0].Href != "/app/recycling/i/T1/lot_processing/L-open/startLot" {
+	if open.Substeps[0].Href != "/app/pv-recovery/i/T1/lot_processing/L-open/startLot" {
 		t.Fatalf("open href = %q", open.Substeps[0].Href)
 	}
 	if len(open.Substeps[0].Submissions) != 1 || open.Substeps[0].OrgActionable {
@@ -129,7 +129,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 		t.Fatalf("weigh actionable/submitMany/empty submissions = %#v", open.Substeps[1])
 	}
 	wait := steps[1].Rows[1]
-	wantSeed := "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
+	wantSeed := "/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
 	if wait.Substeps[0].Href != wantSeed {
 		t.Fatalf("seed href = %q, want %q", wait.Substeps[0].Href, wantSeed)
 	}
@@ -168,7 +168,7 @@ func TestStreamTimelineTemplateRendersEachRows(t *testing.T) {
 					Title:         "Apri lotto",
 					Status:        "locked",
 					BlockedReason: "Linea occupata: lotto L-open",
-					Href:          "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait",
+					Href:          "/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L-wait",
 				}},
 			}},
 		}},
@@ -208,7 +208,7 @@ func TestSubstepShellRendersOrgActionableCardLink(t *testing.T) {
 			Status:        "available",
 			OrgActionable: true,
 			SubmitMany:    true,
-			Href:          "/app/recycling/i/T1/intake/T1/check",
+			Href:          "/app/pv-recovery/i/T1/intake/T1/check",
 			Submissions: []TimelineSubmissionView{
 				{Timestamp: "2026-11-19T11:00:00Z", TimestampHuman: "19 Nov 2026 at 11:00 UTC", UserID: "ops@test"},
 				{Timestamp: "2026-11-19T12:00:00Z", TimestampHuman: "19 Nov 2026 at 12:00 UTC", UserID: "ops@test"},
@@ -223,7 +223,7 @@ func TestSubstepShellRendersOrgActionableCardLink(t *testing.T) {
 	for _, want := range []string{
 		`data-org-actionable="true"`,
 		`class="substep-card-link"`,
-		`href="/app/recycling/i/T1/intake/T1/check"`,
+		`href="/app/pv-recovery/i/T1/intake/T1/check"`,
 		"Submissions (2)",
 		`datetime="2026-11-19T11:00:00Z"`,
 		"ops@test",
@@ -252,7 +252,7 @@ func TestSubstepShellRendersDoneAccordionWithOpenSubmissions(t *testing.T) {
 			SubstepID: "intake.arrive",
 			Title:     "Arrive",
 			Status:    "done",
-			Href:      "/app/recycling/i/T1/intake/T1/arrive",
+			Href:      "/app/pv-recovery/i/T1/intake/T1/arrive",
 			Submissions: []TimelineSubmissionView{
 				{Timestamp: "2026-11-19T10:00:00Z", TimestampHuman: "19 Nov 2026 at 10:00 UTC", UserID: "ops@test"},
 			},
@@ -286,7 +286,7 @@ func TestSubstepShellOmitsEmptySubmissionsShell(t *testing.T) {
 			Title:         "Check",
 			Status:        "available",
 			OrgActionable: true,
-			Href:          "/app/recycling/i/T1/intake/T1/check",
+			Href:          "/app/pv-recovery/i/T1/intake/T1/check",
 		},
 	}
 	var out strings.Builder
@@ -312,7 +312,7 @@ func TestSubstepShellOmitsDataOrgActionableWhenNotActionable(t *testing.T) {
 			SubstepID: "intake.check",
 			Title:     "Check",
 			Status:    "locked",
-			Href:      "/app/recycling/i/T1/intake/T1/check",
+			Href:      "/app/pv-recovery/i/T1/intake/T1/check",
 		},
 	}
 	var out strings.Builder

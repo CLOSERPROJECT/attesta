@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const stream = 'recycling';
+const stream = 'pv-recovery';
 const instance = 'NIR-1';
 const homePath = `/app/${stream}/i/${instance}`;
 const playPath = `/app/${stream}/new`;

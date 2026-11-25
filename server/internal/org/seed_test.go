@@ -82,13 +82,13 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryDPPStore()
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "other", Stream: "recycling", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
+		Org: "other", Stream: "pv-recovery", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/2/b/t",
 	}); err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); err != nil {
 		t.Fatalf("finished lot passport after wipe+stage = %v, want issued DPP", err)
 	}
-	if _, err := passports.Get(t.Context(), Scope{Org: "other", Stream: "recycling"}, "X"); err != nil {
+	if _, err := passports.Get(t.Context(), Scope{Org: "other", Stream: "pv-recovery"}, "X"); err != nil {
 		t.Fatalf("other org passport must survive: %v", err)
 	}
 }
@@ -181,7 +181,7 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -314,7 +314,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)

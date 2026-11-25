@@ -215,14 +215,14 @@ func TestEvaluateReadyWhenBindsStream(t *testing.T) {
 	domain.Entities = map[string]EntityMap{
 		"lot": {"L1": {"truckId": "T-A"}},
 	}
-	ok, err := evaluateReadyWhen(domain, `$count($domain.lot.*[truckId = $stream.id]) = 1`, "", nil, &streamBinding{Key: "recycling", ID: "T-A"})
+	ok, err := evaluateReadyWhen(domain, `$count($domain.lot.*[truckId = $stream.id]) = 1`, "", nil, &streamBinding{Key: "pv-recovery", ID: "T-A"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !ok {
 		t.Fatal("want readyWhen true with $stream.id = T-A")
 	}
-	ok, err = evaluateReadyWhen(domain, `$count($domain.lot.*[truckId = $stream.id]) = 1`, "", nil, &streamBinding{Key: "recycling", ID: "T-B"})
+	ok, err = evaluateReadyWhen(domain, `$count($domain.lot.*[truckId = $stream.id]) = 1`, "", nil, &streamBinding{Key: "pv-recovery", ID: "T-B"})
 	if err != nil {
 		t.Fatal(err)
 	}

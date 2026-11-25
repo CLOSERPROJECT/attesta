@@ -15,12 +15,12 @@ const sample: LoadResult = {
 	taskFormBundles: []
 };
 
-const scope = { stream: 'recycling', instance: 'T-1' };
+const scope = { stream: 'pv-recovery', instance: 'T-1' };
 
 describe('HttpLoadDomainPort', () => {
 	test('GET /api/org/domain sends stream and instance', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe('/api/org/domain?stream=recycling&instance=T-1');
+			expect(String(input)).toBe('/api/org/domain?stream=pv-recovery&instance=T-1');
 			expect(init?.method).toBe('GET');
 			expect(init?.credentials).toBe('include');
 			return new Response(JSON.stringify(sample), {
@@ -44,7 +44,7 @@ describe('HttpLoadDomainPort', () => {
 			const url = String(input);
 			expect(url).not.toContain('/api/runs');
 			expect(url).toBe(
-				'https://host.example/api/org/domain?stream=recycling&instance=T-1'
+				'https://host.example/api/org/domain?stream=pv-recovery&instance=T-1'
 			);
 			return new Response(JSON.stringify(sample), { status: 200 });
 		});

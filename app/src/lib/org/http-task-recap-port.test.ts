@@ -26,7 +26,7 @@ describe('HttpTaskRecapPort', () => {
 	test('sends stream + instance with flat address; normalizes missing links', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			expect(String(input)).toBe(
-				'/api/org/task-recap?jobId=intake&taskId=truckArrive&jobInstanceId=T1&stream=recycling&instance=261102-1'
+				'/api/org/task-recap?jobId=intake&taskId=truckArrive&jobInstanceId=T1&stream=pv-recovery&instance=261102-1'
 			);
 			return new Response(
 				JSON.stringify({
@@ -48,7 +48,7 @@ describe('HttpTaskRecapPort', () => {
 		});
 		const port = createHttpTaskRecapPort({ fetch: fetchFn });
 		const got = await port.fetch({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			taskId: 'truckArrive',
@@ -90,7 +90,7 @@ describe('HttpTaskRecapPort', () => {
 		);
 		const port = createHttpTaskRecapPort({ fetch: fetchFn });
 		const got = await port.fetch({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			taskId: 'register',
@@ -115,7 +115,7 @@ describe('HttpTaskRecapPort', () => {
 		const port = createHttpTaskRecapPort({ fetch: fetchFn });
 		await expect(
 			port.fetch({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				jobId: 'intake',
 				taskId: 'register',
@@ -131,7 +131,7 @@ describe('HttpTaskRecapPort', () => {
 		const port = createHttpTaskRecapPort({ fetch: fetchFn });
 		await expect(
 			port.fetch({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				jobId: 'intake',
 				taskId: 'register',

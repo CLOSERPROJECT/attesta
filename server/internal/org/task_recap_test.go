@@ -172,7 +172,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=register&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=register&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("register recap status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -187,7 +187,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("flat recap = %d", rec.Code)
 	}
@@ -201,13 +201,13 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=weightCheck&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=weightCheck&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("not done = %d, want 404", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?stream=recycling&instance="+truckID+"&taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&taskId=truckArrive", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("missing params = %d", rec.Code)
 	}
@@ -221,7 +221,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	logH.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logistic recap = %d body=%s", rec.Code, rec.Body.String())
 	}

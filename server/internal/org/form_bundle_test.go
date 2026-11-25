@@ -384,7 +384,7 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truckID, nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())

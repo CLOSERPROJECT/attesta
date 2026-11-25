@@ -121,7 +121,7 @@ func waitForSubscribers(t *testing.T, hub *DomainChangeHub, want int) {
 
 func TestHandleEventsStreamsDomainRevisions(t *testing.T) {
 	api, hub, _ := newEventsTestAPI(t)
-	body, resp, cancel := openDomainEvents(t, api, "?stream=recycling")
+	body, resp, cancel := openDomainEvents(t, api, "?stream=pv-recovery")
 	defer cancel()
 
 	if got := resp.Header.Get("Content-Type"); got != "text/event-stream" {
@@ -141,7 +141,7 @@ func TestHandleEventsStreamsDomainRevisions(t *testing.T) {
 		t.Fatalf("first event = %q", got)
 	}
 
-	commitReq := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling",
+	commitReq := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery",
 		strings.NewReader(`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`))
 	commitReq.Header.Set("X-Test-Operator", "second")
 	commitRec := httptest.NewRecorder()
@@ -161,7 +161,7 @@ func TestHandleEventsStreamsDomainRevisions(t *testing.T) {
 func TestHandleEventsHeartbeatKeepsStreamAlive(t *testing.T) {
 	api, _, _ := newEventsTestAPI(t)
 	api.EventsHeartbeat = 20 * time.Millisecond
-	body, _, cancel := openDomainEvents(t, api, "?stream=recycling")
+	body, _, cancel := openDomainEvents(t, api, "?stream=pv-recovery")
 	defer cancel()
 
 	_ = readEventBlock(t, body) // retry
@@ -174,7 +174,7 @@ func TestHandleEventsHeartbeatKeepsStreamAlive(t *testing.T) {
 func TestHandleEventsRejectsNonGET(t *testing.T) {
 	api, _, _ := newEventsTestAPI(t)
 	rec := httptest.NewRecorder()
-	api.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/events?stream=recycling", nil))
+	api.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/events?stream=pv-recovery", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405", rec.Code)
 	}
@@ -184,7 +184,7 @@ func TestHandleEventsRequiresConfiguration(t *testing.T) {
 	api, _, _ := newEventsTestAPI(t)
 	api.Changes = nil
 	rec := httptest.NewRecorder()
-	api.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/events?stream=recycling", nil))
+	api.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/events?stream=pv-recovery", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
@@ -195,7 +195,7 @@ func TestHandleEventsRequiresConfiguration(t *testing.T) {
 
 func TestHandleEventsGateFailurePassesThrough(t *testing.T) {
 	api, _, _ := newEventsTestAPI(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/org/events?stream=recycling", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/events?stream=pv-recovery", nil)
 	req.Header.Set("X-Test-Denied", "1")
 	rec := httptest.NewRecorder()
 	api.ServeHTTP(rec, req)
@@ -211,7 +211,7 @@ func TestHandleEventsRequiresOrgStreamAndKnownStream(t *testing.T) {
 		header string
 		status int
 	}{
-		{name: "empty org", target: "/api/org/events?stream=recycling", header: "empty-org", status: http.StatusForbidden},
+		{name: "empty org", target: "/api/org/events?stream=pv-recovery", header: "empty-org", status: http.StatusForbidden},
 		{name: "missing stream", target: "/api/org/events", status: http.StatusBadRequest},
 		{name: "unknown stream", target: "/api/org/events?stream=missing", status: http.StatusNotFound},
 	}
@@ -244,7 +244,7 @@ func TestHandleEventsRevisionReadFailure(t *testing.T) {
 		Configs: api.DomainLoader.Configs,
 	}
 	rec := httptest.NewRecorder()
-	api.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/events?stream=recycling", nil))
+	api.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/events?stream=pv-recovery", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}

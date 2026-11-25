@@ -55,8 +55,8 @@ func TestLookupTaskAfterJSONRoundTrip(t *testing.T) {
 		t.Fatalf("lookupTask after normalize: %v", err)
 	}
 
-	if decoded.Stream == nil || decoded.Stream.Key != "recycling" {
-		t.Fatalf("stream after JSON = %#v, want recycling", decoded.Stream)
+	if decoded.Stream == nil || decoded.Stream.Key != "pv-recovery" {
+		t.Fatalf("stream after JSON = %#v, want pv-recovery", decoded.Stream)
 	}
 	if len(decoded.Stream.Steps) != 2 || decoded.Stream.Steps[1].Each == nil {
 		t.Fatalf("stream.steps after JSON = %#v", decoded.Stream.Steps)

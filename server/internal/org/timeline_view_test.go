@@ -68,7 +68,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 		},
 	}}
 
-	hrefs := TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, "T1"))
+	hrefs := TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, "T1"))
 	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs)
 	if len(steps) != 2 {
 		t.Fatalf("steps = %#v", steps)
@@ -76,7 +76,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	if steps[0].Title != "Ingresso" || len(steps[0].Substeps) != 2 || len(steps[0].Rows) != 0 {
 		t.Fatalf("once step = %#v", steps[0])
 	}
-	if steps[0].Substeps[0].Href != "/app/recycling/i/T1/intake/T1/arrive" {
+	if steps[0].Substeps[0].Href != "/app/pv-recovery/i/T1/intake/T1/arrive" {
 		t.Fatalf("once href = %q", steps[0].Substeps[0].Href)
 	}
 	if steps[0].Substeps[0].OrgActionable || !steps[0].Substeps[1].OrgActionable {
@@ -98,11 +98,11 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 		t.Fatalf("each step = %#v", steps[1])
 	}
 	open := steps[1].Rows[0]
-	if open.Substeps[0].Href != "/app/recycling/i/T1/lot_processing/L-open/startLot" {
+	if open.Substeps[0].Href != "/app/pv-recovery/i/T1/lot_processing/L-open/startLot" {
 		t.Fatalf("open href = %q", open.Substeps[0].Href)
 	}
 	wait := steps[1].Rows[1]
-	wantSeed := "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
+	wantSeed := "/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
 	if wait.Substeps[0].Href != wantSeed {
 		t.Fatalf("seed href = %q, want %q", wait.Substeps[0].Href, wantSeed)
 	}
@@ -239,7 +239,7 @@ func TestBuildOrgTimelineStepsStatusRollup(t *testing.T) {
 		},
 	}}
 
-	hrefs := TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, "T1"))
+	hrefs := TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, "T1"))
 	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs)
 	if len(steps) != 6 {
 		t.Fatalf("steps = %#v", steps)
@@ -306,21 +306,21 @@ func TestOrgTimelineSubmissionsSkipsEmpty(t *testing.T) {
 }
 
 func TestAppOrgSeededStartTaskPath(t *testing.T) {
-	got := AppOrgSeededStartTaskPath("recycling", "T1", "lot_processing", "startLot", "lotId", "L-wait")
-	want := "/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
+	got := AppOrgSeededStartTaskPath("pv-recovery", "T1", "lot_processing", "startLot", "lotId", "L-wait")
+	want := "/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L-wait"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
 
 func TestAppOrgPlayTaskPath(t *testing.T) {
-	got := AppOrgPlayTaskPath("recycling", "intake", "", "truckArrive")
-	want := "/app/recycling/new/intake/new/truckArrive"
+	got := AppOrgPlayTaskPath("pv-recovery", "intake", "", "truckArrive")
+	want := "/app/pv-recovery/new/intake/new/truckArrive"
 	if got != want {
 		t.Fatalf("blank jobInstance → new: got %q, want %q", got, want)
 	}
-	got = AppOrgPlayTaskPath("recycling", "intake", "T1", "truckArrive")
-	want = "/app/recycling/new/intake/T1/truckArrive"
+	got = AppOrgPlayTaskPath("pv-recovery", "intake", "T1", "truckArrive")
+	want = "/app/pv-recovery/new/intake/T1/truckArrive"
 	if got != want {
 		t.Fatalf("explicit jobInstance: got %q, want %q", got, want)
 	}
@@ -332,14 +332,14 @@ func TestBuildOrgTimelineViewBootActionableHref(t *testing.T) {
 		t.Fatal(err)
 	}
 	op := FixtureAllRolesOp()
-	view := BuildOrgTimelineView(cfg, EmptyDomain(), op, "recycling", TimelineBoot())
+	view := BuildOrgTimelineView(cfg, EmptyDomain(), op, "pv-recovery", TimelineBoot())
 	if view.Mode != TimelineModeBoot {
 		t.Fatalf("mode = %q, want %q", view.Mode, TimelineModeBoot)
 	}
 	if view.Instance != "" {
 		t.Fatalf("boot instance = %q, want empty", view.Instance)
 	}
-	if view.Stream != "recycling" {
+	if view.Stream != "pv-recovery" {
 		t.Fatalf("stream = %q", view.Stream)
 	}
 	if len(view.Steps) == 0 || len(view.Steps[0].Substeps) == 0 {
@@ -350,7 +350,7 @@ func TestBuildOrgTimelineViewBootActionableHref(t *testing.T) {
 		t.Fatalf("boot start must be orgActionable: %#v", start)
 	}
 	taskID := strings.TrimPrefix(start.SubstepID, "intake.")
-	wantHref := AppOrgPlayTaskPath("recycling", "intake", "", taskID)
+	wantHref := AppOrgPlayTaskPath("pv-recovery", "intake", "", taskID)
 	if start.Href != wantHref {
 		t.Fatalf("boot href = %q, want %q", start.Href, wantHref)
 	}
@@ -364,7 +364,7 @@ func TestBuildOrgTimelineViewInstanceMode(t *testing.T) {
 	op := FixtureAllRolesOp()
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "Truck T1"}}
-	view := BuildOrgTimelineView(cfg, domain, op, "recycling", mustTimelineInstance(t, "T1"))
+	view := BuildOrgTimelineView(cfg, domain, op, "pv-recovery", mustTimelineInstance(t, "T1"))
 	if view.Mode != TimelineModeInstance {
 		t.Fatalf("mode = %q, want %q", view.Mode, TimelineModeInstance)
 	}
@@ -375,7 +375,7 @@ func TestBuildOrgTimelineViewInstanceMode(t *testing.T) {
 		t.Fatalf("instance steps = %#v", view.Steps)
 	}
 	href := view.Steps[0].Substeps[0].Href
-	if !strings.HasPrefix(href, "/app/recycling/i/T1/") {
+	if !strings.HasPrefix(href, "/app/pv-recovery/i/T1/") {
 		t.Fatalf("instance href = %q", href)
 	}
 }
@@ -388,7 +388,7 @@ func TestBuildOrgTimelineRoleBadgesFromRoleDefs(t *testing.T) {
 	op := FixtureAllRolesOp()
 	domain := EmptyDomain()
 	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "T1", Label: "Truck T1"}}
-	view := BuildOrgTimelineView(cfg, domain, op, "recycling", mustTimelineInstance(t, "T1"))
+	view := BuildOrgTimelineView(cfg, domain, op, "pv-recovery", mustTimelineInstance(t, "T1"))
 	if len(view.Steps) == 0 {
 		t.Fatal("expected intake step")
 	}

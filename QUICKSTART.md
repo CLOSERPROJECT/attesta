@@ -128,7 +128,7 @@ Demo data comes only from the Go seed (`attesta seed` / `ATTESTA_SEED`). Product
 - Empty-only (default): `task seed` / prepare seed is a no-op while the marker org exists.
 - Rewrite: `task seed -- --replace` (wipes and rebuilds org Domain + passports). After Org Config-as-Stream, re-seed — there is no migration of old `org_*` rows.
 - Identity: org `feragame`, all-roles `admin@feragame.com`, plus `administration@feragame.com`, `logistic@feragame.com`, `line@feragame.com` (password = email). Existing stacks need `--replace` once to pick up new users. Everyone lands on `/my` (stream dashboard), then opens a truck into `/app`.
-- Domain + Active Config: same seed sets feragame-config as Active on stream key `recycling` (from the fixture) and, when Domain is missing/empty or `--replace` is used, rebuilds a staged Domain for that stream. No harness `/api/runs` snapshot PUT.
+- Domain + Active Config: same seed sets feragame-config as Active on stream key `pv-recovery` (from the fixture) and, when Domain is missing/empty or `--replace` is used, rebuilds a staged Domain for that stream. No harness `/api/runs` snapshot PUT.
 - Staged Domain (parallel-truck demo): two active trucks — truck A with one finished lot (DPP issued) and one open lot mid-weigh; truck B still in intake. Truck B's "Apri lotto" shows line busy while A's lot is open.
 - Feragame scopes (skip Formata; always run; scoped to the fixture stream):
   - `task seed:feragame-config` — Active Config + wipe Domain empty (no Appwrite)

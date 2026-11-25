@@ -19,14 +19,14 @@ const sample: TaskFormBundle = {
 	bindings: { domain: {} }
 };
 
-const scoped = { stream: 'recycling', instance: 'T-1' };
-const play = { stream: 'recycling' };
+const scoped = { stream: 'pv-recovery', instance: 'T-1' };
+const play = { stream: 'pv-recovery' };
 
 describe('HttpTaskFormPort', () => {
 	test('GET /api/org/task-form sends stream + instance with job/task', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			expect(String(input)).toBe(
-				'/api/org/task-form?jobId=intake&taskId=register&stream=recycling&instance=T-1'
+				'/api/org/task-form?jobId=intake&taskId=register&stream=pv-recovery&instance=T-1'
 			);
 			expect(init?.method).toBe('GET');
 			expect(init?.credentials).toBe('include');
@@ -47,7 +47,7 @@ describe('HttpTaskFormPort', () => {
 	test('Play omits instance on the wire', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			expect(String(input)).toBe(
-				'/api/org/task-form?jobId=intake&taskId=truckArrive&stream=recycling'
+				'/api/org/task-form?jobId=intake&taskId=truckArrive&stream=pv-recovery'
 			);
 			return new Response(JSON.stringify(sample), { status: 200 });
 		});
@@ -77,15 +77,15 @@ describe('HttpTaskFormPort', () => {
 		});
 
 		expect(urls).toEqual([
-			'/api/org/task-form?jobId=intake&taskId=register&jobInstanceId=&stream=recycling&instance=T-1',
-			'/api/org/task-form?jobId=intake&taskId=register&jobInstanceId=new&stream=recycling&instance=T-1'
+			'/api/org/task-form?jobId=intake&taskId=register&jobInstanceId=&stream=pv-recovery&instance=T-1',
+			'/api/org/task-form?jobId=intake&taskId=register&jobInstanceId=new&stream=pv-recovery&instance=T-1'
 		]);
 	});
 
 	test('sends real jobInstanceId for available Task mount', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			expect(String(input)).toBe(
-				'/api/org/task-form?jobId=intake&taskId=codiceFir&jobInstanceId=NIR-261019-NO-1&stream=recycling&instance=T-1'
+				'/api/org/task-form?jobId=intake&taskId=codiceFir&jobInstanceId=NIR-261019-NO-1&stream=pv-recovery&instance=T-1'
 			);
 			return new Response(
 				JSON.stringify({
@@ -114,7 +114,7 @@ describe('HttpTaskFormPort', () => {
 			const url = String(input);
 			expect(url).not.toContain('/api/runs');
 			expect(url).toBe(
-				'https://host.example/api/org/task-form?jobId=intake&taskId=register&stream=recycling&instance=T-1'
+				'https://host.example/api/org/task-form?jobId=intake&taskId=register&stream=pv-recovery&instance=T-1'
 			);
 			return new Response(JSON.stringify(sample), { status: 200 });
 		});

@@ -4,7 +4,7 @@ import { taskAddressKey, type TaskAddress } from '../task-address.js';
 import { BoardEmbedOpen } from './board-embed-open.svelte.js';
 
 const addr = (taskId: string): TaskAddress => ({
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: 'NIR-1',
 	jobId: 'lot_processing',
 	jobInstanceId: 'DA-1',

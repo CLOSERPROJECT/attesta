@@ -13,7 +13,7 @@ import {
 import type { BoardTaskFocus } from './board-url.js';
 
 const base = {
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: '261102-1',
 	label: 'Camion',
 	status: 'active'

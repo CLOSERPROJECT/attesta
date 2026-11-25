@@ -122,7 +122,7 @@ describe('HttpCommitDomainPort', () => {
 	test('POST /api/org/commit sends stream + instance query with body', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			expect(String(input)).toBe(
-				'/api/org/commit?stream=recycling&instance=261102-1'
+				'/api/org/commit?stream=pv-recovery&instance=261102-1'
 			);
 			expect(init?.method).toBe('POST');
 			expect(init?.credentials).toBe('include');
@@ -140,7 +140,7 @@ describe('HttpCommitDomainPort', () => {
 
 		const port = createHttpCommitDomainPort({ fetch: fetchFn, baseUrl: '' });
 		const got = await port.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-261019-NO-1',
@@ -176,7 +176,7 @@ describe('HttpCommitDomainPort', () => {
 		);
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		const got = await port.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/codiceFir',
 			jobInstanceId: 'NIR-261019-NO-1',
@@ -206,7 +206,7 @@ describe('HttpCommitDomainPort', () => {
 		);
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		const got = await port.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/lots/lots-1/register',
 			jobInstanceId: 'T1',
@@ -219,7 +219,7 @@ describe('HttpCommitDomainPort', () => {
 
 	test('Play startingNew sends stream without instance', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe('/api/org/commit?stream=recycling');
+			expect(String(input)).toBe('/api/org/commit?stream=pv-recovery');
 			expect(JSON.parse(String(init?.body))).toEqual({
 				taskPath: 'intake/truckArrive',
 				jobInstanceId: '',
@@ -233,7 +233,7 @@ describe('HttpCommitDomainPort', () => {
 		});
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		await port.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			taskPath: 'intake/truckArrive',
 			jobInstanceId: '',
 			value: { plate: 'AB' },
@@ -246,7 +246,7 @@ describe('HttpCommitDomainPort', () => {
 			const url = String(input);
 			expect(url).not.toContain('/api/runs');
 			expect(url).toBe(
-				'https://host.example/api/org/commit?stream=recycling&instance=261102-1'
+				'https://host.example/api/org/commit?stream=pv-recovery&instance=261102-1'
 			);
 			return new Response(JSON.stringify(sampleResult), { status: 200 });
 		});
@@ -255,7 +255,7 @@ describe('HttpCommitDomainPort', () => {
 			baseUrl: 'https://host.example'
 		});
 		await port.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/codiceFir',
 			jobInstanceId: 'NIR-261019-NO-1',
@@ -268,7 +268,7 @@ describe('HttpCommitDomainPort', () => {
 		const port = createHttpCommitDomainPort({ fetch: fetchFn });
 		await expect(
 			port.commit({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'x',
 				taskPath: 'intake/register',
 				jobInstanceId: 'x',
@@ -277,7 +277,7 @@ describe('HttpCommitDomainPort', () => {
 		).rejects.toBeInstanceOf(CommitDomainError);
 		await expect(
 			port.commit({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'x',
 				taskPath: 'intake/register',
 				jobInstanceId: 'x',

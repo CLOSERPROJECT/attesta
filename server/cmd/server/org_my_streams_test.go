@@ -12,11 +12,11 @@ import (
 )
 
 func TestOrgCatalogKeyHelpers(t *testing.T) {
-	if got := orgCatalogKey("recycling"); got != "org-recycling" {
+	if got := orgCatalogKey("pv-recovery"); got != "org-pv-recovery" {
 		t.Fatalf("orgCatalogKey = %q", got)
 	}
-	key, ok := parseOrgCatalogKey("org-recycling")
-	if !ok || key != "recycling" {
+	key, ok := parseOrgCatalogKey("org-pv-recovery")
+	if !ok || key != "pv-recovery" {
 		t.Fatalf("parseOrgCatalogKey = %q %v", key, ok)
 	}
 	if _, ok := parseOrgCatalogKey("abcdef0123456789abcdef01"); ok {
@@ -57,15 +57,15 @@ func TestOrgDiscoveryVisibleOnlyToOwningOrg(t *testing.T) {
 		t.Fatalf("owner status = %d", ownerRec.Code)
 	}
 	ownerBody := ownerRec.Body.String()
-	wantHref := `href="/my/streams/org-recycling/"`
-	if !strings.Contains(ownerBody, "Lavorazione rifiuti") || !strings.Contains(ownerBody, wantHref) {
+	wantHref := `href="/my/streams/org-pv-recovery/"`
+	if !strings.Contains(ownerBody, "Recupero materiali da pannelli fotovoltaici") || !strings.Contains(ownerBody, wantHref) {
 		t.Fatalf("owner must see Org discovery card, got:\n%s", ownerBody)
 	}
-	if !strings.Contains(ownerBody, "Ingresso camion e lavorazione lotti") {
+	if !strings.Contains(ownerBody, "Ingresso camion, registrazione lotti FIR e recupero materiali da pannelli fotovoltaici a fine vita") {
 		t.Fatalf("owner card must use stream description, got:\n%s", ownerBody)
 	}
-	if strings.Contains(ownerBody, `id="delete-workflow-org-recycling"`) ||
-		strings.Contains(ownerBody, "formata-builder?stream=org-recycling") {
+	if strings.Contains(ownerBody, `id="delete-workflow-org-pv-recovery"`) ||
+		strings.Contains(ownerBody, "formata-builder?stream=org-pv-recovery") {
 		t.Fatalf("Org discovery must hide Formata delete/edit actions, got:\n%s", ownerBody)
 	}
 
@@ -77,7 +77,7 @@ func TestOrgDiscoveryVisibleOnlyToOwningOrg(t *testing.T) {
 		t.Fatalf("other status = %d", otherRec.Code)
 	}
 	otherBody := otherRec.Body.String()
-	if strings.Contains(otherBody, "Lavorazione rifiuti") || strings.Contains(otherBody, "org-recycling") {
+	if strings.Contains(otherBody, "Recupero materiali da pannelli fotovoltaici") || strings.Contains(otherBody, "org-pv-recovery") {
 		t.Fatalf("other org must not see feragame Org stream, got:\n%s", otherBody)
 	}
 }
@@ -109,10 +109,10 @@ func TestOrgDiscoverySingleStreamLinksToDashboard(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("discovery len = %d, want 1 Org stream shortcut, got %#v", len(items), items)
 	}
-	if items[0].Href != "/my/streams/org-recycling/" {
+	if items[0].Href != "/my/streams/org-pv-recovery/" {
 		t.Fatalf("single-stream shortcut Href = %q", items[0].Href)
 	}
-	if items[0].WorkflowKey != "org-recycling" {
+	if items[0].WorkflowKey != "org-pv-recovery" {
 		t.Fatalf("WorkflowKey = %q", items[0].WorkflowKey)
 	}
 }
@@ -133,7 +133,7 @@ func TestOrgDashboardListsInstancesWithActiveDoneFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Stream == nil || cfg.Stream.Key != "recycling" {
+	if cfg.Stream == nil || cfg.Stream.Key != "pv-recovery" {
 		t.Fatalf("seed stream = %#v", cfg.Stream)
 	}
 
@@ -145,7 +145,7 @@ func TestOrgDashboardListsInstancesWithActiveDoneFilter(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-recycling/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-pv-recovery/", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleMyRoutes(rec, req)
@@ -172,7 +172,7 @@ func TestOrgDashboardListsInstancesWithActiveDoneFilter(t *testing.T) {
 		t.Fatalf("Org Play must not prompt for instance name, got:\n%s", body)
 	}
 
-	doneReq := httptest.NewRequest(http.MethodGet, "/my/streams/org-recycling/?filter=done", nil)
+	doneReq := httptest.NewRequest(http.MethodGet, "/my/streams/org-pv-recovery/?filter=done", nil)
 	doneReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	doneRec := httptest.NewRecorder()
 	server.handleMyRoutes(doneRec, doneReq)
@@ -210,7 +210,7 @@ func TestOrgPlayRedirectsAndRoleGates(t *testing.T) {
 	adminHomeRec := httptest.NewRecorder()
 	server.handleHome(adminHomeRec, adminHome)
 	adminHomeBody := adminHomeRec.Body.String()
-	if !strings.Contains(adminHomeBody, `action="/my/streams/org-recycling/instance/start"`) {
+	if !strings.Contains(adminHomeBody, `action="/my/streams/org-pv-recovery/instance/start"`) {
 		t.Fatalf("administration must see Play, got:\n%s", adminHomeBody)
 	}
 	if strings.Contains(adminHomeBody, "data-start-stream-name") {
@@ -221,11 +221,11 @@ func TestOrgPlayRedirectsAndRoleGates(t *testing.T) {
 	lineHome.AddCookie(&http.Cookie{Name: "attesta_session", Value: lineSession})
 	lineHomeRec := httptest.NewRecorder()
 	server.handleHome(lineHomeRec, lineHome)
-	if strings.Contains(lineHomeRec.Body.String(), `action="/my/streams/org-recycling/instance/start"`) {
+	if strings.Contains(lineHomeRec.Body.String(), `action="/my/streams/org-pv-recovery/instance/start"`) {
 		t.Fatalf("line role must not see Play for intake start Task")
 	}
 
-	startReq := httptest.NewRequest(http.MethodPost, "/my/streams/org-recycling/instance/start", strings.NewReader(""))
+	startReq := httptest.NewRequest(http.MethodPost, "/my/streams/org-pv-recovery/instance/start", strings.NewReader(""))
 	startReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	startReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: adminSession})
 	startRec := httptest.NewRecorder()
@@ -233,11 +233,11 @@ func TestOrgPlayRedirectsAndRoleGates(t *testing.T) {
 	if startRec.Code != http.StatusSeeOther {
 		t.Fatalf("Play status = %d body=%s", startRec.Code, startRec.Body.String())
 	}
-	if loc := startRec.Header().Get("Location"); loc != "/app/recycling/new" {
-		t.Fatalf("Play Location = %q, want /app/recycling/new", loc)
+	if loc := startRec.Header().Get("Location"); loc != "/app/pv-recovery/new" {
+		t.Fatalf("Play Location = %q, want /app/pv-recovery/new", loc)
 	}
 
-	denied := httptest.NewRequest(http.MethodPost, "/my/streams/org-recycling/instance/start", strings.NewReader(""))
+	denied := httptest.NewRequest(http.MethodPost, "/my/streams/org-pv-recovery/instance/start", strings.NewReader(""))
 	denied.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	denied.AddCookie(&http.Cookie{Name: "attesta_session", Value: lineSession})
 	deniedRec := httptest.NewRecorder()
@@ -265,7 +265,7 @@ func TestOrgStreamForeignOrgGetsNotFound(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-recycling/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-pv-recovery/", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleMyRoutes(rec, req)
@@ -295,8 +295,8 @@ func TestOrgStreamHidesStreamOnlyActions(t *testing.T) {
 	for _, tc := range []struct {
 		method, path string
 	}{
-		{http.MethodPost, "/my/streams/org-recycling/delete"},
-		{http.MethodGet, "/my/streams/org-recycling/events"},
+		{http.MethodPost, "/my/streams/org-pv-recovery/delete"},
+		{http.MethodGet, "/my/streams/org-pv-recovery/events"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})

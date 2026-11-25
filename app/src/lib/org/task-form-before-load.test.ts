@@ -21,7 +21,7 @@ const sample: TaskFormBundle = {
 	bindings: { domain: {} }
 };
 
-const stream = 'recycling';
+const stream = 'pv-recovery';
 const truck = '261102-1';
 const taskPath = `/${stream}/i/${truck}/intake/new/register`;
 const homeRedirect = { kind: 'home' as const, stream, instance: truck };

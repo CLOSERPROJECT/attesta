@@ -5,7 +5,7 @@ import { BoardJustCompleted } from './board-just-completed.svelte.js';
 import type { BoardTaskFocus } from './board-url.js';
 
 const addr = (taskId: string, jobInstanceId = 'DA-1'): TaskAddress => ({
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: '261102-1',
 	jobId: 'lot_processing',
 	jobInstanceId,

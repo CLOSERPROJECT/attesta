@@ -9,7 +9,7 @@ import {
 
 function taskAddr(taskId = 'register'): TaskAddress {
 	return normalizeTaskAddress({
-		stream: 'recycling',
+		stream: 'pv-recovery',
 		instance: '261102-1',
 		jobId: 'intake',
 		jobInstanceId: '261102-1',

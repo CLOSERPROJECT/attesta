@@ -192,7 +192,7 @@ func TestHandleLoadJSONIncludesWorklist(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-load", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance=T-load", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -229,7 +229,7 @@ func TestHandleCommitJSONIncludesWorklist(t *testing.T) {
 
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())

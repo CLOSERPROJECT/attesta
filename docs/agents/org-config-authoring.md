@@ -31,8 +31,8 @@ Every Org Config has a required `stream` block ([ADR-0014](../adr/0014-org-confi
 
 ```yaml
 stream:
-  key: recycling              # slug; unique per org; not reserved /app segments i or new
-  title: Lavorazione rifiuti
+  key: pv-recovery            # slug; unique per org; not reserved /app segments i or new
+  title: Recupero materiali da pannelli fotovoltaici
   description: …             # optional
   categorySlug: …             # optional /my discovery
   subCategorySlug: …

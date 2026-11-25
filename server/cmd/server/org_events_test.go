@@ -12,7 +12,7 @@ func TestOrgEventsRouteRequiresAuthentication(t *testing.T) {
 		tmpl:        testTemplates(),
 		enforceAuth: true,
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/org/events?stream=recycling", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/events?stream=pv-recovery", nil)
 	rec := httptest.NewRecorder()
 	server.newMux().ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {

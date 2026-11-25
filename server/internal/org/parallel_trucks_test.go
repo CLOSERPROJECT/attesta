@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Parallel trucks on the recycling stream: two intake trucks at once; line-busy
+// Parallel trucks on the pv-recovery stream: two intake trucks at once; line-busy
 // is per truck, so truck B can Apri lotto while truck A has an open lot.
 func TestParallelTrucksIntakeAndLineBusyBlockedReason(t *testing.T) {
 	c, _, _ := testTaskCommitter(t, readyWhenGateAuthorizer{})

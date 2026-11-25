@@ -12,7 +12,7 @@ import { boardScopeKey, createBoardSession, type BoardScope } from './board-sess
 import { BoardTimelineModel } from './board-timeline-model.svelte.js';
 import type { BoardTaskFocus } from './board-url.js';
 
-function bootView(stream = 'recycling'): TimelineView {
+function bootView(stream = 'pv-recovery'): TimelineView {
 	return {
 		stream,
 		instance: '',
@@ -40,7 +40,7 @@ function bootView(stream = 'recycling'): TimelineView {
 }
 
 function instanceView(
-	stream = 'recycling',
+	stream = 'pv-recovery',
 	instance = '261102-1',
 	revision?: number
 ): TimelineView {
@@ -137,14 +137,14 @@ function harness(
 
 describe('boardScopeKey', () => {
 	test('encodes boot and instance distinctly', () => {
-		expect(boardScopeKey({ kind: 'boot', stream: 'recycling' })).toBe('recycling||boot');
+		expect(boardScopeKey({ kind: 'boot', stream: 'pv-recovery' })).toBe('pv-recovery||boot');
 		expect(
 			boardScopeKey({
 				kind: 'instance',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1'
 			})
-		).toBe('recycling|261102-1|instance');
+		).toBe('pv-recovery|261102-1|instance');
 	});
 });
 
@@ -152,19 +152,19 @@ describe('BoardSession', () => {
 	test('load boot uses TimelineLoadQuery { stream } only', async () => {
 		const view = bootView();
 		const timeline = fakeTimeline(async (q) => {
-			expect(q).toEqual({ stream: 'recycling' });
+			expect(q).toEqual({ stream: 'pv-recovery' });
 			expect('instance' in q).toBe(false);
 			return view;
 		});
-		const { session, model } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
+		const { session, model } = harness({ kind: 'boot', stream: 'pv-recovery' }, timeline);
 
 		await session.load();
 
-		expect(timeline.loads).toEqual([{ stream: 'recycling' }]);
+		expect(timeline.loads).toEqual([{ stream: 'pv-recovery' }]);
 		expect(session.view).toEqual(view);
 		expect(session.loading).toBe(false);
 		expect(session.error).toBe('');
-		expect(session.scopeKey).toBe('recycling||boot');
+		expect(session.scopeKey).toBe('pv-recovery||boot');
 		expect(model.view).toEqual(view);
 	});
 
@@ -172,16 +172,16 @@ describe('BoardSession', () => {
 		const view = instanceView();
 		const timeline = fakeTimeline(async () => view);
 		const { session, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 
 		await session.load();
 
-		expect(timeline.loads).toEqual([{ stream: 'recycling', instance: '261102-1' }]);
+		expect(timeline.loads).toEqual([{ stream: 'pv-recovery', instance: '261102-1' }]);
 		expect(session.view).toEqual(view);
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
 	});
@@ -197,13 +197,13 @@ describe('BoardSession', () => {
 			throw new Error('boom');
 		});
 		const { session, formCache } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 
 		await session.load();
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -236,13 +236,13 @@ describe('BoardSession', () => {
 	test('adoptInstance stages putReady and soft-navigates to instance', async () => {
 		const timeline = fakeTimeline(async () => bootView());
 		const { session, formCache, navigateToInstance } = harness(
-			{ kind: 'boot', stream: 'recycling' },
+			{ kind: 'boot', stream: 'pv-recovery' },
 			timeline
 		);
 		await session.load();
 
 		const nextAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -276,23 +276,23 @@ describe('BoardSession', () => {
 
 		expect(formCache.get(taskAddressKey(nextAddr))?.status).toBe('ready');
 		expect(navigateToInstance).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			focus
 		});
 		expect(session.scope).toEqual({
 			kind: 'instance',
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
-		expect(session.scopeKey).toBe('recycling|261102-1|instance');
+		expect(session.scopeKey).toBe('pv-recovery|261102-1|instance');
 	});
 
 	test('load surfaces port errors without a view', async () => {
 		const timeline = fakeTimeline(async () => {
 			throw new Error('timeline down');
 		});
-		const { session } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
+		const { session } = harness({ kind: 'boot', stream: 'pv-recovery' }, timeline);
 
 		await session.load();
 
@@ -310,14 +310,14 @@ describe('BoardSession', () => {
 			return n === 1 ? first : second;
 		});
 		const { session, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 		await session.load();
 		hydrate.mockClear();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -334,7 +334,7 @@ describe('BoardSession', () => {
 		expect(session.view?.label).toBe('After commit');
 		expect(timeline.loads).toHaveLength(2);
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
 	});
@@ -361,7 +361,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -371,7 +371,7 @@ describe('BoardSession', () => {
 		await session.load();
 
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -409,12 +409,12 @@ describe('BoardSession', () => {
 	test('domainChanged stay without submitMany leaves form bundles ready', async () => {
 		const timeline = fakeTimeline(async () => instanceView());
 		const { session, formCache } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 		await session.load();
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -476,7 +476,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -486,7 +486,7 @@ describe('BoardSession', () => {
 		await session.load();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -539,7 +539,7 @@ describe('BoardSession', () => {
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const hydrate = vi.fn();
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -551,7 +551,7 @@ describe('BoardSession', () => {
 		hydrate.mockClear();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -607,7 +607,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -617,14 +617,14 @@ describe('BoardSession', () => {
 		await session.load();
 
 		const weigh = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
 			taskId: 'weigh'
 		});
 		const register = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -653,11 +653,11 @@ describe('BoardSession', () => {
 	test('domainChanged advance without a view hydrates on instance scope', async () => {
 		const timeline = fakeTimeline(async () => instanceView());
 		const { session, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -674,16 +674,16 @@ describe('BoardSession', () => {
 
 		expect(timeline.loads).toHaveLength(0);
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
 	});
 
 	test('domainChanged advance without a view does nothing on boot scope', async () => {
 		const timeline = fakeTimeline(async () => bootView());
-		const { session, hydrate } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
+		const { session, hydrate } = harness({ kind: 'boot', stream: 'pv-recovery' }, timeline);
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -737,7 +737,7 @@ describe('BoardSession', () => {
 		});
 		const dropSeededDraft = vi.fn();
 		const { session, model, formCache, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			{ formFetch, dropSeededDraft }
 		);
@@ -745,7 +745,7 @@ describe('BoardSession', () => {
 		hydrate.mockClear();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -769,7 +769,7 @@ describe('BoardSession', () => {
 		expect(formCache.get(taskAddressKey(addr))?.bundle).toBe(staleBundle);
 		expect(session.view?.label).toBe('After foreign');
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			background: true
 		});
@@ -792,7 +792,7 @@ describe('BoardSession', () => {
 			throw new Error('unexpected form fetch');
 		});
 		const { session, formCache, hydrate } = harness(
-			{ kind: 'boot', stream: 'recycling' },
+			{ kind: 'boot', stream: 'pv-recovery' },
 			timeline,
 			{ formFetch }
 		);
@@ -800,7 +800,7 @@ describe('BoardSession', () => {
 		hydrate.mockClear();
 
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '',
 			jobId: 'intake',
 			jobInstanceId: '',
@@ -878,7 +878,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -908,7 +908,7 @@ describe('BoardSession', () => {
 	}
 
 	test('connect: echo of loaded revision is ignored; next revision refreshes once', async () => {
-		const first = instanceView('recycling', '261102-1', 1);
+		const first = instanceView('pv-recovery', '261102-1', 1);
 		const second = { ...first, label: 'After foreign', revision: 2 };
 		const h = connectHarness([first, second]);
 		await h.session.load();
@@ -926,7 +926,7 @@ describe('BoardSession', () => {
 	});
 
 	test('connect: own Commit echo during flight causes no refresh', async () => {
-		const first = instanceView('recycling', '261102-1', 1);
+		const first = instanceView('pv-recovery', '261102-1', 1);
 		const h = connectHarness([first]);
 		await h.session.load();
 		h.session.connect();
@@ -939,7 +939,7 @@ describe('BoardSession', () => {
 	});
 
 	test('connect: foreign write during own Commit refreshes once after settle', async () => {
-		const first = instanceView('recycling', '261102-1', 1);
+		const first = instanceView('pv-recovery', '261102-1', 1);
 		const second = { ...first, label: 'After gap', revision: 3 };
 		const h = connectHarness([first, second]);
 		await h.session.load();
@@ -956,7 +956,7 @@ describe('BoardSession', () => {
 	});
 
 	test('connect dispose unsubscribes events and commits', async () => {
-		const first = instanceView('recycling', '261102-1', 1);
+		const first = instanceView('pv-recovery', '261102-1', 1);
 		const h = connectHarness([first]);
 		await h.session.load();
 		const dispose = h.session.connect();
@@ -966,7 +966,7 @@ describe('BoardSession', () => {
 	});
 
 	test('own and foreign domainChanged in the same tick run as one batch', async () => {
-		const first = instanceView('recycling', '261102-1', 1);
+		const first = instanceView('pv-recovery', '261102-1', 1);
 		const second = { ...first, label: 'Batched', revision: 2 };
 		let n = 0;
 		const timeline = fakeTimeline(async () => {
@@ -1017,7 +1017,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -1031,7 +1031,7 @@ describe('BoardSession', () => {
 		session.connect();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',

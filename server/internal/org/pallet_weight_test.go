@@ -17,7 +17,7 @@ func TestTimelineWeighStaysAvailableUntilLastUnweightedPallet(t *testing.T) {
 
 	assertWeigh := func(when string, wantStatus string, wantActionable bool) {
 		t.Helper()
-		view := BuildOrgTimelineView(cfg, mustDomain(t, c), lineOp, "recycling", focus)
+		view := BuildOrgTimelineView(cfg, mustDomain(t, c), lineOp, "pv-recovery", focus)
 		weigh := lotProcessingWeighSubstep(t, view, loadID)
 		if weigh.Status != wantStatus {
 			t.Fatalf("weigh status %s = %q, want %q (submitMany=%v orgActionable=%v)",

@@ -125,7 +125,7 @@ func TestDomainChangeHubInvalidScopeIsIgnored(t *testing.T) {
 
 func TestDomainChangeHubInvalidScopeReturnsClosedChannel(t *testing.T) {
 	hub := NewDomainChangeHub()
-	revisions, cancel := hub.Subscribe(Scope{Org: "", Stream: "recycling"})
+	revisions, cancel := hub.Subscribe(Scope{Org: "", Stream: "pv-recovery"})
 	defer cancel()
 
 	if _, open := <-revisions; open {

@@ -6,7 +6,7 @@ import type { JustCompletedPin } from './board-just-completed.svelte.js';
 import { pinSubmissionIdForAddress } from './just-completed-recap-row.js';
 
 const addr = (taskId: string, jobInstanceId = 'T1'): TaskAddress => ({
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: '261102-1',
 	jobId: 'intake',
 	jobInstanceId,

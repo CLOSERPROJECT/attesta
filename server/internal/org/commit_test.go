@@ -108,7 +108,7 @@ func TestHandleCommitTimelineAndLoadExposeDomainRevision(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(
 		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`,
 	)))
 	if rec.Code != http.StatusOK {
@@ -130,8 +130,8 @@ func TestHandleCommitTimelineAndLoadExposeDomainRevision(t *testing.T) {
 	}
 
 	for _, path := range []string{
-		"/api/org/timeline?stream=recycling&instance=" + truckID,
-		"/api/org/domain?stream=recycling&instance=" + truckID,
+		"/api/org/timeline?stream=pv-recovery&instance=" + truckID,
+		"/api/org/domain?stream=pv-recovery&instance=" + truckID,
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -268,7 +268,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -308,7 +308,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	}
 
 	loadRec := httptest.NewRecorder()
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=261029-1", nil)
+	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance=261029-1", nil)
 	h.ServeHTTP(loadRec, loadReq)
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d", loadRec.Code)

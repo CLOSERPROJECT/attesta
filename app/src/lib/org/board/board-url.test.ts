@@ -54,27 +54,27 @@ describe('board-url ?task= sync', () => {
 
 	test('boardHrefWithTask sets and clears param', () => {
 		expect(
-			boardHrefWithTask('/recycling/i/NIR-1', {
+			boardHrefWithTask('/pv-recovery/i/NIR-1', {
 				jobId: 'intake',
 				jobInstanceId: 'NIR-1',
 				taskId: 'register'
 			})
-		).toBe('/recycling/i/NIR-1?task=intake%2FNIR-1%2Fregister');
+		).toBe('/pv-recovery/i/NIR-1?task=intake%2FNIR-1%2Fregister');
 		expect(
-			boardHrefWithTask('/recycling/i/NIR-1?task=intake/NIR-1/register', null)
-		).toBe('/recycling/i/NIR-1');
+			boardHrefWithTask('/pv-recovery/i/NIR-1?task=intake/NIR-1/register', null)
+		).toBe('/pv-recovery/i/NIR-1');
 	});
 
 	test('address helpers + focus match', () => {
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: 'NIR-1',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-1',
 			taskId: 'register'
 		});
 		const focus = boardTaskFromAddress(addr);
-		expect(addressFromBoardTask('recycling', 'NIR-1', focus)).toEqual(addr);
+		expect(addressFromBoardTask('pv-recovery', 'NIR-1', focus)).toEqual(addr);
 		expect(focusMatchesAddress(focus, addr)).toBe(true);
 		expect(
 			focusMatchesAddress(
@@ -86,13 +86,13 @@ describe('board-url ?task= sync', () => {
 
 	test('parseTaskHref strips /app and seed.*', () => {
 		const parsed = parseTaskHref(
-			'/app/recycling/i/NIR-1/lot_processing/new/startLot?seed.lotId=L1',
-			'recycling',
+			'/app/pv-recovery/i/NIR-1/lot_processing/new/startLot?seed.lotId=L1',
+			'pv-recovery',
 			'NIR-1'
 		);
 		expect(parsed?.address).toEqual(
 			normalizeTaskAddress({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'NIR-1',
 				jobId: 'lot_processing',
 				jobInstanceId: 'new',
@@ -104,13 +104,13 @@ describe('board-url ?task= sync', () => {
 
 	test('parseTaskHref accepts Play boot …/new/{job}/{ji}/{task}', () => {
 		const parsed = parseTaskHref(
-			'/app/recycling/new/intake/new/truckArrive',
-			'recycling',
+			'/app/pv-recovery/new/intake/new/truckArrive',
+			'pv-recovery',
 			''
 		);
 		expect(parsed?.address).toEqual(
 			normalizeTaskAddress({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '',
 				jobId: 'intake',
 				jobInstanceId: 'new',
@@ -122,12 +122,12 @@ describe('board-url ?task= sync', () => {
 
 	test('parseTaskHref Play shape strips seed.*', () => {
 		const parsed = parseTaskHref(
-			'/app/recycling/new/lot_processing/new/startLot?seed.lotId=L1',
-			'recycling'
+			'/app/pv-recovery/new/lot_processing/new/startLot?seed.lotId=L1',
+			'pv-recovery'
 		);
 		expect(parsed?.address).toEqual(
 			normalizeTaskAddress({
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '',
 				jobId: 'lot_processing',
 				jobInstanceId: 'new',

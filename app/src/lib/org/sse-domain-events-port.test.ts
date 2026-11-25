@@ -66,9 +66,9 @@ describe('createSseDomainEventsPort', () => {
 			EventSource: FakeEventSource as unknown as typeof EventSource
 		});
 
-		const unsub = port.subscribe('recycling/a b', onRevision);
+		const unsub = port.subscribe('pv-recovery/a b', onRevision);
 		const source = FakeEventSource.instances[0];
-		expect(source.url).toBe('https://example.test/api/org/events?stream=recycling%2Fa%20b');
+		expect(source.url).toBe('https://example.test/api/org/events?stream=pv-recovery%2Fa%20b');
 		expect(source.withCredentials).toBe(true);
 
 		source.emit('domain-revision', JSON.stringify({ revision: 3 }));
@@ -98,7 +98,7 @@ describe('createSseDomainEventsPort', () => {
 			clearTimeout: clearTimeoutSpy
 		});
 
-		port.subscribe('recycling', onRevision);
+		port.subscribe('pv-recovery', onRevision);
 		const first = FakeEventSource.instances[0]!;
 
 		first.fail(FakeEventSource.CONNECTING);
@@ -151,7 +151,7 @@ describe('createSseDomainEventsPort', () => {
 			clearTimeout: clearTimeoutFn
 		});
 
-		const unsub = port.subscribe('recycling', vi.fn());
+		const unsub = port.subscribe('pv-recovery', vi.fn());
 		const source = FakeEventSource.instances[0];
 		source.fail(FakeEventSource.CLOSED);
 		expect(timers.size).toBe(1);
@@ -168,7 +168,7 @@ describe('createSseDomainEventsPort', () => {
 
 	test('without EventSource, subscribe is a no-op', () => {
 		const port = createSseDomainEventsPort({ EventSource: undefined });
-		const unsub = port.subscribe('recycling', vi.fn());
+		const unsub = port.subscribe('pv-recovery', vi.fn());
 		expect(FakeEventSource.instances).toHaveLength(0);
 		unsub();
 	});

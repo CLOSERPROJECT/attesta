@@ -22,7 +22,7 @@ const bundle = (taskId: string): TaskFormBundle => ({
 
 function addr(taskId: string) {
 	return normalizeTaskAddress({
-		stream: 'recycling',
+		stream: 'pv-recovery',
 		instance: 'NIR-1',
 		jobId: 'intake',
 		jobInstanceId: 'NIR-1',
@@ -40,7 +40,7 @@ describe('BoardFormCache', () => {
 			taskForm: { fetch } satisfies TaskFormPort,
 			concurrency: 2
 		});
-		cache.beginScope('recycling|NIR-1');
+		cache.beginScope('pv-recovery|NIR-1');
 		cache.enqueue([addr('a'), addr('b'), addr('c'), addr('d')]);
 		expect(fetch).toHaveBeenCalledTimes(2);
 
@@ -142,7 +142,7 @@ describe('BoardFormCache', () => {
 		const cache = createBoardFormCache({
 			taskForm: { fetch } satisfies TaskFormPort
 		});
-		cache.beginScope('recycling|NIR-1');
+		cache.beginScope('pv-recovery|NIR-1');
 		const a = addr('a');
 		cache.putReady(a, stale);
 		expect(cache.get(taskAddressKey(a))?.draftGeneration).toBe(0);
@@ -171,7 +171,7 @@ describe('BoardFormCache', () => {
 			taskForm: { fetch } satisfies TaskFormPort,
 			concurrency: 4
 		});
-		cache.beginScope('recycling|NIR-1');
+		cache.beginScope('pv-recovery|NIR-1');
 		cache.putReady(addr('a'), bundle('a'));
 		cache.putReady(addr('b'), bundle('b'));
 		cache.putReady(addr('c'), bundle('c'));

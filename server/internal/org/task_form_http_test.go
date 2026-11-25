@@ -98,7 +98,7 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("provisional status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -111,7 +111,7 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive&jobInstanceId=new", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive&jobInstanceId=new", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("new provisional = %d", rec.Code)
 	}
@@ -121,7 +121,7 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?stream=recycling&instance="+truckID+"&jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
+		"/api/org/task-form?stream=pv-recovery&instance="+truckID+"&jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("admin weigh = %d, want 403", rec.Code)
 	}
@@ -134,13 +134,13 @@ func TestHandleTaskFormHTTP(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	lineH.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?stream=recycling&instance="+truckID+"&jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
+		"/api/org/task-form?stream=pv-recovery&instance="+truckID+"&jobId=lot_processing&taskId=weigh&jobInstanceId="+loadID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("line weigh = %d body=%s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&taskId=truckArrive", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("missing jobId = %d", rec.Code)
 	}

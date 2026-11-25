@@ -9,7 +9,7 @@ func TestStreamsKeepSeparateDPPsAndLinks(t *testing.T) {
 	passports := NewMemoryDPPStore()
 	links := NewMemoryLinkStore()
 
-	scopeA := Scope{Org: "feragame", Stream: "recycling"}
+	scopeA := Scope{Org: "feragame", Stream: "pv-recovery"}
 	scopeB := Scope{Org: "feragame", Stream: "other"}
 	addr := SubmissionAddress{JobID: "intake", JobInstanceID: "T1", TaskID: "register"}
 	ts := "2026-11-19T12:00:00.000000000Z"
@@ -61,7 +61,7 @@ func TestStreamsKeepSeparateDPPsAndLinks(t *testing.T) {
 func TestCreateRejectsIdentityAlreadyIssuedInAnotherStream(t *testing.T) {
 	store := NewMemoryDPPStore()
 	rec := DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: "L1",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: "L1",
 		GTIN: "09506000134352", Lot: "SAME", Serial: "S1",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/x",
 	}
@@ -75,7 +75,7 @@ func TestCreateRejectsIdentityAlreadyIssuedInAnotherStream(t *testing.T) {
 		t.Fatalf("cross-stream identity = %v, want ErrDPPExists", err)
 	}
 	got, err := store.GetByIdentity(t.Context(), "09506000134352", "SAME", "S1")
-	if err != nil || got.Stream != "recycling" || got.SubjectID != "L1" {
+	if err != nil || got.Stream != "pv-recovery" || got.SubjectID != "L1" {
 		t.Fatalf("GetByIdentity = %#v err=%v", got, err)
 	}
 }

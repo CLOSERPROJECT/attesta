@@ -21,11 +21,11 @@ roles:
       name: Line
       palette: orange
 stream:
-    key: recycling
-    title: Lavorazione rifiuti
-    description: Ingresso camion e lavorazione lotti
+    key: pv-recovery
+    title: Recupero materiali da pannelli fotovoltaici
+    description: Ingresso camion, registrazione lotti FIR e recupero materiali da pannelli fotovoltaici a fine vita
     categorySlug: recycling-and-recovery
-    subCategorySlug: flat-screen-displays
+    subCategorySlug: photovoltaic-panels
     instance:
         job: intake
     steps:

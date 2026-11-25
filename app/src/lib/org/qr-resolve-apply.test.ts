@@ -17,13 +17,13 @@ describe('interpretQrResolve', () => {
 				},
 				seed: { palletId: 'load.1' }
 			},
-			'recycling'
+			'pv-recovery'
 		);
 		expect(got).toEqual({
 			kind: 'navigate',
 			target: {
 				kind: 'task',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				jobId: 'line',
 				jobInstanceId: 'L1',
@@ -43,7 +43,7 @@ describe('interpretQrResolve', () => {
 					message: 'Nessuna pesatura disponibile per questo bancale'
 				}
 			},
-			'recycling'
+			'pv-recovery'
 		);
 		expect(got).toEqual({
 			kind: 'error',
@@ -54,16 +54,16 @@ describe('interpretQrResolve', () => {
 
 describe('takeColdEntityIdRaw', () => {
 	test('captures href once and strips entityId from URL', () => {
-		const href = 'https://plant.example/app/recycling?entityId=P9&x=1';
+		const href = 'https://plant.example/app/pv-recovery?entityId=P9&x=1';
 		const got = takeColdEntityIdRaw(href);
 		expect(got.raw).toBe(href);
-		expect(got.strippedHref).toBe('/app/recycling?x=1');
+		expect(got.strippedHref).toBe('/app/pv-recovery?x=1');
 	});
 
 	test('absent entityId yields null raw', () => {
-		expect(takeColdEntityIdRaw('https://plant.example/app/recycling').raw).toBeNull();
+		expect(takeColdEntityIdRaw('https://plant.example/app/pv-recovery').raw).toBeNull();
 		expect(
-			takeColdEntityIdRaw('https://plant.example/app/recycling?entityId=').raw
+			takeColdEntityIdRaw('https://plant.example/app/pv-recovery?entityId=').raw
 		).toBeNull();
 	});
 });
