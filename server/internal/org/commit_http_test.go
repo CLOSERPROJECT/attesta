@@ -2,6 +2,7 @@ package org
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -42,9 +43,13 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if len(labels) != 2 {
 		t.Fatalf("labels body = %#v", body0)
 	}
-	for _, raw := range labels {
+	wantIDs := []string{loadID + ".1", loadID + ".2"}
+	for i, raw := range labels {
 		rec, _ := raw.(map[string]any)
 		id, _ := rec["id"].(string)
+		if id != wantIDs[i] {
+			t.Fatalf("labels[%d].id = %q, want %q (all %#v)", i, id, wantIDs[i], labels)
+		}
 		qr, _ := rec["qr"].(string)
 		want := "https://plant.example/app?entityId=" + id
 		if qr != want {
@@ -67,6 +72,39 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	}
 	if stored.Kind("lot")[loadID]["client"] != "CO" {
 		t.Fatalf("persisted domain = %#v", stored)
+	}
+}
+
+func TestCommitRegisterLabelsOrderedByProgressive(t *testing.T) {
+	port := &recordingHttpPort{
+		responses: []HttpPortResponse{
+			{URL: "blob:labels"},
+		},
+	}
+	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
+	c.HttpPort = port
+	c.SubmitBindings = ExprBindings{"qrEndpoint": "https://plant.example/app"}
+
+	truckID := commitTruckArrive(t, c)
+	value := registerLotValue()
+	value["palletCount"] = 12.0
+	result := commitLotRegister(t, c, truckID, value)
+	loadID := firstLoadID(result.Domain)
+	if len(port.calls) != 1 {
+		t.Fatalf("http calls = %#v", port.calls)
+	}
+	body0, _ := port.calls[0].Body.(map[string]any)
+	labels, ok := body0["labels"].([]any)
+	if !ok || len(labels) != 12 {
+		t.Fatalf("labels = %#v", body0["labels"])
+	}
+	for i, raw := range labels {
+		rec, _ := raw.(map[string]any)
+		id, _ := rec["id"].(string)
+		want := fmt.Sprintf("%s.%d", loadID, i+1)
+		if id != want {
+			t.Fatalf("labels[%d].id = %q, want %q (lexical trap: .10 before .2)", i, id, want)
+		}
 	}
 }
 

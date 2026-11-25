@@ -335,21 +335,27 @@ steps:
                       label: '"Stampa etichette"'
                       action: link
                       body: >-
-                        {
-
-                          "lotId": $lot.id,
-                          "date": $substring($replace($today, '-', ''), 2),
-                          "client": $.client,
-                          "clientProgressive": $lot.clientProgressive,
-                          "numeroFir": $lot.numeroFir,
-                          "wasteCode": $.wasteCode,
-                          "palletCount": $.palletCount,
-                          "netWeight": $lot.netWeight,
-                          "labels": [$each(
-                            $sift($domain.pallet, function($v){$v.lotId = $lot.id}),
-                            function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
-                          )]
-                        }
+                        (
+                          $palletMap := $sift($domain.pallet, function($v){$v.lotId = $lot.id});
+                          $palletIds := $sort($keys($palletMap), function($l, $r){
+                            $number($split($l, ".")[-1]) > $number($split($r, ".")[-1])
+                          });
+                          {
+                            "lotId": $lot.id,
+                            "date": $substring($replace($today, '-', ''), 2),
+                            "client": $.client,
+                            "clientProgressive": $lot.clientProgressive,
+                            "numeroFir": $lot.numeroFir,
+                            "wasteCode": $.wasteCode,
+                            "palletCount": $.palletCount,
+                            "netWeight": $lot.netWeight,
+                            "labels": $count($palletIds) = 0 ? [] : $append([], $map($palletIds, function($id){{
+                              "id": $id,
+                              "client": $.client,
+                              "qr": $qrEndpoint & "?entityId=" & $id
+                            }}))
+                          }
+                        )
             - id: weightCheck
               roles: [administration]
               readyWhen: >-
