@@ -37,7 +37,7 @@
 .computed-field.computed-field__value,
 .readonly-field :is(input, textarea) {
 	background-color: transparent;
-	color: color-mix(in srgb, var(--foreground) 55%, var(--muted-foreground));
+	color: color-mix(in srgb, var(--foreground) 60%, transparent);
 	cursor: default;
 	box-shadow: none;
 	border-style: solid;
