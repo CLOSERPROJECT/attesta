@@ -47,13 +47,6 @@ export type OrgSessionOptions = {
 
 type DraftIdentity = { org: string; stream: string; userId: string };
 
-/** Hears each Commit's lifecycle; OrgSession runs one Commit at a time. */
-export type CommitObserver = {
-	started(): void;
-	/** Revision the Commit wrote, or null when it failed or the server sent none. */
-	settled(revision: number | null): void;
-};
-
 export class OrgSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
@@ -61,9 +54,6 @@ export class OrgSession {
 	readonly #debounceMs: number;
 	readonly #clock: DraftPersistClock;
 	readonly #pendingTimers = new Map<string, unknown>();
-	// Plain Set: observers only gate Commit notifications, never render.
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	readonly #commitObservers = new Set<CommitObserver>();
 	#identity: DraftIdentity | null = null;
 	#hideCleanup: (() => void) | null = null;
 
@@ -114,13 +104,6 @@ export class OrgSession {
 		this.#hideCleanup?.();
 		this.#hideCleanup = null;
 		this.#cancelAllPending();
-	};
-
-	observeCommits = (observer: CommitObserver): (() => void) => {
-		this.#commitObservers.add(observer);
-		return () => {
-			this.#commitObservers.delete(observer);
-		};
 	};
 
 	jobIds = $derived(orderedJobIdsFromWorklist(this.result?.worklist));
@@ -315,12 +298,9 @@ export class OrgSession {
 		if (this.committing) return null;
 		this.committing = true;
 		this.commitError = null;
-		let settledRevision: number | null = null;
-		for (const observer of this.#commitObservers) observer.started();
 		try {
 			const { draftBagInstanceKey: bagKey, ...wire } = req;
 			const committed = await this.commitPort.commit(wire);
-			settledRevision = committed.revision ?? null;
 			const prior = this.result;
 			if (prior) {
 				this.result = {
@@ -348,8 +328,7 @@ export class OrgSession {
 				worklist: committed.worklist,
 				navigation: committed.navigation,
 				continueNavigation: committed.continueNavigation ?? null,
-				nextTaskFormBundle: committed.nextTaskFormBundle ?? null,
-				...(committed.revision !== undefined ? { revision: committed.revision } : {})
+				nextTaskFormBundle: committed.nextTaskFormBundle ?? null
 			};
 		} catch (err) {
 			this.commitError = err instanceof Error ? err.message : String(err);
@@ -359,7 +338,6 @@ export class OrgSession {
 			return null;
 		} finally {
 			this.committing = false;
-			for (const observer of this.#commitObservers) observer.settled(settledRevision);
 		}
 	};
 

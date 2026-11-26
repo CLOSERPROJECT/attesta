@@ -23,9 +23,6 @@ func (s *Server) ensureOrgStores() {
 	if s.orgDPPs == nil {
 		s.orgDPPs = s.newOrgDPPStore()
 	}
-	if s.orgChanges == nil {
-		s.orgChanges = org.NewDomainChangeHub()
-	}
 }
 
 func (s *Server) orgMongoDB() *mongo.Database {
@@ -114,12 +111,10 @@ func (s *Server) orgAPI() http.Handler {
 			HttpPort:   s.orgProductHttpPort(),
 			LinkStore:  s.orgLinks,
 			DPPs:       s.orgDPPs,
-			Changes:    s.orgChanges,
 		},
 		DPPs:      s.orgDPPs,
 		Gate:      s.orgVerifiedGate,
 		Artifacts: s.orgProductArtifacts(),
-		Changes:   s.orgChanges,
 	}
 }
 

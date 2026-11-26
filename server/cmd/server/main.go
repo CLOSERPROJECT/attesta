@@ -168,13 +168,12 @@ type Server struct {
 	turnstileSecretKey string
 	turnstileClient    *http.Client
 	turnstileVerifyURL string
-	orgDomains         org.DomainStore
-	orgConfigs         org.ConfigStore
-	orgLinks           org.LinkStore
-	orgDPPs            org.DPPStore
-	orgChanges         *org.DomainChangeHub
-	orgAuthorizer      org.Authorizer
-	orgHttpPort        org.HttpPort
+	orgDomains      org.DomainStore
+	orgConfigs      org.ConfigStore
+	orgLinks        org.LinkStore
+	orgDPPs    org.DPPStore
+	orgAuthorizer   org.Authorizer
+	orgHttpPort     org.HttpPort
 }
 
 type SSEHub struct {
@@ -2555,7 +2554,6 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.Handle("/api/org/streams", orgHTTP)
 	mux.Handle("/api/org/timeline", orgHTTP)
 	mux.Handle("/api/org/passports", orgHTTP)
-	mux.Handle("/api/org/events", orgHTTP)
 	mux.Handle("/api/org/artifacts/", orgHTTP)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)

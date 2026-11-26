@@ -81,16 +81,6 @@ describe('HttpCommitDomainPort', () => {
 		).toBeUndefined();
 	});
 
-	test('parses revision only when it is a non-negative integer', () => {
-		expect(parseCommitResult({ ...sampleResult, revision: 4 }).revision).toBe(4);
-		expect(parseCommitResult(sampleResult).revision).toBeUndefined();
-		for (const revision of ['4', -1, 1.5]) {
-			const got = parseCommitResult({ ...sampleResult, revision });
-			expect(got.revision).toBeUndefined();
-			expect('revision' in got).toBe(false);
-		}
-	});
-
 	test('Commit worklist preserves instance submissionCounts', () => {
 		const got = parseCommitResult({
 			...sampleResult,

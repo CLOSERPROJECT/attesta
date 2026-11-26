@@ -1229,12 +1229,9 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 type errDomainStore struct{ err error }
 
 func (e *errDomainStore) Get(context.Context, Scope) (Domain, error) { return Domain{}, e.err }
-func (e *errDomainStore) Revision(context.Context, Scope) (int64, error) {
-	return 0, e.err
-}
-func (e *errDomainStore) Put(context.Context, Scope, Domain) error { return e.err }
-func (e *errDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, int64, error) {
-	return Domain{}, 0, e.err
+func (e *errDomainStore) Put(context.Context, Scope, Domain) error   { return e.err }
+func (e *errDomainStore) Update(context.Context, Scope, func(Domain) (Domain, error)) (Domain, error) {
+	return Domain{}, e.err
 }
 func (e *errDomainStore) DeleteExceptStream(context.Context, string, string) error { return e.err }
 
