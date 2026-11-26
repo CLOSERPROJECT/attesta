@@ -728,7 +728,6 @@ steps:
                         incomplete: false
             - id: closeLot
               roles: [logistic]
-              submit: many
               title: Chiudi lotto
               onCommit:
                   navigation: stay

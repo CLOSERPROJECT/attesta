@@ -232,11 +232,15 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if _, has := lock["onCommit"]; has {
 		t.Fatalf("lot_processing/lock must omit onCommit (default advance), got %#v", lock["onCommit"])
 	}
-	for _, id := range []string{"weigh", "markProgress", "containerReg", "closeLot"} {
+	for _, id := range []string{"weigh", "markProgress", "containerReg"} {
 		task, _ := TaskByID(lp.Tasks, id)
 		if !taskSubmitMany(task) {
 			t.Fatalf("lot_processing.%s submit = %#v, want many", id, task["submit"])
 		}
+	}
+	closeLotTask, _ := TaskByID(lp.Tasks, "closeLot")
+	if taskSubmitMany(closeLotTask) {
+		t.Fatalf("closeLot submit = %#v, want once (lot closes once)", closeLotTask["submit"])
 	}
 	startLot, _ := TaskByID(lp.Tasks, "startLot")
 	startLotRoles, _ := startLot["roles"].([]any)

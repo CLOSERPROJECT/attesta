@@ -19,14 +19,14 @@ Every follower above lands in the same commit/PR as the YAML.
 
 ### Feragame `onCommit` examples
 
-HTTP link leave and multi-pass leaves (`register`, `weigh`, `markProgress`, `containerReg`, `closeLot`) typically stay:
+HTTP link leave and multi-pass leaves (`register`, `weigh`, `markProgress`, `containerReg`) typically stay:
 
 ```yaml
 onCommit:
   navigation: stay
 ```
 
-Omit both keys on Job-start and closing once-only Tasks such as `weightCheck` / `lot_processing/lock` (default `advance`). Schema and wire semantics: [`org-config-authoring.md`](org-config-authoring.md).
+`closeLot` is once-only (lot status → `fullyProcessed`) with `onCommit.navigation: stay` for once-recap. Omit both keys on Job-start and closing once-only Tasks such as `weightCheck` / `lot_processing/lock` (default `advance`). Schema and wire semantics: [`org-config-authoring.md`](org-config-authoring.md).
 
 ## Done when
 
