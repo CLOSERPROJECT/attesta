@@ -5,10 +5,8 @@
 	import { getBoardTimelineModel } from '../board/board-timeline-model.svelte.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
 	import { boardJustCompleted } from '../board/board-just-completed.svelte.js';
-	import BoardOnceRecap from '../board/board-once-recap.svelte';
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
-	import ManyRecapDoneBand from '../board/many-recap-done-band.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import DraftBozzaMark from '../draft-bozza-mark.svelte';
 	import { draftAddressForTask } from '../drafts.js';
@@ -18,7 +16,7 @@
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRoleBadges from './timeline-role-badges.svelte';
 	import { timelineRoleBadgesVisible } from './timeline-role-badge-label.js';
-	import { timelineSubstepUsesEmbed } from './timeline-substep-embed.js';
+	import { timelineSubstepShowsTaskPanel } from './timeline-substep-embed.js';
 	import { timelineSubstepTrailVisible } from './timeline-substep-trail.js';
 	import type { TimelineSubstep } from './types.js';
 
@@ -82,16 +80,16 @@
 	});
 	const confirmRecap = $derived(address ? board.confirmRecapFor(address) : false);
 	const justCompleted = $derived(address ? boardJustCompleted.has(address) : false);
-	const embed = $derived(
-		timelineSubstepUsesEmbed({
+	const showTaskPanel = $derived(
+		timelineSubstepShowsTaskPanel({
 			hasAddress: !!address,
 			orgActionable: !!substep.orgActionable,
-			focused,
 			confirmRecap,
-			justCompleted
+			justCompleted,
+			submissionCount: submissions.length
 		})
 	);
-	const embedOpen = $derived(address ? timelineModel.isBodyOpen(address, seed) : false);
+	const bodyOpen = $derived(address ? timelineModel.isBodyOpen(address, seed) : false);
 
 	let detailsOpen = $state(false);
 	$effect(() => {
@@ -100,7 +98,7 @@
 		detailsOpen = false;
 	});
 
-	function onEmbedOpenChange(next: boolean) {
+	function onBodyOpenChange(next: boolean) {
 		if (!address) return;
 		timelineModel.setBodyOpen(address, next, seed);
 		// Closing must not select — select() always re-opens the body.
@@ -125,15 +123,15 @@
 	data-org-actionable={substep.orgActionable ? 'true' : undefined}
 	data-board-focused={focused ? 'true' : undefined}
 >
-	{#if embed && address}
+	{#if address}
 		<Collapsible.Root
 			class="substep-accordion js-process-substep-panel substep-embed-host"
 			data-substep-id={substep.substepId}
 			data-testid="actionable-embed"
-			data-state={embedOpen ? 'open' : 'closed'}
+			data-state={bodyOpen ? 'open' : 'closed'}
 			aria-labelledby={headingId}
-			open={embedOpen}
-			onOpenChange={onEmbedOpenChange}
+			open={bodyOpen}
+			onOpenChange={onBodyOpenChange}
 		>
 			<Collapsible.Trigger class="substep-accordion-summary substep-card-link w-full items-center hover:no-underline">
 				{#if showTrail}
@@ -143,24 +141,39 @@
 				{/if}
 			</Collapsible.Trigger>
 			<Collapsible.Content>
-				<EmbeddedTaskPanel
-					{address}
-					{entry}
-					{seed}
-					submitMany={!!substep.submitMany}
-					{submissions}
-					{focused}
-					{confirmRecap}
-					orgActionable={!!substep.orgActionable}
-					open={embedOpen}
-					bodyId={embedBodyId}
-					onOpenChange={(next) => timelineModel.setBodyOpen(address, next, seed)}
-					onFocus={() => timelineModel.select(address, seed)}
-					onCommitted={(outcome) =>
-						board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })
-					}
-					onAcceptStale={() => board.acceptStale(address)}
-				/>
+				{#if showTaskPanel}
+					<EmbeddedTaskPanel
+						{address}
+						{entry}
+						{seed}
+						submitMany={!!substep.submitMany}
+						{submissions}
+						{focused}
+						{confirmRecap}
+						orgActionable={!!substep.orgActionable}
+						open={bodyOpen}
+						bodyId={embedBodyId}
+						onOpenChange={(next) => timelineModel.setBodyOpen(address, next, seed)}
+						onFocus={() => timelineModel.select(address, seed)}
+						onCommitted={(outcome) =>
+							board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })
+						}
+						onAcceptStale={() => board.acceptStale(address)}
+					/>
+				{:else}
+					<div class="substep-details">
+						{#if substep.blockedReason}
+							<p
+								class="m-0 whitespace-pre-line text-secondary-foreground"
+								data-testid="task-blocked-reason"
+							>
+								{substep.blockedReason}
+							</p>
+						{:else}
+							<p class="text-secondary-foreground">No data form configured for this substep</p>
+						{/if}
+					</div>
+				{/if}
 			</Collapsible.Content>
 		</Collapsible.Root>
 	{:else}
@@ -180,28 +193,13 @@
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div class="substep-details">
-					{#if substep.blockedReason || (submissions.length > 0 && address)}
-						<div class="substep-org-body">
-							{#if substep.blockedReason}
-								<p
-									class="m-0 whitespace-pre-line text-secondary-foreground"
-									data-testid="task-blocked-reason"
-								>
-									{substep.blockedReason}
-								</p>
-							{/if}
-							{#if submissions.length > 0 && address}
-								{#if substep.submitMany}
-									<ManyRecapDoneBand
-										{address}
-										bandTestId="timeline-many-recap-band"
-										recapTestId="timeline-many-recap"
-									/>
-								{:else}
-									<BoardOnceRecap {address} data-testid="timeline-once-recap" />
-								{/if}
-							{/if}
-						</div>
+					{#if substep.blockedReason}
+						<p
+							class="m-0 whitespace-pre-line text-secondary-foreground"
+							data-testid="task-blocked-reason"
+						>
+							{substep.blockedReason}
+						</p>
 					{:else}
 						<p class="text-secondary-foreground">No data form configured for this substep</p>
 					{/if}
