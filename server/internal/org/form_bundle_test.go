@@ -576,7 +576,7 @@ func TestBuildTaskFormBundleFlatSeedsSchemaDefaults(t *testing.T) {
 	}
 }
 
-func TestBuildTaskFormBundleFlatRequiredEnumFallsBackToFirst(t *testing.T) {
+func TestBuildTaskFormBundleFlatRequiredEnumStaysUnsetWithoutDefault(t *testing.T) {
 	cfg := OrgConfig{
 		ID:      "probe",
 		Version: "1",
@@ -617,8 +617,8 @@ func TestBuildTaskFormBundleFlatRequiredEnumFallsBackToFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bundle.InitialData["status"] != "open" {
-		t.Fatalf("required enum without default = %#v, want first enum open", bundle.InitialData)
+	if _, has := bundle.InitialData["status"]; has {
+		t.Fatalf("required enum without default must stay unset; got %#v", bundle.InitialData)
 	}
 	if _, has := bundle.InitialData["note"]; has {
 		t.Fatalf("optional enum without default must stay unset; got %#v", bundle.InitialData)

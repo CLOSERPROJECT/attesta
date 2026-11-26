@@ -426,10 +426,6 @@ func seedFormDefaultsFromSchema(out map[string]any, payload map[string]any) {
 	if props == nil {
 		return
 	}
-	required := make(map[string]struct{})
-	for _, key := range schemaStringList(schema["required"]) {
-		required[key] = struct{}{}
-	}
 	for key, raw := range props {
 		if _, exists := out[key]; exists {
 			continue
@@ -440,14 +436,9 @@ func seedFormDefaultsFromSchema(out map[string]any, payload map[string]any) {
 		}
 		if def, ok := prop["default"]; ok {
 			out[key] = def
-			continue
 		}
-		if _, need := required[key]; !need {
-			continue
-		}
-		if enums := schemaStringEnum(prop); len(enums) > 0 {
-			out[key] = enums[0]
-		}
+		// Required enums without authored default stay unset so the operator
+		// chooses (progressive disclosure / schema dependencies can gate on that).
 	}
 }
 
