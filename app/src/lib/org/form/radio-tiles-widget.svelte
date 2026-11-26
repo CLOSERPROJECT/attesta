@@ -59,11 +59,14 @@
 			]}
 		>
 			<input
-				bind:group={mapped.current}
-				value={optionValue}
 				{...attributes}
 				id={option.id}
+				value={optionValue}
+				checked={selected}
 				disabled={option.disabled || attributes.disabled}
+				onchange={() => {
+					mapped.current = optionValue;
+				}}
 			/>
 			<span class="radio-tiles__label">{option.label}</span>
 		</label>
