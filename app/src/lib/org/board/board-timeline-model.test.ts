@@ -272,6 +272,72 @@ describe('BoardTimelineModel visibility', () => {
 		model.collapseAllBodies();
 		expect(model.isBodyOpen(addrDA())).toBe(false);
 	});
+
+	test('seeded provisional Start open isolates accordion bodies', () => {
+		const syncUrl = vi.fn();
+		const embed = new BoardEmbedOpen();
+		const model = new BoardTimelineModel({ syncUrl, embedOpen: embed });
+		model.setScope(stream, instance);
+		const startAddr = (): TaskAddress => ({
+			stream,
+			instance,
+			jobId: 'lot_processing',
+			jobInstanceId: '',
+			taskId: 'startLot',
+			provisionalJob: true
+		});
+		model.setView({
+			...base,
+			steps: [
+				{
+					stepId: '2',
+					title: 'Lavorazione',
+					substepCount: 2,
+					expanded: true,
+					rows: [
+						{
+							id: 'lot_processing.L1',
+							label: 'Lotto L1',
+							expanded: true,
+							substeps: [
+								{
+									substepId: 'lot_processing.startLot',
+									title: 'Apri lotto',
+									status: 'available',
+									orgActionable: true,
+									href: `/app/${stream}/i/${instance}/lot_processing/new/startLot?seed.lotId=L1`
+								}
+							]
+						},
+						{
+							id: 'lot_processing.L2',
+							label: 'Lotto L2',
+							expanded: true,
+							substeps: [
+								{
+									substepId: 'lot_processing.startLot',
+									title: 'Apri lotto',
+									status: 'available',
+									orgActionable: true,
+									href: `/app/${stream}/i/${instance}/lot_processing/new/startLot?seed.lotId=L2`
+								}
+							]
+						}
+					]
+				}
+			]
+		});
+
+		model.select(startAddr(), { lotId: 'L1' });
+		expect(model.isBodyOpen(startAddr(), { lotId: 'L1' })).toBe(true);
+		expect(model.isBodyOpen(startAddr(), { lotId: 'L2' })).toBe(false);
+		expect(model.isSelected(startAddr(), { lotId: 'L1' })).toBe(true);
+		expect(model.isSelected(startAddr(), { lotId: 'L2' })).toBe(false);
+		expect(model.soleActionable).toBeNull();
+		model.applyLoadPolicy();
+		expect(model.selection?.taskId).toBe('startLot');
+		expect(model.selectionSeed).toEqual({ lotId: 'L1' });
+	});
 });
 
 describe('BoardTimelineModel just-completed pin', () => {

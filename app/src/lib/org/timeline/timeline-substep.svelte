@@ -72,7 +72,7 @@
 	const embed = $derived(!!(substep.orgActionable && address));
 	const focused = $derived.by(() => {
 		if (!address) return false;
-		return timelineModel.isSelected(address);
+		return timelineModel.isSelected(address, seed);
 	});
 	const entry = $derived.by(() => {
 		void boardFormCache.entries;
@@ -80,7 +80,7 @@
 		return boardFormCache.get(taskAddressKey(address));
 	});
 	const confirmRecap = $derived(address ? board.confirmRecapFor(address) : false);
-	const embedOpen = $derived(address ? timelineModel.isBodyOpen(address) : false);
+	const embedOpen = $derived(address ? timelineModel.isBodyOpen(address, seed) : false);
 
 	let detailsOpen = $state(false);
 	$effect(() => {
@@ -91,9 +91,9 @@
 
 	function onEmbedOpenChange(next: boolean) {
 		if (!address) return;
-		timelineModel.setBodyOpen(address, next);
+		timelineModel.setBodyOpen(address, next, seed);
 		// Closing must not select — select() always re-opens the body.
-		if (next) timelineModel.select(address);
+		if (next) timelineModel.select(address, seed);
 	}
 </script>
 
@@ -142,8 +142,8 @@
 					{confirmRecap}
 					open={embedOpen}
 					bodyId={embedBodyId}
-					onOpenChange={(next) => timelineModel.setBodyOpen(address, next)}
-					onFocus={() => timelineModel.select(address)}
+					onOpenChange={(next) => timelineModel.setBodyOpen(address, next, seed)}
+					onFocus={() => timelineModel.select(address, seed)}
 					onCommitted={(outcome) =>
 						board.onCommitted(address, outcome, { submitMany: !!substep.submitMany })
 					}

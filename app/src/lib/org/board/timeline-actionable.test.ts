@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import type { TimelineSubstep, TimelineView } from '../timeline/types.js';
 import {
+	actionableSeededRefsFromTimeline,
 	firstActionableAddress,
 	recapAddressesFromTimeline,
 	soleActionableAddress,
@@ -63,6 +64,32 @@ describe('soleActionableAddress', () => {
 		]);
 		expect(soleActionableAddress(many)).toBeNull();
 		expect(firstActionableAddress(many)?.taskId).toBe('register');
+	});
+
+	test('seeded provisional Starts stay distinct for sole counting', () => {
+		const manyLots = viewWithActionables([
+			{
+				substepId: 'lot_processing.startLot',
+				href: '/app/pv-recovery/i/261102-1/lot_processing/new/startLot?seed.lotId=L1'
+			},
+			{
+				substepId: 'lot_processing.startLot',
+				href: '/app/pv-recovery/i/261102-1/lot_processing/new/startLot?seed.lotId=L2'
+			}
+		]);
+		expect(soleActionableAddress(manyLots)).toBeNull();
+		const refs = actionableSeededRefsFromTimeline(manyLots);
+		expect(refs).toHaveLength(2);
+		expect(refs.map((r) => r.seed.lotId).sort()).toEqual(['L1', 'L2']);
+
+		const oneLot = viewWithActionables([
+			{
+				substepId: 'lot_processing.startLot',
+				href: '/app/pv-recovery/i/261102-1/lot_processing/new/startLot?seed.lotId=L9'
+			}
+		]);
+		expect(soleActionableAddress(oneLot)?.taskId).toBe('startLot');
+		expect(actionableSeededRefsFromTimeline(oneLot)[0]?.seed).toEqual({ lotId: 'L9' });
 	});
 
 	test('resolves Play boot …/new/{job}/{ji}/{task} hrefs', () => {

@@ -1,14 +1,16 @@
 import { describe, expect, test } from 'vitest';
 
+import { provisionalSeedDraftKey } from '../drafts.js';
 import { taskAddressKey, type TaskAddress } from '../task-address.js';
-import { BoardEmbedOpen } from './board-embed-open.svelte.js';
+import { BoardEmbedOpen, embedBodyKey } from './board-embed-open.svelte.js';
 
-const addr = (taskId: string): TaskAddress => ({
+const addr = (taskId: string, provisional = false): TaskAddress => ({
 	stream: 'pv-recovery',
 	instance: 'NIR-1',
 	jobId: 'lot_processing',
-	jobInstanceId: 'DA-1',
-	taskId
+	jobInstanceId: provisional ? '' : 'DA-1',
+	taskId,
+	provisionalJob: provisional
 });
 
 describe('BoardEmbedOpen', () => {
@@ -51,5 +53,34 @@ describe('BoardEmbedOpen', () => {
 		store.setOpen(b, true);
 		store.closeAll([a]);
 		expect(Object.keys(store.opened)).toEqual([taskAddressKey(b)]);
+	});
+
+	test('provisional seed keys isolate accordion open state', () => {
+		const store = new BoardEmbedOpen();
+		const start = addr('startLot', true);
+		const seedL1 = { lotId: 'L1' };
+		const seedL2 = { lotId: 'L2' };
+
+		expect(embedBodyKey(start, seedL1)).toBe(
+			`${taskAddressKey(start)}|${provisionalSeedDraftKey(seedL1)}`
+		);
+
+		store.setOpen(start, true, seedL1);
+		expect(store.isOpen(start, seedL1)).toBe(true);
+		expect(store.isOpen(start, seedL2)).toBe(false);
+		// Address-only query sees any seeded open (hold / collapse callers).
+		expect(store.isOpen(start)).toBe(true);
+
+		store.setOpen(start, true, seedL2);
+		expect(store.isOpen(start, seedL1)).toBe(true);
+		expect(store.isOpen(start, seedL2)).toBe(true);
+
+		store.setOpen(start, false, seedL1);
+		expect(store.isOpen(start, seedL1)).toBe(false);
+		expect(store.isOpen(start, seedL2)).toBe(true);
+
+		store.closeAll([start]);
+		expect(store.isOpen(start, seedL2)).toBe(false);
+		expect(Object.keys(store.opened)).toHaveLength(0);
 	});
 });
