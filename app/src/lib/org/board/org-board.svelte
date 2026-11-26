@@ -19,6 +19,7 @@
 	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
 	import { Checkbox } from '#lib/shadcn/ui/checkbox/index.js';
+	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 	import { Label } from '#lib/shadcn/ui/label/index.js';
 	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
@@ -46,6 +47,7 @@
 	import { resolveTaskDeepLink } from '../worklist-nav.js';
 	import { createHttpPassportsPort } from '../passports/http-passports-port.js';
 	import type { InstancePassport } from '../passports/types.js';
+	import { formatSubmissionTimestamp } from '../submission-table.js';
 
 	import '../timeline/org-timeline.css';
 	import '../timeline/role-palette.css';
@@ -122,6 +124,7 @@
 	/** Deferred Passports aside — filled after instance timeline view loads. */
 	let passports = $state.raw<InstancePassport[]>([]);
 	let passportsLoadedScopeKey = '';
+	let passportsAsideOpen = $state(true);
 
 	const scopeKey = $derived(session.scopeKey);
 
@@ -561,27 +564,38 @@
 
 			{#if passports.length > 0}
 				<aside class="org-board-passports-aside" data-testid="org-board-passports">
-					<h2 class="text-sm font-medium">{m.org_board_passports_heading()}</h2>
-					<ul class="org-board-passports-list">
-						{#each passports as passport (passport.subjectId)}
-							<li class="org-board-passports-item">
-								<span class="text-sm">{passport.label}</span>
-								{#if passport.issuedAt}
-									<span class="text-xs text-muted-foreground">{passport.issuedAt}</span>
-								{/if}
-								<a
-									class="inline-flex items-center gap-1 text-sm"
-									href={passport.digitalLink}
-									target="_blank"
-									rel="noopener noreferrer"
-									data-testid="org-board-passport-link"
-								>
-									{m.org_board_passport_open()}
-									<ArrowUpRight class="size-3.5" aria-hidden="true" />
-								</a>
-							</li>
-						{/each}
-					</ul>
+					<Collapsible.Root bind:open={passportsAsideOpen}>
+						<Collapsible.Trigger
+							class="org-board-passports-trigger w-full items-center hover:no-underline"
+						>
+							<h2 class="text-sm font-medium">{m.org_board_passports_heading()}</h2>
+						</Collapsible.Trigger>
+						<Collapsible.Content>
+							<ul class="org-board-passports-list">
+								{#each passports as passport (passport.subjectId)}
+									<li class="org-board-passports-item">
+										<span class="text-sm">{passport.label}</span>
+										{#if passport.issuedAt}
+											<span class="text-xs text-muted-foreground">
+												{formatSubmissionTimestamp(passport.issuedAt)}
+											</span>
+										{/if}
+										<Button
+											href={passport.digitalLink}
+											variant="link"
+											class="h-auto gap-1 px-0 underline"
+											target="_blank"
+											rel="noopener noreferrer"
+											data-testid="org-board-passport-link"
+										>
+											{m.org_board_passport_open()}
+											<ArrowUpRight class="size-3.5" aria-hidden="true" />
+										</Button>
+									</li>
+								{/each}
+							</ul>
+						</Collapsible.Content>
+					</Collapsible.Root>
 				</aside>
 			{/if}
 		</div>

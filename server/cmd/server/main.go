@@ -2554,6 +2554,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.Handle("/api/org/qr-resolve", orgHTTP)
 	mux.Handle("/api/org/streams", orgHTTP)
 	mux.Handle("/api/org/timeline", orgHTTP)
+	mux.Handle("/api/org/passports", orgHTTP)
 	mux.Handle("/api/org/events", orgHTTP)
 	mux.Handle("/api/org/artifacts/", orgHTTP)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)

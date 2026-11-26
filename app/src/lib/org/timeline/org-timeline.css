@@ -681,13 +681,29 @@
 .org-board-passports-aside {
 	order: -1;
 	min-width: 0;
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--spacing) * 2);
+	background: var(--org-elev-3);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	padding: calc(var(--spacing) * 3);
 }
 
 .org-board-passports-aside h2 {
 	margin: 0;
+}
+
+.org-board-passports-trigger {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--spacing) * 2);
+	min-height: 0;
+	padding: 0;
+	border-radius: 0;
+}
+
+.org-board-passports-aside
+	[data-slot='collapsible'][data-state='open']
+	> [data-slot='collapsible-content'] {
+	padding-top: calc(var(--spacing) * 3);
 }
 
 .org-board-passports-list {
