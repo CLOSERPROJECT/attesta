@@ -314,14 +314,25 @@
 	opacity: 1;
 }
 
-/* Locked: white elev (undo Formata card opacity); no primary hover — mark + title only. */
+/* Locked: white elev (undo Formata card opacity); no primary hover — mark + title only.
+ * Done archive drops the title fade (data-stream-status=done on the page root). */
 .org-timeline-page .substep-locked {
 	opacity: 1;
 }
 
-.org-timeline-page .substep-locked .timeline-header-index,
-.org-timeline-page .substep-locked .timeline-header-title {
+.org-timeline-page:not([data-stream-status='done']) .substep-locked .timeline-header-index,
+.org-timeline-page:not([data-stream-status='done']) .substep-locked .timeline-header-title {
 	opacity: 0.4;
+}
+
+/* Stream-level completed chip in the board header (nest done stays muted gray). */
+.org-timeline-page .org-timeline-header .timeline-header-trail {
+	margin-right: 0;
+}
+
+.org-timeline-page .org-timeline-header .status[data-status='completed'] {
+	color: var(--stream-available);
+	background-color: color-mix(in srgb, var(--stream-available) 12%, transparent);
 }
 
 /* --- One-line headers; Lucide chevrons share one absolute column from each row’s right edge --- */

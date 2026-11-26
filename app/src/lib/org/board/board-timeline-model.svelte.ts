@@ -25,6 +25,9 @@ import {
 	BoardJustCompleted,
 	boardJustCompleted
 } from './board-just-completed.svelte.js';
+import { boardChromePolicy, type BoardChromePolicy } from './board-chrome-policy.js';
+
+export type { BoardChromePolicy };
 
 /** Actionable timeline card with optional `?seed.*` from its href. */
 export type SeededTaskRef = {
@@ -303,12 +306,25 @@ export class BoardTimelineModel {
 		this.#justCompleted = opts.justCompleted ?? boardJustCompleted;
 	}
 
+	get chrome(): BoardChromePolicy {
+		return boardChromePolicy(this.view?.status, this.showAll);
+	}
+
+	/** Projection: Show-all toggle or done-stream archive. */
+	get effectiveShowAll(): boolean {
+		return this.chrome.projectAll;
+	}
+
+	get showAllFilterVisible(): boolean {
+		return !!this.view && this.chrome.showAllFilterVisible;
+	}
+
 	get visibleSteps(): VisibleStep[] {
 		const view = this.view;
 		if (!view) return [];
 		void this.#justCompleted.get();
 		return projectVisibleSteps(view, {
-			showAll: this.showAll,
+			showAll: this.chrome.projectAll,
 			focus: this.selection,
 			stream: this.stream || view.stream,
 			instance: this.instance || view.instance,
@@ -319,7 +335,7 @@ export class BoardTimelineModel {
 	get actionableAddresses(): TaskAddress[] {
 		const view = this.view;
 		if (!view) return [];
-		return actionableAddressesFromTimeline(view, { showAll: this.showAll });
+		return actionableAddressesFromTimeline(view, { showAll: this.chrome.projectAll });
 	}
 
 	get soleActionable(): TaskAddress | null {
@@ -330,7 +346,7 @@ export class BoardTimelineModel {
 
 	/** Available-only empty: no projected cards (actionable, focus, or pin). */
 	get isEmpty(): boolean {
-		if (this.showAll) return false;
+		if (this.chrome.projectAll) return false;
 		if (!this.view) return false;
 		return this.visibleSteps.length === 0;
 	}

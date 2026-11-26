@@ -130,7 +130,7 @@
 	);
 
 	const orphanFocus = $derived(model.orphanFocus);
-	const showAll = $derived(model.showAll);
+	const showAll = $derived(model.effectiveShowAll);
 	const actionableOnlyEmpty = $derived(model.isEmpty);
 
 	function setFocus(addr: TaskAddress) {
@@ -334,7 +334,7 @@
 		if (!shellPainted || loading) return;
 		void scopeKey;
 		void isBoot;
-		void model.showAll;
+		void model.effectiveShowAll;
 		void model.view;
 		void model.selection;
 
@@ -387,6 +387,7 @@
 	data-org-board="1"
 	data-board-scope={scope.kind}
 	data-show-all={showAll ? '1' : '0'}
+	data-stream-status={view?.status ?? ''}
 	data-route-key={scopeKey}
 >
 	<div class="org-timeline-toolbar" data-testid="board-chrome">
@@ -413,18 +414,32 @@
 						{view?.label || instance}
 					</span>
 				{/if}
+				{#if model.chrome.instanceStatusChip}
+					<span class="timeline-header-trail">
+						<span
+							class="status"
+							data-status="completed"
+							data-testid="board-chrome-status"
+							aria-label={m.stream_status_done()}
+						>
+							{m.stream_status_done()}
+						</span>
+					</span>
+				{/if}
 			</span>
 		</header>
 		{#if view}
 			<div class="stream-show-all-filter">
-				<Label class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}>
-					<Checkbox
-						class="js-show-all-filter border-foreground/35 bg-background shadow-none"
-						bind:checked={() => model.showAll, (v) => model.setShowAll(!!v)}
-						data-testid="show-all-filter"
-					/>
-					{m.show_all()}
-				</Label>
+				{#if model.showAllFilterVisible}
+					<Label class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}>
+						<Checkbox
+							class="js-show-all-filter border-foreground/35 bg-background shadow-none"
+							bind:checked={() => model.showAll, (v) => model.setShowAll(!!v)}
+							data-testid="show-all-filter"
+						/>
+						{m.show_all()}
+					</Label>
+				{/if}
 				<Button
 					type="button"
 					variant="outline"

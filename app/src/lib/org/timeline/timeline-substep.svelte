@@ -12,7 +12,7 @@
 	import { draftAddressForTask } from '../drafts.js';
 	import { orgSession } from '../org-app.svelte.js';
 	import { taskAddressKey } from '../task-address.js';
-	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
+	import { nestStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRoleBadges from './timeline-role-badges.svelte';
 	import { timelineRoleBadgesVisible } from './timeline-role-badge-label.js';
@@ -40,10 +40,13 @@
 	const status = $derived(substep.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
 	const showStatusChip = $derived(
-		!!status && streamStatusChipVisible(status, timelineModel.showAll)
+		nestStatusChipVisible(status, {
+			nestStatusChips: timelineModel.chrome.nestStatusChips,
+			projectAll: timelineModel.chrome.projectAll
+		})
 	);
 	const roleBadges = $derived(
-		timelineRoleBadgesVisible(timelineModel.showAll, substep.roleBadges)
+		timelineRoleBadgesVisible(timelineModel.chrome.roleBadges, substep.roleBadges)
 	);
 	const submissions = $derived(substep.submissions ?? []);
 	const statusClass = $derived(status ? `substep-${status}` : '');

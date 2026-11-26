@@ -466,3 +466,44 @@ describe('BoardTimelineModel just-completed pin', () => {
 		expect(model.visibleSteps).toHaveLength(1);
 	});
 });
+
+describe('done stream chrome policy', () => {
+	test('done view projects full timeline; filter and nest chips off; header chip on', () => {
+		const view = multiLotView();
+		view.status = 'done';
+		const model = new BoardTimelineModel({ syncUrl: vi.fn() });
+		model.setScope(stream, instance);
+		model.setView(view);
+
+		expect(model.showAll).toBe(false);
+		expect(model.chrome).toMatchObject({
+			projectAll: true,
+			showAllFilterVisible: false,
+			nestStatusChips: false,
+			roleBadges: false,
+			lockedFade: false,
+			instanceStatusChip: true
+		});
+		expect(model.effectiveShowAll).toBe(true);
+		expect(model.showAllFilterVisible).toBe(false);
+		expect(model.isEmpty).toBe(false);
+		expect(model.visibleSteps[0]!.rows).toHaveLength(2);
+	});
+
+	test('active view keeps actionable-only until toggle', () => {
+		const model = new BoardTimelineModel({ syncUrl: vi.fn() });
+		model.setScope(stream, instance);
+		model.setView(multiLotView());
+
+		expect(model.chrome.projectAll).toBe(false);
+		expect(model.chrome.nestStatusChips).toBe(true);
+		expect(model.chrome.instanceStatusChip).toBe(false);
+		expect(model.showAllFilterVisible).toBe(true);
+		expect(model.visibleSteps[0]!.rows).toHaveLength(1);
+
+		model.setShowAll(true);
+		expect(model.chrome.projectAll).toBe(true);
+		expect(model.chrome.roleBadges).toBe(true);
+		expect(model.visibleSteps[0]!.rows).toHaveLength(2);
+	});
+});
