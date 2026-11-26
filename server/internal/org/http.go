@@ -27,6 +27,8 @@ type API struct {
 	DomainLoader  *DomainLoader
 	TaskCommitter *TaskCommitter
 	Gate          Gate
+	// DPPs backs GET /api/org/passports; nil → empty list (timeline stays independent).
+	DPPs DPPStore
 	// Artifacts fetches sidecar bytes with the shared secret; nil → artifact route unavailable.
 	Artifacts *SidecarHttpPort
 	// Changes feeds GET /api/org/events; nil → route unavailable (500).
@@ -65,6 +67,8 @@ func (h *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleStreams(w, r)
 	case path == "/api/org/timeline":
 		h.handleTimeline(w, r)
+	case path == "/api/org/passports":
+		h.handlePassports(w, r)
 	case path == "/api/org/events":
 		h.handleEvents(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
@@ -135,6 +139,80 @@ func (h *API) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(view)
+}
+
+func (h *API) handlePassports(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.Gate == nil || h.DomainLoader == nil {
+		http.Error(w, "org passports not configured", http.StatusInternalServerError)
+		return
+	}
+	op, ok := h.Gate(w, r)
+	if !ok {
+		return
+	}
+	orgID := strings.TrimSpace(op.Org)
+	if orgID == "" {
+		http.Error(w, "organization required", http.StatusForbidden)
+		return
+	}
+	streamKey := strings.TrimSpace(r.URL.Query().Get("stream"))
+	if streamKey == "" {
+		http.Error(w, "stream required", http.StatusBadRequest)
+		return
+	}
+	instanceID := strings.TrimSpace(r.URL.Query().Get("instance"))
+	if instanceID == "" {
+		http.Error(w, "instance required", http.StatusBadRequest)
+		return
+	}
+	focus, focusErr := TimelineInstance(instanceID)
+	if focusErr != nil {
+		http.Error(w, "instance required", http.StatusBadRequest)
+		return
+	}
+	scope, cfg, ok := h.resolveStreamScope(w, r.Context(), orgID, streamKey, h.DomainLoader.Configs)
+	if !ok {
+		return
+	}
+	if !h.ensureStreamInstance(w, r.Context(), scope, cfg, instanceID) {
+		return
+	}
+
+	domain := EmptyDomain()
+	if h.DomainLoader.Domains != nil {
+		var domainErr error
+		domain, _, domainErr = domainSnapshot(r.Context(), h.DomainLoader.Domains, scope)
+		if domainErr != nil {
+			http.Error(w, "failed to load passports", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	passports := []InstancePassportDTO{}
+	if h.DPPs != nil {
+		var collectErr error
+		passports, collectErr = CollectInstancePassports(r.Context(), cfg, domain, focus, h.DPPs)
+		if collectErr != nil {
+			http.Error(w, "failed to load passports", http.StatusInternalServerError)
+			return
+		}
+		if passports == nil {
+			passports = []InstancePassportDTO{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method == http.MethodHead {
+		return
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(InstancePassportsView{Passports: passports})
 }
 
 func (h *API) handleStreams(w http.ResponseWriter, r *http.Request) {

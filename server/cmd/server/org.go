@@ -116,6 +116,7 @@ func (s *Server) orgAPI() http.Handler {
 			DPPs:       s.orgDPPs,
 			Changes:    s.orgChanges,
 		},
+		DPPs:      s.orgDPPs,
 		Gate:      s.orgVerifiedGate,
 		Artifacts: s.orgProductArtifacts(),
 		Changes:   s.orgChanges,

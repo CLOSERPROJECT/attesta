@@ -664,3 +664,57 @@
 		z-index: 10;
 	}
 }
+
+/* Board main: timeline + deferred Passports aside */
+.org-board-main-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: calc(var(--spacing) * 4);
+	align-items: start;
+	min-width: 0;
+}
+
+.org-board-timeline-col {
+	min-width: 0;
+}
+
+.org-board-passports-aside {
+	order: -1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--spacing) * 2);
+}
+
+.org-board-passports-aside h2 {
+	margin: 0;
+}
+
+.org-board-passports-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--spacing) * 3);
+}
+
+.org-board-passports-item {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: calc(var(--spacing) * 0.5);
+	min-width: 0;
+}
+
+@media (width >= 640px) {
+	.org-board-main-grid:has(.org-board-passports-aside) {
+		grid-template-columns: minmax(0, 1fr) minmax(12rem, max-content);
+	}
+
+	.org-board-passports-aside {
+		order: 0;
+		position: sticky;
+		top: calc(var(--spacing) * 4);
+	}
+}

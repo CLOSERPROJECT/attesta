@@ -15,6 +15,7 @@
 	import { navigateOrgTarget, orgMyStreamDashboardPath } from '../../router/navigate-target.js';
 	import { navigate } from '../../router/index.js';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
 	import { Checkbox } from '#lib/shadcn/ui/checkbox/index.js';
@@ -43,6 +44,8 @@
 		type BoardTaskFocus
 	} from './board-url.js';
 	import { resolveTaskDeepLink } from '../worklist-nav.js';
+	import { createHttpPassportsPort } from '../passports/http-passports-port.js';
+	import type { InstancePassport } from '../passports/types.js';
 
 	import '../timeline/org-timeline.css';
 	import '../timeline/role-palette.css';
@@ -70,6 +73,7 @@
 	setBoardTimelineModel(model);
 
 	const timelinePort = createHttpTimelinePort();
+	const passportsPort = createHttpPassportsPort();
 
 	const session = createBoardSession({
 		// One-shot init; `$effect` below keeps scope in sync with route props.
@@ -114,6 +118,10 @@
 
 	/** Stay Commit → land on once-recap / many-recap (keyed by address). */
 	let confirmRecapByKey = $state.raw<Record<string, true>>({});
+
+	/** Deferred Passports aside — filled after instance timeline view loads. */
+	let passports = $state.raw<InstancePassport[]>([]);
+	let passportsLoadedScopeKey = '';
 
 	const scopeKey = $derived(session.scopeKey);
 
@@ -379,6 +387,44 @@
 			navigateOrgTarget(gate);
 		}
 	});
+
+	// Deferred Passports: after instance timeline view loads; ignore stale on scope change.
+	$effect(() => {
+		const v = view;
+		const sk = scopeKey;
+		const s = stream;
+		const inst = instance;
+		const instanceScope = scope.kind === 'instance';
+
+		if (!instanceScope || !v || !inst) {
+			passports = [];
+			passportsLoadedScopeKey = '';
+			return;
+		}
+
+		if (sk !== passportsLoadedScopeKey) {
+			passports = [];
+			passportsLoadedScopeKey = sk;
+		}
+
+		let cancelled = false;
+		void passportsPort
+			.load({ stream: s, instance: inst })
+			.then(
+				(result) => {
+					if (cancelled) return;
+					passports = result.passports;
+				},
+				() => {
+					if (cancelled) return;
+					passports = [];
+				}
+			);
+
+		return () => {
+			cancelled = true;
+		};
+	});
 </script>
 
 <div
@@ -461,7 +507,7 @@
 	{/if}
 
 	{#if loading && !view}
-		<p class="text-sm text-muted-foreground" data-testid="org-timeline-status">
+		<p class="text-sm text-zinc-500" data-testid="org-timeline-status">
 			{m.loading()}
 		</p>
 	{:else if error && !view}
@@ -469,45 +515,75 @@
 			{error}
 		</p>
 	{:else}
-		{#if orphanFocus}
-			<section class="mb-6" data-testid="orphan-focus-embed">
-				<EmbeddedTaskPanel
-					address={orphanFocus}
-					entry={getEntry(orphanFocus)}
-					focused={true}
-					confirmRecap={confirmRecapFor(orphanFocus)}
-					open={model.isBodyOpen(orphanFocus)}
-					onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
-					onFocus={() => setFocus(orphanFocus)}
-					onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
-					onAcceptStale={() => session.acceptStale(orphanFocus)}
-				/>
-			</section>
-		{/if}
+		<div class="org-board-main-grid">
+			<div class="org-board-timeline-col">
+				{#if orphanFocus}
+					<section class="mb-6" data-testid="orphan-focus-embed">
+						<EmbeddedTaskPanel
+							address={orphanFocus}
+							entry={getEntry(orphanFocus)}
+							focused={true}
+							confirmRecap={confirmRecapFor(orphanFocus)}
+							open={model.isBodyOpen(orphanFocus)}
+							onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
+							onFocus={() => setFocus(orphanFocus)}
+							onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
+							onAcceptStale={() => session.acceptStale(orphanFocus)}
+						/>
+					</section>
+				{/if}
 
-		{#if view}
-			<div class="process-stream-block">
-				<div class="js-show-all-filter-root stream-show-all-filter-root">
-					{#if actionableOnlyEmpty}
-						<div
-							class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground"
-						>
-							<p class="m-0 text-xs leading-5 font-medium text-muted-foreground">
-								No matching tasks
-							</p>
-							<p class="m-0 text-xs leading-4 text-muted-foreground">
-								Turn on Show all to see the full stream timeline.
-							</p>
+				{#if view}
+					<div class="process-stream-block">
+						<div class="js-show-all-filter-root stream-show-all-filter-root">
+							{#if actionableOnlyEmpty}
+								<div
+									class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground"
+								>
+									<p class="m-0 text-xs leading-5 font-medium text-muted-foreground">
+										No matching tasks
+									</p>
+									<p class="m-0 text-xs leading-4 text-muted-foreground">
+										Turn on Show all to see the full stream timeline.
+									</p>
+								</div>
+							{:else}
+								<div class="stream-timeline-list">
+									{#each model.visibleSteps as vs (vs.step.stepId)}
+										<TimelineStep projected={vs} {stream} {instance} />
+									{/each}
+								</div>
+							{/if}
 						</div>
-					{:else}
-						<div class="stream-timeline-list">
-							{#each model.visibleSteps as vs (vs.step.stepId)}
-								<TimelineStep projected={vs} {stream} {instance} />
-							{/each}
-						</div>
-					{/if}
-				</div>
+					</div>
+				{/if}
 			</div>
-		{/if}
+
+			{#if passports.length > 0}
+				<aside class="org-board-passports-aside" data-testid="org-board-passports">
+					<h2 class="text-sm font-medium">{m.org_board_passports_heading()}</h2>
+					<ul class="org-board-passports-list">
+						{#each passports as passport (passport.subjectId)}
+							<li class="org-board-passports-item">
+								<span class="text-sm">{passport.label}</span>
+								{#if passport.issuedAt}
+									<span class="text-xs text-muted-foreground">{passport.issuedAt}</span>
+								{/if}
+								<a
+									class="inline-flex items-center gap-1 text-sm"
+									href={passport.digitalLink}
+									target="_blank"
+									rel="noopener noreferrer"
+									data-testid="org-board-passport-link"
+								>
+									{m.org_board_passport_open()}
+									<ArrowUpRight class="size-3.5" aria-hidden="true" />
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</aside>
+			{/if}
+		</div>
 	{/if}
 </div>
