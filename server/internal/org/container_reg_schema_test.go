@@ -28,12 +28,12 @@ func TestContainerRegSchemaFlatMaterialWeight(t *testing.T) {
 	schema := containerRegSchema(t)
 	props, _ := schema["properties"].(map[string]any)
 	req, _ := schema["required"].([]any)
-	if len(req) != 2 || req[0] != "material" || req[1] != "weight" {
-		t.Fatalf("required = %#v, want [material weight]", req)
+	if len(req) != 1 || req[0] != "material" {
+		t.Fatalf("required = %#v, want [material]", req)
 	}
-	for _, gone := range []string{"polvereDiVetro", "plastica", "sourceLotId", "secondarySourceLotId"} {
+	for _, gone := range []string{"polvereDiVetro", "plastica", "sourceLotId", "secondarySourceLotId", "weight", "incomplete"} {
 		if _, has := props[gone]; has {
-			t.Fatalf("schema property %s must be removed", gone)
+			t.Fatalf("schema property %s must be removed from root (weight/incomplete live under dependencies.material)", gone)
 		}
 	}
 	if _, has := schema["if"]; has {
@@ -43,20 +43,30 @@ func TestContainerRegSchemaFlatMaterialWeight(t *testing.T) {
 	if mat == nil || mat["type"] != "string" {
 		t.Fatalf("material = %#v, want string", mat)
 	}
-	weight, _ := props["weight"].(map[string]any)
-	if weight == nil || weight["type"] != "number" {
-		t.Fatalf("weight = %#v, want number", weight)
-	}
-	inc, _ := props["incomplete"].(map[string]any)
-	if inc == nil || inc["type"] != "boolean" {
-		t.Fatalf("incomplete = %#v, want boolean", inc)
-	}
-	if inc["default"] != false {
-		t.Fatalf("incomplete.default = %#v, want false", inc["default"])
-	}
 	cont, _ := props["continuesContainerId"].(map[string]any)
 	if cont == nil || cont["type"] != "string" {
 		t.Fatalf("continuesContainerId = %#v, want string", cont)
+	}
+	deps, _ := schema["dependencies"].(map[string]any)
+	matDep, _ := deps["material"].(map[string]any)
+	if matDep == nil {
+		t.Fatal("dependencies.material missing")
+	}
+	depReq, _ := matDep["required"].([]any)
+	if len(depReq) != 1 || depReq[0] != "weight" {
+		t.Fatalf("dependencies.material.required = %#v, want [weight]", depReq)
+	}
+	depProps, _ := matDep["properties"].(map[string]any)
+	weight, _ := depProps["weight"].(map[string]any)
+	if weight == nil || weight["type"] != "number" {
+		t.Fatalf("dependencies.material.properties.weight = %#v, want number", weight)
+	}
+	inc, _ := depProps["incomplete"].(map[string]any)
+	if inc == nil || inc["type"] != "boolean" {
+		t.Fatalf("dependencies.material.properties.incomplete = %#v, want boolean", inc)
+	}
+	if inc["default"] != false {
+		t.Fatalf("incomplete.default = %#v, want false", inc["default"])
 	}
 }
 

@@ -72,19 +72,29 @@ describe('containerReg leaf Ajv', () => {
 	const uiSchema = (leaf?.uiSchema ?? null) as Record<string, unknown> | null;
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
-	test('flat material+weight valid; no material arrays / dualSources', () => {
+	test('material gates weight via dependencies; no material arrays / dualSources', () => {
 		expect(schema).toBeTruthy();
 		expect(schema).not.toHaveProperty('if');
 		const props = (schema as { properties?: Record<string, unknown> }).properties ?? {};
 		expect(props).toHaveProperty('material');
-		expect(props).toHaveProperty('weight');
-		expect(props).toHaveProperty('incomplete');
 		expect(props).toHaveProperty('continuesContainerId');
+		expect(props).not.toHaveProperty('weight');
+		expect(props).not.toHaveProperty('incomplete');
 		expect(props).not.toHaveProperty('polvereDiVetro');
 		expect(props).not.toHaveProperty('sourceLotId');
 		expect(props).not.toHaveProperty('secondarySourceLotId');
 		expect(props).not.toHaveProperty('dualSources');
 
+		const deps = (schema as { dependencies?: Record<string, unknown> }).dependencies ?? {};
+		const matDep = deps.material as
+			| { required?: string[]; properties?: Record<string, unknown> }
+			| undefined;
+		expect(matDep?.required).toEqual(['weight']);
+		expect(matDep?.properties).toHaveProperty('weight');
+		expect(matDep?.properties).toHaveProperty('incomplete');
+
+		expect(validator.isValid(schema!, schema!, {})).toBe(false);
+		expect(validator.isValid(schema!, schema!, { material: 'polvereDiVetro' })).toBe(false);
 		expect(
 			validator.isValid(schema!, schema!, {
 				material: 'polvereDiVetro',
@@ -100,12 +110,6 @@ describe('containerReg leaf Ajv', () => {
 				incomplete: false
 			})
 		).toBe(true);
-		expect(
-			validator.isValid(schema!, schema!, {
-				material: 'polvereDiVetro',
-				incomplete: false
-			})
-		).toBe(false);
 	});
 
 	test('continuesContainerId authored as hiddenField (not RJSF ui:widget)', () => {

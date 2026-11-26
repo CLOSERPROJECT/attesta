@@ -647,19 +647,23 @@ steps:
               schema:
                 type: object
                 title: Registrazione contenitori
-                required: [material, weight]
+                required: [material]
                 properties:
                     material:
                         type: string
                         title: Materiale
                         enum: [polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
-                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
-                    incomplete:
-                        type: boolean
-                        title: Incompleto
-                        default: false
                     continuesContainerId:
                         type: string
+                dependencies:
+                    material:
+                        required: [weight]
+                        properties:
+                            weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                            incomplete:
+                                type: boolean
+                                title: Incompleto
+                                default: false
               uiSchema:
                 ui:options:
                     order: [material, weight, incomplete, continuesContainerId]
