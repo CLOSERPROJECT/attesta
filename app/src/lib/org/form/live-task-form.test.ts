@@ -25,6 +25,7 @@ function planOf(partial: {
 const ports = {
 	getValue: () => ({}),
 	setValue: () => {},
+	seedValue: () => {},
 	getDomain: () => ({})
 };
 
@@ -105,5 +106,7 @@ describe('createConfigForm reactive schema wiring', () => {
 		expect(src).toMatch(/get schema\(\)/);
 		expect(src).toMatch(/get uiSchema\(\)/);
 		expect(src).toContain('ConfigFormSchemas | (() => ConfigFormSchemas)');
+		expect(src).toContain('seedValue');
+		expect(src).toContain('seedDraft');
 	});
 });

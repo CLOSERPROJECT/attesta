@@ -6,11 +6,11 @@ export function timelineRoleBadgeLabel(badge: TimelineRoleBadge): string {
 	return label || badge.id;
 }
 
-/** Role pills appear only in Show all (API order preserved by caller). */
+/** Role pills when chrome.roleBadges (API order preserved by caller). */
 export function timelineRoleBadgesVisible(
-	showAll: boolean,
+	roleBadges: boolean,
 	badges: TimelineRoleBadge[] | undefined
 ): TimelineRoleBadge[] {
-	if (!showAll || !badges?.length) return [];
+	if (!roleBadges || !badges?.length) return [];
 	return badges;
 }

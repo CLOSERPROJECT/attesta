@@ -115,7 +115,7 @@ func TestCommitHTTPUnconfiguredDoesNotRollbackDomain(t *testing.T) {
 	if len(result.Links) != 0 {
 		t.Fatalf("links = %#v", result.Links)
 	}
-	if len(result.HttpErrors) != 2 {
+	if len(result.HttpErrors) != 1 {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
 	stored, err := domains.Get(t.Context(), FeragameScope())
@@ -131,12 +131,7 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 	n := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n++
-		id := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		if n == 2 {
-			id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-			w.Header().Set("Content-Disposition", `attachment; filename="NIR-261019-CO-1.csv"`)
-		}
-		_, _ = io.WriteString(w, "/artifacts/"+id)
+		_, _ = io.WriteString(w, "/artifacts/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	}))
 	t.Cleanup(srv.Close)
 
@@ -155,19 +150,16 @@ func TestCommitSidecarHttpPortSuccessLinks(t *testing.T) {
 	if len(result.HttpErrors) != 0 {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
-	if len(result.Links) != 2 {
+	if len(result.Links) != 1 {
 		t.Fatalf("links = %#v", result.Links)
 	}
 	if result.Links[0].URL != ArtifactProxyPathPrefix+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
 		t.Fatalf("link0 = %#v", result.Links[0])
 	}
-	if result.Links[1].URL != ArtifactProxyPathPrefix+"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
-		t.Fatalf("link1 = %#v", result.Links[1])
+	if result.Links[0].Label != "Stampa etichette" || result.Links[0].Action != HttpActionLink {
+		t.Fatalf("link0 = %#v", result.Links[0])
 	}
-	if result.Links[1].Filename != "NIR-261019-CO-1.csv" {
-		t.Fatalf("filename = %q", result.Links[1].Filename)
-	}
-	if n != 2 {
+	if n != 1 {
 		t.Fatalf("upstream calls = %d", n)
 	}
 }

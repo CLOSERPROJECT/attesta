@@ -31,7 +31,7 @@
 	);
 </script>
 
-<div data-testid={testId}>
+<div class="min-w-0" data-testid={testId}>
 	{#if empty}
 		<div
 			class="flex items-center justify-center gap-2 rounded-md bg-muted/60 px-3 py-3 text-muted-foreground"
@@ -41,7 +41,7 @@
 			<p class="m-0 text-sm">{m.no_data_yet()}</p>
 		</div>
 	{:else if !entry || entry.status === 'idle' || entry.status === 'loading'}
-		<p class="text-sm text-zinc-500" data-testid="many-recap-loading">
+		<p class="text-sm text-muted-foreground" data-testid="many-recap-loading">
 			{m.loading_recap()}
 		</p>
 	{:else if entry.status === 'error'}

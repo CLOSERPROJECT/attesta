@@ -9,7 +9,7 @@ import {
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { normalizeTaskAddress } from './task-address.js';
 
-const stream = 'recycling';
+const stream = 'pv-recovery';
 const truck = '261102-1';
 
 const nextBundle: TaskFormBundle = {

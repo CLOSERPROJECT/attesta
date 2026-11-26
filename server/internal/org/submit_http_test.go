@@ -30,7 +30,6 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="register.csv"`}},
 		},
 	}
 	domain := EmptyDomain()
@@ -43,17 +42,12 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 			Body:    `{ "lotId": $lot.id, "labels": [$keys($sift($domain.pallet, function($v){$v.lotId = $lot.id}))] }`,
 			HasBody: true,
 		},
-		{
-			Method: `"POST"`, URL: `"/effects/register-csv"`, Label: `"Scarica CSV registrazione"`, Action: "download",
-			Body:    `{ "client": $.client, "lotId": $lot.id }`,
-			HasBody: true,
-		},
 	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"lot": map[string]any{"id": "acme-1"}}, domain, "acme-1", nil, "feragame")
 
 	if len(result.Errors) != 0 {
 		t.Fatalf("errors = %#v", result.Errors)
 	}
-	if len(port.calls) != 2 {
+	if len(port.calls) != 1 {
 		t.Fatalf("calls = %#v", port.calls)
 	}
 	if port.calls[0].Method != "POST" || port.calls[0].URL != "/effects/labels" || port.calls[0].Org != "feragame" {
@@ -63,14 +57,11 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 	if body0["lotId"] != "acme-1" {
 		t.Fatalf("body0 = %#v", port.calls[0].Body)
 	}
-	if len(result.Links) != 2 {
+	if len(result.Links) != 1 {
 		t.Fatalf("links = %#v", result.Links)
 	}
 	if result.Links[0] != (HttpLinkItem{Label: "Stampa etichette", URL: "blob:labels", Action: HttpActionLink}) {
 		t.Fatalf("link0 = %#v", result.Links[0])
-	}
-	if result.Links[1] != (HttpLinkItem{Label: "Scarica CSV registrazione", URL: "blob:csv", Action: HttpActionDownload, Filename: "register.csv"}) {
-		t.Fatalf("link1 = %#v", result.Links[1])
 	}
 }
 

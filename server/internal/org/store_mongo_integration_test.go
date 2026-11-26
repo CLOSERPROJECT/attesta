@@ -414,7 +414,7 @@ func TestMongoStreamsOfOneOrgKeepSeparateDPPsAndLinks(t *testing.T) {
 	passports := NewMongoDPPStore(db)
 	links := NewMongoLinkStore(db)
 
-	scopeA := Scope{Org: "mongo-dpp-" + t.Name(), Stream: "recycling"}
+	scopeA := Scope{Org: "mongo-dpp-" + t.Name(), Stream: "pv-recovery"}
 	scopeB := Scope{Org: scopeA.Org, Stream: "other"}
 	addr := SubmissionAddress{JobID: "intake", JobInstanceID: "T1", TaskID: "register"}
 	ts := "2026-11-19T12:00:00.000000000Z"

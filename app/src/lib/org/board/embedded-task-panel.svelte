@@ -1,6 +1,8 @@
 <script lang="ts">
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { untrack } from 'svelte';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -10,9 +12,16 @@
 	import type { TimelineSubmission } from '../timeline/types.js';
 	import { boardFormCache, type BoardFormEntry } from './board-form-cache.svelte.js';
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
-	import BoardManyRecap from './board-many-recap.svelte';
 	import BoardOnceRecap from './board-once-recap.svelte';
-	import { stayConfirmSurface } from './commit-stay-recap.js';
+	import ManyRecapDoneBand from './many-recap-done-band.svelte';
+	import {
+		initialManyLand,
+		reduceManyLand,
+		showComposer,
+		showDoneBand,
+		stayConfirmSurface,
+		type ManyLandSurface
+	} from './commit-stay-recap.js';
 
 	type Props = {
 		address: TaskAddress;
@@ -24,6 +33,8 @@
 		/** Stay Commit: land on once-recap / close many composer (no under-form Continue). */
 		confirmRecap?: boolean;
 		open?: boolean;
+		/** When false, stay land shows Done-band / once-recap only (no Add / live form). */
+		orgActionable?: boolean;
 		/** `?seed.*` from timeline href — locks those fields for this embed open. */
 		seed?: Record<string, string>;
 		/** Optional id for the embed body region (aria-controls). */
@@ -43,6 +54,7 @@
 		disabled = false,
 		confirmRecap = false,
 		open = true,
+		orgActionable = true,
 		seed = {},
 		bodyId,
 		onOpenChange,
@@ -63,34 +75,55 @@
 		Boolean(confirmRecap) ||
 			(recapEntry?.status === 'ready' && (recapEntry.table.rows.length ?? 0) > 0)
 	);
-	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
 
-	/** Many-submit: composer under the recap table (closed by default). */
-	let composerOpen = $state(false);
+	let manySurface = $state<ManyLandSurface>('empty-compose');
 
-	/** One-shot: stay → close composer; recap table stays visible. */
-	let closedComposerOnStay = $state(false);
+	/** Re-init when address key changes only — remount / draftGeneration / catch-up must not re-reduce. */
+	$effect.pre(() => {
+		if (!submitMany) return;
+		void key;
+		manySurface = initialManyLand({
+			submissionCount: untrack(() => submissions.length),
+			confirmRecap: untrack(() => confirmRecap)
+		});
+	});
+
+	const composerVisible = $derived(showComposer(manySurface));
+	const doneBandVisible = $derived(showDoneBand(manySurface));
+
+	/** One-shot per confirmRecap edge — parent onOpenChange identity must not re-close Add. */
+	let latchedStayConfirm = $state(false);
 	$effect(() => {
 		if (!confirmRecap) {
-			closedComposerOnStay = false;
+			latchedStayConfirm = false;
 			return;
 		}
 		if (stayConfirmSurface(submitMany) !== 'many-recap') return;
-		if (closedComposerOnStay) return;
-		closedComposerOnStay = true;
-		composerOpen = false;
-		onOpenChange?.(true);
+		if (latchedStayConfirm) return;
+		latchedStayConfirm = true;
+		untrack(() => onOpenChange?.(true));
 	});
 
 	function openComposer() {
-		composerOpen = true;
+		manySurface = reduceManyLand(manySurface, { type: 'openComposer' });
 		onOpenChange?.(true);
 		onFocus?.();
 	}
 
 	function discardComposer() {
-		composerOpen = false;
+		manySurface = reduceManyLand(manySurface, {
+			type: 'discard',
+			submissionCount: submissions.length
+		});
 		boardFormCache.beginFreshDraft(address);
+	}
+
+	/** Every many Commit (incl. 2nd+) — surface owns close; confirmRecap is not a mode event. */
+	function onFormCommitted(outcome: CommitOutcome) {
+		if (submitMany) {
+			manySurface = reduceManyLand(manySurface, { type: 'commitSuccess' });
+		}
+		onCommitted?.(outcome);
 	}
 </script>
 
@@ -146,8 +179,8 @@
 				provisionalJob={address.provisionalJob}
 				{seed}
 				{disabled}
-				submitStart={submitMany && composerOpen ? discardAction : undefined}
-				onCommitted={(outcome) => onCommitted?.(outcome)}
+				submitStart={submitMany && manySurface === 'composing' ? discardAction : undefined}
+				onCommitted={onFormCommitted}
 			/>
 		{/key}
 		{#if !submitMany && showOnceRecap}
@@ -161,7 +194,7 @@
 	data-testid="embedded-task-panel"
 	data-address-key={key}
 	data-focused={focused ? '1' : '0'}
-	data-composer={submitMany ? (composerOpen ? 'open' : 'closed') : undefined}
+	data-composer={submitMany ? (composerVisible ? 'open' : 'closed') : undefined}
 	data-open={open ? '1' : '0'}
 	data-confirm-recap={confirmRecap ? '1' : '0'}
 >
@@ -172,29 +205,46 @@
 			data-testid="embed-panel-body"
 		>
 			{#if submitMany}
-				{#if !address.provisionalJob && address.jobInstanceId}
-					<BoardManyRecap {address} empty={manyEmpty} data-testid="embed-many-recap" />
+				{#if doneBandVisible && !address.provisionalJob && address.jobInstanceId}
+					<ManyRecapDoneBand {address} />
 				{/if}
-				<div class="mt-8" data-testid="embed-composer-region">
-					{#if !composerOpen}
-						<div class="flex justify-end">
-							<Button
-								type="button"
-								variant="default"
-								size="sm"
-								data-testid="embed-composer-open"
-								onclick={openComposer}
-							>
-								<PlusIcon data-icon="inline-start" aria-hidden="true" />
-								{m.embed_composer_add()}
-							</Button>
-						</div>
-					{:else}
-						<div class="outline-none" data-testid="embed-form-pane">
-							{@render formPane()}
-						</div>
-					{/if}
-				</div>
+				{#if orgActionable}
+					<div
+						class={doneBandVisible ? 'pt-5' : undefined}
+						data-testid="embed-composer-region"
+					>
+						{#if !composerVisible}
+							<div class="flex justify-center">
+								<Button
+									type="button"
+									variant="default"
+									size="default"
+									class="w-56 max-w-full shrink"
+									data-testid="embed-composer-open"
+									onclick={openComposer}
+								>
+									<PlusIcon data-icon="inline-start" aria-hidden="true" />
+									{m.embed_composer_add()}
+								</Button>
+							</div>
+						{:else}
+							<div class="outline-none pt-2 pb-2" data-testid="embed-form-pane">
+								{#if manySurface === 'composing'}
+									<h3
+										class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
+										data-testid="embed-many-new-entry-title"
+									>
+										<PencilIcon class="size-3.5 shrink-0" aria-hidden="true" />
+										{m.embed_many_new_entry()}
+									</h3>
+								{/if}
+								{@render formPane()}
+							</div>
+						{/if}
+					</div>
+				{/if}
+			{:else if !orgActionable}
+				<BoardOnceRecap {address} data-testid="embed-once-recap" />
 			{:else}
 				<div class="outline-none" data-testid="embed-form-pane">
 					{@render formPane()}

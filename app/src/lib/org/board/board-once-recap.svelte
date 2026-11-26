@@ -19,7 +19,7 @@
 </script>
 
 {#if !entry || entry.status === 'idle' || entry.status === 'loading'}
-	<p class="text-sm text-zinc-500" data-testid="once-recap-loading">{m.loading_recap()}</p>
+	<p class="text-sm text-muted-foreground" data-testid="once-recap-loading">{m.loading_recap()}</p>
 {:else if entry.status === 'error'}
 	<p class="text-sm text-red-700" role="alert" data-testid="once-recap-error">
 		{entry.error ?? m.could_not_load_recap()}

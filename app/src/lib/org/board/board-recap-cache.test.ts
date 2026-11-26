@@ -26,7 +26,7 @@ const recap = (taskId: string, n = 1): TaskRecapTable => ({
 
 function addr(taskId: string) {
 	return normalizeTaskAddress({
-		stream: 'recycling',
+		stream: 'pv-recovery',
 		instance: 'NIR-1',
 		jobId: 'intake',
 		jobInstanceId: 'NIR-1',
@@ -44,7 +44,7 @@ describe('BoardRecapCache', () => {
 			taskRecap: { fetch } satisfies TaskRecapPort,
 			concurrency: 2
 		});
-		cache.beginScope('recycling|NIR-1');
+		cache.beginScope('pv-recovery|NIR-1');
 		cache.enqueue([addr('a'), addr('b'), addr('c'), addr('d')]);
 		expect(fetch).toHaveBeenCalledTimes(2);
 

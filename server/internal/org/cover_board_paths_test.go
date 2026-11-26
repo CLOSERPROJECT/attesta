@@ -85,7 +85,7 @@ func TestTimelineHelpersEdgeCoverage(t *testing.T) {
 		t.Fatalf("simple = %q", got)
 	}
 
-	if got := AppOrgSeededStartTaskPath("recycling", "T1", "lot_processing", "startLot", "", "L1"); got != "/app/recycling/i/T1/lot_processing/new/startLot" {
+	if got := AppOrgSeededStartTaskPath("pv-recovery", "T1", "lot_processing", "startLot", "", "L1"); got != "/app/pv-recovery/i/T1/lot_processing/new/startLot" {
 		t.Fatalf("empty seed field = %q", got)
 	}
 
@@ -175,13 +175,13 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 	h := &API{DomainLoader: loader, Gate: gateOK}
 
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/timeline?stream=recycling&instance="+truck, nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/timeline?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("POST = %d", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	(&API{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=recycling&instance="+truck, nil))
+	(&API{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("unconfigured = %d", rec.Code)
 	}
@@ -190,19 +190,19 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 		return OperatorIdentity{UserID: "ada"}, true
 	}}
 	rec = httptest.NewRecorder()
-	emptyOrg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=recycling&instance="+truck, nil))
+	emptyOrg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("empty org = %d", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=recycling", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=pv-recovery", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("boot (stream only) = %d body=%s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/org/timeline?stream=recycling&instance="+truck, nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/org/timeline?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("HEAD = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -218,14 +218,14 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 
 	// resolveStreamScope: nil configs
 	rec = httptest.NewRecorder()
-	scope, _, ok := h.resolveStreamScope(rec, t.Context(), "feragame", "recycling", nil)
+	scope, _, ok := h.resolveStreamScope(rec, t.Context(), "feragame", "pv-recovery", nil)
 	if ok || scope.Stream != "" || rec.Code != http.StatusInternalServerError {
 		t.Fatalf("nil configs = ok=%v scope=%#v code=%d", ok, scope, rec.Code)
 	}
 
 	// ActiveVersion hard error
 	rec = httptest.NewRecorder()
-	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "recycling", activeVersionErrStore{
+	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "pv-recovery", activeVersionErrStore{
 		ConfigStore: loader.Configs,
 		err:         errors.New("boom"),
 	})
@@ -240,7 +240,7 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 	}
 	_ = version
 	rec = httptest.NewRecorder()
-	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "recycling", getConfigErrStore{
+	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "pv-recovery", getConfigErrStore{
 		ConfigStore: loader.Configs,
 		err:         errors.New("get boom"),
 	})
@@ -254,7 +254,7 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
-	badDomainAPI.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=recycling&instance="+truck, nil))
+	badDomainAPI.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("domain boom = %d", rec.Code)
 	}
@@ -278,7 +278,7 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 
 	// resolveStreamScope: Get returns ErrNotFound
 	rec = httptest.NewRecorder()
-	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "recycling", getConfigErrStore{
+	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "pv-recovery", getConfigErrStore{
 		ConfigStore: loader.Configs,
 		err:         ErrNotFound,
 	})
@@ -288,7 +288,7 @@ func TestHandleTimelineAndResolveScopeEdges(t *testing.T) {
 
 	// resolveStreamScope: ActiveVersion ErrNotFound
 	rec = httptest.NewRecorder()
-	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "recycling", activeVersionErrStore{
+	_, _, ok = h.resolveStreamScope(rec, t.Context(), "feragame", "pv-recovery", activeVersionErrStore{
 		ConfigStore: loader.Configs,
 		err:         ErrNotFound,
 	})
@@ -440,10 +440,10 @@ func TestRequireStreamAndMissingStreamQuery(t *testing.T) {
 
 func TestBuildOrgTimelineMissingJobFallsBack(t *testing.T) {
 	cfg := OrgConfig{Jobs: OrderedObject{Keys: []string{}, Values: map[string]any{}}}
-	hrefs := TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, "T1"))
+	hrefs := TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, "T1"))
 	steps := BuildOrgTimelineSteps(cfg, EmptyDomain(), StreamTimeline{Steps: []StreamTimelineStep{
 		{JobID: "missing", Title: "", Tasks: []StreamTimelineTask{{ID: "t", Title: "", State: StreamSubstepAvailable}}},
-	}}, hrefs)
+	}}, hrefs, "")
 	if len(steps) != 1 || steps[0].Title != "missing" {
 		t.Fatalf("empty step title falls back to job id: %#v", steps)
 	}
@@ -459,7 +459,7 @@ func TestBuildOrgTimelineMissingJobFallsBack(t *testing.T) {
 		{JobID: "each", Title: "Each", Rows: []StreamTimelineRow{
 			{ID: "L1", Label: "L1", Tasks: []StreamTimelineTask{{ID: "start", Title: "Start", State: StreamSubstepLocked}}},
 		}},
-	}}, hrefs)
+	}}, hrefs, "")
 	if len(steps) != 1 || len(steps[0].Rows) != 1 || steps[0].Rows[0].Status != string(StreamSubstepLocked) {
 		t.Fatalf("each-row status = %#v", steps)
 	}
@@ -550,7 +550,7 @@ func TestHandleLoadTimelineQrErrorBranches(t *testing.T) {
 				Configs: &nthActiveVersionStore{ConfigStore: loader.Configs, failAt: 2, err: tc.err},
 			},
 			Gate: gateOK,
-		}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truck, nil))
+		}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 		if rec.Code != tc.code {
 			t.Fatalf("load second active %v = %d, want %d", tc.err, rec.Code, tc.code)
 		}
@@ -571,7 +571,7 @@ func TestHandleLoadTimelineQrErrorBranches(t *testing.T) {
 				Configs: loader.Configs,
 			},
 			Gate: gateOK,
-		}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=recycling&instance="+truck, nil))
+		}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/timeline?stream=pv-recovery&instance="+truck, nil))
 		if rec.Code != tc.code {
 			t.Fatalf("timeline second get %v = %d, want %d", tc.err, rec.Code, tc.code)
 		}
@@ -584,7 +584,7 @@ func TestHandleLoadTimelineQrErrorBranches(t *testing.T) {
 		t.Fatalf("qr missing stream = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling", strings.NewReader(`{`)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery", strings.NewReader(`{`)))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("qr bad json = %d", rec.Code)
 	}
@@ -598,7 +598,7 @@ func TestHandleLoadTimelineQrErrorBranches(t *testing.T) {
 		},
 		Gate: gateOK,
 	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive&instance="+truck, nil))
+		"/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive&instance="+truck, nil))
 	if rec.Code != http.StatusNotFound && rec.Code != http.StatusInternalServerError {
 		t.Fatalf("task-form second active = %d", rec.Code)
 	}
@@ -606,7 +606,7 @@ func TestHandleLoadTimelineQrErrorBranches(t *testing.T) {
 	// Task recap: invalid address + domain boom + HEAD
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&jobId=&taskId=truckArrive&jobInstanceId="+truck+"&instance="+truck, nil))
+		"/api/org/task-recap?stream=pv-recovery&jobId=&taskId=truckArrive&jobInstanceId="+truck+"&instance="+truck, nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("recap missing jobId = %d", rec.Code)
 	}
@@ -615,14 +615,14 @@ func TestHandleLoadTimelineQrErrorBranches(t *testing.T) {
 		DomainLoader: &DomainLoader{Domains: &errDomainStore{err: errors.New("recap boom")}, Configs: loader.Configs},
 		Gate:         gateOK,
 	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&jobId=intake&taskId=truckArrive&jobInstanceId="+truck+"&instance="+truck, nil))
+		"/api/org/task-recap?stream=pv-recovery&jobId=intake&taskId=truckArrive&jobInstanceId="+truck+"&instance="+truck, nil))
 	// ensureStreamInstance fails first with domain boom → 500
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("recap domain boom = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead,
-		"/api/org/task-recap?stream=recycling&jobId=intake&taskId=truckArrive&jobInstanceId="+truck+"&instance="+truck, nil))
+		"/api/org/task-recap?stream=pv-recovery&jobId=intake&taskId=truckArrive&jobInstanceId="+truck+"&instance="+truck, nil))
 	if rec.Code != http.StatusOK && rec.Code != http.StatusNotFound {
 		t.Fatalf("recap HEAD = %d", rec.Code)
 	}
@@ -757,24 +757,24 @@ func TestHandleLoadEdges(t *testing.T) {
 	h := &API{DomainLoader: loader, Gate: gateOK}
 
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/domain?stream=recycling&instance="+truck, nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("POST = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
-	(&API{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truck, nil))
+	(&API{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("unconfigured = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
 	(&API{DomainLoader: loader, Gate: func(http.ResponseWriter, *http.Request) (OperatorIdentity, bool) {
 		return OperatorIdentity{UserID: "ada"}, true
-	}}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truck, nil))
+	}}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("empty org = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/org/domain?stream=recycling&instance="+truck, nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
 		t.Fatalf("HEAD = %d body=%q", rec.Code, rec.Body.String())
 	}
@@ -784,7 +784,7 @@ func TestHandleLoadEdges(t *testing.T) {
 	(&API{
 		DomainLoader: &DomainLoader{Domains: loader.Domains, Configs: activeVersionErrStore{ConfigStore: loader.Configs, err: ErrNotFound}},
 		Gate:         gateOK,
-	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truck, nil))
+	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("active not found = %d", rec.Code)
 	}
@@ -793,7 +793,7 @@ func TestHandleLoadEdges(t *testing.T) {
 	(&API{
 		DomainLoader: &DomainLoader{Domains: loader.Domains, Configs: activeVersionErrStore{ConfigStore: loader.Configs, err: errors.New("load boom")}},
 		Gate:         gateOK,
-	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truck, nil))
+	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truck, nil))
 	// requireStreamAndInstance → resolveStreamScope fails with 500 before Load
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("load boom = %d", rec.Code)
@@ -933,7 +933,7 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 				Configs: &nthActiveVersionStore{ConfigStore: loader.Configs, failAt: 2, err: tc.err},
 			},
 			Gate: gateOK,
-		}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling",
+		}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery",
 			strings.NewReader(`{"raw":"x"}`)))
 		if rec.Code != tc.code {
 			t.Fatalf("qr load %v = %d, want %d", tc.err, rec.Code, tc.code)
@@ -949,7 +949,7 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 		},
 		Gate: gateOK,
 	}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truck+
+		"/api/org/task-recap?stream=pv-recovery&instance="+truck+
 			"&jobId=intake&taskId=truckArrive&jobInstanceId="+truck, nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("recap second get = %d", rec.Code)
@@ -1007,7 +1007,7 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 	rows := buildOrgTimelineRows(OrgConfig{}, Job{Title: "Lot"}, StreamTimelineStep{
 		JobID: "lot_processing",
 		Rows:  []StreamTimelineRow{{ID: "L1", Label: "  ", Finished: true}},
-	}, domain, TimelineHrefPolicyFromFocus("recycling", mustTimelineInstance(t, truck)))
+	}, domain, TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, truck)), "")
 	if len(rows) != 1 || rows[0].Label != "L1" {
 		t.Fatalf("empty label = %#v", rows)
 	}

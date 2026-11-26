@@ -14,9 +14,11 @@
 	import { navigateOrgTarget, orgMyStreamDashboardPath } from '../../router/navigate-target.js';
 	import { navigate } from '../../router/index.js';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { Button, buttonVariants } from '#lib/shadcn/ui/button/index.js';
 	import { Checkbox } from '#lib/shadcn/ui/checkbox/index.js';
+	import * as Collapsible from '#lib/shadcn/ui/collapsible/index.js';
 	import { Label } from '#lib/shadcn/ui/label/index.js';
 	import { cn } from '#lib/shadcn/utils.js';
 	import { setBoardEmbed, type BoardEmbedApi } from './board-context.js';
@@ -42,6 +44,9 @@
 		type BoardTaskFocus
 	} from './board-url.js';
 	import { resolveTaskDeepLink } from '../worklist-nav.js';
+	import { createHttpPassportsPort } from '../passports/http-passports-port.js';
+	import type { InstancePassport } from '../passports/types.js';
+	import { formatSubmissionTimestamp } from '../submission-table.js';
 
 	import '../timeline/org-timeline.css';
 	import '../timeline/role-palette.css';
@@ -69,6 +74,7 @@
 	setBoardTimelineModel(model);
 
 	const timelinePort = createHttpTimelinePort();
+	const passportsPort = createHttpPassportsPort();
 
 	const session = createBoardSession({
 		// One-shot init; `$effect` below keeps scope in sync with route props.
@@ -112,6 +118,11 @@
 	/** Stay Commit → land on once-recap / many-recap (keyed by address). */
 	let confirmRecapByKey = $state.raw<Record<string, true>>({});
 
+	/** Deferred Passports aside — filled after instance timeline view loads. */
+	let passports = $state.raw<InstancePassport[]>([]);
+	let passportsLoadedScopeKey = '';
+	let passportsAsideOpen = $state(true);
+
 	const scopeKey = $derived(session.scopeKey);
 
 	const focusFromUrl = $derived.by(() => {
@@ -127,7 +138,7 @@
 	);
 
 	const orphanFocus = $derived(model.orphanFocus);
-	const showAll = $derived(model.showAll);
+	const showAll = $derived(model.effectiveShowAll);
 	const actionableOnlyEmpty = $derived(model.isEmpty);
 
 	function setFocus(addr: TaskAddress) {
@@ -325,7 +336,7 @@
 		if (!shellPainted || loading) return;
 		void scopeKey;
 		void isBoot;
-		void model.showAll;
+		void model.effectiveShowAll;
 		void model.view;
 		void model.selection;
 
@@ -370,6 +381,44 @@
 			navigateOrgTarget(gate);
 		}
 	});
+
+	// Deferred Passports: after instance timeline view loads; ignore stale on scope change.
+	$effect(() => {
+		const v = view;
+		const sk = scopeKey;
+		const s = stream;
+		const inst = instance;
+		const instanceScope = scope.kind === 'instance';
+
+		if (!instanceScope || !v || !inst) {
+			passports = [];
+			passportsLoadedScopeKey = '';
+			return;
+		}
+
+		if (sk !== passportsLoadedScopeKey) {
+			passports = [];
+			passportsLoadedScopeKey = sk;
+		}
+
+		let cancelled = false;
+		void passportsPort
+			.load({ stream: s, instance: inst })
+			.then(
+				(result) => {
+					if (cancelled) return;
+					passports = result.passports;
+				},
+				() => {
+					if (cancelled) return;
+					passports = [];
+				}
+			);
+
+		return () => {
+			cancelled = true;
+		};
+	});
 </script>
 
 <div
@@ -378,6 +427,7 @@
 	data-org-board="1"
 	data-board-scope={scope.kind}
 	data-show-all={showAll ? '1' : '0'}
+	data-stream-status={view?.status ?? ''}
 	data-route-key={scopeKey}
 >
 	<div class="org-timeline-toolbar" data-testid="board-chrome">
@@ -404,18 +454,32 @@
 						{view?.label || instance}
 					</span>
 				{/if}
+				{#if model.chrome.instanceStatusChip}
+					<span class="timeline-header-trail">
+						<span
+							class="status"
+							data-status="completed"
+							data-testid="board-chrome-status"
+							aria-label={m.stream_status_done()}
+						>
+							{m.stream_status_done()}
+						</span>
+					</span>
+				{/if}
 			</span>
 		</header>
 		{#if view}
 			<div class="stream-show-all-filter">
-				<Label class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}>
-					<Checkbox
-						class="js-show-all-filter border-foreground/35 bg-background shadow-none"
-						bind:checked={() => model.showAll, (v) => model.setShowAll(!!v)}
-						data-testid="show-all-filter"
-					/>
-					{m.show_all()}
-				</Label>
+				{#if model.showAllFilterVisible}
+					<Label class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}>
+						<Checkbox
+							class="js-show-all-filter border-foreground/35 bg-background shadow-none"
+							bind:checked={() => model.showAll, (v) => model.setShowAll(!!v)}
+							data-testid="show-all-filter"
+						/>
+						{m.show_all()}
+					</Label>
+				{/if}
 				<Button
 					type="button"
 					variant="outline"
@@ -445,45 +509,86 @@
 			{error}
 		</p>
 	{:else}
-		{#if orphanFocus}
-			<section class="mb-6" data-testid="orphan-focus-embed">
-				<EmbeddedTaskPanel
-					address={orphanFocus}
-					entry={getEntry(orphanFocus)}
-					focused={true}
-					confirmRecap={confirmRecapFor(orphanFocus)}
-					open={model.isBodyOpen(orphanFocus)}
-					onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
-					onFocus={() => setFocus(orphanFocus)}
-					onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
-					onAcceptStale={() => session.acceptStale(orphanFocus)}
-				/>
-			</section>
-		{/if}
+		<div class="org-board-main-grid">
+			<div class="org-board-timeline-col">
+				{#if orphanFocus}
+					<section class="mb-6" data-testid="orphan-focus-embed">
+						<EmbeddedTaskPanel
+							address={orphanFocus}
+							entry={getEntry(orphanFocus)}
+							focused={true}
+							confirmRecap={confirmRecapFor(orphanFocus)}
+							open={model.isBodyOpen(orphanFocus)}
+							onOpenChange={(next) => model.setBodyOpen(orphanFocus, next)}
+							onFocus={() => setFocus(orphanFocus)}
+							onCommitted={(outcome) => onCommitted(orphanFocus, outcome)}
+							onAcceptStale={() => session.acceptStale(orphanFocus)}
+						/>
+					</section>
+				{/if}
 
-		{#if view}
-			<div class="process-stream-block">
-				<div class="js-show-all-filter-root stream-show-all-filter-root">
-					{#if actionableOnlyEmpty}
-						<div
-							class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground"
-						>
-							<p class="m-0 text-xs leading-5 font-medium text-muted-foreground">
-								No matching tasks
-							</p>
-							<p class="m-0 text-xs leading-4 text-muted-foreground">
-								Turn on Show all to see the full stream timeline.
-							</p>
+				{#if view}
+					<div class="process-stream-block">
+						<div class="js-show-all-filter-root stream-show-all-filter-root">
+							{#if actionableOnlyEmpty}
+								<div
+									class="stream-show-all-filter-empty flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/60 p-4 text-center text-muted-foreground"
+								>
+									<p class="m-0 text-xs leading-5 font-medium text-muted-foreground">
+										No matching tasks
+									</p>
+									<p class="m-0 text-xs leading-4 text-muted-foreground">
+										Turn on Show all to see the full stream timeline.
+									</p>
+								</div>
+							{:else}
+								<div class="stream-timeline-list">
+									{#each model.visibleSteps as vs (vs.step.stepId)}
+										<TimelineStep projected={vs} {stream} {instance} />
+									{/each}
+								</div>
+							{/if}
 						</div>
-					{:else}
-						<div class="stream-timeline-list">
-							{#each model.visibleSteps as vs (vs.step.stepId)}
-								<TimelineStep projected={vs} {stream} {instance} />
-							{/each}
-						</div>
-					{/if}
-				</div>
+					</div>
+				{/if}
 			</div>
-		{/if}
+
+			{#if passports.length > 0}
+				<aside class="org-board-passports-aside" data-testid="org-board-passports">
+					<Collapsible.Root bind:open={passportsAsideOpen}>
+						<Collapsible.Trigger
+							class="org-board-passports-trigger w-full items-center hover:no-underline"
+						>
+							<h2 class="text-sm font-medium">{m.org_board_passports_heading()}</h2>
+						</Collapsible.Trigger>
+						<Collapsible.Content>
+							<ul class="org-board-passports-list">
+								{#each passports as passport (passport.subjectId)}
+									<li class="org-board-passports-item">
+										<span class="text-sm">{passport.label}</span>
+										{#if passport.issuedAt}
+											<span class="text-xs text-muted-foreground">
+												{formatSubmissionTimestamp(passport.issuedAt)}
+											</span>
+										{/if}
+										<Button
+											href={passport.digitalLink}
+											variant="link"
+											class="h-auto gap-1 px-0 underline"
+											target="_blank"
+											rel="noopener noreferrer"
+											data-testid="org-board-passport-link"
+										>
+											{m.org_board_passport_open()}
+											<ArrowUpRight class="size-3.5" aria-hidden="true" />
+										</Button>
+									</li>
+								{/each}
+							</ul>
+						</Collapsible.Content>
+					</Collapsible.Root>
+				</aside>
+			{/if}
+		</div>
 	{/if}
 </div>

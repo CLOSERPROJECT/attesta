@@ -35,7 +35,9 @@ Flags:
   --help, -h             Show this help.
 
 Feragame scope flags are mutually exclusive. Domain wipe is the default for
-Feragame paths unless --keep-domain is set on config/identity.
+Feragame paths unless --keep-domain is set on config/identity. Every seed that
+runs SeedDemo also drops retired stream keys under the Feragame fixture org
+(Active Config, configs, Domain) so renamed-fixture orphans do not linger.
 
 Examples:
   task seed

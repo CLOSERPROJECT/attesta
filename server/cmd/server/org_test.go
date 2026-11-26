@@ -50,7 +50,7 @@ func livingCommit(t *testing.T, server *Server, sessionID, query, body string) o
 
 func arriveIntakeTruck(t *testing.T, server *Server, sessionID string) string {
 	t.Helper()
-	arrived := livingCommit(t, server, sessionID, "stream=recycling",
+	arrived := livingCommit(t, server, sessionID, "stream=pv-recovery",
 		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`)
 	if arrived.JobInstanceID == "" {
 		t.Fatal("truck jobInstanceId empty")
@@ -119,7 +119,7 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	server.orgAuthorizer = org.AllowAllAuthorizer{}
 	truckID := arriveIntakeTruck(t, server, sessionID)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truckID, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgDomainHandler().ServeHTTP(rec, req)
@@ -237,7 +237,7 @@ func TestLivingDomainMuxRegistration(t *testing.T) {
 	server.orgAuthorizer = org.AllowAllAuthorizer{}
 	truckID := arriveIntakeTruck(t, server, sessionID)
 	mux := server.newMux()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truckID, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -272,7 +272,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	truckID := arriveIntakeTruck(t, server, sessionID)
 
 	body := `{"taskPath":"intake/register","jobInstanceId":"` + truckID + `","value":{"client":"CO","wasteCode":"160214","numeroFir":"FIR-1","palletCount":2,"truckWeightAfter":700,"notes":""}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling&instance="+truckID, strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery&instance="+truckID, strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(rec, req)
@@ -303,7 +303,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if len(domain.Submissions) < 2 || domain.Submissions[len(domain.Submissions)-1].TaskID != "register" {
 		t.Fatalf("submissions = %#v", domain.Submissions)
 	}
-	if len(committed.Links) != 2 {
+	if len(committed.Links) != 1 {
 		t.Fatalf("wired HttpPort links = %#v", committed.Links)
 	}
 	if committed.Links[0].Label != "Stampa etichette" || committed.Links[0].Action != org.HttpActionLink {
@@ -311,12 +311,6 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	}
 	if !strings.HasPrefix(committed.Links[0].URL, "data:application/pdf;base64,") {
 		t.Fatalf("labels url = %q", committed.Links[0].URL)
-	}
-	if committed.Links[1].Label != "Scarica CSV registrazione" || committed.Links[1].Action != org.HttpActionDownload {
-		t.Fatalf("link1 = %#v", committed.Links[1])
-	}
-	if committed.Links[1].Filename == "" {
-		t.Fatalf("csv filename empty: %#v", committed.Links[1])
 	}
 	if len(committed.HttpErrors) != 0 {
 		t.Fatalf("httpErrors = %#v", committed.HttpErrors)
@@ -337,7 +331,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		t.Fatalf("Commit worklist intake register not actionable: %#v", committed.Worklist)
 	}
 
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
+	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truckID, nil)
 	loadReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	loadRec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(loadRec, loadReq)
@@ -442,8 +436,8 @@ func TestLivingProductHttpPortFromEnvOrSoftFail(t *testing.T) {
 	if handler.TaskCommitter.HttpPort != stub {
 		t.Fatalf("handler HttpPort = %T, want override", handler.TaskCommitter.HttpPort)
 	}
-	if got := org.OrgAppBaseURL("recycling"); got != "https://plant.example/app/recycling" {
-		t.Fatalf("OrgAppBaseURL(recycling) = %q", got)
+	if got := org.OrgAppBaseURL("pv-recovery"); got != "https://plant.example/app/pv-recovery" {
+		t.Fatalf("OrgAppBaseURL(pv-recovery) = %q", got)
 	}
 	if handler.Artifacts == nil {
 		t.Fatal("handler Artifacts should still come from env when HttpPort is overridden")
@@ -471,7 +465,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	}
 	seedOrgDemo(t, server)
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.orgAPI().ServeHTTP(rec, req)
@@ -511,7 +505,7 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 	seedOrgDemo(t, server)
 	mux := server.newMux()
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -542,7 +536,7 @@ func TestLivingQRResolveMuxRegistration(t *testing.T) {
 	}
 	seedOrgDemo(t, server)
 	mux := server.newMux()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling",
+	req := httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery",
 		strings.NewReader(`{"raw":"missing-pallet"}`))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()

@@ -43,12 +43,17 @@ export type CreateConfigFormOptions<T extends Record<string, unknown> = Record<s
 	/** See ConfigFormOptions.getDomain — `$domain` for derived exprs. */
 	getDomain?: () => unknown;
 	getCatalogs?: () => unknown;
+	/**
+	 * First sync tick — non-dirty bag populate (schema defaults / remount).
+	 * Required so mount does not dirty via `setValue`.
+	 */
+	seedValue: (next: T) => void;
 };
 
 /**
  * Live-form value lives in deep `$state` so sjsf in-place mutations (array Add /
  * objectCtx.set) re-render. `syncDeepLocalToDraft` is the only Draft bridge —
- * deep in-place mutates and setter whole-value assign both go through the effect.
+ * first tick via `seedValue` (non-dirty), later edits via `setValue` (dirty).
  * DraftSession stays `$state.raw` + whole-object setValue for structuredClone persist.
  * Optional `derived` uses ConfigForm as the value owner (ADR-0016 override set).
  * derivedLeaf operator edits call ConfigForm.writePath / restore only — not sjsf
@@ -71,7 +76,7 @@ export function createConfigForm<T extends Record<string, unknown>>(
 	schemas: ConfigFormSchemas | (() => ConfigFormSchemas),
 	getValue: () => T,
 	setValue: (next: T) => void,
-	options: CreateConfigFormOptions<T> = {}
+	options: CreateConfigFormOptions<T>
 ): CreateConfigFormResult<T> {
 	const getSchemas = typeof schemas === 'function' ? schemas : () => schemas;
 	// Cache resolved schema by raw identity so getters stay stable across reads.
@@ -111,7 +116,10 @@ export function createConfigForm<T extends Record<string, unknown>>(
 		const [, setBound] = engine.valueBinding();
 		const disposeLocalDraftSync = syncDeepLocalToDraft(
 			() => engine.value as Record<string, unknown>,
-			(next) => setValue(next as T)
+			{
+				seedDraft: (next) => options.seedValue(next as T),
+				setDraft: (next) => setValue(next as T)
+			}
 		);
 		const form = createForm<T>({
 			theme,
@@ -145,7 +153,10 @@ export function createConfigForm<T extends Record<string, unknown>>(
 	let local = $state($state.snapshot(seededValue) as T);
 	const disposeLocalDraftSync = syncDeepLocalToDraft(
 		() => local as Record<string, unknown>,
-		(next) => setValue(next as T)
+		{
+			seedDraft: (next) => options.seedValue(next as T),
+			setDraft: (next) => setValue(next as T)
+		}
 	);
 	const form = createForm<T>({
 		theme,

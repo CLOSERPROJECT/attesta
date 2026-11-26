@@ -4,6 +4,51 @@ import (
 	"testing"
 )
 
+func TestProjectTaskRecapReservedIDColumn(t *testing.T) {
+	cfg := OrgConfig{
+		Jobs: OrderedObject{
+			Keys: []string{"j"},
+			Values: map[string]any{
+				"j": Job{Tasks: []TaskConfig{{
+					"id": "t",
+					"recap": map[string]any{
+						"entity": "lot",
+						"columns": []any{
+							map[string]any{"field": "id"},
+							map[string]any{"field": "numeroFir", "title": "FIR"},
+						},
+					},
+				}}},
+			},
+		},
+	}
+	domain := domainFromKinds(map[string]EntityMap{
+		"lot": {
+			"L1": {"numeroFir": "FIR-1"},
+		},
+	})
+	domain.Submissions = []Submission{{
+		JobID: "j", TaskID: "t", JobInstanceID: "i1",
+		Timestamp: "2026-01-01T10:00:00Z", UserID: "ada",
+		EntitiesTouched: []EntityTouch{{Op: "mint", Entity: "lot", ID: "L1"}},
+	}}
+
+	table, err := ProjectTaskRecap(cfg, domain, SubmissionAddress{JobID: "j", TaskID: "t", JobInstanceID: "i1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(table.Rows) != 1 {
+		t.Fatalf("rows = %#v", table.Rows)
+	}
+	row := table.Rows[0]
+	if row.Key != "L1" || row.Cells["id"] != "L1" || row.Cells["numeroFir"] != "FIR-1" {
+		t.Fatalf("row = %#v", row)
+	}
+	if columnByKey(table.Columns, "id").Title != "Id" {
+		t.Fatalf("id column title = %#v", table.Columns)
+	}
+}
+
 func TestProjectTaskRecapMintAndPatchSameEntityKeepsMinted(t *testing.T) {
 	cfg := OrgConfig{
 		Jobs: OrderedObject{

@@ -4,82 +4,124 @@
  * DraftSession / localStorage never see the row. Wire once from createConfigForm
  * so every deep change republishes to Draft.
  *
- * `$effect.root` — createConfigForm is called from StepStackSession.#liveForm
+ * First observation must not dirty: schema-default merge / remount bag populate
+ * goes through `seedDraft` (non-dirty). Later local changes use dirtying `setDraft`.
+ *
+ * `$effect.root` — createConfigForm is called from LiveTaskForm.#mountForm
  * (not component init). JSON.stringify walks the proxy so Add / new keys
  * re-subscribe; `$state.snapshot` alone does not. `untrack` + lastJson gate —
- * setDraft must not re-enter the effect (effect_update_depth_exceeded).
- * Tests: wrap `$state` + sync in `$effect.root`, `flushSync`, then cleanup
- * (Svelte Vitest docs).
+ * publish must not re-enter the effect (effect_update_depth_exceeded).
+ * Tests: drive `publishDeepLocalJson` (shared with the effect) via probes;
+ * `$effect` itself is not runnable under Vitest node.
  */
-import { flushSync, untrack } from 'svelte';
+import { untrack } from 'svelte';
 import { republishBoundValue } from './republish-form-value.js';
+
+/** Seed (first tick, non-dirty) vs set (later edits, dirty) publish ports. */
+export type DeepLocalDraftPublish<T extends Record<string, unknown>> = {
+	seedDraft: (next: T) => void;
+	setDraft: (next: T) => void;
+};
+
+export type DeepLocalDraftSyncState = {
+	lastJson: string;
+	primed: boolean;
+};
+
+/** Shared tick: first json → seedDraft; later changes → setDraft. */
+export function publishDeepLocalJson<T extends Record<string, unknown>>(
+	json: string,
+	state: DeepLocalDraftSyncState,
+	publish: DeepLocalDraftPublish<T>
+): void {
+	if (json === state.lastJson) return;
+	state.lastJson = json;
+	const publishDraft = state.primed ? publish.setDraft : publish.seedDraft;
+	state.primed = true;
+	untrack(() => {
+		republishBoundValue(
+			() => JSON.parse(json) as Record<string, unknown>,
+			(next) => publishDraft(next as T)
+		);
+	});
+}
 
 export function syncDeepLocalToDraft<T extends Record<string, unknown>>(
 	getLocal: () => T,
-	setDraft: (next: T) => void
+	publish: DeepLocalDraftPublish<T>
 ): () => void {
-	let lastJson = '';
+	const state: DeepLocalDraftSyncState = { lastJson: '', primed: false };
 	return $effect.root(() => {
 		$effect(() => {
 			// JSON.stringify walks the proxy graph so array push / new keys re-run;
 			// $state.snapshot alone does not always subscribe to deep adds.
-			const json = JSON.stringify(getLocal());
-			if (json === lastJson) return;
-			lastJson = json;
-			untrack(() => {
-				republishBoundValue(
-					() => JSON.parse(json) as Record<string, unknown>,
-					(next) => setDraft(next as T)
-				);
-			});
+			publishDeepLocalJson(JSON.stringify(getLocal()), state, publish);
 		});
 	});
 }
 
-/** Test probe: deep local + array Add, asserting syncDeepLocalToDraft → setDraft. */
+export type ProbeSyncDeepLocalResult = {
+	calls: Record<string, unknown>[];
+	seedCalls: Record<string, unknown>[];
+	setCalls: Record<string, unknown>[];
+};
+
+function probePublish(
+	setDraft: (next: Record<string, unknown>) => void,
+	seedDraft: (next: Record<string, unknown>) => void
+): {
+	publish: DeepLocalDraftPublish<Record<string, unknown>>;
+	calls: Record<string, unknown>[];
+	seedCalls: Record<string, unknown>[];
+	setCalls: Record<string, unknown>[];
+} {
+	const calls: Record<string, unknown>[] = [];
+	const seedCalls: Record<string, unknown>[] = [];
+	const setCalls: Record<string, unknown>[] = [];
+	return {
+		calls,
+		seedCalls,
+		setCalls,
+		publish: {
+			seedDraft: (next) => {
+				calls.push(next);
+				seedCalls.push(next);
+				seedDraft(next);
+			},
+			setDraft: (next) => {
+				calls.push(next);
+				setCalls.push(next);
+				setDraft(next);
+			}
+		}
+	};
+}
+
+/** Test probe: deep local + array Add via publishDeepLocalJson (effect body). */
 export function probeSyncDeepLocalArrayAdd(
-	setDraft: (next: Record<string, unknown>) => void
-): { calls: Record<string, unknown>[] } {
-	const calls: Record<string, unknown>[] = [];
-	let mutate = (): void => {};
-	const cleanup = $effect.root(() => {
-		let local = $state({} as Record<string, unknown>);
-		syncDeepLocalToDraft(() => local, (next) => {
-			calls.push(next);
-			setDraft(next);
-		});
-		mutate = () => {
-			local.rows = [];
-			(local.rows as Record<string, unknown>[]).push({ weight: 12 });
-		};
-	});
-	flushSync();
-	mutate();
-	flushSync();
-	cleanup();
-	return { calls };
+	setDraft: (next: Record<string, unknown>) => void,
+	seedDraft: (next: Record<string, unknown>) => void = () => {}
+): ProbeSyncDeepLocalResult {
+	const { publish, calls, seedCalls, setCalls } = probePublish(setDraft, seedDraft);
+	const state: DeepLocalDraftSyncState = { lastJson: '', primed: false };
+	let local: Record<string, unknown> = {};
+	publishDeepLocalJson(JSON.stringify(local), state, publish);
+	local = { ...local, rows: [] };
+	(local.rows as Record<string, unknown>[]).push({ weight: 12 });
+	publishDeepLocalJson(JSON.stringify(local), state, publish);
+	return { calls, seedCalls, setCalls };
 }
 
-/** Test probe: whole-value local assign (createConfigForm setter path) → setDraft via effect. */
+/** Test probe: whole-value local assign via publishDeepLocalJson (effect body). */
 export function probeSyncDeepLocalWholeAssign(
-	setDraft: (next: Record<string, unknown>) => void
-): { calls: Record<string, unknown>[] } {
-	const calls: Record<string, unknown>[] = [];
-	let assign = (): void => {};
-	const cleanup = $effect.root(() => {
-		let local = $state({} as Record<string, unknown>);
-		syncDeepLocalToDraft(() => local, (next) => {
-			calls.push(next);
-			setDraft(next);
-		});
-		// Mimic createConfigForm setter: local = next only (effect writes Draft)
-		assign = () => {
-			local = { material: 'polvereDiVetro', weight: 1 };
-		};
-	});
-	flushSync();
-	assign();
-	flushSync();
-	cleanup();
-	return { calls };
+	setDraft: (next: Record<string, unknown>) => void,
+	seedDraft: (next: Record<string, unknown>) => void = () => {}
+): ProbeSyncDeepLocalResult {
+	const { publish, calls, seedCalls, setCalls } = probePublish(setDraft, seedDraft);
+	const state: DeepLocalDraftSyncState = { lastJson: '', primed: false };
+	let local: Record<string, unknown> = {};
+	publishDeepLocalJson(JSON.stringify(local), state, publish);
+	local = { material: 'polvereDiVetro', weight: 1 };
+	publishDeepLocalJson(JSON.stringify(local), state, publish);
+	return { calls, seedCalls, setCalls };
 }

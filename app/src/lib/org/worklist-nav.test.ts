@@ -11,7 +11,7 @@ import {
 	resolveUnmountableTaskTarget
 } from './worklist-nav.js';
 
-const stream = 'recycling';
+const stream = 'pv-recovery';
 const instance = 'NIR-1';
 
 const taskChrome = [

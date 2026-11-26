@@ -133,7 +133,7 @@ func TestSeedOrgStoresWipeDomainOnReplace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), org.DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -355,7 +355,7 @@ func TestSeedFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), org.DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -508,7 +508,7 @@ func TestSeedFeragameIdentityHardResetsIdentityWipesDomainSkipsFormata(t *testin
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), org.DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: org.SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)

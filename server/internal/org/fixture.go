@@ -167,7 +167,7 @@ func SeedFixtureConfigStore(store ConfigStore) (OrgConfig, error) {
 
 // FeragameScope is the (org, stream) of the embedded Feragame fixture.
 func FeragameScope() Scope {
-	return Scope{Org: "feragame", Stream: "recycling"}
+	return Scope{Org: "feragame", Stream: "pv-recovery"}
 }
 
 func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {

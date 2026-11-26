@@ -24,7 +24,7 @@ func TestHandleLoadScopedToStreamInstance(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/domain?stream=recycling&instance="+truckA, nil))
+		"/api/org/domain?stream=pv-recovery&instance="+truckA, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -53,7 +53,7 @@ func TestHandleTimelineBoot(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/timeline?stream=recycling", nil))
+		"/api/org/timeline?stream=pv-recovery", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("boot status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -64,7 +64,7 @@ func TestHandleTimelineBoot(t *testing.T) {
 	if got.Mode != TimelineModeBoot {
 		t.Fatalf("mode = %q, want %q", got.Mode, TimelineModeBoot)
 	}
-	if got.Stream != "recycling" || got.Instance != "" {
+	if got.Stream != "pv-recovery" || got.Instance != "" {
 		t.Fatalf("boot scope = %#v", got)
 	}
 	if len(got.Steps) == 0 || len(got.Steps[0].Substeps) == 0 {
@@ -74,14 +74,14 @@ func TestHandleTimelineBoot(t *testing.T) {
 	if !start.OrgActionable {
 		t.Fatalf("boot start must be orgActionable: %#v", start)
 	}
-	wantHref := AppOrgPlayTaskPath("recycling", "intake", "", "truckArrive")
+	wantHref := AppOrgPlayTaskPath("pv-recovery", "intake", "", "truckArrive")
 	if start.Href != wantHref {
 		t.Fatalf("boot href = %q, want %q", start.Href, wantHref)
 	}
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/timeline?stream=recycling&instance=", nil))
+		"/api/org/timeline?stream=pv-recovery&instance=", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("blank instance boot = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -107,7 +107,7 @@ func TestHandleTimelineScopedToStreamInstance(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/timeline?stream=recycling&instance="+truckA, nil))
+		"/api/org/timeline?stream=pv-recovery&instance="+truckA, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -118,7 +118,7 @@ func TestHandleTimelineScopedToStreamInstance(t *testing.T) {
 	if got.Mode != TimelineModeInstance {
 		t.Fatalf("mode = %q, want %q", got.Mode, TimelineModeInstance)
 	}
-	if got.Stream != "recycling" || got.Instance != truckA {
+	if got.Stream != "pv-recovery" || got.Instance != truckA {
 		t.Fatalf("scope = %#v", got)
 	}
 	if len(got.Steps) == 0 {
@@ -126,7 +126,7 @@ func TestHandleTimelineScopedToStreamInstance(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/timeline?stream=recycling&instance=missing-truck", nil))
+		"/api/org/timeline?stream=pv-recovery&instance=missing-truck", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("missing instance = %d, want 404", rec.Code)
 	}
@@ -142,13 +142,13 @@ func TestHandleTaskFormPlayWithoutInstance(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+		"/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Play task-form = %d body=%s", rec.Code, rec.Body.String())
 	}
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-form?stream=recycling&jobId=intake&taskId=register", nil))
+		"/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=register", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("non-Play without instance = %d, want 400", rec.Code)
 	}
@@ -161,7 +161,7 @@ func TestHandleCommitPlayWithoutInstance(t *testing.T) {
 	}}
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Play commit = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -180,7 +180,7 @@ func TestHandleQrResolveColdScanRequiresStreamOnly(t *testing.T) {
 	}
 	palletID := loadID + ".1"
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling",
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery",
 		strings.NewReader(`{"raw":"https://plant.example/app?entityId=`+palletID+`"}`)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("cold scan = %d body=%s", rec.Code, rec.Body.String())
@@ -204,7 +204,7 @@ func TestHandleCommitRejectsNonMemberJobInstance(t *testing.T) {
 	body := `{"taskPath":"intake/register","jobInstanceId":"` + truckB + `","value":` + mustJSON(t, registerLotValue()) + `}`
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost,
-		"/api/org/commit?stream=recycling&instance="+truckA, strings.NewReader(body)))
+		"/api/org/commit?stream=pv-recovery&instance="+truckA, strings.NewReader(body)))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("non-member = %d body=%s, want 409", rec.Code, rec.Body.String())
 	}
@@ -257,7 +257,7 @@ func TestHandleCommitStreamIsolation(t *testing.T) {
 	}}
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("recycling commit = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -320,7 +320,7 @@ func TestHandleStreamsListsOrgStreams(t *testing.T) {
 	for _, s := range got {
 		byKey[s.Key] = s.Title
 	}
-	if byKey["recycling"] == "" || byKey["other"] != "Other stream" {
+	if byKey["pv-recovery"] == "" || byKey["other"] != "Other stream" {
 		t.Fatalf("streams = %#v", got)
 	}
 }

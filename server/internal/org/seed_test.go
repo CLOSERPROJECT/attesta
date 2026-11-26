@@ -41,6 +41,113 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	}
 }
 
+func TestSeedDemoPrunesRetiredStreams(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	orphanScope := Scope{Org: "feragame", Stream: "recycling"}
+	fixture := FeragameScope()
+
+	orphanCfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.Put(t.Context(), orphanScope, "1", orphanCfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.SetActiveVersion(t.Context(), orphanScope, "1"); err != nil {
+		t.Fatal(err)
+	}
+	orphanDomain := domainFromKinds(map[string]EntityMap{"lot": {"OLD": {"client": "X"}}})
+	orphanDomain.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
+	if err := domains.Put(t.Context(), orphanScope, orphanDomain); err != nil {
+		t.Fatal(err)
+	}
+	keep := domainFromKinds(map[string]EntityMap{"lot": {"KEEP": {"client": "Y"}}})
+	keep.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "KEEP"}}
+	if err := domains.Put(t.Context(), fixture, keep); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{WipeDomain: false}); err != nil {
+		t.Fatal(err)
+	}
+
+	streams, err := configs.ListStreams(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(streams) != 1 || streams[0] != fixture.Stream {
+		t.Fatalf("active streams = %v, want [%q]", streams, fixture.Stream)
+	}
+	if _, err := configs.ActiveVersion(t.Context(), orphanScope); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("orphan active = %v, want ErrNotFound", err)
+	}
+	if _, err := configs.Get(t.Context(), orphanScope, "1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("orphan config = %v, want ErrNotFound", err)
+	}
+	if _, err := domains.Get(t.Context(), orphanScope); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("orphan domain = %v, want ErrNotFound", err)
+	}
+	got, err := domains.Get(t.Context(), fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("lot")["KEEP"] == nil {
+		t.Fatalf("fixture Domain must be kept without WipeDomain: %#v", got)
+	}
+}
+
+func TestSeedDemoKeepDomainPrunesRetiredStreams(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	orphanScope := Scope{Org: "feragame", Stream: "recycling"}
+	fixture := FeragameScope()
+
+	orphanCfg, err := LoadFeragameConfigFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.Put(t.Context(), orphanScope, "1", orphanCfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := configs.SetActiveVersion(t.Context(), orphanScope, "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := domains.Put(t.Context(), orphanScope, domainFromKinds(map[string]EntityMap{"lot": {"OLD": {}}})); err != nil {
+		t.Fatal(err)
+	}
+	keep := domainFromKinds(map[string]EntityMap{"lot": {"L1": {"client": "NO"}}})
+	keep.Submissions = []Submission{{JobID: "intake", TaskID: "register", JobInstanceID: "L1"}}
+	if err := domains.Put(t.Context(), fixture, keep); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SeedDemo(t.Context(), domains, configs, SeedOptions{
+		Scope:      SeedScopeFeragameConfig,
+		KeepDomain: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	streams, err := configs.ListStreams(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(streams) != 1 || streams[0] != fixture.Stream {
+		t.Fatalf("active streams = %v, want [%q]", streams, fixture.Stream)
+	}
+	if _, err := domains.Get(t.Context(), orphanScope); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("orphan domain survived keep-domain: %v", err)
+	}
+	got, err := domains.Get(t.Context(), fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind("lot")["L1"] == nil || len(got.Submissions) != 1 {
+		t.Fatalf("fixture Domain must be kept: %#v", got)
+	}
+}
+
 func TestSeedDemoWipesDomainAndSeedsStagedFixture(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
@@ -82,13 +189,13 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	configs := NewMemoryConfigStore()
 	passports := NewMemoryDPPStore()
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "other", Stream: "recycling", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
+		Org: "other", Stream: "pv-recovery", SubjectID: "X", GTIN: "2", Lot: "b", Serial: "t",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/2/b/t",
 	}); err != nil {
 		t.Fatal(err)
@@ -103,7 +210,7 @@ func TestSeedDemoWipeClearsPassports(t *testing.T) {
 	if _, err := passports.Get(t.Context(), FeragameScope(), SeedLoadCOID); err != nil {
 		t.Fatalf("finished lot passport after wipe+stage = %v, want issued DPP", err)
 	}
-	if _, err := passports.Get(t.Context(), Scope{Org: "other", Stream: "recycling"}, "X"); err != nil {
+	if _, err := passports.Get(t.Context(), Scope{Org: "other", Stream: "pv-recovery"}, "X"); err != nil {
 		t.Fatalf("other org passport must survive: %v", err)
 	}
 }
@@ -181,7 +288,7 @@ func TestSeedDemoFeragameConfigWipesToEmptyWithoutStaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -239,7 +346,7 @@ func TestSeedDemoFeragameConfigKeepDomainLeavesDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)
@@ -314,7 +421,7 @@ func TestSeedDemoFeragameFullWipesAndStages(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := passports.Create(t.Context(), DPPRecord{
-		Org: "feragame", Stream: "recycling", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
+		Org: "feragame", Stream: "pv-recovery", SubjectID: SeedLoadCOID, GTIN: "1", Lot: "a", Serial: "s",
 		Snapshot: map[string]any{}, IssuedAt: "t", DigitalLink: "/1/a/s",
 	}); err != nil {
 		t.Fatal(err)

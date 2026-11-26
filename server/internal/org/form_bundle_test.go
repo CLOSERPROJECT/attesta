@@ -384,7 +384,7 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance="+truckID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance="+truckID, nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -427,7 +427,7 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	committed, err := c.Commit(t.Context(), FeragameScope(), all, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
-		Value:         map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value:         map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -576,7 +576,7 @@ func TestBuildTaskFormBundleFlatSeedsSchemaDefaults(t *testing.T) {
 	}
 }
 
-func TestBuildTaskFormBundleFlatRequiredEnumFallsBackToFirst(t *testing.T) {
+func TestBuildTaskFormBundleFlatRequiredEnumSeedsOnlySingleton(t *testing.T) {
 	cfg := OrgConfig{
 		ID:      "probe",
 		Version: "1",
@@ -593,11 +593,15 @@ func TestBuildTaskFormBundleFlatRequiredEnumFallsBackToFirst(t *testing.T) {
 							"roles": []any{"logistic"},
 							"schema": map[string]any{
 								"type":     "object",
-								"required": []any{"status"},
+								"required": []any{"status", "kind"},
 								"properties": map[string]any{
 									"status": map[string]any{
 										"type": "string",
 										"enum": []any{"open", "closed"},
+									},
+									"kind": map[string]any{
+										"type": "string",
+										"enum": []any{"only"},
 									},
 									"note": map[string]any{
 										"type": "string",
@@ -617,8 +621,11 @@ func TestBuildTaskFormBundleFlatRequiredEnumFallsBackToFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bundle.InitialData["status"] != "open" {
-		t.Fatalf("required enum without default = %#v, want first enum open", bundle.InitialData)
+	if _, has := bundle.InitialData["status"]; has {
+		t.Fatalf("multi-value required enum without default must stay unset; got %#v", bundle.InitialData)
+	}
+	if bundle.InitialData["kind"] != "only" {
+		t.Fatalf("singleton required enum = %#v, want only", bundle.InitialData)
 	}
 	if _, has := bundle.InitialData["note"]; has {
 		t.Fatalf("optional enum without default must stay unset; got %#v", bundle.InitialData)

@@ -137,17 +137,17 @@ func TestCommitWeightCheckAfterRegister(t *testing.T) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value:    map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind("truck")[truckID]["checkedTruckWeight"] != 1000.0 {
-		t.Fatalf("truck = %#v", result.Domain.Kind("truck")[truckID])
-	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
 	if last.TaskID != "weightCheck" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
+	}
+	if _, has := result.Domain.Kind("truck")[truckID]["checkedTruckWeight"]; has {
+		t.Fatalf("confirm-only weightCheck must not patch checkedTruckWeight: %#v", result.Domain.Kind("truck")[truckID])
 	}
 }
 
@@ -193,7 +193,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 
 	body := `{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(body))
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
@@ -233,7 +233,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	}
 
 	loadRec := httptest.NewRecorder()
-	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=261029-1", nil)
+	loadReq := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance=261029-1", nil)
 	h.ServeHTTP(loadRec, loadReq)
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d", loadRec.Code)

@@ -17,12 +17,30 @@ import {
 } from './board-url.js';
 import {
 	BoardEmbedOpen,
-	boardEmbedOpen
+	boardEmbedOpen,
+	embedBodyKey,
+	type EmbedSeed
 } from './board-embed-open.svelte.js';
 import {
 	BoardJustCompleted,
 	boardJustCompleted
 } from './board-just-completed.svelte.js';
+import { boardChromePolicy, type BoardChromePolicy } from './board-chrome-policy.js';
+
+export type { BoardChromePolicy };
+
+/** Actionable timeline card with optional `?seed.*` from its href. */
+export type SeededTaskRef = {
+	address: TaskAddress;
+	seed: EmbedSeed;
+};
+
+function seedEquals(a: EmbedSeed, b: EmbedSeed): boolean {
+	const ak = Object.keys(a).filter(Boolean).sort();
+	const bk = Object.keys(b).filter(Boolean).sort();
+	if (ak.length !== bk.length) return false;
+	return ak.every((k, i) => k === bk[i] && a[k] === b[k]);
+}
 
 export type VisibleSub = {
 	sub: TimelineSubstep;
@@ -80,6 +98,28 @@ function focusEquals(a: BoardTaskFocus | null, b: BoardTaskFocus | null): boolea
 	);
 }
 
+/**
+ * Org-actionable cards with seed (provisional Start rows stay distinct).
+ * Form preload still uses {@link actionableAddressesFromTimeline} (address dedupe).
+ */
+export function actionableSeededRefsFromTimeline(
+	view: TimelineView,
+	_opts: { showAll?: boolean } = {}
+): SeededTaskRef[] {
+	const out: SeededTaskRef[] = [];
+	const seen = new Set<string>();
+	for (const sub of walkSubsteps(view)) {
+		if (!sub.orgActionable || !sub.href) continue;
+		const parsed = parseTaskHref(sub.href, view.stream, view.instance);
+		if (!parsed) continue;
+		const key = embedBodyKey(parsed.address, parsed.seed);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push({ address: parsed.address, seed: parsed.seed });
+	}
+	return out;
+}
+
 /** Org-actionable Task addresses from the timeline projection (optional Show-all). */
 export function actionableAddressesFromTimeline(
 	view: TimelineView,
@@ -124,12 +164,17 @@ export function firstActionableAddress(
 	return actionableAddressesFromTimeline(view)[0] ?? null;
 }
 
+/** Auto-open candidate: exactly one actionable card (seed-distinct). */
+export function soleActionableSeededRef(view: TimelineView): SeededTaskRef | null {
+	const refs = actionableSeededRefsFromTimeline(view);
+	return refs.length === 1 ? refs[0]! : null;
+}
+
 /** Auto-open candidate: only when the board has exactly one actionable Task. */
 export function soleActionableAddress(
 	view: TimelineView
 ): TaskAddress | null {
-	const addrs = actionableAddressesFromTimeline(view);
-	return addrs.length === 1 ? addrs[0] : null;
+	return soleActionableSeededRef(view)?.address ?? null;
 }
 
 /** Whether a substep card belongs on the board under Show all / actionable-only. */
@@ -139,6 +184,8 @@ export function timelineSubstepShown(
 ): boolean {
 	if (opts.showAll) return true;
 	if (sub.orgActionable) return true;
+	// Done-by-me stays in the actionable-only board (badge is server-stamped).
+	if (sub.doneByMe) return true;
 	if (!sub.href || opts.stream == null) return false;
 	// Instance-aware only — substepId is jobId.taskId and collides across lot rows.
 	const parsed = parseTaskHref(sub.href, opts.stream, opts.instance ?? '');
@@ -252,6 +299,8 @@ export class BoardTimelineModel {
 	stream = $state('');
 	instance = $state('');
 	selection = $state.raw<BoardTaskFocus | null>(null);
+	/** Seed bag for the current selection (provisional accordion isolation). */
+	selectionSeed = $state.raw<EmbedSeed>({});
 
 	constructor(opts: BoardTimelineModelOptions) {
 		this.#syncUrl = opts.syncUrl;
@@ -259,12 +308,25 @@ export class BoardTimelineModel {
 		this.#justCompleted = opts.justCompleted ?? boardJustCompleted;
 	}
 
+	get chrome(): BoardChromePolicy {
+		return boardChromePolicy(this.view?.status, this.showAll);
+	}
+
+	/** Projection: Show-all toggle or done-stream archive. */
+	get effectiveShowAll(): boolean {
+		return this.chrome.projectAll;
+	}
+
+	get showAllFilterVisible(): boolean {
+		return !!this.view && this.chrome.showAllFilterVisible;
+	}
+
 	get visibleSteps(): VisibleStep[] {
 		const view = this.view;
 		if (!view) return [];
 		void this.#justCompleted.get();
 		return projectVisibleSteps(view, {
-			showAll: this.showAll,
+			showAll: this.chrome.projectAll,
 			focus: this.selection,
 			stream: this.stream || view.stream,
 			instance: this.instance || view.instance,
@@ -275,7 +337,7 @@ export class BoardTimelineModel {
 	get actionableAddresses(): TaskAddress[] {
 		const view = this.view;
 		if (!view) return [];
-		return actionableAddressesFromTimeline(view, { showAll: this.showAll });
+		return actionableAddressesFromTimeline(view, { showAll: this.chrome.projectAll });
 	}
 
 	get soleActionable(): TaskAddress | null {
@@ -286,7 +348,7 @@ export class BoardTimelineModel {
 
 	/** Available-only empty: no projected cards (actionable, focus, or pin). */
 	get isEmpty(): boolean {
-		if (this.showAll) return false;
+		if (this.chrome.projectAll) return false;
 		if (!this.view) return false;
 		return this.visibleSteps.length === 0;
 	}
@@ -299,13 +361,16 @@ export class BoardTimelineModel {
 		this.#justCompleted.clear();
 	}
 
-	isSelected(addr: TaskAddress): boolean {
-		return focusMatchesAddress(this.selection, addr);
+	isSelected(addr: TaskAddress, seed?: EmbedSeed): boolean {
+		if (!focusMatchesAddress(this.selection, addr)) return false;
+		if (!seed || Object.keys(seed).filter(Boolean).length === 0) return true;
+		if (Object.keys(this.selectionSeed).filter(Boolean).length === 0) return true;
+		return seedEquals(this.selectionSeed, seed);
 	}
 
-	isBodyOpen(addr: TaskAddress): boolean {
+	isBodyOpen(addr: TaskAddress, seed?: EmbedSeed): boolean {
 		void this.#embed.opened;
-		return this.#embed.isOpen(addr);
+		return this.#embed.isOpen(addr, seed);
 	}
 
 	addressVisible(addr: TaskAddress): boolean {
@@ -336,17 +401,19 @@ export class BoardTimelineModel {
 		this.instance = instance;
 	}
 
-	select(addr: TaskAddress): void {
+	select(addr: TaskAddress, seed: EmbedSeed = {}): void {
 		const next = boardTaskFromAddress(addr);
 		this.#justCompleted.onFocusChange(next, this.stream, this.instance);
 		this.selection = next;
+		this.selectionSeed = { ...seed };
 		this.#syncUrl(next);
-		this.#embed.setOpen(addr, true);
+		this.#embed.setOpen(addr, true, seed);
 	}
 
 	clearSelection(): void {
 		this.#justCompleted.onFocusChange(null, this.stream, this.instance);
 		this.selection = null;
+		this.selectionSeed = {};
 		this.#syncUrl(null);
 	}
 
@@ -354,23 +421,25 @@ export class BoardTimelineModel {
 	 * URL deep-link: adopt selection from `?task=`.
 	 * Opens the body only when the focus *changes* — re-running the URL sync
 	 * must not undo a user collapse while the same `?task=` stays in the bar.
+	 * URL has no seed, so provisional multi-lot rows stay closed until clicked.
 	 */
 	setFocusFromUrl(focus: BoardTaskFocus): void {
 		const unchanged = focusEquals(this.selection, focus);
 		this.#justCompleted.onFocusChange(focus, this.stream, this.instance);
 		this.selection = focus;
+		this.selectionSeed = {};
 		this.#syncUrl(focus);
 		if (unchanged) return;
 		const addr = addressFromBoardTask(this.stream, this.instance, focus);
 		this.#embed.setOpen(addr, true);
 	}
 
-	setBodyOpen(addr: TaskAddress, open: boolean): void {
-		this.#embed.setOpen(addr, open);
+	setBodyOpen(addr: TaskAddress, open: boolean, seed?: EmbedSeed): void {
+		this.#embed.setOpen(addr, open, seed);
 	}
 
-	toggleBody(addr: TaskAddress): boolean {
-		return this.#embed.toggle(addr);
+	toggleBody(addr: TaskAddress, seed?: EmbedSeed): boolean {
+		return this.#embed.toggle(addr, seed);
 	}
 
 	collapseAllBodies(): void {
@@ -389,8 +458,10 @@ export class BoardTimelineModel {
 	 * Caller must skip when URL already carries focus.
 	 */
 	applyLoadPolicy(): void {
-		const sole = this.soleActionable;
-		if (sole) this.select(sole);
+		const view = this.view;
+		if (!view) return;
+		const sole = soleActionableSeededRef(view);
+		if (sole) this.select(sole.address, sole.seed);
 	}
 }
 

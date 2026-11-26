@@ -112,6 +112,7 @@ func (s *Server) orgAPI() http.Handler {
 			LinkStore:  s.orgLinks,
 			DPPs:       s.orgDPPs,
 		},
+		DPPs:      s.orgDPPs,
 		Gate:      s.orgVerifiedGate,
 		Artifacts: s.orgProductArtifacts(),
 	}

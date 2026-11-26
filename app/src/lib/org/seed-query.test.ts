@@ -10,33 +10,33 @@ import {
 describe('takeSeedQueryParams', () => {
 	test('collects seed.* params and strips them from the URL', () => {
 		const href =
-			'https://plant.example/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L9&x=1';
+			'https://plant.example/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L9&x=1';
 		const got = takeSeedQueryParams(href);
 		expect(got.seed).toEqual({ lotId: 'L9' });
 		expect(got.strippedHref).toBe(
-			'/app/recycling/i/T1/lot_processing/new/startLot?x=1'
+			'/app/pv-recovery/i/T1/lot_processing/new/startLot?x=1'
 		);
 	});
 
 	test('supports multiple seed fields', () => {
 		const href =
-			'https://plant.example/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L9&seed.material=PET';
+			'https://plant.example/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L9&seed.material=PET';
 		const got = takeSeedQueryParams(href);
 		expect(got.seed).toEqual({ lotId: 'L9', material: 'PET' });
 		expect(got.strippedHref).toBe(
-			'/app/recycling/i/T1/lot_processing/new/startLot'
+			'/app/pv-recovery/i/T1/lot_processing/new/startLot'
 		);
 	});
 
 	test('absent seed.* yields empty seed and unchanged path', () => {
-		const href = 'https://plant.example/app/recycling/i/T1/intake/T1/register';
+		const href = 'https://plant.example/app/pv-recovery/i/T1/intake/T1/register';
 		const got = takeSeedQueryParams(href);
 		expect(got.seed).toEqual({});
-		expect(got.strippedHref).toBe('/app/recycling/i/T1/intake/T1/register');
+		expect(got.strippedHref).toBe('/app/pv-recovery/i/T1/intake/T1/register');
 	});
 
 	test('empty seed value is kept as empty string', () => {
-		const href = 'https://plant.example/app/recycling/new?seed.note=';
+		const href = 'https://plant.example/app/pv-recovery/new?seed.note=';
 		expect(takeSeedQueryParams(href).seed).toEqual({ note: '' });
 	});
 });
@@ -48,7 +48,7 @@ describe('applySeedQueryParams', () => {
 		let openSeed: Record<string, string> | null = null;
 		const seedKey = provisionalSeedDraftKey({ lotId: 'L9' });
 		const stripped = applySeedQueryParams(
-			'https://plant.example/app/recycling/i/T1/lot_processing/new/startLot?seed.lotId=L9',
+			'https://plant.example/app/pv-recovery/i/T1/lot_processing/new/startLot?seed.lotId=L9',
 			{
 				getDraft: (path, key) => bag.get(`${path}::${key}`) ?? null,
 				seedDraft: (path, key, value, seededFields) => {
@@ -61,7 +61,7 @@ describe('applySeedQueryParams', () => {
 			},
 			{ jobId: 'lot_processing', taskId: 'startLot', jobInstanceId: '' }
 		);
-		expect(stripped).toBe('/app/recycling/i/T1/lot_processing/new/startLot');
+		expect(stripped).toBe('/app/pv-recovery/i/T1/lot_processing/new/startLot');
 		expect(bag.get(`lot_processing/startLot::${seedKey}`)).toEqual({ lotId: 'L9' });
 		expect(seededMeta.get(`lot_processing/startLot::${seedKey}`)).toEqual(['lotId']);
 		expect(openSeed).toEqual({ lotId: 'L9' });
@@ -97,7 +97,7 @@ describe('applySeedQueryParams', () => {
 		};
 		expect(
 			applySeedQueryParams(
-				'https://plant.example/app/recycling/i/T1/lot_processing/new/startLot',
+				'https://plant.example/app/pv-recovery/i/T1/lot_processing/new/startLot',
 				{ getDraft: () => null, seedDraft },
 				{ jobId: 'lot_processing', taskId: 'startLot', jobInstanceId: '' }
 			)

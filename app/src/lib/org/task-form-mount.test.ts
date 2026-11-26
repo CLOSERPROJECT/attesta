@@ -20,7 +20,7 @@ const sample: TaskFormBundle = {
 	bindings: { domain: {} }
 };
 
-const stream = 'recycling';
+const stream = 'pv-recovery';
 const truck = '261102-1';
 const homeRedirect = { kind: 'home' as const, stream, instance: truck };
 
@@ -77,7 +77,7 @@ describe('TaskFormMount', () => {
 		expect(mount.status).toBe('denied');
 		expect(mount.redirect).toEqual(homeRedirect);
 		expect(mount.bundle).toBeNull();
-		expect(mount.addressKey).toBe('recycling|261102-1|intake|new|register');
+		expect(mount.addressKey).toBe('pv-recovery|261102-1|intake|new|register');
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
@@ -101,7 +101,7 @@ describe('TaskFormMount', () => {
 		expect(mount.bundle).toEqual(sample);
 		expect(mount.error).toBeNull();
 		expect(mount.redirect).toBeNull();
-		expect(mount.addressKey).toBe('recycling|261102-1|intake|new|register');
+		expect(mount.addressKey).toBe('pv-recovery|261102-1|intake|new|register');
 		expect(fetch).toHaveBeenCalledOnce();
 	});
 
@@ -187,7 +187,7 @@ describe('TaskFormMount', () => {
 
 		expect(second).toEqual({ kind: 'ready' });
 		expect(mount.bundle?.taskId).toBe('codiceFir');
-		expect(mount.addressKey).toBe('recycling|261102-1|intake|NIR-advance|codiceFir');
+		expect(mount.addressKey).toBe('pv-recovery|261102-1|intake|NIR-advance|codiceFir');
 
 		releaseSlow({ ...sample, title: 'stale-should-not-win' });
 		const firstResult = await first;
@@ -250,7 +250,7 @@ describe('TaskFormMount', () => {
 
 		expect(result).toEqual({ kind: 'ready' });
 		expect(mount.bundle?.title).toBe('Codice FIR again');
-		expect(mount.addressKey).toBe('recycling|261102-1|intake|NIR-advance|codiceFir');
+		expect(mount.addressKey).toBe('pv-recovery|261102-1|intake|NIR-advance|codiceFir');
 		expect(fetch).toHaveBeenCalledTimes(2);
 		expect(fetch).toHaveBeenLastCalledWith({
 			stream,

@@ -16,8 +16,8 @@ func validStreamCfg() OrgConfig {
 			},
 		},
 		Stream: &StreamConfig{
-			Key:   "recycling",
-			Title: "Lavorazione rifiuti",
+			Key:   "pv-recovery",
+			Title: "Recupero materiali da pannelli fotovoltaici",
 			Instance: StreamInstance{
 				Job: "intake",
 			},

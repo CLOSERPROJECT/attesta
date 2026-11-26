@@ -19,6 +19,15 @@ export function streamStatusLabel(status: string): string {
 }
 
 /** Hide Available when the list is already filtered to actionable items. */
-export function streamStatusChipVisible(status: string, showAll: boolean): boolean {
-	return !(status === 'available' && !showAll);
+export function streamStatusChipVisible(status: string, projectAll: boolean): boolean {
+	return !(status === 'available' && !projectAll);
+}
+
+/** Nest/step/row chip: board chrome may suppress all nest chips (done archive). */
+export function nestStatusChipVisible(
+	status: string | undefined | null,
+	opts: { nestStatusChips: boolean; projectAll: boolean }
+): boolean {
+	if (!opts.nestStatusChips || !status) return false;
+	return streamStatusChipVisible(status, opts.projectAll);
 }

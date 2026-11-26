@@ -2,6 +2,7 @@ package org
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -10,7 +11,6 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
 		},
 	}
 	c, domains, _ := testTaskCommitter(t, AllowAllAuthorizer{})
@@ -23,14 +23,11 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if result.Domain.Kind("lot")[loadID]["client"] != "CO" {
 		t.Fatalf("domain rolled back? %#v", result.Domain.Kind("lot"))
 	}
-	if len(port.calls) != 2 {
+	if len(port.calls) != 1 {
 		t.Fatalf("http calls = %#v", port.calls)
 	}
 	if port.calls[0].Method != "POST" || port.calls[0].URL != "/effects/labels" {
 		t.Fatalf("call0 = %#v", port.calls[0])
-	}
-	if port.calls[1].URL != "/effects/register-csv" {
-		t.Fatalf("call1 = %#v", port.calls[1])
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)
 	if body0["wasteCode"] != "160214" {
@@ -46,23 +43,24 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if len(labels) != 2 {
 		t.Fatalf("labels body = %#v", body0)
 	}
-	for _, raw := range labels {
+	wantIDs := []string{loadID + ".1", loadID + ".2"}
+	for i, raw := range labels {
 		rec, _ := raw.(map[string]any)
 		id, _ := rec["id"].(string)
+		if id != wantIDs[i] {
+			t.Fatalf("labels[%d].id = %q, want %q (all %#v)", i, id, wantIDs[i], labels)
+		}
 		qr, _ := rec["qr"].(string)
 		want := "https://plant.example/app?entityId=" + id
 		if qr != want {
 			t.Fatalf("label %#v qr = %q, want %q", rec, qr, want)
 		}
 	}
-	if len(result.Links) != 2 {
+	if len(result.Links) != 1 {
 		t.Fatalf("links = %#v", result.Links)
 	}
 	if result.Links[0].Label != "Stampa etichette" || result.Links[0].Action != HttpActionLink || result.Links[0].URL != "blob:labels" {
 		t.Fatalf("link0 = %#v", result.Links[0])
-	}
-	if result.Links[1].Action != HttpActionDownload || result.Links[1].Filename != "reg.csv" {
-		t.Fatalf("link1 = %#v", result.Links[1])
 	}
 	if len(result.HttpErrors) != 0 {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
@@ -77,11 +75,43 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	}
 }
 
+func TestCommitRegisterLabelsOrderedByProgressive(t *testing.T) {
+	port := &recordingHttpPort{
+		responses: []HttpPortResponse{
+			{URL: "blob:labels"},
+		},
+	}
+	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
+	c.HttpPort = port
+	c.SubmitBindings = ExprBindings{"qrEndpoint": "https://plant.example/app"}
+
+	truckID := commitTruckArrive(t, c)
+	value := registerLotValue()
+	value["palletCount"] = 12.0
+	result := commitLotRegister(t, c, truckID, value)
+	loadID := firstLoadID(result.Domain)
+	if len(port.calls) != 1 {
+		t.Fatalf("http calls = %#v", port.calls)
+	}
+	body0, _ := port.calls[0].Body.(map[string]any)
+	labels, ok := body0["labels"].([]any)
+	if !ok || len(labels) != 12 {
+		t.Fatalf("labels = %#v", body0["labels"])
+	}
+	for i, raw := range labels {
+		rec, _ := raw.(map[string]any)
+		id, _ := rec["id"].(string)
+		want := fmt.Sprintf("%s.%d", loadID, i+1)
+		if id != want {
+			t.Fatalf("labels[%d].id = %q, want %q (lexical trap: .10 before .2)", i, id, want)
+		}
+	}
+}
+
 func TestCommitRegisterOnePalletLabelsBodyIsArray(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
 		},
 	}
 	c, _, _ := testTaskCommitter(t, AllowAllAuthorizer{})
@@ -125,7 +155,7 @@ func TestCommitRegisterOnePalletLabelsBodyIsArray(t *testing.T) {
 
 func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	port := &recordingHttpPort{
-		errs: []error{errors.New("printer down"), errors.New("csv down")},
+		errs: []error{errors.New("printer down")},
 	}
 	c, domains, _ := testTaskCommitter(t, AllowAllAuthorizer{})
 	c.HttpPort = port
@@ -149,10 +179,10 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	if len(result.Links) != 0 {
 		t.Fatalf("links = %#v", result.Links)
 	}
-	if len(result.HttpErrors) != 2 {
+	if len(result.HttpErrors) != 1 {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
-	if result.HttpErrors[0] != "printer down" || result.HttpErrors[1] != "csv down" {
+	if result.HttpErrors[0] != "printer down" {
 		t.Fatalf("httpErrors = %#v", result.HttpErrors)
 	}
 
@@ -173,18 +203,18 @@ func TestCommitWithoutHTTPSkipsPort(t *testing.T) {
 
 	truckID := commitTruckArrive(t, c)
 	_ = commitLotRegister(t, c, truckID, registerLotValue())
-	if len(port.calls) != 2 {
-		t.Fatalf("register should call http twice — calls=%d", len(port.calls))
+	if len(port.calls) != 1 {
+		t.Fatalf("register should call http once — calls=%d", len(port.calls))
 	}
 
 	result, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 300.0},
+		Value: map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(port.calls) != 2 {
+	if len(port.calls) != 1 {
 		t.Fatalf("weightCheck must not call http — calls=%d", len(port.calls))
 	}
 	if len(result.Links) != 0 || len(result.HttpErrors) != 0 {

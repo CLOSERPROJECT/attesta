@@ -14,5 +14,5 @@
 {#if scope}
 	<OrgBoard {scope} />
 {:else}
-	<p class="text-sm text-zinc-500" data-testid="play-missing">Missing stream.</p>
+	<p class="text-sm text-muted-foreground" data-testid="play-missing">Missing stream.</p>
 {/if}

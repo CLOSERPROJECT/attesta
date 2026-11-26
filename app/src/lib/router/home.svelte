@@ -15,5 +15,5 @@
 {#if scope}
 	<OrgBoard {scope} />
 {:else}
-	<p class="text-sm text-zinc-500" data-testid="org-home-missing">Missing stream or instance.</p>
+	<p class="text-sm text-muted-foreground" data-testid="org-home-missing">Missing stream or instance.</p>
 {/if}

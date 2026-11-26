@@ -49,7 +49,7 @@ func buildOrgTimelineSteps(cfg org.OrgConfig, domain org.Domain, timeline org.St
 		}
 	}
 	hrefs := org.TimelineHrefPolicyFromFocus(streamKey, focus)
-	return timelineStepsFromDTO(org.BuildOrgTimelineSteps(cfg, domain, timeline, hrefs))
+	return timelineStepsFromDTO(org.BuildOrgTimelineSteps(cfg, domain, timeline, hrefs, ""))
 }
 
 func orgTimelineSubmissions(domain org.Domain, jobID, jobInstanceID, taskID string) []TimelineSubmissionView {

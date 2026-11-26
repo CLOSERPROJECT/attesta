@@ -6,7 +6,7 @@
 		getBoardTimelineModel,
 		type VisibleRow
 	} from '../board/board-timeline-model.svelte.js';
-	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
+	import { nestStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
 
@@ -24,7 +24,12 @@
 	const mark = $derived(projected.mark);
 	const status = $derived(row.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
-	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
+	const showStatusChip = $derived(
+		nestStatusChipVisible(status, {
+			nestStatusChips: timelineModel.chrome.nestStatusChips,
+			projectAll: timelineModel.chrome.projectAll
+		})
+	);
 	const visibleSubsteps = $derived(projected.substeps);
 
 	let open = $state(Boolean(untrack(() => row.expanded)));

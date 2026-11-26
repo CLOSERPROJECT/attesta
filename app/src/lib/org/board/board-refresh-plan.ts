@@ -29,7 +29,7 @@ export type BoardRefreshPlan = {
 	worklistOnly: boolean;
 	/** Skeleton + refetch every cached form bundle (own submitMany stay). */
 	remountForms: boolean;
-	/** Recaps to invalidate and re-enqueue. */
+	/** Recaps that must refresh after this Commit (soft if ready; hard if missing/error). */
 	recapRefresh: TaskAddress[];
 	/** Refetch ready form bundles in place; open forms get a stale marker instead of a swap. */
 	revalidateForms: boolean;

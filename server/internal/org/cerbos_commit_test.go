@@ -95,7 +95,7 @@ func TestCommitWeightCheckDeniedViaCerbosWhenReadyWhenFails(t *testing.T) {
 	_, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
-		Value:         map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
+		Value:         map[string]any{},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -157,7 +157,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 
 	_, err = c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1.0, "checkedLotSum": 1.0},
+		Value:    map[string]any{},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {

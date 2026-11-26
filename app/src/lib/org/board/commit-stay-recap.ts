@@ -34,3 +34,44 @@ export function stayAftermath(submitMany: boolean): StayAftermath {
 		clearUnderFormLinks: true
 	};
 }
+
+/**
+ * Submit-many embed land surface (Option C).
+ * Mode owns composer / Done-band visibility — remountForms, draftGeneration,
+ * and confirmRecap catch-up must not infer open/closed.
+ */
+export type ManyLandSurface = 'empty-compose' | 'done-band' | 'composing';
+
+export type ManyLandEvent =
+	| { type: 'commitSuccess' }
+	| { type: 'discard'; submissionCount: number }
+	| { type: 'openComposer' };
+
+/** First paint for a many embed address — not re-run on submission/recap catch-up. */
+export function initialManyLand(input: {
+	submissionCount: number;
+	confirmRecap: boolean;
+}): ManyLandSurface {
+	if (input.submissionCount === 0 && !input.confirmRecap) return 'empty-compose';
+	return 'done-band';
+}
+
+export function reduceManyLand(surface: ManyLandSurface, event: ManyLandEvent): ManyLandSurface {
+	switch (event.type) {
+		case 'commitSuccess':
+			return 'done-band';
+		case 'discard':
+			return event.submissionCount === 0 ? 'empty-compose' : 'done-band';
+		case 'openComposer':
+			return 'composing';
+	}
+}
+
+export function showComposer(surface: ManyLandSurface): boolean {
+	return surface !== 'done-band';
+}
+
+/** Done/recap band + Add chrome (hidden only on empty-compose auto-open). */
+export function showDoneBand(surface: ManyLandSurface): boolean {
+	return surface !== 'empty-compose';
+}

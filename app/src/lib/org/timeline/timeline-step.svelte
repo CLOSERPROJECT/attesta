@@ -7,7 +7,7 @@
 		type VisibleStep
 	} from '../board/board-timeline-model.svelte.js';
 	import { displayStepTitle } from './outline-label.js';
-	import { streamStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
+	import { nestStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRow from './timeline-row.svelte';
 	import TimelineSubstep from './timeline-substep.svelte';
@@ -29,7 +29,12 @@
 	const title = $derived(displayStepTitle(step.title));
 	const status = $derived(step.status);
 	const statusChipLabel = $derived(status ? streamStatusLabel(status) : '');
-	const showStatusChip = $derived(!!status && streamStatusChipVisible(status, timelineModel.showAll));
+	const showStatusChip = $derived(
+		nestStatusChipVisible(status, {
+			nestStatusChips: timelineModel.chrome.nestStatusChips,
+			projectAll: timelineModel.chrome.projectAll
+		})
+	);
 	const visibleRows = $derived(projected.rows ?? []);
 	const visibleSubsteps = $derived(projected.substeps ?? []);
 

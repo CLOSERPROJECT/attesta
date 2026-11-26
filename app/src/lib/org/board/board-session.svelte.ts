@@ -173,8 +173,16 @@ export function createBoardSession(opts: BoardSessionOptions): BoardSession {
 			if (plan.remountForms) {
 				formCache.refreshAllAfterDomainCommit();
 			}
+			// Hard-fetch only when missing/error. Ready rows stay painted so stay
+			// Commit → done-band does not wipe BoardManyRecap (height collapse flash).
+			// Soft refresh of ready targets is handled by revalidateRecaps below.
 			for (const addr of plan.recapRefresh) {
-				recapCache.invalidate(taskAddressKey(addr));
+				const key = taskAddressKey(addr);
+				const existing = recapCache.get(key);
+				if (existing?.status === 'ready' || existing?.status === 'loading') {
+					continue;
+				}
+				recapCache.invalidate(key);
 				recapCache.enqueue([addr]);
 			}
 			if (plan.revalidateForms) {

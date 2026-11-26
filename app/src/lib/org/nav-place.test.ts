@@ -54,71 +54,71 @@ describe('§6 Routes table (pathname after /app base strip)', () => {
 	});
 
 	test('/app/{stream} → stream (cold scan or dashboard redirect)', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/recycling' })).toBe('stream');
-		expect(navPlaceKindFromRoute({ pathname: '/recycling/' })).toBe('stream');
-		expect(orgRouteCoordsFromPath({ pathname: '/recycling' })).toEqual({
-			stream: 'recycling',
+		expect(navPlaceKindFromRoute({ pathname: '/pv-recovery' })).toBe('stream');
+		expect(navPlaceKindFromRoute({ pathname: '/pv-recovery/' })).toBe('stream');
+		expect(orgRouteCoordsFromPath({ pathname: '/pv-recovery' })).toEqual({
+			stream: 'pv-recovery',
 			instance: '',
 			jobId: '',
 			jobInstanceId: '',
 			taskId: ''
 		});
-		expect(orgMyDashboardPath('recycling')).toBe('/my/streams/org-recycling/');
+		expect(orgMyDashboardPath('pv-recovery')).toBe('/my/streams/org-pv-recovery/');
 	});
 
 	test('/app/{stream}/new → play (anchor start Task)', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/recycling/new' })).toBe('play');
-		expect(orgRouteCoordsFromPath({ pathname: '/recycling/new' })).toEqual({
-			stream: 'recycling',
+		expect(navPlaceKindFromRoute({ pathname: '/pv-recovery/new' })).toBe('play');
+		expect(orgRouteCoordsFromPath({ pathname: '/pv-recovery/new' })).toEqual({
+			stream: 'pv-recovery',
 			instance: '',
 			jobId: '',
 			jobInstanceId: '',
 			taskId: ''
 		});
-		expect(orgPlayPath('recycling')).toBe('/recycling/new');
+		expect(orgPlayPath('pv-recovery')).toBe('/pv-recovery/new');
 	});
 
 	test('/app/{stream}/i/{instance} → home (instance Worklist)', () => {
-		expect(navPlaceKindFromRoute({ pathname: '/recycling/i/T1' })).toBe('home');
-		expect(orgRouteCoordsFromPath({ pathname: '/recycling/i/T1' })).toEqual({
-			stream: 'recycling',
+		expect(navPlaceKindFromRoute({ pathname: '/pv-recovery/i/T1' })).toBe('home');
+		expect(orgRouteCoordsFromPath({ pathname: '/pv-recovery/i/T1' })).toEqual({
+			stream: 'pv-recovery',
 			instance: 'T1',
 			jobId: '',
 			jobInstanceId: '',
 			taskId: ''
 		});
-		expect(orgHomePath('recycling', 'T1')).toBe('/recycling/i/T1');
+		expect(orgHomePath('pv-recovery', 'T1')).toBe('/pv-recovery/i/T1');
 	});
 
 	test('/app/{stream}/i/{instance}/{job}/{jobInstance}/{task} → task', () => {
 		expect(
 			navPlaceKindFromRoute({
-				pathname: '/recycling/i/T1/intake/NIR-2/register'
+				pathname: '/pv-recovery/i/T1/intake/NIR-2/register'
 			})
 		).toBe('task');
 		expect(
 			orgRouteCoordsFromPath({
-				pathname: '/recycling/i/T1/intake/NIR-2/register'
+				pathname: '/pv-recovery/i/T1/intake/NIR-2/register'
 			})
 		).toEqual({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: 'T1',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-2',
 			taskId: 'register'
 		});
-		expect(orgTaskPath('recycling', 'T1', 'intake', 'NIR-2', 'register')).toBe(
-			'/recycling/i/T1/intake/NIR-2/register'
+		expect(orgTaskPath('pv-recovery', 'T1', 'intake', 'NIR-2', 'register')).toBe(
+			'/pv-recovery/i/T1/intake/NIR-2/register'
 		);
 	});
 
 	test('provisional Task under instance uses new sentinel', () => {
 		expect(
 			orgRouteCoordsFromPath({
-				pathname: '/recycling/i/T1/lot_processing/new/startLot'
+				pathname: '/pv-recovery/i/T1/lot_processing/new/startLot'
 			})
 		).toEqual({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: 'T1',
 			jobId: 'lot_processing',
 			jobInstanceId: 'new',
@@ -126,7 +126,7 @@ describe('§6 Routes table (pathname after /app base strip)', () => {
 		});
 		expect(
 			navPlaceKindFromRoute({
-				pathname: '/recycling/i/T1/lot_processing/new/startLot'
+				pathname: '/pv-recovery/i/T1/lot_processing/new/startLot'
 			})
 		).toBe('task');
 	});
@@ -137,10 +137,10 @@ describe('§6 Routes table (pathname after /app base strip)', () => {
 		expect(navPlaceKindFromRoute({ pathname: '/intake/NIR-2' })).toBe('app-root');
 		const kinds = [
 			navPlaceKindFromRoute({ pathname: '/' }),
-			navPlaceKindFromRoute({ pathname: '/recycling' }),
-			navPlaceKindFromRoute({ pathname: '/recycling/new' }),
-			navPlaceKindFromRoute({ pathname: '/recycling/i/T1' }),
-			navPlaceKindFromRoute({ pathname: '/recycling/i/T1/intake/a/b' }),
+			navPlaceKindFromRoute({ pathname: '/pv-recovery' }),
+			navPlaceKindFromRoute({ pathname: '/pv-recovery/new' }),
+			navPlaceKindFromRoute({ pathname: '/pv-recovery/i/T1' }),
+			navPlaceKindFromRoute({ pathname: '/pv-recovery/i/T1/intake/a/b' }),
 			navPlaceKindFromRoute({ pathname: '/archive' }),
 			navPlaceKindFromRoute({ pathname: '/intake/NIR-2' })
 		];
@@ -153,11 +153,11 @@ describe('§6 Routes table (pathname after /app base strip)', () => {
 	});
 
 	test('orgPathSegments strips trailing slash', () => {
-		expect(orgPathSegments('/recycling/i/T1/')).toEqual(['recycling', 'i', 'T1']);
+		expect(orgPathSegments('/pv-recovery/i/T1/')).toEqual(['pv-recovery', 'i', 'T1']);
 	});
 
 	test('orgMyInstancePath is SPA instance home', () => {
-		expect(orgMyInstancePath('recycling', 'T1')).toBe('/recycling/i/T1');
+		expect(orgMyInstancePath('pv-recovery', 'T1')).toBe('/pv-recovery/i/T1');
 	});
 
 	test('streamInstanceLabel reads anchor instance label from Worklist', () => {
@@ -171,7 +171,7 @@ describe('resolveNavPlace', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'home',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'T1',
 				jobId: '',
 				jobInstanceId: '',
@@ -181,7 +181,7 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: false,
-			backTarget: { kind: 'home', stream: 'recycling', instance: 'T1' },
+			backTarget: { kind: 'home', stream: 'pv-recovery', instance: 'T1' },
 			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		});
@@ -191,7 +191,7 @@ describe('resolveNavPlace', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'play',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '',
 				jobId: 'intake',
 				jobInstanceId: '',
@@ -201,7 +201,7 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: false,
-			backTarget: { kind: 'myStream', stream: 'recycling' },
+			backTarget: { kind: 'myStream', stream: 'pv-recovery' },
 			primaryLabel: m.fallback_home(),
 			jobTitleLine: null
 		});
@@ -211,7 +211,7 @@ describe('resolveNavPlace', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'T1',
 				jobId: 'intake',
 				jobInstanceId: '',
@@ -221,7 +221,7 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'home', stream: 'recycling', instance: 'T1' },
+			backTarget: { kind: 'home', stream: 'pv-recovery', instance: 'T1' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion'
 		});
@@ -231,7 +231,7 @@ describe('resolveNavPlace', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'NIR-2',
 				jobId: 'intake',
 				jobInstanceId: 'NIR-2',
@@ -241,7 +241,7 @@ describe('resolveNavPlace', () => {
 			})
 		).toEqual({
 			showBack: true,
-			backTarget: { kind: 'home', stream: 'recycling', instance: 'NIR-2' },
+			backTarget: { kind: 'home', stream: 'pv-recovery', instance: 'NIR-2' },
 			primaryLabel: 'Registrazione',
 			jobTitleLine: 'Camion · Camion B'
 		});
@@ -251,7 +251,7 @@ describe('resolveNavPlace', () => {
 		expect(
 			resolveNavPlace({
 				kind: 'task',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: 'T1',
 				jobId: 'intake',
 				jobInstanceId: '',
@@ -289,7 +289,7 @@ describe('resolveNavPlace', () => {
 		};
 		const place = resolveNavPlace({
 			kind: 'task',
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: 'NIR-1',
 			jobId: 'intake',
 			jobInstanceId: 'NIR-1',

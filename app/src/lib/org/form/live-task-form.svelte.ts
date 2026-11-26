@@ -92,6 +92,7 @@ export class LiveTaskForm {
 			ports.getValue,
 			ports.setValue,
 			{
+				seedValue: ports.seedValue,
 				...(this.#plan.derived !== undefined ? { derived: this.#plan.derived } : {}),
 				getDomain: ports.getDomain,
 				getCatalogs: ports.getCatalogs,

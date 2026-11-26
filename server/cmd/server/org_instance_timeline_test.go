@@ -32,14 +32,14 @@ func TestOrgInstanceTimelineRedirectsToSPAHome(t *testing.T) {
 
 	truckID := arriveIntakeTruck(t, server, sessionID)
 
-	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-recycling/instance/"+truckID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/org-pv-recovery/instance/"+truckID, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleMyRoutes(rec, req)
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
-	wantLoc := "/app/recycling/i/" + truckID
+	wantLoc := "/app/pv-recovery/i/" + truckID
 	if loc := rec.Header().Get("Location"); loc != wantLoc {
 		t.Fatalf("Location = %q, want %q", loc, wantLoc)
 	}
@@ -68,10 +68,10 @@ func TestOrgInstanceTimelineMutationsAndEventsNotFound(t *testing.T) {
 	for _, tc := range []struct {
 		method, path string
 	}{
-		{http.MethodPost, "/my/streams/org-recycling/instance/" + truckID + "/terminate"},
-		{http.MethodGet, "/my/streams/org-recycling/instance/" + truckID + "/substep/1.1/override"},
-		{http.MethodPost, "/my/streams/org-recycling/instance/" + truckID + "/substep/1.1/complete"},
-		{http.MethodGet, "/my/streams/org-recycling/events"},
+		{http.MethodPost, "/my/streams/org-pv-recovery/instance/" + truckID + "/terminate"},
+		{http.MethodGet, "/my/streams/org-pv-recovery/instance/" + truckID + "/substep/1.1/override"},
+		{http.MethodPost, "/my/streams/org-pv-recovery/instance/" + truckID + "/substep/1.1/complete"},
+		{http.MethodGet, "/my/streams/org-pv-recovery/events"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})

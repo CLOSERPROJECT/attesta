@@ -148,7 +148,12 @@ func mergeChromeIntoSchemas(
 	}
 	schema["type"] = "object"
 	schema["properties"] = sealProps
-	schema["required"] = sealRequired
+	// Omit empty required — nil []any JSON-marshals as null and Ajv rejects the schema.
+	if len(sealRequired) > 0 {
+		schema["required"] = sealRequired
+	} else {
+		delete(schema, "required")
+	}
 
 	uiSchema := cloneMapJSON(authoredUi)
 	uiOpts, _ := uiSchema["ui:options"].(map[string]any)
@@ -381,7 +386,7 @@ func applyDefaultPlaceholders(uiNode, schemaNode map[string]any, skipRoot map[st
 	return changed
 }
 
-var shadcnPlaceholderWidgets = []string{"shadcn4Text", "shadcn4Number", "shadcn4Select"}
+var shadcnPlaceholderWidgets = []string{"shadcn4Text", "shadcn4Number", "shadcn4Select", "textarea"}
 
 func writeDefaultPlaceholder(fieldUi map[string]any, text string) {
 	_ = stampPlaceholder(fieldUi, text, true)

@@ -5,7 +5,7 @@ import { TimelineLoadError } from './timeline-port.js';
 import type { TimelineView } from './types.js';
 
 const bootView: TimelineView = {
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: '',
 	mode: 'boot',
 	label: 'Recycling',
@@ -14,7 +14,7 @@ const bootView: TimelineView = {
 };
 
 const instanceView: TimelineView = {
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: '261102-1',
 	mode: 'instance',
 	label: 'Camion',
@@ -25,7 +25,7 @@ const instanceView: TimelineView = {
 describe('HttpTimelinePort', () => {
 	test('GET /api/org/timeline with stream only (boot)', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			expect(String(input)).toBe('/api/org/timeline?stream=recycling');
+			expect(String(input)).toBe('/api/org/timeline?stream=pv-recovery');
 			expect(init?.method).toBe('GET');
 			expect(init?.credentials).toBe('include');
 			return new Response(JSON.stringify(bootView), {
@@ -35,7 +35,7 @@ describe('HttpTimelinePort', () => {
 		});
 
 		const port = createHttpTimelinePort({ fetch: fetchFn, baseUrl: '' });
-		const got = await port.load({ stream: 'recycling' });
+		const got = await port.load({ stream: 'pv-recovery' });
 		expect(got).toEqual(bootView);
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
@@ -43,7 +43,7 @@ describe('HttpTimelinePort', () => {
 	test('GET /api/org/timeline with stream and instance', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			expect(String(input)).toBe(
-				'/api/org/timeline?stream=recycling&instance=261102-1'
+				'/api/org/timeline?stream=pv-recovery&instance=261102-1'
 			);
 			expect(init?.method).toBe('GET');
 			return new Response(JSON.stringify(instanceView), {
@@ -53,7 +53,7 @@ describe('HttpTimelinePort', () => {
 		});
 
 		const port = createHttpTimelinePort({ fetch: fetchFn, baseUrl: '' });
-		const got = await port.load({ stream: 'recycling', instance: '261102-1' });
+		const got = await port.load({ stream: 'pv-recovery', instance: '261102-1' });
 		expect(got).toEqual(instanceView);
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
@@ -63,10 +63,10 @@ describe('HttpTimelinePort', () => {
 			async () => new Response('organization required', { status: 403 })
 		);
 		const port = createHttpTimelinePort({ fetch: fetchFn });
-		await expect(port.load({ stream: 'recycling' })).rejects.toBeInstanceOf(
+		await expect(port.load({ stream: 'pv-recovery' })).rejects.toBeInstanceOf(
 			TimelineLoadError
 		);
-		await expect(port.load({ stream: 'recycling' })).rejects.toMatchObject({
+		await expect(port.load({ stream: 'pv-recovery' })).rejects.toMatchObject({
 			status: 403
 		});
 	});
@@ -102,7 +102,7 @@ describe('HttpTimelinePort', () => {
 				})
 		);
 		const port = createHttpTimelinePort({ fetch: fetchFn });
-		const got = await port.load({ stream: 'recycling', instance: '261102-1' });
+		const got = await port.load({ stream: 'pv-recovery', instance: '261102-1' });
 		expect(got.steps[0]?.substeps?.[0]?.roleBadges).toEqual([
 			{ id: 'dep1', label: 'Depot', palette: 'blue' },
 			{ id: 'ops', label: 'Ops', palette: 'emerald' }

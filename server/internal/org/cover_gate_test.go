@@ -74,7 +74,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	(&API{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	(&API{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("task-form unconfigured = %d", rec.Code)
 	}
@@ -91,7 +91,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 		},
 	}
 	rec = httptest.NewRecorder()
-	emptyOrg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	emptyOrg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("task-form empty org = %d", rec.Code)
 	}
@@ -109,7 +109,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 		},
 	}
 	rec = httptest.NewRecorder()
-	denyGate.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	denyGate.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("task-form gate = %d", rec.Code)
 	}
@@ -124,7 +124,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
-	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("task-form missing config = %d", rec.Code)
 	}
@@ -134,13 +134,13 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
-	boomForm.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	boomForm.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("task-form boom = %d", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/org/task-form?stream=recycling&jobId=intake&taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/api/org/task-form?stream=pv-recovery&jobId=intake&taskId=truckArrive", nil))
 	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
 		t.Fatalf("task-form HEAD = %d body=%q", rec.Code, rec.Body.String())
 	}
@@ -148,7 +148,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 	truckID := commitTruckArrive(t, c)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodHead,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
 		t.Fatalf("task-recap HEAD = %d body=%q", rec.Code, rec.Body.String())
 	}
@@ -159,7 +159,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	boomRecap.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusInternalServerError && rec.Code != http.StatusNotFound {
 		t.Fatalf("task-recap boom = %d", rec.Code)
 	}
@@ -176,12 +176,12 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 		t.Fatalf("qr unconfigured = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling", strings.NewReader(`{`)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery", strings.NewReader(`{`)))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("qr bad json = %d", rec.Code)
 	}
 	rec = httptest.NewRecorder()
-	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling", strings.NewReader(`{"raw":"x"}`)))
+	missingCfg.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery", strings.NewReader(`{"raw":"x"}`)))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("qr missing config = %d", rec.Code)
 	}
@@ -190,7 +190,7 @@ func TestHandlerTaskFormRecapQrErrorEdges(t *testing.T) {
 		Gate:         gateOK,
 	}
 	rec = httptest.NewRecorder()
-	boomQR.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=recycling", strings.NewReader(`{"raw":"x"}`)))
+	boomQR.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/qr-resolve?stream=pv-recovery", strings.NewReader(`{"raw":"x"}`)))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("qr boom = %d", rec.Code)
 	}

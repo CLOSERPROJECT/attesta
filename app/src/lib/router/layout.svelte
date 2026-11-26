@@ -3,7 +3,9 @@
 	import { onMount } from 'svelte';
 
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import Moon from '@lucide/svelte/icons/moon';
 	import Scan from '@lucide/svelte/icons/scan';
+	import Sun from '@lucide/svelte/icons/sun';
 
 	import attestaMark from '#lib/assets/attesta-mark.svg';
 	import * as m from '#lib/paraglide/messages.js';
@@ -23,6 +25,7 @@
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import { navigateOrgTarget } from '#lib/router/navigate-target.js';
 	import { route } from '#lib/router/index.js';
+	import { toggleTheme } from '#lib/theme.js';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -56,6 +59,7 @@
 	const qrPort = createHttpQrResolvePort();
 	let scanOpen = $state(false);
 	let scanBusy = $state(false);
+	let isDark = $state(false);
 
 	async function handleRaw(raw: string) {
 		if (scanBusy || !coords.stream) return;
@@ -78,6 +82,7 @@
 	}
 
 	onMount(() => {
+		isDark = document.documentElement.classList.contains('dark');
 		if (
 			coords.stream &&
 			coords.instance &&
@@ -96,9 +101,9 @@
 	});
 </script>
 
-<div class="flex min-h-svh flex-col">
+<div class="flex min-h-svh flex-col bg-background text-foreground">
 	<nav
-		class="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 text-sm"
+		class="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm"
 		data-testid="org-nav"
 	>
 		<div class="flex min-w-0 items-center gap-2">
@@ -115,18 +120,18 @@
 				</Button>
 				<div class="min-w-0 text-left" data-testid="nav-place">
 					{#if place.jobTitleLine}
-						<p class="truncate text-xs text-zinc-500" data-testid="nav-place-job-title">
+						<p class="truncate text-xs text-muted-foreground" data-testid="nav-place-job-title">
 							{place.jobTitleLine}
 						</p>
 					{/if}
-					<p class="truncate font-semibold text-zinc-900" data-testid="nav-place-primary">
+					<p class="truncate font-semibold text-foreground" data-testid="nav-place-primary">
 						{place.primaryLabel}
 					</p>
 				</div>
 			{:else}
 				<a
 					href="/"
-					class="inline-flex min-w-0 items-center gap-1 text-zinc-900 no-underline hover:no-underline"
+					class="inline-flex min-w-0 items-center gap-1 text-foreground no-underline hover:no-underline"
 					data-testid="nav-brand"
 				>
 					<img
@@ -152,6 +157,24 @@
 					{/each}
 				</div>
 			{/if}
+			<Button
+				type="button"
+				variant="outline"
+				size="icon"
+				aria-label={isDark ? m.theme_to_light() : m.theme_to_dark()}
+				title={isDark ? m.theme_to_light() : m.theme_to_dark()}
+				data-testid="theme-toggle"
+				onclick={() => {
+					const next = toggleTheme();
+					isDark = next === 'dark';
+				}}
+			>
+				{#if isDark}
+					<Sun class="size-4" />
+				{:else}
+					<Moon class="size-4" />
+				{/if}
+			</Button>
 			{#if coords.stream}
 				<Button
 					type="button"

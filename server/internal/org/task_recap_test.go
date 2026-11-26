@@ -55,9 +55,7 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels-1"},
-			{URL: "blob:csv-1", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg1.csv"`}},
 			{URL: "blob:labels-2"},
-			{URL: "blob:csv-2", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg2.csv"`}},
 		},
 	}
 	links := NewMemoryLinkStore()
@@ -92,20 +90,34 @@ func TestLoadTaskRecapManySubmitEntityModeWithPerRowLinks(t *testing.T) {
 	if table.Rows[0].Timestamp >= table.Rows[1].Timestamp {
 		t.Fatalf("want oldest first: %q then %q", table.Rows[0].Timestamp, table.Rows[1].Timestamp)
 	}
-	if table.Rows[0].Cells["client"] != "CO" || table.Rows[1].Cells["client"] != "DA" {
+	if table.Rows[0].Cells["numeroFir"] != "FIR-1" || table.Rows[1].Cells["numeroFir"] != "FIR-2" {
 		t.Fatalf("cells order = %#v %#v", table.Rows[0].Cells, table.Rows[1].Cells)
 	}
-	if len(table.Rows[0].Links) != 2 || table.Rows[0].Links[0].URL != "blob:labels-1" ||
-		table.Rows[0].Links[1].Filename != "reg1.csv" {
+	if table.Rows[0].Cells["id"] != table.Rows[0].Key || table.Rows[1].Cells["id"] != table.Rows[1].Key {
+		t.Fatalf("id cells = %#v %#v", table.Rows[0].Cells["id"], table.Rows[1].Cells["id"])
+	}
+	if len(table.Rows[0].Links) != 1 || table.Rows[0].Links[0].URL != "blob:labels-1" {
 		t.Fatalf("first links = %#v", table.Rows[0].Links)
 	}
-	if len(table.Rows[1].Links) != 2 || table.Rows[1].Links[0].URL != "blob:labels-2" ||
-		table.Rows[1].Links[1].Filename != "reg2.csv" {
+	if len(table.Rows[1].Links) != 1 || table.Rows[1].Links[0].URL != "blob:labels-2" {
 		t.Fatalf("second links = %#v", table.Rows[1].Links)
 	}
-	col := columnByKey(table.Columns, "client")
-	if col == nil || col.Title != "Cliente" {
+	wantCols := []TaskRecapCol{
+		{Key: "id", Title: "Id"},
+		{Key: "numeroFir", Title: "Numero FIR"},
+		{Key: "netWeight", Title: "Peso netto"},
+		{Key: "palletCount", Title: "Bancali"},
+	}
+	if len(table.Columns) != len(wantCols) {
 		t.Fatalf("columns = %#v", table.Columns)
+	}
+	for i, want := range wantCols {
+		if table.Columns[i] != want {
+			t.Fatalf("columns[%d] = %#v, want %#v (all=%#v)", i, table.Columns[i], want, table.Columns)
+		}
+	}
+	if table.Rows[0].Key == "" || table.Rows[1].Key == "" {
+		t.Fatalf("entity id keys missing: %#v %#v", table.Rows[0], table.Rows[1])
 	}
 }
 
@@ -139,7 +151,6 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
 		},
 	}
 	links := NewMemoryLinkStore()
@@ -161,7 +172,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=register&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=register&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("register recap status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -170,13 +181,13 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	if wire.Mode != taskRecapModeEntity || len(wire.Rows) != 1 ||
-		len(wire.Rows[0].Links) != 2 || wire.Rows[0].UserID != "ada" {
+		len(wire.Rows[0].Links) != 1 || wire.Rows[0].UserID != "ada" {
 		t.Fatalf("wire = %#v", wire)
 	}
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("flat recap = %d", rec.Code)
 	}
@@ -190,13 +201,13 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=weightCheck&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=weightCheck&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("not done = %d, want 404", rec.Code)
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?stream=recycling&instance="+truckID+"&taskId=truckArrive", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&taskId=truckArrive", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("missing params = %d", rec.Code)
 	}
@@ -210,7 +221,7 @@ func TestHandleTaskRecapHTTP(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	logH.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/api/org/task-recap?stream=recycling&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
+		"/api/org/task-recap?stream=pv-recovery&instance="+truckID+"&jobId=intake&taskId=truckArrive&jobInstanceId="+truckID, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logistic recap = %d body=%s", rec.Code, rec.Body.String())
 	}

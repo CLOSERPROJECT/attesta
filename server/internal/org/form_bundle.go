@@ -445,7 +445,9 @@ func seedFormDefaultsFromSchema(out map[string]any, payload map[string]any) {
 		if _, need := required[key]; !need {
 			continue
 		}
-		if enums := schemaStringEnum(prop); len(enums) > 0 {
+		// Only seed when the enum is a singleton (constant). Longer lists stay
+		// unset so the operator chooses (progressive disclosure / dependencies).
+		if enums := schemaStringEnum(prop); len(enums) == 1 {
 			out[key] = enums[0]
 		}
 	}

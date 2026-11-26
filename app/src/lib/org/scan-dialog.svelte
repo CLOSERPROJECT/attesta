@@ -77,7 +77,7 @@
 
 		<div class="space-y-3">
 			<div
-				class="aspect-video overflow-hidden rounded-md border border-zinc-200 bg-zinc-950"
+				class="aspect-video overflow-hidden rounded-md border border-border bg-zinc-950"
 				data-testid="scan-camera"
 			>
 				{#if open}
@@ -91,7 +91,7 @@
 				{/if}
 			</div>
 			{#if camError}
-				<p class="text-xs text-zinc-500" data-testid="scan-camera-hint">{camError}</p>
+				<p class="text-xs text-muted-foreground" data-testid="scan-camera-hint">{camError}</p>
 			{/if}
 
 			<form
@@ -102,7 +102,7 @@
 				}}
 			>
 				<input
-					class="min-w-0 flex-1 rounded-md border border-zinc-200 px-3 py-2 text-sm"
+					class="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
 					data-testid="scan-manual-input"
 					placeholder={m.scan_paste_placeholder()}
 					autocomplete="off"

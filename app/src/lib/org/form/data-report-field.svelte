@@ -148,9 +148,10 @@
 	.data-report {
 		margin: 0 0 1rem;
 		padding: 0.75rem 0.9rem;
-		border: 1px solid oklch(0.88 0.01 250);
-		border-radius: 0.5rem;
-		background: oklch(0.97 0.005 250);
+		border: 1px solid var(--border);
+		border-radius: 0;
+		/* Same wash as many-recap Done band (`bg-muted/60`). */
+		background: color-mix(in srgb, var(--muted) 60%, transparent);
 		font-size: var(--text-sm, 0.875rem);
 		line-height: var(--text-sm--line-height, calc(1.25 / 0.875));
 	}

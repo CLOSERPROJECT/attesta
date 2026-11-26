@@ -19,6 +19,8 @@ export type TimelineSubstep = {
 	status: string;
 	statusLabel?: string;
 	orgActionable?: boolean;
+	/** Operator has a Submission on this done Task — stays visible when Show all is off. */
+	doneByMe?: boolean;
 	submitMany?: boolean;
 	blockedReason?: string;
 	href?: string;

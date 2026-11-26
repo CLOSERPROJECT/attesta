@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import type { TimelineSubstep, TimelineView } from '../timeline/types.js';
 import {
+	actionableSeededRefsFromTimeline,
 	firstActionableAddress,
 	recapAddressesFromTimeline,
 	soleActionableAddress,
@@ -9,7 +10,7 @@ import {
 } from './timeline-actionable.js';
 
 const base = {
-	stream: 'recycling',
+	stream: 'pv-recovery',
 	instance: '261102-1',
 	label: 'Camion',
 	status: 'active'
@@ -45,7 +46,7 @@ describe('soleActionableAddress', () => {
 		const one = viewWithActionables([
 			{
 				substepId: 'lot_processing.weigh',
-				href: '/app/recycling/i/261102-1/lot_processing/DA-1/weigh'
+				href: '/app/pv-recovery/i/261102-1/lot_processing/DA-1/weigh'
 			}
 		]);
 		expect(soleActionableAddress(one)?.taskId).toBe('weigh');
@@ -54,23 +55,49 @@ describe('soleActionableAddress', () => {
 		const many = viewWithActionables([
 			{
 				substepId: 'intake.register',
-				href: '/app/recycling/i/261102-1/intake/261102-1/register'
+				href: '/app/pv-recovery/i/261102-1/intake/261102-1/register'
 			},
 			{
 				substepId: 'lot_processing.weigh',
-				href: '/app/recycling/i/261102-1/lot_processing/DA-1/weigh'
+				href: '/app/pv-recovery/i/261102-1/lot_processing/DA-1/weigh'
 			}
 		]);
 		expect(soleActionableAddress(many)).toBeNull();
 		expect(firstActionableAddress(many)?.taskId).toBe('register');
 	});
 
+	test('seeded provisional Starts stay distinct for sole counting', () => {
+		const manyLots = viewWithActionables([
+			{
+				substepId: 'lot_processing.startLot',
+				href: '/app/pv-recovery/i/261102-1/lot_processing/new/startLot?seed.lotId=L1'
+			},
+			{
+				substepId: 'lot_processing.startLot',
+				href: '/app/pv-recovery/i/261102-1/lot_processing/new/startLot?seed.lotId=L2'
+			}
+		]);
+		expect(soleActionableAddress(manyLots)).toBeNull();
+		const refs = actionableSeededRefsFromTimeline(manyLots);
+		expect(refs).toHaveLength(2);
+		expect(refs.map((r) => r.seed.lotId).sort()).toEqual(['L1', 'L2']);
+
+		const oneLot = viewWithActionables([
+			{
+				substepId: 'lot_processing.startLot',
+				href: '/app/pv-recovery/i/261102-1/lot_processing/new/startLot?seed.lotId=L9'
+			}
+		]);
+		expect(soleActionableAddress(oneLot)?.taskId).toBe('startLot');
+		expect(actionableSeededRefsFromTimeline(oneLot)[0]?.seed).toEqual({ lotId: 'L9' });
+	});
+
 	test('resolves Play boot …/new/{job}/{ji}/{task} hrefs', () => {
 		const boot: TimelineView = {
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '',
 			mode: 'boot',
-			label: 'recycling',
+			label: 'pv-recovery',
 			status: 'active',
 			steps: [
 				{
@@ -84,7 +111,7 @@ describe('soleActionableAddress', () => {
 							title: 'Truck arrive',
 							status: 'available',
 							orgActionable: true,
-							href: '/app/recycling/new/intake/new/truckArrive'
+							href: '/app/pv-recovery/new/intake/new/truckArrive'
 						}
 					]
 				}
@@ -92,7 +119,7 @@ describe('soleActionableAddress', () => {
 		};
 		const addr = firstActionableAddress(boot);
 		expect(addr).toMatchObject({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '',
 			jobId: 'intake',
 			taskId: 'truckArrive',
@@ -116,7 +143,7 @@ describe('recapAddressesFromTimeline', () => {
 							substepId: 'intake.register',
 							title: 'Register',
 							status: 'done',
-							href: '/app/recycling/i/261102-1/intake/261102-1/register',
+							href: '/app/pv-recovery/i/261102-1/intake/261102-1/register',
 							submissions: [{ timestamp: '2024-01-01T00:00:00Z' }]
 						},
 						{
@@ -125,13 +152,13 @@ describe('recapAddressesFromTimeline', () => {
 							status: 'available',
 							orgActionable: true,
 							submitMany: true,
-							href: '/app/recycling/i/261102-1/intake/261102-1/photos'
+							href: '/app/pv-recovery/i/261102-1/intake/261102-1/photos'
 						},
 						{
 							substepId: 'intake.skip',
 							title: 'Skip',
 							status: 'available',
-							href: '/app/recycling/i/261102-1/intake/261102-1/skip'
+							href: '/app/pv-recovery/i/261102-1/intake/261102-1/skip'
 						}
 					]
 				}
@@ -143,7 +170,7 @@ describe('recapAddressesFromTimeline', () => {
 });
 
 describe('timelineSubstepShown', () => {
-	const stream = 'recycling';
+	const stream = 'pv-recovery';
 	const instance = '261102-1';
 	const lockedOtherLot: TimelineSubstep = {
 		substepId: 'lot_processing.weigh',
@@ -192,6 +219,18 @@ describe('timelineSubstepShown', () => {
 				{ ...lockedOtherLot, href: undefined },
 				{ showAll: false, focus: focusDA, stream, instance }
 			)
+		).toBe(false);
+	});
+
+	test('doneByMe stays visible when Show all is off', () => {
+		const doneByMe: TimelineSubstep = {
+			...lockedOtherLot,
+			status: 'done',
+			doneByMe: true
+		};
+		expect(timelineSubstepShown(doneByMe, { showAll: false })).toBe(true);
+		expect(
+			timelineSubstepShown({ ...doneByMe, doneByMe: false }, { showAll: false })
 		).toBe(false);
 	});
 });

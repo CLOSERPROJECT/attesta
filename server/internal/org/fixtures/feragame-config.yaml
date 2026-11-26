@@ -21,11 +21,11 @@ roles:
       name: Line
       palette: orange
 stream:
-    key: recycling
-    title: Lavorazione rifiuti
-    description: Ingresso camion e lavorazione lotti
+    key: pv-recovery
+    title: Recupero materiali da pannelli fotovoltaici
+    description: Ingresso camion, registrazione lotti FIR e recupero materiali da pannelli fotovoltaici a fine vita
     categorySlug: recycling-and-recovery
-    subCategorySlug: flat-screen-displays
+    subCategorySlug: photovoltaic-panels
     instance:
         job: intake
     steps:
@@ -37,7 +37,7 @@ stream:
 domain:
     entities:
         truck:
-            fields: [truckWeight, lastScaleReading, checkedTruckWeight, checkedLotSum]
+            fields: [truckWeight, lastScaleReading]
         lot:
             fields: [client, clientProgressive, numeroFir, wasteCode, palletCount, netWeight, truckId, notes, status, locked, issued]
         pallet:
@@ -207,8 +207,8 @@ steps:
               recap:
                   entity: lot
                   columns:
-                      - field: client
-                        title: Cliente
+                      - field: id
+                        title: Id
                       - field: numeroFir
                         title: Numero FIR
                       - field: netWeight
@@ -253,6 +253,8 @@ steps:
                 numeroFir:
                     ui:options:
                         layoutNewRow: true
+                        shadcn4Text:
+                            class: org-text-uppercase
                 wasteCode:
                     ui:options:
                         enumNames: ['16.02.14']
@@ -261,6 +263,7 @@ steps:
                         textWidget: textareaWidget
                     ui:options:
                         layoutSpan: true
+                        placeholder: Inserisci Note…
               chrome:
                 progressiveNumber:
                     kind: readonly
@@ -309,7 +312,7 @@ steps:
                             $prefix := $.client & '-' & $dateStamp & '-';
                             $count($filter($keys($domain.lot), function($k){ $substring($string($k), 0, $length($prefix)) = $prefix })) + 1
                           )
-                        numeroFir: $.numeroFir
+                        numeroFir: $uppercase($.numeroFir)
                         wasteCode: $.wasteCode
                         palletCount: $.palletCount
                         truckId: $instance.id
@@ -333,41 +336,27 @@ steps:
                       label: '"Stampa etichette"'
                       action: link
                       body: >-
-                        {
-
-                          "lotId": $lot.id,
-                          "date": $substring($replace($today, '-', ''), 2),
-                          "client": $.client,
-                          "clientProgressive": $lot.clientProgressive,
-                          "numeroFir": $.numeroFir,
-                          "wasteCode": $.wasteCode,
-                          "palletCount": $.palletCount,
-                          "netWeight": $lot.netWeight,
-                          "labels": [$each(
-                            $sift($domain.pallet, function($v){$v.lotId = $lot.id}),
-                            function($v, $id){{ "id": $id, "client": $.client, "qr": $qrEndpoint & "?entityId=" & $id }}
-                          )]
-                        }
-                    - method: '"POST"'
-                      url: '"/effects/register-csv"'
-                      label: '"Scarica CSV registrazione"'
-                      action: download
-                      body: >-
-                        {
-
-                          "client": $.client,
-                          "numeroFir": $.numeroFir,
-                          "palletCount": $.palletCount,
-                          "truckWeightAfter": $.truckWeightAfter,
-                          "netWeight": $lot.netWeight,
-                          "notes": $.notes,
-                          "lotId": $lot.id,
-                          "truckId": $instance.id,
-                          "palletIds": [$each(
-                            $sift($domain.pallet, function($v){$v.lotId = $lot.id}),
-                            function($v, $k){$k}
-                          )]
-                        }
+                        (
+                          $palletMap := $sift($domain.pallet, function($v){$v.lotId = $lot.id});
+                          $palletIds := $sort($keys($palletMap), function($l, $r){
+                            $number($split($l, ".")[-1]) > $number($split($r, ".")[-1])
+                          });
+                          {
+                            "lotId": $lot.id,
+                            "date": $substring($replace($today, '-', ''), 2),
+                            "client": $.client,
+                            "clientProgressive": $lot.clientProgressive,
+                            "numeroFir": $lot.numeroFir,
+                            "wasteCode": $.wasteCode,
+                            "palletCount": $.palletCount,
+                            "netWeight": $lot.netWeight,
+                            "labels": $count($palletIds) = 0 ? [] : $append([], $map($palletIds, function($id){{
+                              "id": $id,
+                              "client": $.client,
+                              "qr": $qrEndpoint & "?entityId=" & $id
+                            }}))
+                          }
+                        )
             - id: weightCheck
               roles: [administration]
               readyWhen: >-
@@ -378,52 +367,53 @@ steps:
               schema:
                 type: object
                 title: Controllo camion vs lotti
-                required: [checkedTruckWeight, checkedLotSum]
-                properties:
-                    checkedTruckWeight: {type: number, exclusiveMinimum: 0, title: Peso camion verificato}
-                    checkedLotSum: {type: number, exclusiveMinimum: 0, title: Somma pesi netti lotti verificata}
-              uiSchema:
-                ui:options:
-                    order: [checkedTruckWeight, checkedLotSum]
+                properties: {}
               chrome:
                 registeredData:
                     kind: dataReport
                     title: Dati registrati
-                    before: checkedTruckWeight
                     expr: |-
                         (
                           $truck := $lookup($domain.truck, $instance.id);
                           $gross := $truck.truckWeight;
-                          $lotSum := $sum($append([], $domain.lot.*[truckId=$instance.id].netWeight));
                           $tare := $truck.lastScaleReading;
-                          $m := $max([$gross - $tare, $lotSum]);
-                          $pct := $m = 0 ? 0 : 100 * $min([$gross - $tare, $lotSum]) / $m;
+                          $expectedNet := $type($gross) = "number" and $type($tare) = "number" ? $gross - $tare : undefined;
+                          $lotIds := $sort($keys($sift($domain.lot, function($v){$v.truckId = $instance.id})));
+                          $lotSum := $sum($append([], $domain.lot.*[truckId=$instance.id].netWeight[$type($)="number"]));
+                          $delta := $type($expectedNet) = "number" ? $lotSum - $expectedNet : undefined;
+                          $m := $type($expectedNet) = "number" ? $max([$expectedNet, $lotSum]) : 0;
+                          $pct := $m = 0 ? 0 : 100 * $min([$expectedNet, $lotSum]) / $m;
                           $tone := $pct >= 98 ? "green" : $pct >= 90 ? "warning" : "danger";
                           $kg := function($v){ $type($v) = "number" ? $string($v) : null };
+                          $deltaLabel := $type($delta) != "number" ? null : ($delta > 0 ? "+" & $string($delta) : $string($delta)) & " kg";
+                          $lotRows := $count($lotIds) = 0 ? [] : $map($lotIds, function($id){(
+                            $lot := $lookup($domain.lot, $id);
+                            {"label": "Lotto " & $id, "value": $kg($lot.netWeight), "error": null, "tone": null}
+                          )});
                           {
                             "value": null,
                             "error": null,
-                            "rows": [
-                              {"label": "Peso lordo camion", "value": $kg($gross), "error": null, "tone": null},
-                              {"label": "Ultima lettura (tara)", "value": $kg($tare), "error": null, "tone": null},
-                              {"label": "Σ netti lotti", "value": $kg($lotSum), "error": null, "tone": null},
-                              {"label": "Corrispondenza %", "value": $string($pct), "error": null, "tone": $tone}
-                            ]
+                            "rows": $append(
+                              [{"label": "Peso lordo camion", "value": $kg($gross), "error": null, "tone": null}],
+                              $append(
+                                $lotRows,
+                                [
+                                  {"label": "Tara camion", "value": $kg($tare), "error": null, "tone": null},
+                                  {"label": "Netto atteso (lordo−tara)", "value": $kg($expectedNet), "error": null, "tone": null},
+                                  {"label": "Σ netti lotti", "value": $kg($lotSum), "error": null, "tone": null},
+                                  {"label": "Δ (Σ − netto atteso)", "value": $deltaLabel, "error": null, "tone": $tone}
+                                ]
+                              )
+                            )
                           }
                         )
                 currentOperator:
                     kind: readonly
                     title: Operatore corrente
                     expr: $operator.displayName
-                    after: checkedLotSum
+                    after: registeredData
               onSubmit:
-                transform:
-                    - op: patch
-                      entity: truck
-                      id: '$instance.id'
-                      set:
-                        checkedTruckWeight: $.checkedTruckWeight
-                        checkedLotSum: $.checkedLotSum
+                transform: []
     lot_processing:
         repeatable: true
         title: Lavorazione
@@ -591,6 +581,13 @@ steps:
                     and $not(progress = 'done')
                   ]) >= 1
                 )
+              recap:
+                  entity: pallet
+                  columns:
+                      - field: id
+                        title: Bancale
+                      - field: progress
+                        title: Avanzamento
               dynamicProperties:
                 progress:
                     read: rows
@@ -650,19 +647,23 @@ steps:
               schema:
                 type: object
                 title: Registrazione contenitori
-                required: [material, weight]
+                required: [material]
                 properties:
                     material:
                         type: string
                         title: Materiale
                         enum: [polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
-                    weight: {type: number, exclusiveMinimum: 0, title: Peso}
-                    incomplete:
-                        type: boolean
-                        title: Incompleto
-                        default: false
                     continuesContainerId:
                         type: string
+                dependencies:
+                    material:
+                        required: [weight]
+                        properties:
+                            weight: {type: number, exclusiveMinimum: 0, title: Peso}
+                            incomplete:
+                                type: boolean
+                                title: Incompleto
+                                default: false
               uiSchema:
                 ui:options:
                     order: [material, weight, incomplete, continuesContainerId]
@@ -727,7 +728,6 @@ steps:
                         incomplete: false
             - id: closeLot
               roles: [logistic]
-              submit: many
               title: Chiudi lotto
               onCommit:
                   navigation: stay

@@ -88,8 +88,8 @@
 }
 
 /*
- * Board elevation: elev-0 = light Attesta green page; ladder is steps → rows → substeps.
- * Light: primary mixed into white. Dark: primary into slate lifts.
+ * Board elevation: elev-0 = page; ladder is steps → rows → substeps.
+ * Light: primary mixed into white. Dark: Attesta gray lifts from --background/--card.
  * Mobile: block pad only. ≥640px: stream container pads on all sides.
  */
 .org-timeline-page {
@@ -98,6 +98,12 @@
 	--org-elev-2: color-mix(in srgb, var(--primary) 8%, #ffffff); /* rows/instances */
 	--org-elev-3: #ffffff; /* substeps + tabs */
 	--org-pad-l: calc(var(--spacing) * 3);
+	/* Embed body + many form pane share this; recap band uses 2× / −1× for full-bleed align. */
+	--org-embed-pad-x: calc(var(--spacing) * 3);
+	/* Just-completed bar parked in band left pad (outside table). */
+	--many-recap-bar-width: 3px;
+	--many-recap-bar-gap: 10px;
+	--many-recap-wash-ms: 700ms;
 	/* Chevron column: same right edge + slot width at every nest level. */
 	--org-chevron-pad: calc(var(--spacing) * 3);
 	--org-chevron-slot: 1.25rem;
@@ -122,12 +128,20 @@
 	}
 }
 
-/* Dark: page + ladder lift toward --primary. */
+/* Mobile: nest indent + embed/form/band horizontal pads at 50% of desktop (*3 → *1.5). */
+@media (width < 640px) {
+	.org-timeline-page {
+		--org-pad-l: calc(var(--spacing) * 1.5);
+		--org-embed-pad-x: calc(var(--spacing) * 1.5);
+	}
+}
+
+/* Dark: Attesta gray ladder (no slate / primary tint). */
 :is(.dark *) .org-timeline-page {
-	--org-elev-0: color-mix(in srgb, var(--primary) 8%, #0f172a);
-	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #1e293b);
-	--org-elev-2: color-mix(in srgb, var(--primary) 12%, #334155);
-	--org-elev-3: color-mix(in srgb, var(--primary) 10%, #475569);
+	--org-elev-0: var(--background);
+	--org-elev-1: color-mix(in srgb, #fff 6%, var(--background));
+	--org-elev-2: color-mix(in srgb, #fff 10%, var(--background));
+	--org-elev-3: color-mix(in srgb, #fff 14%, var(--card));
 }
 
 .org-timeline-toolbar {
@@ -192,6 +206,11 @@
 
 .org-timeline-page .stream-timeline-step[data-state='open'] > .stream-timeline-step-summary {
 	background: var(--org-elev-1);
+}
+
+.org-timeline-page .substep-accordion[data-state='open'] > .substep-accordion-summary,
+.org-timeline-page .substep-embed-host[data-state='open'] .substep-accordion-summary {
+	background: var(--org-elev-3);
 }
 
 .org-timeline-page .stream-timeline-row-accordion {
@@ -295,14 +314,25 @@
 	opacity: 1;
 }
 
-/* Locked: white elev (undo Formata card opacity); no primary hover — mark + title only. */
+/* Locked: white elev (undo Formata card opacity); no primary hover — mark + title only.
+ * Done archive drops the title fade (data-stream-status=done on the page root). */
 .org-timeline-page .substep-locked {
 	opacity: 1;
 }
 
-.org-timeline-page .substep-locked .timeline-header-index,
-.org-timeline-page .substep-locked .timeline-header-title {
+.org-timeline-page:not([data-stream-status='done']) .substep-locked .timeline-header-index,
+.org-timeline-page:not([data-stream-status='done']) .substep-locked .timeline-header-title {
 	opacity: 0.4;
+}
+
+/* Stream-level completed chip in the board header (nest done stays muted gray). */
+.org-timeline-page .org-timeline-header .timeline-header-trail {
+	margin-right: 0;
+}
+
+.org-timeline-page .org-timeline-header .status[data-status='completed'] {
+	color: var(--stream-available);
+	background-color: color-mix(in srgb, var(--stream-available) 12%, transparent);
 }
 
 /* --- One-line headers; Lucide chevrons share one absolute column from each row’s right edge --- */
@@ -509,7 +539,69 @@
 }
 
 .org-timeline-page .substep-embed [data-testid='embed-panel-body'] {
-	padding: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3);
+	padding: 0 var(--org-embed-pad-x) calc(var(--spacing) * 3);
+}
+
+/* Many new-entry form: same inline pad as embed body (coupled via --org-embed-pad-x). */
+.org-timeline-page .substep-embed[data-composer] [data-testid='embed-form-pane'] {
+	padding-inline: var(--org-embed-pad-x);
+}
+
+/* Submit-many: muted history band (embed pad + show-all locked details).
+   * Inline pad 2× --org-embed-pad-x matches form pane (body + form) so table/eyebrow align with fields. */
+.org-timeline-page .embed-many-recap-band {
+	display: grid;
+	gap: calc(var(--spacing) * 2);
+	/* Allow inner overflow-x to engage — grid min-width:auto otherwise expands with the table. */
+	min-width: 0;
+	margin-inline: calc(var(--org-embed-pad-x) * -1);
+	padding: calc(var(--spacing) * 3) calc(var(--org-embed-pad-x) * 2);
+}
+
+/* th semibold vs td normal — literal weights so theme tokens cannot flatten the contrast. */
+.org-timeline-page .embed-many-recap-band th {
+	font-weight: 600;
+}
+
+.org-timeline-page .embed-many-recap-band td {
+	font-weight: 400;
+}
+
+/*
+ * Just-completed Commit: primary bar is an absolute sibling outside <table>, parked in the
+ * Done band’s left padding (barWidth + gap). Table stays flush with the form (edgePad).
+ * Wash: hold → fade via opacity/color transition (JS sets data attrs; CSS owns the tween).
+ */
+.org-timeline-page .embed-many-recap-band .many-recap-highlight-host {
+	position: relative;
+}
+
+.org-timeline-page .embed-many-recap-band .many-recap-just-completed-bar {
+	position: absolute;
+	left: calc(-1 * (var(--many-recap-bar-width) + var(--many-recap-bar-gap)));
+	width: var(--many-recap-bar-width);
+	background-color: var(--primary);
+	opacity: 1;
+	pointer-events: none;
+	z-index: 1;
+	transition: opacity var(--many-recap-wash-ms) ease;
+}
+
+.org-timeline-page .embed-many-recap-band .many-recap-just-completed-bar--fade {
+	opacity: 0;
+}
+
+.org-timeline-page .embed-many-recap-band .many-recap-cell {
+	color: var(--muted-foreground);
+	transition: color var(--many-recap-wash-ms) ease;
+}
+
+.org-timeline-page .embed-many-recap-band tr[data-just-completed] > .many-recap-cell {
+	color: var(--foreground);
+}
+
+.org-timeline-page .embed-many-recap-band tr[data-just-completed-fade] > .many-recap-cell {
+	color: var(--muted-foreground);
 }
 
 /* Open nest: space under the header before children (no hairline — card edges already outline). */
@@ -568,6 +660,77 @@
 	.org-timeline-page .substep-embed-host[data-state='open'] .substep-accordion-summary {
 		position: sticky;
 		top: 0;
+		background: var(--org-elev-3);
 		z-index: 10;
+	}
+}
+
+/* Board main: timeline + deferred Passports aside */
+.org-board-main-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: calc(var(--spacing) * 4);
+	align-items: start;
+	min-width: 0;
+}
+
+.org-board-timeline-col {
+	min-width: 0;
+}
+
+.org-board-passports-aside {
+	order: -1;
+	min-width: 0;
+	background: var(--org-elev-3);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	padding: calc(var(--spacing) * 3);
+}
+
+.org-board-passports-aside h2 {
+	margin: 0;
+}
+
+.org-board-passports-trigger {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--spacing) * 2);
+	min-height: 0;
+	padding: 0;
+	border-radius: 0;
+}
+
+.org-board-passports-aside
+	[data-slot='collapsible'][data-state='open']
+	> [data-slot='collapsible-content'] {
+	padding-top: calc(var(--spacing) * 3);
+}
+
+.org-board-passports-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--spacing) * 3);
+}
+
+.org-board-passports-item {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: calc(var(--spacing) * 0.5);
+	min-width: 0;
+}
+
+@media (width >= 640px) {
+	.org-board-main-grid:has(.org-board-passports-aside) {
+		grid-template-columns: minmax(0, 1fr) minmax(12rem, max-content);
+	}
+
+	.org-board-passports-aside {
+		order: 0;
+		position: sticky;
+		top: calc(var(--spacing) * 4);
 	}
 }

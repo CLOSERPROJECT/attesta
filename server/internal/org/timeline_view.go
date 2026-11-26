@@ -34,6 +34,7 @@ type TimelineSubstepDTO struct {
 	Status        string                  `json:"status"`
 	StatusLabel   string                  `json:"statusLabel,omitempty"`
 	OrgActionable bool                    `json:"orgActionable,omitempty"`
+	DoneByMe      bool                    `json:"doneByMe,omitempty"`
 	SubmitMany    bool                    `json:"submitMany,omitempty"`
 	BlockedReason string                  `json:"blockedReason,omitempty"`
 	Href          string                  `json:"href,omitempty"`
@@ -131,7 +132,7 @@ func BuildOrgTimelineView(cfg OrgConfig, domain Domain, op OperatorIdentity, str
 			Instance: "",
 			Label:    label,
 			Status:   "",
-			Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, hrefs),
+			Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, hrefs, op.UserID),
 		}
 	}
 
@@ -155,12 +156,13 @@ func BuildOrgTimelineView(cfg OrgConfig, domain Domain, op OperatorIdentity, str
 		Instance: instanceID,
 		Label:    label,
 		Status:   status,
-		Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, hrefs),
+		Steps:    BuildOrgTimelineSteps(cfg, domain, timeline, hrefs, op.UserID),
 	}
 }
 
 // BuildOrgTimelineSteps enriches a ProjectStreamTimeline with Href / submissions / flags.
-func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline, hrefs TimelineHrefPolicy) []TimelineStepDTO {
+// viewerUserID stamps DoneByMe when the operator has a Submission on a done Task.
+func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline, hrefs TimelineHrefPolicy, viewerUserID string) []TimelineStepDTO {
 	out := make([]TimelineStepDTO, 0, len(timeline.Steps))
 	for i, step := range timeline.Steps {
 		jobVal, _ := cfg.Jobs.Get(step.JobID)
@@ -179,14 +181,14 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 		if len(step.Rows) > 0 {
 			tlStep.Title = fmt.Sprintf("%s ×%d", title, len(step.Rows))
 			tlStep.SubstepCount = len(step.Rows)
-			tlStep.Rows = buildOrgTimelineRows(cfg, job, step, domain, hrefs)
+			tlStep.Rows = buildOrgTimelineRows(cfg, job, step, domain, hrefs, viewerUserID)
 			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromRows(tlStep.Rows)); ok {
 				tlStep.Status = string(status)
 				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
 			}
 		} else {
 			jobInstanceID := hrefs.streamInstanceID
-			tlStep.Substeps = buildOrgTimelineTaskSubsteps(cfg, job, step.JobID, jobInstanceID, step.Tasks, hrefs, false, "", domain)
+			tlStep.Substeps = buildOrgTimelineTaskSubsteps(cfg, job, step.JobID, jobInstanceID, step.Tasks, hrefs, false, "", domain, viewerUserID)
 			if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(tlStep.Substeps)); ok {
 				tlStep.Status = string(status)
 				tlStep.StatusLabel = timelineStatusLabel(tlStep.Status)
@@ -197,7 +199,7 @@ func BuildOrgTimelineSteps(cfg OrgConfig, domain Domain, timeline StreamTimeline
 	return out
 }
 
-func buildOrgTimelineRows(cfg OrgConfig, job Job, step StreamTimelineStep, domain Domain, hrefs TimelineHrefPolicy) []TimelineRowDTO {
+func buildOrgTimelineRows(cfg OrgConfig, job Job, step StreamTimelineStep, domain Domain, hrefs TimelineHrefPolicy, viewerUserID string) []TimelineRowDTO {
 	seedField := orgJobSeedField(job)
 	rows := make([]TimelineRowDTO, 0, len(step.Rows))
 	for _, row := range step.Rows {
@@ -210,7 +212,7 @@ func buildOrgTimelineRows(cfg OrgConfig, job Job, step StreamTimelineStep, domai
 			ID:       row.ID,
 			Label:    label,
 			Expanded: true,
-			Substeps: buildOrgTimelineTaskSubsteps(cfg, job, step.JobID, row.ID, row.Tasks, hrefs, !exists, seedField, domain),
+			Substeps: buildOrgTimelineTaskSubsteps(cfg, job, step.JobID, row.ID, row.Tasks, hrefs, !exists, seedField, domain, viewerUserID),
 		}
 		if status, ok := aggregateStreamSubstepStates(timelineChildStatusesFromSubsteps(group.Substeps)); ok {
 			group.Status = string(status)
@@ -279,7 +281,7 @@ func timelineChildStatusesFromRows(rows []TimelineRowDTO) []StreamSubstepState {
 	return out
 }
 
-func buildOrgTimelineTaskSubsteps(cfg OrgConfig, job Job, jobID, jobInstanceID string, tasks []StreamTimelineTask, hrefs TimelineHrefPolicy, provisional bool, seedField string, domain Domain) []TimelineSubstepDTO {
+func buildOrgTimelineTaskSubsteps(cfg OrgConfig, job Job, jobID, jobInstanceID string, tasks []StreamTimelineTask, hrefs TimelineHrefPolicy, provisional bool, seedField string, domain Domain, viewerUserID string) []TimelineSubstepDTO {
 	out := make([]TimelineSubstepDTO, 0, len(tasks))
 	ordered := OrderedTaskIDs(job.Tasks)
 	startTaskID := ""
@@ -310,10 +312,24 @@ func buildOrgTimelineTaskSubsteps(cfg OrgConfig, job Job, jobID, jobInstanceID s
 		case !provisional:
 			sub.Href = hrefs.TaskHref(jobID, jobInstanceID, task.ID)
 			sub.Submissions = OrgTimelineSubmissions(domain, jobID, jobInstanceID, task.ID)
+			sub.DoneByMe = task.State == StreamSubstepDone && timelineSubmissionByViewer(sub.Submissions, viewerUserID)
 		}
 		out = append(out, sub)
 	}
 	return out
+}
+
+func timelineSubmissionByViewer(subs []TimelineSubmissionDTO, viewerUserID string) bool {
+	viewer := strings.TrimSpace(viewerUserID)
+	if viewer == "" {
+		return false
+	}
+	for _, s := range subs {
+		if strings.TrimSpace(s.UserID) == viewer {
+			return true
+		}
+	}
+	return false
 }
 
 // roleBadgesForPath projects task roles: through RoleDefs (Identity-seeded catalog meta).

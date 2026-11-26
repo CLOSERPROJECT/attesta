@@ -18,8 +18,11 @@ func ValidateOrgConfig(cfg OrgConfig) error {
 	return nil
 }
 
+// Reserved recap column field: entity map key (TaskRecapRow.key), not a Domain field.
+const taskRecapFieldID = "id"
+
 // ValidateRecapConfig walks Jobs/Tasks and checks optional Task recap blocks
-// against domain.entities.<kind>.fields (names only).
+// against domain.entities.<kind>.fields (names only). Reserved field "id" is allowed.
 func ValidateRecapConfig(cfg OrgConfig) error {
 	fieldsByKind, err := EntityFieldsFromConfig(cfg)
 	if err != nil {
@@ -85,6 +88,9 @@ func validateTaskRecap(
 			return fmt.Errorf("%s %q: recap.columns[%d].field %q is duplicate", prefix, id, i, col.Field)
 		}
 		seen[col.Field] = struct{}{}
+		if col.Field == taskRecapFieldID {
+			continue
+		}
 		if _, ok := allowedSet[col.Field]; !ok {
 			return fmt.Errorf("%s %q: recap.columns[%d].field %q not in domain.entities.%s.fields", prefix, id, i, col.Field, spec.Entity)
 		}

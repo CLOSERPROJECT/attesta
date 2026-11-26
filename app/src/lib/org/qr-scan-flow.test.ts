@@ -22,7 +22,7 @@ describe('runQrScan', () => {
 		const result = await runQrScan(
 			{
 				resolve,
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				drafts: {
 					getDraft: (path, key) => drafts.get(`${path}::${key}`) ?? null,
@@ -33,19 +33,19 @@ describe('runQrScan', () => {
 				navigate,
 				toast
 			},
-			'https://plant.example/app/recycling?entityId=P1'
+			'https://plant.example/app/pv-recovery?entityId=P1'
 		);
 		expect(result).toBe('navigated');
 		expect(resolve).toHaveBeenCalledWith(
-			'https://plant.example/app/recycling?entityId=P1',
-			{ stream: 'recycling', instance: '261102-1' }
+			'https://plant.example/app/pv-recovery?entityId=P1',
+			{ stream: 'pv-recovery', instance: '261102-1' }
 		);
 		expect(drafts.get('line/weigh::L1')).toEqual({
 			palletId: 'P1'
 		});
 		expect(navigate).toHaveBeenCalledWith({
 			kind: 'task',
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'line',
 			jobInstanceId: 'L1',
@@ -69,7 +69,7 @@ describe('runQrScan', () => {
 					},
 					seed: { palletId: 'P2' }
 				}),
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				drafts: {
 					getDraft: (path, key) => drafts.get(`${path}::${key}`) ?? null,
@@ -86,7 +86,7 @@ describe('runQrScan', () => {
 		expect(toast).toHaveBeenCalledWith(m.scan_switched_instance());
 		expect(navigate).toHaveBeenCalledWith({
 			kind: 'task',
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-2',
 			jobId: 'line',
 			jobInstanceId: 'L2',
@@ -107,7 +107,7 @@ describe('runQrScan', () => {
 					},
 					seed: {}
 				}),
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				drafts: {
 					getDraft: () => null,
@@ -129,7 +129,7 @@ describe('runQrScan', () => {
 				resolve: async () => ({
 					error: { code: 'many', message: 'Più destinazioni possibili' }
 				}),
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				drafts: {
 					getDraft: () => null,
 					setDraft: () => undefined
@@ -151,7 +151,7 @@ describe('runQrScan', () => {
 				resolve: async () => {
 					throw new QrResolveHttpError('org qr-resolve failed (500)', 500);
 				},
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				drafts: {
 					getDraft: () => null,
 					setDraft: () => undefined

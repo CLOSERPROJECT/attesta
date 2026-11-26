@@ -25,25 +25,25 @@ describe('hrefOrgTarget', () => {
 	});
 
 	test('myStream uses org catalog key', () => {
-		expect(hrefOrgTarget({ kind: 'myStream', stream: 'recycling' })).toBe(
-			'/my/streams/org-recycling/'
+		expect(hrefOrgTarget({ kind: 'myStream', stream: 'pv-recovery' })).toBe(
+			'/my/streams/org-pv-recovery/'
 		);
-		expect(orgMyStreamDashboardPath('recycling')).toBe('/my/streams/org-recycling/');
+		expect(orgMyStreamDashboardPath('pv-recovery')).toBe('/my/streams/org-pv-recovery/');
 	});
 
 	test('home target is SPA instance timeline', () => {
 		expect(
 			hrefOrgTarget({
 				kind: 'home',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1'
 			})
-		).toBe('/app/recycling/i/261102-1');
-		expect(orgSpaInstanceHomePath('recycling', '261102-1')).toBe(
-			'/app/recycling/i/261102-1'
+		).toBe('/app/pv-recovery/i/261102-1');
+		expect(orgSpaInstanceHomePath('pv-recovery', '261102-1')).toBe(
+			'/app/pv-recovery/i/261102-1'
 		);
-		expect(orgMyInstanceTimelinePath('recycling', '261102-1')).toBe(
-			'/app/recycling/i/261102-1'
+		expect(orgMyInstanceTimelinePath('pv-recovery', '261102-1')).toBe(
+			'/app/pv-recovery/i/261102-1'
 		);
 	});
 
@@ -51,14 +51,14 @@ describe('hrefOrgTarget', () => {
 		expect(
 			hrefOrgTarget({
 				kind: 'task',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1',
 				jobId: 'intake',
 				jobInstanceId: '261102-1',
 				taskId: 'register'
 			})
 		).toBe(
-			'/app/recycling/i/261102-1?task=intake%2F261102-1%2Fregister'
+			'/app/pv-recovery/i/261102-1?task=intake%2F261102-1%2Fregister'
 		);
 	});
 });

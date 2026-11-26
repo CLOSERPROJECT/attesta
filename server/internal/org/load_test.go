@@ -67,7 +67,7 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=recycling&instance=T-empty", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/org/domain?stream=pv-recovery&instance=T-empty", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())

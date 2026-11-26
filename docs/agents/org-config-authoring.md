@@ -31,8 +31,8 @@ Every Org Config has a required `stream` block ([ADR-0014](../adr/0014-org-confi
 
 ```yaml
 stream:
-  key: recycling              # slug; unique per org; not reserved /app segments i or new
-  title: Lavorazione rifiuti
+  key: pv-recovery            # slug; unique per org; not reserved /app segments i or new
+  title: Recupero materiali da pannelli fotovoltaici
   description: …             # optional
   categorySlug: …             # optional /my discovery
   subCategorySlug: …
@@ -62,18 +62,20 @@ JSONata string evaluated when `readyWhen` is false; shown next to the unavailabl
 
 ### `recap` (Task, optional)
 
-Optional overview table over a Domain entity kind. Field names are validated against `domain.entities.<kind>.fields` (allowlist of names only — not JSON Schema).
+Optional overview table over a Domain entity kind. Field names are validated against `domain.entities.<kind>.fields` (allowlist of names only — not JSON Schema). Reserved column `field: id` is the entity map key (`TaskRecapRow.key`); title defaults to `Id`.
 
 ```yaml
 recap:
   entity: lot
   columns:
+    - field: id
+      title: Id            # optional; defaults to Id
     - field: numeroFir
       title: FIR          # optional display override
     - field: netWeight
 ```
 
-Rules when authored: `entity` must be a declared `domain.entities` kind that declares `fields`; at least one column; each `columns[].field` must appear in that list; no duplicate fields. Omit `recap` (or leave it empty) when the Task has no overview table.
+Rules when authored: `entity` must be a declared `domain.entities` kind that declares `fields`; at least one column; each `columns[].field` must appear in that list (or be reserved `id`); no duplicate fields. Omit `recap` (or leave it empty) when the Task has no overview table.
 
 ## Commit navigation (`onCommit`)
 

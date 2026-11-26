@@ -61,7 +61,7 @@ export function needsStartingNewMint(
 	return addr.provisionalJob || !addr.instance;
 }
 
-/** Stable address key (`recycling|261102-1|intake|new|register`); provisional always keyed as `new`. */
+/** Stable address key (`pv-recovery|261102-1|intake|new|register`); provisional always keyed as `new`. */
 export function taskAddressKey(
 	addr: Pick<
 		TaskAddress,

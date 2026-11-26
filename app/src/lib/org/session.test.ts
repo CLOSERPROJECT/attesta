@@ -28,7 +28,7 @@ function manualClock(): DraftPersistClock & { flush: () => void } {
 	};
 }
 
-const hydrateScope = { stream: 'recycling', instance: '261102-1' };
+const hydrateScope = { stream: 'pv-recovery', instance: '261102-1' };
 
 const sample: LoadResult = {
 	org: 'feragame',
@@ -182,7 +182,7 @@ describe('OrgSession', () => {
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
 		const outcome = await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
@@ -220,7 +220,8 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		const req = {
-			taskPath: 'intake/register',
+			stream: 'pv-recovery',
+			instance: '261102-1',			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
 			mint: { kind: 'none' as const }
@@ -256,7 +257,7 @@ describe('OrgSession', () => {
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '', { client: 'NO' });
 		const outcome = await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			taskPath: 'intake/register',
 			jobInstanceId: '',
 			value: { client: 'NO' },
@@ -264,7 +265,7 @@ describe('OrgSession', () => {
 		});
 		expect(outcome?.jobInstanceId).toBe('NIR-1');
 		expect(commit).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			taskPath: 'intake/register',
 			jobInstanceId: '',
 			value: { client: 'NO' },
@@ -303,7 +304,7 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		const outcome = await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
@@ -338,7 +339,7 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		const outcome = await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/lots/lots-1/register',
 			jobInstanceId: 'T1',
@@ -375,7 +376,7 @@ describe('OrgSession', () => {
 		});
 		session.result = structuredClone(sample);
 		await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'lot_processing/lock',
 			jobInstanceId: 'L1',
@@ -408,7 +409,7 @@ describe('OrgSession', () => {
 		});
 		staySession.result = structuredClone(sample);
 		const outcome = await staySession.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'lot_processing/lock',
 			jobInstanceId: 'L1',
@@ -451,7 +452,7 @@ describe('OrgSession', () => {
 		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
 
 		const outcome = await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
@@ -533,7 +534,7 @@ describe('OrgSession', () => {
 		expect(session.hasDirtyDraft('intake/register', 'NIR-1')).toBe(true);
 
 		await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
@@ -560,7 +561,7 @@ describe('OrgSession', () => {
 		const path = 'intake/register';
 		const bagKey = 'NIR-1';
 		const key = draftKey(path, bagKey);
-		const storageKey = orgDraftStorageKey('feragame', 'recycling', 'u1', key);
+		const storageKey = orgDraftStorageKey('feragame', 'pv-recovery', 'u1', key);
 
 		session.seedDraft(path, bagKey, { client: 'seed' });
 		clock.flush();
@@ -577,7 +578,7 @@ describe('OrgSession', () => {
 	test('rehydrate on identity known; refreshKeepDrafts does not clobber memory', async () => {
 		const bagKey = draftKey('intake/register', 'NIR-1');
 		const storage = memoryStorage({
-			[orgDraftStorageKey('feragame', 'recycling', 'u1', bagKey)]: JSON.stringify({
+			[orgDraftStorageKey('feragame', 'pv-recovery', 'u1', bagKey)]: JSON.stringify({
 				client: 'from-storage'
 			})
 		});
@@ -625,7 +626,7 @@ describe('OrgSession', () => {
 		await session.hydrate(hydrateScope);
 		const path = 'intake/register';
 		const bagKey = 'NIR-1';
-		const storageKey = orgDraftStorageKey('feragame', 'recycling', 'u1', draftKey(path, bagKey));
+		const storageKey = orgDraftStorageKey('feragame', 'pv-recovery', 'u1', draftKey(path, bagKey));
 
 		session.setDraft(path, bagKey, { client: 'pending' });
 		expect(storage.getItem(storageKey)).toBeNull();
@@ -633,7 +634,7 @@ describe('OrgSession', () => {
 		expect(readStoredDraft(storage, storageKey)).toEqual({ client: 'pending' });
 
 		await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: path,
 			jobInstanceId: bagKey,
@@ -648,13 +649,13 @@ describe('OrgSession', () => {
 		const storage = memoryStorage();
 		const adaKey = orgDraftStorageKey(
 			'feragame',
-			'recycling',
+			'pv-recovery',
 			'u1',
 			draftKey('intake/register', 'NIR-1')
 		);
 		const otherKey = orgDraftStorageKey(
 			'other-org',
-			'recycling',
+			'pv-recovery',
 			'u9',
 			draftKey('intake/register', 'OTHER')
 		);
@@ -717,7 +718,7 @@ describe('OrgSession', () => {
 			expect(session).not.toHaveProperty(key);
 		}
 		const outcome = await session.commit({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',

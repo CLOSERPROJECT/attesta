@@ -1,6 +1,61 @@
 package org
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestMergeChromeOmitsEmptyRequired(t *testing.T) {
+	chromeRaw := map[string]any{
+		"hint": map[string]any{
+			"kind":  "readonly",
+			"expr":  "1",
+			"title": "Hint",
+		},
+	}
+	rules := readChromeRules(map[string]any{"chrome": chromeRaw})
+	schema, _ := mergeChromeIntoSchemas(
+		map[string]any{"type": "object", "properties": map[string]any{}},
+		map[string]any{},
+		rules,
+		chromeRaw,
+	)
+	if _, has := schema["required"]; has {
+		t.Fatalf("required must be omitted when empty; got %#v", schema["required"])
+	}
+	raw, err := json.Marshal(schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := wire["required"]; has {
+		t.Fatalf("JSON required must be absent (not null); got %#v in %s", wire["required"], raw)
+	}
+}
+
+func TestMergeChromePreservesAuthoredRequired(t *testing.T) {
+	chromeRaw := map[string]any{
+		"hint": map[string]any{"kind": "readonly", "expr": "1", "title": "Hint"},
+	}
+	rules := readChromeRules(map[string]any{"chrome": chromeRaw})
+	schema, _ := mergeChromeIntoSchemas(
+		map[string]any{
+			"type":       "object",
+			"required":   []any{"name"},
+			"properties": map[string]any{"name": map[string]any{"type": "string"}},
+		},
+		map[string]any{},
+		rules,
+		chromeRaw,
+	)
+	req, _ := schema["required"].([]any)
+	if len(req) != 1 || req[0] != "name" {
+		t.Fatalf("required = %#v, want [name]", req)
+	}
+}
 
 func TestMergeChromeHideIfNullStamp(t *testing.T) {
 	chromeRaw := map[string]any{

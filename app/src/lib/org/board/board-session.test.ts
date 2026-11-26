@@ -10,7 +10,7 @@ import { boardScopeKey, createBoardSession, type BoardScope } from './board-sess
 import { BoardTimelineModel } from './board-timeline-model.svelte.js';
 import type { BoardTaskFocus } from './board-url.js';
 
-function bootView(stream = 'recycling'): TimelineView {
+function bootView(stream = 'pv-recovery'): TimelineView {
 	return {
 		stream,
 		instance: '',
@@ -38,7 +38,7 @@ function bootView(stream = 'recycling'): TimelineView {
 }
 
 function instanceView(
-	stream = 'recycling',
+	stream = 'pv-recovery',
 	instance = '261102-1',
 	revision?: number
 ): TimelineView {
@@ -135,14 +135,14 @@ function harness(
 
 describe('boardScopeKey', () => {
 	test('encodes boot and instance distinctly', () => {
-		expect(boardScopeKey({ kind: 'boot', stream: 'recycling' })).toBe('recycling||boot');
+		expect(boardScopeKey({ kind: 'boot', stream: 'pv-recovery' })).toBe('pv-recovery||boot');
 		expect(
 			boardScopeKey({
 				kind: 'instance',
-				stream: 'recycling',
+				stream: 'pv-recovery',
 				instance: '261102-1'
 			})
-		).toBe('recycling|261102-1|instance');
+		).toBe('pv-recovery|261102-1|instance');
 	});
 });
 
@@ -150,19 +150,19 @@ describe('BoardSession', () => {
 	test('load boot uses TimelineLoadQuery { stream } only', async () => {
 		const view = bootView();
 		const timeline = fakeTimeline(async (q) => {
-			expect(q).toEqual({ stream: 'recycling' });
+			expect(q).toEqual({ stream: 'pv-recovery' });
 			expect('instance' in q).toBe(false);
 			return view;
 		});
-		const { session, model } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
+		const { session, model } = harness({ kind: 'boot', stream: 'pv-recovery' }, timeline);
 
 		await session.load();
 
-		expect(timeline.loads).toEqual([{ stream: 'recycling' }]);
+		expect(timeline.loads).toEqual([{ stream: 'pv-recovery' }]);
 		expect(session.view).toEqual(view);
 		expect(session.loading).toBe(false);
 		expect(session.error).toBe('');
-		expect(session.scopeKey).toBe('recycling||boot');
+		expect(session.scopeKey).toBe('pv-recovery||boot');
 		expect(model.view).toEqual(view);
 	});
 
@@ -170,16 +170,16 @@ describe('BoardSession', () => {
 		const view = instanceView();
 		const timeline = fakeTimeline(async () => view);
 		const { session, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 
 		await session.load();
 
-		expect(timeline.loads).toEqual([{ stream: 'recycling', instance: '261102-1' }]);
+		expect(timeline.loads).toEqual([{ stream: 'pv-recovery', instance: '261102-1' }]);
 		expect(session.view).toEqual(view);
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
 	});
@@ -195,13 +195,13 @@ describe('BoardSession', () => {
 			throw new Error('boom');
 		});
 		const { session, formCache } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 
 		await session.load();
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -234,13 +234,13 @@ describe('BoardSession', () => {
 	test('adoptInstance stages putReady and soft-navigates to instance', async () => {
 		const timeline = fakeTimeline(async () => bootView());
 		const { session, formCache, navigateToInstance } = harness(
-			{ kind: 'boot', stream: 'recycling' },
+			{ kind: 'boot', stream: 'pv-recovery' },
 			timeline
 		);
 		await session.load();
 
 		const nextAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -274,23 +274,23 @@ describe('BoardSession', () => {
 
 		expect(formCache.get(taskAddressKey(nextAddr))?.status).toBe('ready');
 		expect(navigateToInstance).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			focus
 		});
 		expect(session.scope).toEqual({
 			kind: 'instance',
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
-		expect(session.scopeKey).toBe('recycling|261102-1|instance');
+		expect(session.scopeKey).toBe('pv-recovery|261102-1|instance');
 	});
 
 	test('load surfaces port errors without a view', async () => {
 		const timeline = fakeTimeline(async () => {
 			throw new Error('timeline down');
 		});
-		const { session } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
+		const { session } = harness({ kind: 'boot', stream: 'pv-recovery' }, timeline);
 
 		await session.load();
 
@@ -308,14 +308,14 @@ describe('BoardSession', () => {
 			return n === 1 ? first : second;
 		});
 		const { session, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 		await session.load();
 		hydrate.mockClear();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -332,7 +332,7 @@ describe('BoardSession', () => {
 		expect(session.view?.label).toBe('After commit');
 		expect(timeline.loads).toHaveLength(2);
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
 	});
@@ -359,7 +359,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -369,7 +369,7 @@ describe('BoardSession', () => {
 		await session.load();
 
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -404,15 +404,113 @@ describe('BoardSession', () => {
 		expect(formFetch).toHaveBeenCalled();
 	});
 
+	test('domainChanged stay keeps ready many-recap rows painted until refetch lands', async () => {
+		const oldTable = {
+			mode: 'submission' as const,
+			columns: [{ key: 'n', title: 'N' }],
+			rows: [
+				{
+					key: 'register-1',
+					cells: { n: 1 },
+					submissionId: '2026-01-01T00:00:00Z',
+					timestamp: '2026-01-01T00:00:00Z',
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
+		};
+		const nextTable = {
+			...oldTable,
+			rows: [
+				...oldTable.rows,
+				{
+					key: 'register-2',
+					cells: { n: 2 },
+					submissionId: '2026-01-02T00:00:00Z',
+					timestamp: '2026-01-02T00:00:00Z',
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
+		};
+		let resolveRecap!: (table: typeof nextTable) => void;
+		const recapFetch = vi.fn(
+			() =>
+				new Promise<typeof nextTable>((resolve) => {
+					resolveRecap = resolve;
+				})
+		);
+		const timeline = fakeTimeline(async () => instanceView());
+		const formCache = createBoardFormCache({
+			taskForm: {
+				fetch: vi.fn(async () => ({
+					jobId: 'intake',
+					taskId: 'register',
+					jobInstanceId: '261102-1',
+					title: 'Register',
+					surface: 'live' as const,
+					schema: { type: 'object' },
+					uiSchema: {},
+					initialData: {},
+					chrome: [],
+					chromeFieldIds: [],
+					sealFieldIds: [],
+					bindings: { domain: {} }
+				}))
+			}
+		});
+		const recapCache = createBoardRecapCache({
+			taskRecap: { fetch: recapFetch }
+		});
+		const model = new BoardTimelineModel({ syncUrl: () => {} });
+		const session = createBoardSession({
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
+			timeline,
+			model,
+			formCache,
+			recapCache,
+			navigateToInstance: vi.fn(async () => {})
+		});
+		await session.load();
+
+		const addr = normalizeTaskAddress({
+			stream: 'pv-recovery',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		recapCache.putReady(addr, oldTable);
+
+		const changed = session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'stay',
+			submitMany: true
+		});
+		await vi.waitFor(() => expect(recapFetch).toHaveBeenCalled());
+		// Stay must not wipe the Done-band table while the soft refetch is in flight.
+		expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
+		expect(recapCache.get(taskAddressKey(addr))?.table).toBe(oldTable);
+
+		resolveRecap(nextTable);
+		await changed;
+		await vi.waitFor(() => {
+			expect(recapCache.get(taskAddressKey(addr))?.table.rows).toHaveLength(2);
+		});
+		expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
+	});
+
 	test('domainChanged stay without submitMany leaves form bundles ready', async () => {
 		const timeline = fakeTimeline(async () => instanceView());
 		const { session, formCache } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 		await session.load();
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -474,7 +572,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -484,7 +582,7 @@ describe('BoardSession', () => {
 		await session.load();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -537,7 +635,7 @@ describe('BoardSession', () => {
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const hydrate = vi.fn();
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -549,7 +647,7 @@ describe('BoardSession', () => {
 		hydrate.mockClear();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -605,7 +703,7 @@ describe('BoardSession', () => {
 		});
 		const model = new BoardTimelineModel({ syncUrl: () => {} });
 		const session = createBoardSession({
-			scope: { kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			model,
 			formCache,
@@ -615,14 +713,14 @@ describe('BoardSession', () => {
 		await session.load();
 
 		const weigh = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
 			taskId: 'weigh'
 		});
 		const register = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -651,11 +749,11 @@ describe('BoardSession', () => {
 	test('domainChanged advance without a view hydrates on instance scope', async () => {
 		const timeline = fakeTimeline(async () => instanceView());
 		const { session, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline
 		);
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -672,16 +770,16 @@ describe('BoardSession', () => {
 
 		expect(timeline.loads).toHaveLength(0);
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1'
 		});
 	});
 
 	test('domainChanged advance without a view does nothing on boot scope', async () => {
 		const timeline = fakeTimeline(async () => bootView());
-		const { session, hydrate } = harness({ kind: 'boot', stream: 'recycling' }, timeline);
+		const { session, hydrate } = harness({ kind: 'boot', stream: 'pv-recovery' }, timeline);
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -735,7 +833,7 @@ describe('BoardSession', () => {
 		});
 		const dropSeededDraft = vi.fn();
 		const { session, model, formCache, hydrate } = harness(
-			{ kind: 'instance', stream: 'recycling', instance: '261102-1' },
+			{ kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
 			timeline,
 			{ formFetch, dropSeededDraft }
 		);
@@ -743,7 +841,7 @@ describe('BoardSession', () => {
 		hydrate.mockClear();
 
 		const addr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			jobId: 'intake',
 			jobInstanceId: '261102-1',
@@ -767,7 +865,7 @@ describe('BoardSession', () => {
 		expect(formCache.get(taskAddressKey(addr))?.bundle).toBe(staleBundle);
 		expect(session.view?.label).toBe('After foreign');
 		expect(hydrate).toHaveBeenCalledWith({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '261102-1',
 			background: true
 		});
@@ -790,7 +888,7 @@ describe('BoardSession', () => {
 			throw new Error('unexpected form fetch');
 		});
 		const { session, formCache, hydrate } = harness(
-			{ kind: 'boot', stream: 'recycling' },
+			{ kind: 'boot', stream: 'pv-recovery' },
 			timeline,
 			{ formFetch }
 		);
@@ -798,7 +896,7 @@ describe('BoardSession', () => {
 		hydrate.mockClear();
 
 		const readyAddr = normalizeTaskAddress({
-			stream: 'recycling',
+			stream: 'pv-recovery',
 			instance: '',
 			jobId: 'intake',
 			jobInstanceId: '',

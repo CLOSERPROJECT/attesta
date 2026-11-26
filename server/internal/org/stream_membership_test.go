@@ -80,7 +80,7 @@ func TestResolveReadBindsStream(t *testing.T) {
 		Entity: "lot",
 		Where:  "truckId = $stream.id",
 		Key:    "id",
-	}, "", "", nil, &streamBinding{Key: "recycling", ID: "T-A"})
+	}, "", "", nil, &streamBinding{Key: "pv-recovery", ID: "T-A"})
 	if err != nil {
 		t.Fatal(err)
 	}

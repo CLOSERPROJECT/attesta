@@ -195,15 +195,12 @@ func plantCommitRegister(t *testing.T, c *TaskCommitter, truckID string, value m
 	return result
 }
 
-func plantCommitWeightCheck(t *testing.T, c *TaskCommitter, truckID string, truckWeight, lotSum float64) {
+func plantCommitWeightCheck(t *testing.T, c *TaskCommitter, truckID string) {
 	t.Helper()
 	if _, err := c.Commit(t.Context(), FeragameScope(), adminOp(), CommitRequest{
 		TaskPath:      "intake/weightCheck",
 		JobInstanceID: truckID,
-		Value: map[string]any{
-			"checkedTruckWeight": truckWeight,
-			"checkedLotSum":      lotSum,
-		},
+		Value:         map[string]any{},
 	}); err != nil {
 		t.Fatal(err)
 	}

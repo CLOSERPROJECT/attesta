@@ -11,7 +11,7 @@ import {
 } from './task-address.js';
 import { PROVISIONAL_JOB_INSTANCE_ID } from './types.js';
 
-const stream = 'recycling';
+const stream = 'pv-recovery';
 const truck = '261102-1';
 
 describe('task-address', () => {

@@ -185,13 +185,13 @@ func TestPlantPathLotsAndLotProcessingWeigh(t *testing.T) {
 
 	wc, err := c.Commit(t.Context(), FeragameScope(), op, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: truckID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedLotSum": 600.0},
+		Value:    map[string]any{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if wc.Domain.Kind("truck")[truckID]["checkedLotSum"] != 600.0 {
-		t.Fatalf("weightCheck patch = %#v", wc.Domain.Kind("truck")[truckID])
+	if _, has := wc.Domain.Kind("truck")[truckID]["checkedLotSum"]; has {
+		t.Fatalf("confirm-only weightCheck must not patch checkedLotSum: %#v", wc.Domain.Kind("truck")[truckID])
 	}
 	afterWC, err := loader.Load(t.Context(), FeragameScope(), op)
 	if err != nil {

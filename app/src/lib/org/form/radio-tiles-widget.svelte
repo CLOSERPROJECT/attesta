@@ -59,11 +59,14 @@
 			]}
 		>
 			<input
-				bind:group={mapped.current}
-				value={optionValue}
 				{...attributes}
 				id={option.id}
+				value={optionValue}
+				checked={selected}
 				disabled={option.disabled || attributes.disabled}
+				onchange={() => {
+					mapped.current = optionValue;
+				}}
 			/>
 			<span class="radio-tiles__label">{option.label}</span>
 		</label>
@@ -94,7 +97,7 @@
 
 	.radio-tiles__tile--selected {
 		border: none;
-		background: color-mix(in srgb, var(--primary) 12%, #ffffff);
+		background: color-mix(in srgb, var(--primary) 12%, var(--card));
 		color: var(--foreground);
 		outline: 2px solid var(--primary);
 		outline-offset: 0;

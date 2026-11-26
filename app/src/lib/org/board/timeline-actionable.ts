@@ -3,10 +3,13 @@
  */
 export {
 	actionableAddressesFromTimeline,
+	actionableSeededRefsFromTimeline,
 	addressVisibleOnTimeline,
 	firstActionableAddress,
 	recapAddressesFromTimeline,
 	soleActionableAddress,
+	soleActionableSeededRef,
 	timelineSubstepShown,
+	type SeededTaskRef,
 	type TimelineShowFilter
 } from './board-timeline-model.svelte.js';

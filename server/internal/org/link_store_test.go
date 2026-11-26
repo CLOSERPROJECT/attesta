@@ -48,7 +48,6 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
 		},
 	}
 	links := NewMemoryLinkStore()
@@ -58,7 +57,7 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 
 	truckID := commitTruckArrive(t, c)
 	result := commitLotRegister(t, c, truckID, registerLotValue())
-	if len(result.Links) != 2 {
+	if len(result.Links) != 1 {
 		t.Fatalf("commit response links = %#v", result.Links)
 	}
 
@@ -86,7 +85,7 @@ func TestCommitPersistsLinksAndReadableByAddressAndTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stored) != 2 || stored[0].Label != "Stampa etichette" || stored[1].Filename != "reg.csv" {
+	if len(stored) != 1 || stored[0].Label != "Stampa etichette" || stored[0].URL != "blob:labels" {
 		t.Fatalf("stored links = %#v", stored)
 	}
 
@@ -108,9 +107,7 @@ func TestCommitManySubmitPreservesLinksPerTimestamp(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels-1"},
-			{URL: "blob:csv-1", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg1.csv"`}},
 			{URL: "blob:labels-2"},
-			{URL: "blob:csv-2", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg2.csv"`}},
 		},
 	}
 	store := NewMemoryLinkStore()
@@ -154,10 +151,10 @@ func TestCommitManySubmitPreservesLinksPerTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got1) != 2 || got1[0].URL != "blob:labels-1" || got1[1].Filename != "reg1.csv" {
+	if len(got1) != 1 || got1[0].URL != "blob:labels-1" {
 		t.Fatalf("first links = %#v (commit links=%#v)", got1, first.Links)
 	}
-	if len(got2) != 2 || got2[0].URL != "blob:labels-2" || got2[1].Filename != "reg2.csv" {
+	if len(got2) != 1 || got2[0].URL != "blob:labels-2" {
 		t.Fatalf("second links = %#v (commit links=%#v)", got2, second.Links)
 	}
 	if len(store.byKey) != 2 {
@@ -169,7 +166,6 @@ func TestCommitLinkStoreFailureDoesNotFailOrRollback(t *testing.T) {
 	port := &recordingHttpPort{
 		responses: []HttpPortResponse{
 			{URL: "blob:labels"},
-			{URL: "blob:csv", Headers: map[string]string{"Content-Disposition": `attachment; filename="reg.csv"`}},
 		},
 	}
 	c, domains, _ := testTaskCommitter(t, AllowAllAuthorizer{})
@@ -185,7 +181,7 @@ func TestCommitLinkStoreFailureDoesNotFailOrRollback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commit must succeed when LinkStore fails: %v", err)
 	}
-	if len(result.Links) != 2 {
+	if len(result.Links) != 1 {
 		t.Fatalf("response must still return links: %#v", result.Links)
 	}
 	loadID := firstLoadID(result.Domain)

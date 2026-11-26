@@ -136,7 +136,7 @@ func TestCommitMapsDomainConflict(t *testing.T) {
 		Gate:          func(http.ResponseWriter, *http.Request) (OperatorIdentity, bool) { return op, true },
 	}
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=recycling", strings.NewReader(
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/org/commit?stream=pv-recovery", strings.NewReader(
 		`{"taskPath":"intake/truckArrive","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"truckWeight":1000}}`,
 	)))
 	if rec.Code != http.StatusConflict {
