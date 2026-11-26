@@ -576,7 +576,7 @@ func TestBuildTaskFormBundleFlatSeedsSchemaDefaults(t *testing.T) {
 	}
 }
 
-func TestBuildTaskFormBundleFlatRequiredEnumStaysUnsetWithoutDefault(t *testing.T) {
+func TestBuildTaskFormBundleFlatRequiredEnumSeedsOnlySingleton(t *testing.T) {
 	cfg := OrgConfig{
 		ID:      "probe",
 		Version: "1",
@@ -593,11 +593,15 @@ func TestBuildTaskFormBundleFlatRequiredEnumStaysUnsetWithoutDefault(t *testing.
 							"roles": []any{"logistic"},
 							"schema": map[string]any{
 								"type":     "object",
-								"required": []any{"status"},
+								"required": []any{"status", "kind"},
 								"properties": map[string]any{
 									"status": map[string]any{
 										"type": "string",
 										"enum": []any{"open", "closed"},
+									},
+									"kind": map[string]any{
+										"type": "string",
+										"enum": []any{"only"},
 									},
 									"note": map[string]any{
 										"type": "string",
@@ -618,7 +622,10 @@ func TestBuildTaskFormBundleFlatRequiredEnumStaysUnsetWithoutDefault(t *testing.
 		t.Fatal(err)
 	}
 	if _, has := bundle.InitialData["status"]; has {
-		t.Fatalf("required enum without default must stay unset; got %#v", bundle.InitialData)
+		t.Fatalf("multi-value required enum without default must stay unset; got %#v", bundle.InitialData)
+	}
+	if bundle.InitialData["kind"] != "only" {
+		t.Fatalf("singleton required enum = %#v, want only", bundle.InitialData)
 	}
 	if _, has := bundle.InitialData["note"]; has {
 		t.Fatalf("optional enum without default must stay unset; got %#v", bundle.InitialData)
