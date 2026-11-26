@@ -3,6 +3,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { untrack } from 'svelte';
 	import { Button } from '#lib/shadcn/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -14,7 +15,11 @@
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
 	import BoardManyRecap from './board-many-recap.svelte';
 	import BoardOnceRecap from './board-once-recap.svelte';
-	import { stayConfirmSurface } from './commit-stay-recap.js';
+	import {
+		manyLandEmpty,
+		manyShowComposer,
+		stayConfirmSurface
+	} from './commit-stay-recap.js';
 
 	type Props = {
 		address: TaskAddress;
@@ -68,27 +73,47 @@
 		Boolean(confirmRecap) ||
 			(recapEntry?.status === 'ready' && (recapEntry.table.rows.length ?? 0) > 0)
 	);
-	const manyEmpty = $derived(submissions.length === 0 && !confirmRecap);
-
 	let composerOpen = $state(false);
-	/** Empty land shows the form; Add only once submissions exist. */
-	const showComposer = $derived(composerOpen || manyEmpty);
+	/**
+	 * Latch after many stay Commit / Discard so manyEmpty cannot auto-reopen the
+	 * form while remountForms (register progressive chrome) or timeline reload
+	 * still lag confirmRecap / submissions. Cleared only by Add.
+	 */
+	let holdComposerClosed = $state(false);
 
-	/** One-shot: stay → close composer; recap table stays visible. */
-	let closedComposerOnStay = $state(false);
+	const manyEmpty = $derived(
+		manyLandEmpty({
+			holdClosed: holdComposerClosed,
+			submissionCount: submissions.length,
+			confirmRecap
+		})
+	);
+	const showComposer = $derived(
+		manyShowComposer({
+			composerOpen,
+			holdClosed: holdComposerClosed,
+			submissionCount: submissions.length,
+			confirmRecap
+		})
+	);
+
+	/** One-shot per confirmRecap edge — parent onOpenChange identity must not re-close Add. */
+	let latchedStayConfirm = $state(false);
 	$effect(() => {
 		if (!confirmRecap) {
-			closedComposerOnStay = false;
+			latchedStayConfirm = false;
 			return;
 		}
 		if (stayConfirmSurface(submitMany) !== 'many-recap') return;
-		if (closedComposerOnStay) return;
-		closedComposerOnStay = true;
+		if (latchedStayConfirm) return;
+		latchedStayConfirm = true;
+		holdComposerClosed = true;
 		composerOpen = false;
-		onOpenChange?.(true);
+		untrack(() => onOpenChange?.(true));
 	});
 
 	function openComposer() {
+		holdComposerClosed = false;
 		composerOpen = true;
 		onOpenChange?.(true);
 		onFocus?.();
@@ -96,7 +121,17 @@
 
 	function discardComposer() {
 		composerOpen = false;
+		holdComposerClosed = true;
 		boardFormCache.beginFreshDraft(address);
+	}
+
+	/** Every many Commit (incl. 2nd+) — effect is one-shot while confirmRecap stays true. */
+	function onFormCommitted(outcome: CommitOutcome) {
+		if (submitMany) {
+			holdComposerClosed = true;
+			composerOpen = false;
+		}
+		onCommitted?.(outcome);
 	}
 </script>
 
@@ -153,7 +188,7 @@
 				{seed}
 				{disabled}
 				submitStart={submitMany && composerOpen ? discardAction : undefined}
-				onCommitted={(outcome) => onCommitted?.(outcome)}
+				onCommitted={onFormCommitted}
 			/>
 		{/key}
 		{#if !submitMany && showOnceRecap}

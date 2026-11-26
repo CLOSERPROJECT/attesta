@@ -34,3 +34,34 @@ export function stayAftermath(submitMany: boolean): StayAftermath {
 		clearUnderFormLinks: true
 	};
 }
+
+/** Inputs for submit-many composer open/closed (Option C). */
+export type ManyComposerVisibility = {
+	composerOpen: boolean;
+	/**
+	 * Latched true after a successful many stay Commit (or Discard). Blocks
+	 * manyEmpty auto-open until Add — closes the race where remountForms
+	 * (register progressive chrome) paints a fresh form before confirmRecap /
+	 * submissions land.
+	 */
+	holdClosed: boolean;
+	submissionCount: number;
+	confirmRecap: boolean;
+};
+
+/**
+ * Whether the submit-many embed shows the form pane.
+ * Empty land (N=0, no stay cue, not held) auto-opens; after Commit with data /
+ * hold, stays closed until Add sets composerOpen.
+ */
+export function manyShowComposer(v: ManyComposerVisibility): boolean {
+	if (v.holdClosed) return false;
+	const manyEmpty = v.submissionCount === 0 && !v.confirmRecap;
+	return v.composerOpen || manyEmpty;
+}
+
+/** Empty land for spacing / Done-band gate (held post-Commit counts as non-empty). */
+export function manyLandEmpty(v: Omit<ManyComposerVisibility, 'composerOpen'>): boolean {
+	if (v.holdClosed) return false;
+	return v.submissionCount === 0 && !v.confirmRecap;
+}
