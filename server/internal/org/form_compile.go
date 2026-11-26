@@ -148,7 +148,12 @@ func mergeChromeIntoSchemas(
 	}
 	schema["type"] = "object"
 	schema["properties"] = sealProps
-	schema["required"] = sealRequired
+	// Omit empty required — nil []any JSON-marshals as null and Ajv rejects the schema.
+	if len(sealRequired) > 0 {
+		schema["required"] = sealRequired
+	} else {
+		delete(schema, "required")
+	}
 
 	uiSchema := cloneMapJSON(authoredUi)
 	uiOpts, _ := uiSchema["ui:options"].(map[string]any)

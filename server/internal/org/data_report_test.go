@@ -239,6 +239,11 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 		t.Fatalf("currentOperator must stay readonly: %#v", operator)
 	}
 
+	schemaWire, _ := wire["schema"].(map[string]any)
+	if _, has := schemaWire["required"]; has {
+		t.Fatalf("confirm-only weightCheck schema must omit required (Ajv rejects null); got %#v", schemaWire["required"])
+	}
+
 	ui, _ := wire["uiSchema"].(map[string]any)
 	fieldUI, _ := ui["registeredData"].(map[string]any)
 	comps, _ := fieldUI["ui:components"].(map[string]any)
