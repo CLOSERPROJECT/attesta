@@ -16,9 +16,12 @@
 	import BoardManyRecap from './board-many-recap.svelte';
 	import BoardOnceRecap from './board-once-recap.svelte';
 	import {
-		manyLandEmpty,
-		manyShowComposer,
-		stayConfirmSurface
+		initialManyLand,
+		reduceManyLand,
+		showComposer,
+		showDoneBand,
+		stayConfirmSurface,
+		type ManyLandSurface
 	} from './commit-stay-recap.js';
 
 	type Props = {
@@ -73,29 +76,21 @@
 		Boolean(confirmRecap) ||
 			(recapEntry?.status === 'ready' && (recapEntry.table.rows.length ?? 0) > 0)
 	);
-	let composerOpen = $state(false);
-	/**
-	 * Latch after many stay Commit / Discard so manyEmpty cannot auto-reopen the
-	 * form while remountForms (register progressive chrome) or timeline reload
-	 * still lag confirmRecap / submissions. Cleared only by Add.
-	 */
-	let holdComposerClosed = $state(false);
 
-	const manyEmpty = $derived(
-		manyLandEmpty({
-			holdClosed: holdComposerClosed,
-			submissionCount: submissions.length,
-			confirmRecap
-		})
-	);
-	const showComposer = $derived(
-		manyShowComposer({
-			composerOpen,
-			holdClosed: holdComposerClosed,
-			submissionCount: submissions.length,
-			confirmRecap
-		})
-	);
+	let manySurface = $state<ManyLandSurface>('empty-compose');
+
+	/** Re-init when address key changes only — remount / draftGeneration / catch-up must not re-reduce. */
+	$effect.pre(() => {
+		if (!submitMany) return;
+		void key;
+		manySurface = initialManyLand({
+			submissionCount: untrack(() => submissions.length),
+			confirmRecap: untrack(() => confirmRecap)
+		});
+	});
+
+	const composerVisible = $derived(showComposer(manySurface));
+	const doneBandVisible = $derived(showDoneBand(manySurface));
 
 	/** One-shot per confirmRecap edge — parent onOpenChange identity must not re-close Add. */
 	let latchedStayConfirm = $state(false);
@@ -107,29 +102,27 @@
 		if (stayConfirmSurface(submitMany) !== 'many-recap') return;
 		if (latchedStayConfirm) return;
 		latchedStayConfirm = true;
-		holdComposerClosed = true;
-		composerOpen = false;
 		untrack(() => onOpenChange?.(true));
 	});
 
 	function openComposer() {
-		holdComposerClosed = false;
-		composerOpen = true;
+		manySurface = reduceManyLand(manySurface, { type: 'openComposer' });
 		onOpenChange?.(true);
 		onFocus?.();
 	}
 
 	function discardComposer() {
-		composerOpen = false;
-		holdComposerClosed = true;
+		manySurface = reduceManyLand(manySurface, {
+			type: 'discard',
+			submissionCount: submissions.length
+		});
 		boardFormCache.beginFreshDraft(address);
 	}
 
-	/** Every many Commit (incl. 2nd+) — effect is one-shot while confirmRecap stays true. */
+	/** Every many Commit (incl. 2nd+) — surface owns close; confirmRecap is not a mode event. */
 	function onFormCommitted(outcome: CommitOutcome) {
 		if (submitMany) {
-			holdComposerClosed = true;
-			composerOpen = false;
+			manySurface = reduceManyLand(manySurface, { type: 'commitSuccess' });
 		}
 		onCommitted?.(outcome);
 	}
@@ -187,7 +180,7 @@
 				provisionalJob={address.provisionalJob}
 				{seed}
 				{disabled}
-				submitStart={submitMany && composerOpen ? discardAction : undefined}
+				submitStart={submitMany && manySurface === 'composing' ? discardAction : undefined}
 				onCommitted={onFormCommitted}
 			/>
 		{/key}
@@ -202,7 +195,7 @@
 	data-testid="embedded-task-panel"
 	data-address-key={key}
 	data-focused={focused ? '1' : '0'}
-	data-composer={submitMany ? (showComposer ? 'open' : 'closed') : undefined}
+	data-composer={submitMany ? (composerVisible ? 'open' : 'closed') : undefined}
 	data-open={open ? '1' : '0'}
 	data-confirm-recap={confirmRecap ? '1' : '0'}
 >
@@ -213,7 +206,7 @@
 			data-testid="embed-panel-body"
 		>
 			{#if submitMany}
-				{#if !manyEmpty && !address.provisionalJob && address.jobInstanceId}
+				{#if doneBandVisible && !address.provisionalJob && address.jobInstanceId}
 					<section
 						class="embed-many-recap-band bg-muted/60"
 						data-testid="embed-many-recap-band"
@@ -231,10 +224,10 @@
 					</section>
 				{/if}
 				<div
-					class={manyEmpty ? undefined : 'pt-5'}
+					class={doneBandVisible ? 'pt-5' : undefined}
 					data-testid="embed-composer-region"
 				>
-					{#if !showComposer}
+					{#if !composerVisible}
 						<div class="flex justify-center">
 							<Button
 								type="button"

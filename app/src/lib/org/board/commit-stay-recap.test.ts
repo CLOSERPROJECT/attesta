@@ -4,10 +4,13 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
-	manyLandEmpty,
-	manyShowComposer,
+	initialManyLand,
+	reduceManyLand,
+	showComposer,
+	showDoneBand,
 	stayAftermath,
-	stayConfirmSurface
+	stayConfirmSurface,
+	type ManyLandSurface
 } from './commit-stay-recap.js';
 
 describe('stayConfirmSurface', () => {
@@ -20,65 +23,65 @@ describe('stayConfirmSurface', () => {
 	});
 });
 
-describe('manyShowComposer / manyLandEmpty (Option C)', () => {
-	test('empty land auto-opens the form', () => {
-		expect(
-			manyShowComposer({
-				composerOpen: false,
-				holdClosed: false,
-				submissionCount: 0,
-				confirmRecap: false
-			})
-		).toBe(true);
-		expect(
-			manyLandEmpty({ holdClosed: false, submissionCount: 0, confirmRecap: false })
-		).toBe(true);
+describe('ManyLandSurface (Option C)', () => {
+	test('empty land → empty-compose: form open, Done-band hidden', () => {
+		const surface = initialManyLand({ submissionCount: 0, confirmRecap: false });
+		expect(surface).toBe('empty-compose');
+		expect(showComposer(surface)).toBe(true);
+		expect(showDoneBand(surface)).toBe(false);
 	});
 
-	test('holdClosed after Commit closes even before confirmRecap/submissions', () => {
-		// Register remountForms race: progressive chrome refetch while manyEmpty
-		// would still be true if we only keyed off confirmRecap.
-		expect(
-			manyShowComposer({
-				composerOpen: false,
-				holdClosed: true,
-				submissionCount: 0,
-				confirmRecap: false
-			})
-		).toBe(false);
-		expect(
-			manyLandEmpty({ holdClosed: true, submissionCount: 0, confirmRecap: false })
-		).toBe(false);
+	test('land with submissions or confirmRecap → done-band', () => {
+		expect(initialManyLand({ submissionCount: 1, confirmRecap: false })).toBe('done-band');
+		expect(initialManyLand({ submissionCount: 0, confirmRecap: true })).toBe('done-band');
+		expect(showComposer('done-band')).toBe(false);
+		expect(showDoneBand('done-band')).toBe(true);
 	});
 
-	test('after Commit with submissions, composer stays closed until Add', () => {
-		expect(
-			manyShowComposer({
-				composerOpen: false,
-				holdClosed: true,
-				submissionCount: 1,
-				confirmRecap: true
-			})
-		).toBe(false);
-		expect(
-			manyShowComposer({
-				composerOpen: true,
-				holdClosed: false,
-				submissionCount: 1,
-				confirmRecap: true
-			})
-		).toBe(true);
+	test('commitSuccess closes composer before confirmRecap/submissions catch-up', () => {
+		// Register remountForms race: progressive chrome refetch must not reopen
+		// the form — mode is done-band, not inferred from manyEmpty.
+		const afterCommit = reduceManyLand('composing', { type: 'commitSuccess' });
+		expect(afterCommit).toBe('done-band');
+		expect(showComposer(afterCommit)).toBe(false);
+		expect(showDoneBand(afterCommit)).toBe(true);
+
+		const fromEmpty = reduceManyLand('empty-compose', { type: 'commitSuccess' });
+		expect(fromEmpty).toBe('done-band');
+		expect(showComposer(fromEmpty)).toBe(false);
 	});
 
-	test('second stay: holdClosed wins over composerOpen (Add then Commit)', () => {
+	test('openComposer → composing: form open, Done-band stays', () => {
+		const surface = reduceManyLand('done-band', { type: 'openComposer' });
+		expect(surface).toBe('composing');
+		expect(showComposer(surface)).toBe(true);
+		expect(showDoneBand(surface)).toBe(true);
+	});
+
+	test('second stay: Commit from composing → done-band (Add then Commit)', () => {
+		let surface: ManyLandSurface = 'done-band';
+		surface = reduceManyLand(surface, { type: 'openComposer' });
+		surface = reduceManyLand(surface, { type: 'commitSuccess' });
+		expect(surface).toBe('done-band');
+		expect(showComposer(surface)).toBe(false);
+	});
+
+	test('discard → empty-compose when N=0, else done-band', () => {
 		expect(
-			manyShowComposer({
-				composerOpen: true,
-				holdClosed: true,
-				submissionCount: 2,
-				confirmRecap: true
-			})
-		).toBe(false);
+			reduceManyLand('composing', { type: 'discard', submissionCount: 0 })
+		).toBe('empty-compose');
+		expect(
+			reduceManyLand('composing', { type: 'discard', submissionCount: 2 })
+		).toBe('done-band');
+	});
+
+	test('visibility is mode-only (no submissionCount / confirmRecap race)', () => {
+		expect(showComposer('empty-compose')).toBe(true);
+		expect(showComposer('composing')).toBe(true);
+		expect(showComposer('done-band')).toBe(false);
+		expect(showDoneBand('empty-compose')).toBe(false);
+		expect(showDoneBand('composing')).toBe(true);
+		expect(showDoneBand('done-band')).toBe(true);
 	});
 });
 
@@ -113,15 +116,24 @@ describe('org-board stay wires clearUnderFormLinks', () => {
 	});
 });
 
-describe('embedded-task-panel many stay close', () => {
-	test('latches holdClosed on Commit and clears hold only via openComposer', () => {
+describe('embedded-task-panel many land surface', () => {
+	test('dispatches reduceManyLand on Commit / Add / Discard; lands via initialManyLand', () => {
 		const panel = readFileSync(join(import.meta.dirname, 'embedded-task-panel.svelte'), 'utf8');
-		expect(panel).toContain('holdComposerClosed');
-		expect(panel).toContain('onFormCommitted');
-		expect(panel).toContain('manyShowComposer');
-		expect(panel).toMatch(/function openComposer\(\)[\s\S]*holdComposerClosed = false/);
+		expect(panel).toContain('manySurface');
+		expect(panel).toContain('initialManyLand');
+		expect(panel).toContain('reduceManyLand');
+		expect(panel).toContain('showComposer');
+		expect(panel).toContain('showDoneBand');
+		expect(panel).not.toContain('holdComposerClosed');
+		expect(panel).not.toContain('composerOpen');
 		expect(panel).toMatch(
-			/function onFormCommitted\([\s\S]*holdComposerClosed = true[\s\S]*composerOpen = false/
+			/function openComposer\(\)[\s\S]*reduceManyLand\(manySurface, \{ type: 'openComposer' \}\)/
+		);
+		expect(panel).toMatch(
+			/function onFormCommitted\([\s\S]*reduceManyLand\(manySurface, \{ type: 'commitSuccess' \}\)/
+		);
+		expect(panel).toMatch(
+			/function discardComposer\(\)[\s\S]*type: 'discard'/
 		);
 	});
 });

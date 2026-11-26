@@ -35,33 +35,43 @@ export function stayAftermath(submitMany: boolean): StayAftermath {
 	};
 }
 
-/** Inputs for submit-many composer open/closed (Option C). */
-export type ManyComposerVisibility = {
-	composerOpen: boolean;
-	/**
-	 * Latched true after a successful many stay Commit (or Discard). Blocks
-	 * manyEmpty auto-open until Add — closes the race where remountForms
-	 * (register progressive chrome) paints a fresh form before confirmRecap /
-	 * submissions land.
-	 */
-	holdClosed: boolean;
+/**
+ * Submit-many embed land surface (Option C).
+ * Mode owns composer / Done-band visibility — remountForms, draftGeneration,
+ * and confirmRecap catch-up must not infer open/closed.
+ */
+export type ManyLandSurface = 'empty-compose' | 'done-band' | 'composing';
+
+export type ManyLandEvent =
+	| { type: 'commitSuccess' }
+	| { type: 'discard'; submissionCount: number }
+	| { type: 'openComposer' };
+
+/** First paint for a many embed address — not re-run on submission/recap catch-up. */
+export function initialManyLand(input: {
 	submissionCount: number;
 	confirmRecap: boolean;
-};
-
-/**
- * Whether the submit-many embed shows the form pane.
- * Empty land (N=0, no stay cue, not held) auto-opens; after Commit with data /
- * hold, stays closed until Add sets composerOpen.
- */
-export function manyShowComposer(v: ManyComposerVisibility): boolean {
-	if (v.holdClosed) return false;
-	const manyEmpty = v.submissionCount === 0 && !v.confirmRecap;
-	return v.composerOpen || manyEmpty;
+}): ManyLandSurface {
+	if (input.submissionCount === 0 && !input.confirmRecap) return 'empty-compose';
+	return 'done-band';
 }
 
-/** Empty land for spacing / Done-band gate (held post-Commit counts as non-empty). */
-export function manyLandEmpty(v: Omit<ManyComposerVisibility, 'composerOpen'>): boolean {
-	if (v.holdClosed) return false;
-	return v.submissionCount === 0 && !v.confirmRecap;
+export function reduceManyLand(surface: ManyLandSurface, event: ManyLandEvent): ManyLandSurface {
+	switch (event.type) {
+		case 'commitSuccess':
+			return 'done-band';
+		case 'discard':
+			return event.submissionCount === 0 ? 'empty-compose' : 'done-band';
+		case 'openComposer':
+			return 'composing';
+	}
+}
+
+export function showComposer(surface: ManyLandSurface): boolean {
+	return surface !== 'done-band';
+}
+
+/** Done/recap band + Add chrome (hidden only on empty-compose auto-open). */
+export function showDoneBand(surface: ManyLandSurface): boolean {
+	return surface !== 'empty-compose';
 }
