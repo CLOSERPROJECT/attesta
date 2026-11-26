@@ -3,6 +3,8 @@
 	"nav_back": "Back",
 	"nav_scan": "Scan",
 	"nav_archive": "Archive",
+	"theme_to_light": "Switch to light theme",
+	"theme_to_dark": "Switch to dark theme",
 	"archive": "Archive",
 	"brand_attesta": "Attesta",
 	"loading": "Loading…",

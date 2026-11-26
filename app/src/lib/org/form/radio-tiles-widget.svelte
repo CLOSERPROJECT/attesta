@@ -97,7 +97,7 @@
 
 	.radio-tiles__tile--selected {
 		border: none;
-		background: color-mix(in srgb, var(--primary) 12%, #ffffff);
+		background: color-mix(in srgb, var(--primary) 12%, var(--card));
 		color: var(--foreground);
 		outline: 2px solid var(--primary);
 		outline-offset: 0;

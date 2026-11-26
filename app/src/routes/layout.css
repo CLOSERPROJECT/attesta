@@ -10,6 +10,7 @@
 
 /* Org FormPlan / sjsf light tokens */
 :root {
+	color-scheme: light;
 	--background: #fafcfb;
 	--foreground: #12210c;
 	--card: #fff;
@@ -31,6 +32,29 @@
 	--ring: #1e6f5c;
 	--radius: 4px;
 	--input-radius: 2px;
+}
+
+/* Attesta dark grays (mirror web/src/styles/tokens.css [data-theme=dark]). */
+.dark {
+	color-scheme: dark;
+	--background: #1f242e;
+	--foreground: #ebf5f4;
+	--card: #1d1f2b;
+	--card-foreground: #ebf5f4;
+	--popover: #1d1f2b;
+	--popover-foreground: #ebf5f4;
+	--primary: #1cc195;
+	--primary-foreground: #121420;
+	--secondary: #0d3235;
+	--secondary-foreground: #a8bfc0;
+	--muted: color-mix(in srgb, #fff 4%, #1d1f2b);
+	--muted-foreground: #c1cac8;
+	--accent: color-mix(in srgb, #fff 4%, #1d1f2b);
+	--accent-foreground: #ebf5f4;
+	--destructive: #ff6b5f;
+	--border: rgb(255 255 255 / 10%);
+	--input: color-mix(in srgb, #fff 8%, var(--card));
+	--ring: #1cc195;
 }
 
 @theme inline {

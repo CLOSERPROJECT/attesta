@@ -51,10 +51,10 @@
 
 {#if mode === 'progress'}
 	<div class={['flex min-w-0 items-center gap-1.5', className]}>
-		<p class={['min-w-0 truncate text-zinc-900', textClass]}>
+		<p class={['min-w-0 truncate text-foreground', textClass]}>
 			{@render jobTitleMark()}
-			<span class="text-zinc-400">·</span>
-			<span class="font-normal text-zinc-600">{label}</span>
+			<span class="text-muted-foreground">·</span>
+			<span class="font-normal text-secondary-foreground">{label}</span>
 		</p>
 		<span
 			class="inline-flex shrink-0 items-center gap-1"
@@ -65,7 +65,7 @@
 			data-total={total}
 		>
 			<svg
-				class={['-rotate-90 text-zinc-200', ring.svgClass]}
+				class={['-rotate-90 text-border', ring.svgClass]}
 				viewBox="0 0 {ring.box} {ring.box}"
 				aria-hidden="true"
 			>
@@ -78,7 +78,7 @@
 					stroke-width={ring.stroke}
 				/>
 				<circle
-					class="text-zinc-700"
+					class="text-foreground"
 					cx={center}
 					cy={center}
 					r={ring.r}
@@ -90,15 +90,15 @@
 					stroke-dashoffset={ringOffset}
 				/>
 			</svg>
-			<span class={['tabular-nums leading-none text-zinc-500', ring.countClass]}>
+			<span class={['tabular-nums leading-none text-muted-foreground', ring.countClass]}>
 				{done}/{total}
 			</span>
 		</span>
 	</div>
 {:else}
-	<p class={['min-w-0 text-zinc-900', textClass, className]}>
+	<p class={['min-w-0 text-foreground', textClass, className]}>
 		{@render jobTitleMark()}
-		<span class="text-zinc-400">·</span>
-		<span class="font-normal text-zinc-600">{label}</span>
+		<span class="text-muted-foreground">·</span>
+		<span class="font-normal text-secondary-foreground">{label}</span>
 	</p>
 {/if}

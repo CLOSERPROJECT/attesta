@@ -461,7 +461,7 @@
 	{/if}
 
 	{#if loading && !view}
-		<p class="text-sm text-zinc-500" data-testid="org-timeline-status">
+		<p class="text-sm text-muted-foreground" data-testid="org-timeline-status">
 			{m.loading()}
 		</p>
 	{:else if error && !view}

@@ -59,8 +59,8 @@
 	<a
 		href={href!}
 		class={[
-			'block rounded-lg border-y border-r border-zinc-200 bg-white px-4 py-3 hover:bg-zinc-50',
-			accent ? 'border-l-2' : 'border-l border-zinc-200',
+			'block rounded-lg border-y border-r border-border bg-card px-4 py-3 hover:bg-muted',
+			accent ? 'border-l-2' : 'border-l border-border',
 			className
 		]}
 		style:border-left-color={accent || undefined}
@@ -72,8 +72,8 @@
 {:else}
 	<div
 		class={[
-			'rounded-lg border-y border-r border-zinc-200 px-4 py-3',
-			accent ? 'border-l-2' : 'border-l border-zinc-200',
+			'rounded-lg border-y border-r border-border px-4 py-3',
+			accent ? 'border-l-2' : 'border-l border-border',
 			className
 		]}
 		style:border-left-color={accent || undefined}

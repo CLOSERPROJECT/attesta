@@ -266,7 +266,7 @@
 			</div>
 		</fieldset>
 	{:else}
-		<p class="text-sm text-zinc-500" data-testid="live-form-missing">{m.form_unavailable()}</p>
+		<p class="text-sm text-muted-foreground" data-testid="live-form-missing">{m.form_unavailable()}</p>
 	{/if}
 
 	{#if submitError}

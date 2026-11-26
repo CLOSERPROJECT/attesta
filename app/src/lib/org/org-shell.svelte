@@ -91,20 +91,20 @@
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="org-shell">
 	<header class="space-y-1" data-testid="instance-chrome">
-		<p class="text-xs text-zinc-500" data-testid="instance-chrome-stream">{titleText}</p>
-		<p class="text-lg font-semibold text-zinc-900" data-testid="instance-chrome-label">
+		<p class="text-xs text-muted-foreground" data-testid="instance-chrome-stream">{titleText}</p>
+		<p class="text-lg font-semibold text-foreground" data-testid="instance-chrome-label">
 			{instanceLabel}
 		</p>
 	</header>
 
 	{#if !orgSession.result && orgSession.loading}
-		<p class="text-sm text-zinc-500" data-testid="org-load-status">{m.loading()}</p>
+		<p class="text-sm text-muted-foreground" data-testid="org-load-status">{m.loading()}</p>
 	{:else if !orgSession.result && orgSession.error}
 		<p class="text-sm text-red-700" data-testid="org-load-error" role="alert">
 			{orgSession.error}
 		</p>
 	{:else if !orgSession.result}
-		<p class="text-sm text-zinc-500" data-testid="org-load-status">
+		<p class="text-sm text-muted-foreground" data-testid="org-load-status">
 			{m.not_loaded_yet()}
 		</p>
 	{/if}
@@ -114,7 +114,7 @@
 		</p>
 	{/if}
 	{#if orgSession.committing}
-		<p class="text-sm text-zinc-500" data-testid="org-commit-status">{m.committing()}</p>
+		<p class="text-sm text-muted-foreground" data-testid="org-commit-status">{m.committing()}</p>
 	{/if}
 
 	{#if orgSession.result}
@@ -135,7 +135,7 @@
 									accentColor={row.jobColor}
 									href={hrefOrgTarget(availableRowTarget(row, scope))}
 								>
-									<p class="min-w-0 text-sm font-bold text-zinc-900">{row.title}</p>
+									<p class="min-w-0 text-sm font-bold text-foreground">{row.title}</p>
 									<WorklistJobLine
 										class="mt-1"
 										mode="progress"
@@ -183,7 +183,7 @@
 					</li>
 				{:else}
 					<li>
-						<WorklistRow data-testid="act-now-empty" class="text-sm text-zinc-500">
+						<WorklistRow data-testid="act-now-empty" class="text-sm text-muted-foreground">
 							{m.no_available_tasks()}
 						</WorklistRow>
 					</li>

@@ -88,8 +88,8 @@
 }
 
 /*
- * Board elevation: elev-0 = light Attesta green page; ladder is steps → rows → substeps.
- * Light: primary mixed into white. Dark: primary into slate lifts.
+ * Board elevation: elev-0 = page; ladder is steps → rows → substeps.
+ * Light: primary mixed into white. Dark: Attesta gray lifts from --background/--card.
  * Mobile: block pad only. ≥640px: stream container pads on all sides.
  */
 .org-timeline-page {
@@ -136,12 +136,12 @@
 	}
 }
 
-/* Dark: page + ladder lift toward --primary. */
+/* Dark: Attesta gray ladder (no slate / primary tint). */
 :is(.dark *) .org-timeline-page {
-	--org-elev-0: color-mix(in srgb, var(--primary) 8%, #0f172a);
-	--org-elev-1: color-mix(in srgb, var(--primary) 18%, #1e293b);
-	--org-elev-2: color-mix(in srgb, var(--primary) 12%, #334155);
-	--org-elev-3: color-mix(in srgb, var(--primary) 10%, #475569);
+	--org-elev-0: var(--background);
+	--org-elev-1: color-mix(in srgb, #fff 6%, var(--background));
+	--org-elev-2: color-mix(in srgb, #fff 10%, var(--background));
+	--org-elev-3: color-mix(in srgb, #fff 14%, var(--card));
 }
 
 .org-timeline-toolbar {

@@ -6,4 +6,4 @@
 	});
 </script>
 
-<p class="text-sm text-zinc-500" data-testid="org-root-redirect">Redirecting…</p>
+<p class="text-sm text-muted-foreground" data-testid="org-root-redirect">Redirecting…</p>

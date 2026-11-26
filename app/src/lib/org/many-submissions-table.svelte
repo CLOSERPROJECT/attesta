@@ -120,9 +120,9 @@
 			></div>
 		{/if}
 		<div class="many-recap-table-scroll min-w-0 overflow-x-auto">
-			<table class="w-max min-w-full border-collapse border-t border-zinc-200 text-sm">
+			<table class="w-max min-w-full border-collapse border-t border-border text-sm">
 				<thead>
-					<tr class="border-b border-zinc-200 text-left">
+					<tr class="border-b border-border text-left">
 						{#each table.columns as col, i (col.key)}
 							<th
 								class="{edgePad(i)} whitespace-nowrap py-2 align-top font-semibold text-muted-foreground"
@@ -158,7 +158,7 @@
 						{@const track = highlighted && phase !== 'off'}
 						{@const emphasize = highlighted && phase === 'on'}
 						<tr
-							class="border-b border-zinc-100 last:border-0"
+							class="border-b border-border last:border-0"
 							use:trackHighlightRow={track}
 							data-just-completed={emphasize ? '1' : undefined}
 							data-just-completed-fade={highlighted && phase === 'fade'

@@ -4,4 +4,4 @@
 	/** Legacy Task path — beforeLoad rewrites to board `?task=`; this is a brief fallback. */
 </script>
 
-<p class="text-sm text-zinc-500" data-testid="task-redirecting">{m.redirecting()}</p>
+<p class="text-sm text-muted-foreground" data-testid="task-redirecting">{m.redirecting()}</p>

@@ -24,22 +24,22 @@
 	<table class="w-full border-collapse text-sm">
 		<tbody>
 			{#each columns as column (column.key)}
-				<tr class="border-b border-zinc-100">
-					<th class="py-2 pr-3 text-left font-medium text-zinc-600">
+				<tr class="border-b border-border">
+					<th class="py-2 pr-3 text-left font-medium text-secondary-foreground">
 						{column.title}
 					</th>
-					<td class="py-2 text-zinc-900">
+					<td class="py-2 text-foreground">
 						{formatFactValue(row.cells[column.key])}
 					</td>
 				</tr>
 			{/each}
-			<tr class="border-b border-zinc-100">
-				<th class="py-2 pr-3 text-left font-medium text-zinc-600">Timestamp</th>
-				<td class="py-2 text-zinc-900">{timestamp}</td>
+			<tr class="border-b border-border">
+				<th class="py-2 pr-3 text-left font-medium text-secondary-foreground">Timestamp</th>
+				<td class="py-2 text-foreground">{timestamp}</td>
 			</tr>
-			<tr class="border-b border-zinc-100 last:border-0">
-				<th class="py-2 pr-3 text-left font-medium text-zinc-600">User</th>
-				<td class="py-2 text-zinc-900">{user}</td>
+			<tr class="border-b border-border last:border-0">
+				<th class="py-2 pr-3 text-left font-medium text-secondary-foreground">User</th>
+				<td class="py-2 text-foreground">{user}</td>
 			</tr>
 		</tbody>
 	</table>
