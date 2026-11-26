@@ -536,9 +536,9 @@
 	padding-inline: var(--org-embed-pad-x);
 }
 
-/* Submit-many: muted history band full-bleed within embed body padding.
- * Inline pad 2× --org-embed-pad-x matches form pane (body + form) so table/eyebrow align with fields. */
-.org-timeline-page .substep-embed .embed-many-recap-band {
+/* Submit-many: muted history band (embed pad + show-all locked details).
+   * Inline pad 2× --org-embed-pad-x matches form pane (body + form) so table/eyebrow align with fields. */
+.org-timeline-page .embed-many-recap-band {
 	display: grid;
 	gap: calc(var(--spacing) * 2);
 	/* Allow inner overflow-x to engage — grid min-width:auto otherwise expands with the table. */
@@ -548,11 +548,11 @@
 }
 
 /* th semibold vs td normal — literal weights so theme tokens cannot flatten the contrast. */
-.org-timeline-page .substep-embed .embed-many-recap-band th {
+.org-timeline-page .embed-many-recap-band th {
 	font-weight: 600;
 }
 
-.org-timeline-page .substep-embed .embed-many-recap-band td {
+.org-timeline-page .embed-many-recap-band td {
 	font-weight: 400;
 }
 
@@ -561,11 +561,11 @@
  * Done band’s left padding (barWidth + gap). Table stays flush with the form (edgePad).
  * Wash: hold → fade via opacity/color transition (JS sets data attrs; CSS owns the tween).
  */
-.org-timeline-page .substep-embed .embed-many-recap-band .many-recap-highlight-host {
+.org-timeline-page .embed-many-recap-band .many-recap-highlight-host {
 	position: relative;
 }
 
-.org-timeline-page .substep-embed .embed-many-recap-band .many-recap-just-completed-bar {
+.org-timeline-page .embed-many-recap-band .many-recap-just-completed-bar {
 	position: absolute;
 	left: calc(-1 * (var(--many-recap-bar-width) + var(--many-recap-bar-gap)));
 	width: var(--many-recap-bar-width);
@@ -576,31 +576,20 @@
 	transition: opacity var(--many-recap-wash-ms) ease;
 }
 
-.org-timeline-page
-	.substep-embed
-	.embed-many-recap-band
-	.many-recap-just-completed-bar--fade {
+.org-timeline-page .embed-many-recap-band .many-recap-just-completed-bar--fade {
 	opacity: 0;
 }
 
-.org-timeline-page .substep-embed .embed-many-recap-band .many-recap-cell {
+.org-timeline-page .embed-many-recap-band .many-recap-cell {
 	color: var(--muted-foreground);
 	transition: color var(--many-recap-wash-ms) ease;
 }
 
-.org-timeline-page
-	.substep-embed
-	.embed-many-recap-band
-	tr[data-just-completed]
-	> .many-recap-cell {
+.org-timeline-page .embed-many-recap-band tr[data-just-completed] > .many-recap-cell {
 	color: var(--foreground);
 }
 
-.org-timeline-page
-	.substep-embed
-	.embed-many-recap-band
-	tr[data-just-completed-fade]
-	> .many-recap-cell {
+.org-timeline-page .embed-many-recap-band tr[data-just-completed-fade] > .many-recap-cell {
 	color: var(--muted-foreground);
 }
 

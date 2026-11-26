@@ -124,6 +124,8 @@ describe('embedded-task-panel many land surface', () => {
 		expect(panel).toContain('reduceManyLand');
 		expect(panel).toContain('showComposer');
 		expect(panel).toContain('showDoneBand');
+		expect(panel).toContain('ManyRecapDoneBand');
+		expect(panel).toContain('orgActionable');
 		expect(panel).not.toContain('holdComposerClosed');
 		expect(panel).not.toContain('composerOpen');
 		expect(panel).toMatch(
@@ -135,5 +137,7 @@ describe('embedded-task-panel many land surface', () => {
 		expect(panel).toMatch(
 			/function discardComposer\(\)[\s\S]*type: 'discard'/
 		);
+		// Locked stay land: Done-band only (no Add / composer region).
+		expect(panel).toMatch(/\{#if orgActionable\}[\s\S]*embed-composer-region/);
 	});
 });

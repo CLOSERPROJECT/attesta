@@ -4,10 +4,11 @@
 	import { getBoardEmbed } from '../board/board-context.js';
 	import { getBoardTimelineModel } from '../board/board-timeline-model.svelte.js';
 	import { boardFormCache } from '../board/board-form-cache.svelte.js';
-	import BoardManyRecap from '../board/board-many-recap.svelte';
+	import { boardJustCompleted } from '../board/board-just-completed.svelte.js';
 	import BoardOnceRecap from '../board/board-once-recap.svelte';
 	import { getBoardNestCollapse } from '../board/board-nest-collapse.svelte.js';
 	import EmbeddedTaskPanel from '../board/embedded-task-panel.svelte';
+	import ManyRecapDoneBand from '../board/many-recap-done-band.svelte';
 	import { parseTaskHref } from '../board/board-url.js';
 	import DraftBozzaMark from '../draft-bozza-mark.svelte';
 	import { draftAddressForTask } from '../drafts.js';
@@ -17,6 +18,7 @@
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRoleBadges from './timeline-role-badges.svelte';
 	import { timelineRoleBadgesVisible } from './timeline-role-badge-label.js';
+	import { timelineSubstepUsesEmbed } from './timeline-substep-embed.js';
 	import { timelineSubstepTrailVisible } from './timeline-substep-trail.js';
 	import type { TimelineSubstep } from './types.js';
 
@@ -69,7 +71,6 @@
 			showDraft
 		})
 	);
-	const embed = $derived(!!(substep.orgActionable && address));
 	const focused = $derived.by(() => {
 		if (!address) return false;
 		return timelineModel.isSelected(address, seed);
@@ -80,6 +81,16 @@
 		return boardFormCache.get(taskAddressKey(address));
 	});
 	const confirmRecap = $derived(address ? board.confirmRecapFor(address) : false);
+	const justCompleted = $derived(address ? boardJustCompleted.has(address) : false);
+	const embed = $derived(
+		timelineSubstepUsesEmbed({
+			hasAddress: !!address,
+			orgActionable: !!substep.orgActionable,
+			focused,
+			confirmRecap,
+			justCompleted
+		})
+	);
 	const embedOpen = $derived(address ? timelineModel.isBodyOpen(address, seed) : false);
 
 	let detailsOpen = $state(false);
@@ -140,6 +151,7 @@
 					{submissions}
 					{focused}
 					{confirmRecap}
+					orgActionable={!!substep.orgActionable}
 					open={embedOpen}
 					bodyId={embedBodyId}
 					onOpenChange={(next) => timelineModel.setBodyOpen(address, next, seed)}
@@ -180,7 +192,11 @@
 							{/if}
 							{#if submissions.length > 0 && address}
 								{#if substep.submitMany}
-									<BoardManyRecap {address} data-testid="timeline-many-recap" />
+									<ManyRecapDoneBand
+										{address}
+										bandTestId="timeline-many-recap-band"
+										recapTestId="timeline-many-recap"
+									/>
 								{:else}
 									<BoardOnceRecap {address} data-testid="timeline-once-recap" />
 								{/if}

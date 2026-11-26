@@ -1,5 +1,4 @@
 <script lang="ts">
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -13,8 +12,8 @@
 	import type { TimelineSubmission } from '../timeline/types.js';
 	import { boardFormCache, type BoardFormEntry } from './board-form-cache.svelte.js';
 	import { boardRecapCache } from './board-recap-cache.svelte.js';
-	import BoardManyRecap from './board-many-recap.svelte';
 	import BoardOnceRecap from './board-once-recap.svelte';
+	import ManyRecapDoneBand from './many-recap-done-band.svelte';
 	import {
 		initialManyLand,
 		reduceManyLand,
@@ -34,6 +33,8 @@
 		/** Stay Commit: land on once-recap / close many composer (no under-form Continue). */
 		confirmRecap?: boolean;
 		open?: boolean;
+		/** When false, stay land shows Done-band / once-recap only (no Add / live form). */
+		orgActionable?: boolean;
 		/** `?seed.*` from timeline href — locks those fields for this embed open. */
 		seed?: Record<string, string>;
 		/** Optional id for the embed body region (aria-controls). */
@@ -53,6 +54,7 @@
 		disabled = false,
 		confirmRecap = false,
 		open = true,
+		orgActionable = true,
 		seed = {},
 		bodyId,
 		onOpenChange,
@@ -60,9 +62,6 @@
 		onFocus,
 		onAcceptStale
 	}: Props = $props();
-
-	const uid = $props.id();
-	const manyRecapEyebrowId = `${uid}-many-recap-eyebrow`;
 
 	const status = $derived(entry?.status ?? 'idle');
 	const bundle = $derived(entry?.bundle ?? null);
@@ -207,53 +206,43 @@
 		>
 			{#if submitMany}
 				{#if doneBandVisible && !address.provisionalJob && address.jobInstanceId}
-					<section
-						class="embed-many-recap-band bg-muted/60"
-						data-testid="embed-many-recap-band"
-						aria-labelledby={manyRecapEyebrowId}
-					>
-						<p
-							id={manyRecapEyebrowId}
-							class="m-0 flex items-center gap-1.5 text-sm font-bold text-muted-foreground"
-							data-testid="embed-many-recap-eyebrow"
-						>
-							<CheckIcon class="size-3.5 shrink-0" aria-hidden="true" />
-							{m.embed_many_already_registered()}
-						</p>
-						<BoardManyRecap {address} empty={false} data-testid="embed-many-recap" />
-					</section>
+					<ManyRecapDoneBand {address} />
 				{/if}
-				<div
-					class={doneBandVisible ? 'pt-5' : undefined}
-					data-testid="embed-composer-region"
-				>
-					{#if !composerVisible}
-						<div class="flex justify-center">
-							<Button
-								type="button"
-								variant="default"
-								size="default"
-								class="w-56 max-w-full shrink"
-								data-testid="embed-composer-open"
-								onclick={openComposer}
-							>
-								<PlusIcon data-icon="inline-start" aria-hidden="true" />
-								{m.embed_composer_add()}
-							</Button>
-						</div>
-					{:else}
-						<div class="outline-none pt-2 pb-2" data-testid="embed-form-pane">
-							<h3
-								class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
-								data-testid="embed-many-new-entry-title"
-							>
-								<PencilIcon class="size-3.5 shrink-0" aria-hidden="true" />
-								{m.embed_many_new_entry()}
-							</h3>
-							{@render formPane()}
-						</div>
-					{/if}
-				</div>
+				{#if orgActionable}
+					<div
+						class={doneBandVisible ? 'pt-5' : undefined}
+						data-testid="embed-composer-region"
+					>
+						{#if !composerVisible}
+							<div class="flex justify-center">
+								<Button
+									type="button"
+									variant="default"
+									size="default"
+									class="w-56 max-w-full shrink"
+									data-testid="embed-composer-open"
+									onclick={openComposer}
+								>
+									<PlusIcon data-icon="inline-start" aria-hidden="true" />
+									{m.embed_composer_add()}
+								</Button>
+							</div>
+						{:else}
+							<div class="outline-none pt-2 pb-2" data-testid="embed-form-pane">
+								<h3
+									class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
+									data-testid="embed-many-new-entry-title"
+								>
+									<PencilIcon class="size-3.5 shrink-0" aria-hidden="true" />
+									{m.embed_many_new_entry()}
+								</h3>
+								{@render formPane()}
+							</div>
+						{/if}
+					</div>
+				{/if}
+			{:else if !orgActionable}
+				<BoardOnceRecap {address} data-testid="embed-once-recap" />
 			{:else}
 				<div class="outline-none" data-testid="embed-form-pane">
 					{@render formPane()}
