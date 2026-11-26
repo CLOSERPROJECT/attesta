@@ -8,17 +8,30 @@ describe('timelineSubstepTrailVisible', () => {
 			timelineSubstepTrailVisible({
 				showStatusChip: false,
 				roleBadgeCount: 0,
-				showDraft: true
+				showDraft: true,
+				showDoneByMe: false
 			})
 		).toBe(true);
 	});
 
-	test('empty when no chip, roles, or draft', () => {
+	test('doneByMe alone shows trail', () => {
 		expect(
 			timelineSubstepTrailVisible({
 				showStatusChip: false,
 				roleBadgeCount: 0,
-				showDraft: false
+				showDraft: false,
+				showDoneByMe: true
+			})
+		).toBe(true);
+	});
+
+	test('empty when no chip, roles, draft, or doneByMe', () => {
+		expect(
+			timelineSubstepTrailVisible({
+				showStatusChip: false,
+				roleBadgeCount: 0,
+				showDraft: false,
+				showDoneByMe: false
 			})
 		).toBe(false);
 	});
@@ -28,14 +41,16 @@ describe('timelineSubstepTrailVisible', () => {
 			timelineSubstepTrailVisible({
 				showStatusChip: true,
 				roleBadgeCount: 0,
-				showDraft: false
+				showDraft: false,
+				showDoneByMe: false
 			})
 		).toBe(true);
 		expect(
 			timelineSubstepTrailVisible({
 				showStatusChip: false,
 				roleBadgeCount: 1,
-				showDraft: false
+				showDraft: false,
+				showDoneByMe: false
 			})
 		).toBe(true);
 	});

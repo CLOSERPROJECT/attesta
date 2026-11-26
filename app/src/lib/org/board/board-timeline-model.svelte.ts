@@ -184,6 +184,8 @@ export function timelineSubstepShown(
 ): boolean {
 	if (opts.showAll) return true;
 	if (sub.orgActionable) return true;
+	// Done-by-me stays in the actionable-only board (badge is server-stamped).
+	if (sub.doneByMe) return true;
 	if (!sub.href || opts.stream == null) return false;
 	// Instance-aware only — substepId is jobId.taskId and collides across lot rows.
 	const parsed = parseTaskHref(sub.href, opts.stream, opts.instance ?? '');

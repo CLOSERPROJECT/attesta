@@ -12,6 +12,7 @@
 	import { draftAddressForTask } from '../drafts.js';
 	import { orgSession } from '../org-app.svelte.js';
 	import { taskAddressKey } from '../task-address.js';
+	import DoneByMeMark from './done-by-me-mark.svelte';
 	import { nestStatusChipVisible, streamStatusLabel } from './stream-status-label.js';
 	import TimelineHeaderLine from './timeline-header-line.svelte';
 	import TimelineRoleBadges from './timeline-role-badges.svelte';
@@ -65,11 +66,13 @@
 		});
 		return orgSession.hasDirtyDraft(d.taskPath, d.draftBagInstanceKey);
 	});
+	const showDoneByMe = $derived(!!substep.doneByMe);
 	const showTrail = $derived(
 		timelineSubstepTrailVisible({
 			showStatusChip,
 			roleBadgeCount: roleBadges.length,
-			showDraft
+			showDraft,
+			showDoneByMe
 		})
 	);
 	const focused = $derived.by(() => {
@@ -112,6 +115,9 @@
 {#snippet trail()}
 	{#if roleBadges.length > 0}
 		<TimelineRoleBadges badges={roleBadges} />
+	{/if}
+	{#if showDoneByMe}
+		<DoneByMeMark />
 	{/if}
 	{#if showDraft}
 		<DraftBozzaMark />

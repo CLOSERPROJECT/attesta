@@ -72,6 +72,7 @@
 	"back_to_stream_dashboard": "Torna alla dashboard",
 	"show_all": "Mostra tutto",
 	"collapse_all": "Comprimi tutto",
+	"done_by_me": "Fatto da me",
 	"qr_resolve_failed": "Risoluzione QR non riuscita",
 	"org_domain_load_failed": "caricamento dominio org non riuscito ({status})",
 	"org_timeline_load_failed": "caricamento timeline org non riuscito ({status})",

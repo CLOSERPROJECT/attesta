@@ -3,6 +3,7 @@ export function timelineSubstepTrailVisible(parts: {
 	showStatusChip: boolean;
 	roleBadgeCount: number;
 	showDraft: boolean;
+	showDoneByMe: boolean;
 }): boolean {
-	return parts.showStatusChip || parts.roleBadgeCount > 0 || parts.showDraft;
+	return parts.showStatusChip || parts.roleBadgeCount > 0 || parts.showDraft || parts.showDoneByMe;
 }

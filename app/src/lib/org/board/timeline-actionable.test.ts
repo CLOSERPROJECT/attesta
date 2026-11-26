@@ -221,4 +221,16 @@ describe('timelineSubstepShown', () => {
 			)
 		).toBe(false);
 	});
+
+	test('doneByMe stays visible when Show all is off', () => {
+		const doneByMe: TimelineSubstep = {
+			...lockedOtherLot,
+			status: 'done',
+			doneByMe: true
+		};
+		expect(timelineSubstepShown(doneByMe, { showAll: false })).toBe(true);
+		expect(
+			timelineSubstepShown({ ...doneByMe, doneByMe: false }, { showAll: false })
+		).toBe(false);
+	});
 });

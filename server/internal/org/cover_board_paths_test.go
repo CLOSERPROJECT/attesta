@@ -443,7 +443,7 @@ func TestBuildOrgTimelineMissingJobFallsBack(t *testing.T) {
 	hrefs := TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, "T1"))
 	steps := BuildOrgTimelineSteps(cfg, EmptyDomain(), StreamTimeline{Steps: []StreamTimelineStep{
 		{JobID: "missing", Title: "", Tasks: []StreamTimelineTask{{ID: "t", Title: "", State: StreamSubstepAvailable}}},
-	}}, hrefs)
+	}}, hrefs, "")
 	if len(steps) != 1 || steps[0].Title != "missing" {
 		t.Fatalf("empty step title falls back to job id: %#v", steps)
 	}
@@ -459,7 +459,7 @@ func TestBuildOrgTimelineMissingJobFallsBack(t *testing.T) {
 		{JobID: "each", Title: "Each", Rows: []StreamTimelineRow{
 			{ID: "L1", Label: "L1", Tasks: []StreamTimelineTask{{ID: "start", Title: "Start", State: StreamSubstepLocked}}},
 		}},
-	}}, hrefs)
+	}}, hrefs, "")
 	if len(steps) != 1 || len(steps[0].Rows) != 1 || steps[0].Rows[0].Status != string(StreamSubstepLocked) {
 		t.Fatalf("each-row status = %#v", steps)
 	}
@@ -1007,7 +1007,7 @@ func TestCoverageGateRemainingPaths(t *testing.T) {
 	rows := buildOrgTimelineRows(OrgConfig{}, Job{Title: "Lot"}, StreamTimelineStep{
 		JobID: "lot_processing",
 		Rows:  []StreamTimelineRow{{ID: "L1", Label: "  ", Finished: true}},
-	}, domain, TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, truck)))
+	}, domain, TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, truck)), "")
 	if len(rows) != 1 || rows[0].Label != "L1" {
 		t.Fatalf("empty label = %#v", rows)
 	}

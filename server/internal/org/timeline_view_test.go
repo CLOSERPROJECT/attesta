@@ -69,7 +69,7 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	}}
 
 	hrefs := TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, "T1"))
-	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs)
+	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs, "")
 	if len(steps) != 2 {
 		t.Fatalf("steps = %#v", steps)
 	}
@@ -81,6 +81,16 @@ func TestBuildOrgTimelineStepsEachGroupAndSeed(t *testing.T) {
 	}
 	if steps[0].Substeps[0].OrgActionable || !steps[0].Substeps[1].OrgActionable {
 		t.Fatalf("org actionable flags = done=%v available=%v", steps[0].Substeps[0].OrgActionable, steps[0].Substeps[1].OrgActionable)
+	}
+	stepsMine := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs, "ops@test")
+	if !stepsMine[0].Substeps[0].DoneByMe {
+		t.Fatalf("arrive done by ops@test → DoneByMe, got %#v", stepsMine[0].Substeps[0])
+	}
+	if stepsMine[0].Substeps[1].DoneByMe {
+		t.Fatalf("check still available → not DoneByMe, got %#v", stepsMine[0].Substeps[1])
+	}
+	if stepsMine[1].Rows[0].Substeps[0].DoneByMe {
+		t.Fatalf("startLot by line@test → not DoneByMe for ops, got %#v", stepsMine[1].Rows[0].Substeps[0])
 	}
 	if steps[0].Substeps[0].SubmitMany || !steps[0].Substeps[1].SubmitMany {
 		t.Fatalf("submitMany flags = arrive=%v check=%v", steps[0].Substeps[0].SubmitMany, steps[0].Substeps[1].SubmitMany)
@@ -240,7 +250,7 @@ func TestBuildOrgTimelineStepsStatusRollup(t *testing.T) {
 	}}
 
 	hrefs := TimelineHrefPolicyFromFocus("pv-recovery", mustTimelineInstance(t, "T1"))
-	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs)
+	steps := BuildOrgTimelineSteps(cfg, domain, timeline, hrefs, "")
 	if len(steps) != 6 {
 		t.Fatalf("steps = %#v", steps)
 	}
