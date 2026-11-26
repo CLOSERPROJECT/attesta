@@ -406,6 +406,104 @@ describe('BoardSession', () => {
 		expect(formFetch).toHaveBeenCalled();
 	});
 
+	test('domainChanged stay keeps ready many-recap rows painted until refetch lands', async () => {
+		const oldTable = {
+			mode: 'submission' as const,
+			columns: [{ key: 'n', title: 'N' }],
+			rows: [
+				{
+					key: 'register-1',
+					cells: { n: 1 },
+					submissionId: '2026-01-01T00:00:00Z',
+					timestamp: '2026-01-01T00:00:00Z',
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
+		};
+		const nextTable = {
+			...oldTable,
+			rows: [
+				...oldTable.rows,
+				{
+					key: 'register-2',
+					cells: { n: 2 },
+					submissionId: '2026-01-02T00:00:00Z',
+					timestamp: '2026-01-02T00:00:00Z',
+					userId: 'u1',
+					userName: 'U1'
+				}
+			]
+		};
+		let resolveRecap!: (table: typeof nextTable) => void;
+		const recapFetch = vi.fn(
+			() =>
+				new Promise<typeof nextTable>((resolve) => {
+					resolveRecap = resolve;
+				})
+		);
+		const timeline = fakeTimeline(async () => instanceView());
+		const formCache = createBoardFormCache({
+			taskForm: {
+				fetch: vi.fn(async () => ({
+					jobId: 'intake',
+					taskId: 'register',
+					jobInstanceId: '261102-1',
+					title: 'Register',
+					surface: 'live' as const,
+					schema: { type: 'object' },
+					uiSchema: {},
+					initialData: {},
+					chrome: [],
+					chromeFieldIds: [],
+					sealFieldIds: [],
+					bindings: { domain: {} }
+				}))
+			}
+		});
+		const recapCache = createBoardRecapCache({
+			taskRecap: { fetch: recapFetch }
+		});
+		const model = new BoardTimelineModel({ syncUrl: () => {} });
+		const session = createBoardSession({
+			scope: { kind: 'instance', stream: 'pv-recovery', instance: '261102-1' },
+			timeline,
+			model,
+			formCache,
+			recapCache,
+			navigateToInstance: vi.fn(async () => {})
+		});
+		await session.load();
+
+		const addr = normalizeTaskAddress({
+			stream: 'pv-recovery',
+			instance: '261102-1',
+			jobId: 'intake',
+			jobInstanceId: '261102-1',
+			taskId: 'register'
+		});
+		recapCache.putReady(addr, oldTable);
+
+		const changed = session.domainChanged({
+			origin: 'own',
+			revision: 2,
+			addr,
+			follow: 'stay',
+			submitMany: true
+		});
+		await vi.waitFor(() => expect(recapFetch).toHaveBeenCalled());
+		// Stay must not wipe the Done-band table while the soft refetch is in flight.
+		expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
+		expect(recapCache.get(taskAddressKey(addr))?.table).toBe(oldTable);
+
+		resolveRecap(nextTable);
+		await changed;
+		await vi.waitFor(() => {
+			expect(recapCache.get(taskAddressKey(addr))?.table.rows).toHaveLength(2);
+		});
+		expect(recapCache.get(taskAddressKey(addr))?.status).toBe('ready');
+	});
+
 	test('domainChanged stay without submitMany leaves form bundles ready', async () => {
 		const timeline = fakeTimeline(async () => instanceView());
 		const { session, formCache } = harness(
