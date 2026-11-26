@@ -588,8 +588,6 @@ steps:
                         title: Bancale
                       - field: progress
                         title: Avanzamento
-                      - field: weight
-                        title: Peso
               dynamicProperties:
                 progress:
                     read: rows
