@@ -229,13 +229,15 @@
 							</div>
 						{:else}
 							<div class="outline-none pt-2 pb-2" data-testid="embed-form-pane">
-								<h3
-									class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
-									data-testid="embed-many-new-entry-title"
-								>
-									<PencilIcon class="size-3.5 shrink-0" aria-hidden="true" />
-									{m.embed_many_new_entry()}
-								</h3>
+								{#if manySurface === 'composing'}
+									<h3
+										class="m-0 mb-8 flex items-center gap-1.5 border-b border-border pb-2 text-sm font-bold text-foreground"
+										data-testid="embed-many-new-entry-title"
+									>
+										<PencilIcon class="size-3.5 shrink-0" aria-hidden="true" />
+										{m.embed_many_new_entry()}
+									</h3>
+								{/if}
 								{@render formPane()}
 							</div>
 						{/if}
